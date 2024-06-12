@@ -1,0 +1,31 @@
+general:
+  name: wakiza
+
+system:
+  chipset: q35
+  version: 8.1
+  bios:   { model: ovmf, uuid: 04d064c3-66a1-4aa7-9589-f8b3ecf91cd7, disk: /dev/vm1/vm-108-efidisk }
+  cpu:    { model: qemu64, sockets: 1, cores: 8, flags: +aes,enforce,hv_ipi,hv_relaxed,hv_reset,hv_runtime,hv_spinlocks=0x1fff,hv_stimer,hv_synic,hv_time,hv_vapic,hv_vendor_id=ezkvm,hv_vpindex,kvm=off,+kvm_pv_eoi,+kvm_pv_unhalt,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3 }
+  memory: { max: 16384, balloon: false }
+
+spice:
+  port: 5903
+  addr: 0.0.0.0
+
+looking_glass_host:
+  path: /dev/shm/lg03
+  size: 128M
+
+host:
+  pci:
+    - { vm_id: "0.0", host_id: "0000:03:00.0", multi_function: true }
+    - { vm_id: "0.1", host_id: "0000:03:00.1" }
+  usb:
+    - { vm_port: "1", host_bus: "1", host_port: "2.2" }
+
+storage:
+  - { driver: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: "0" }
+  - { driver: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
+
+network:
+  - { controller: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
