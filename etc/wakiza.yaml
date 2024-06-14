@@ -1,0 +1,21 @@
+name:    "wakiza"
+system:  { type: "q35" }
+bios:    { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
+cpu:     { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,enforce,hv_ipi,hv_relaxed,hv_reset,hv_runtime,hv_spinlocks=0x1fff,hv_stimer,hv_synic,hv_time,hv_vapic,hv_vendor_id=ezkvm,hv_vpindex,kvm=off,+kvm_pv_eoi,+kvm_pv_unhalt,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3" }
+memory:  { max: 16384, balloon: true }
+
+spice:   { port: 5903, addr: "0.0.0.0" }
+lg_host: { path: "/dev/shm/lg03", size: "128M" }
+
+storage:
+  - { type: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
+  - { type: "ide-cd",  file: "endeavoros.iso", boot_index: "0" }
+
+network:
+  - { type: "pool",   pool:   "x550t2", mac: "BC:24:11:FF:76:89" }
+  - { type: "bridge", bridge: "vmbr0",  mac: "BC:24:11:FF:76:89", driver: "virtio-net-pci" }
+
+host:
+  - { type: "pci", vm_id: "0.0", host_id: "0000:03:00.0", multi_function: true }
+  - { type: "pci", vm_id: "0.1", host_id: "0000:03:00.1" }
+  - { type: "usb", vm_port: "1", host_bus: "1", host_port: "2.2" }

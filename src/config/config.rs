@@ -6,8 +6,11 @@ use crate::config::bios::Bios;
 use crate::config::cpu::Cpu;
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
+use crate::config::host::HostDevice;
+use crate::config::lg_host::LgHost;
 use crate::config::memory::Memory;
 use crate::config::network::NetworkDevice;
+use crate::config::spice::Spice;
 use crate::config::storage::StorageDevice;
 use crate::config::system::System;
 
@@ -18,6 +21,7 @@ pub trait QemuDevice: Debug {
 #[derive(Deserialize,Debug)]
 pub struct Config {
     name: String,
+
     #[serde(default, deserialize_with = "default_when_missing")]
     system: Box<dyn System>,
     #[serde(default, deserialize_with = "default_when_missing")]
@@ -26,10 +30,21 @@ pub struct Config {
     cpu: Cpu,
     #[serde(default, deserialize_with = "default_when_missing")]
     memory: Memory,
+
+    spice: Option<Spice>,
+    lg_host: Option<LgHost>,
+
+    #[serde(default, deserialize_with = "default_when_missing")]
     display: Vec<Box<dyn Display>>,
+    #[serde(default, deserialize_with = "default_when_missing")]
     gpu: Vec<Box<dyn Gpu>>,
+
+    #[serde(default, deserialize_with = "default_when_missing")]
     network: Vec<Box<dyn NetworkDevice>>,
-    storage: Vec<Box<dyn StorageDevice>>
+    #[serde(default, deserialize_with = "default_when_missing")]
+    storage: Vec<Box<dyn StorageDevice>>,
+    #[serde(default, deserialize_with = "default_when_missing")]
+    host: Vec<Box<dyn HostDevice>>
 }
 
 impl QemuDevice for Config {
@@ -50,6 +65,19 @@ impl QemuDevice for Config {
         result.extend(self.cpu.get_args(0));
         result.extend(self.memory.get_args(0));
 
+        match &self.spice {
+            Some(spice) => {
+                result.extend(spice.get_args(0));
+            }
+            _ => {}
+        }
+        match &self.lg_host {
+            Some(lg_host) => {
+                result.extend(lg_host.get_args(0));
+            }
+            _ => {}
+        }
+
         for (i,display) in self.display.iter().enumerate() {
             result.extend(display.get_args(i));
         }
@@ -64,6 +92,10 @@ impl QemuDevice for Config {
 
         for (i,disk) in self.storage.iter().enumerate() {
             result.extend(disk.get_args(i));
+        }
+
+        for (i,host) in self.host.iter().enumerate() {
+            result.extend(host.get_args(i));
         }
 
         let mut args = "qemu-system-x86_64".to_string();

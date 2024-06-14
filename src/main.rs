@@ -1,38 +1,66 @@
 pub mod config;
+mod args;
 
+use std::env;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
-use log::{Level, LevelFilter};
+use log::{debug, Level, LevelFilter};
 use serde::{Deserialize, Deserializer, Serialize};
 use crate::config::config::{Config, QemuDevice};
 use chrono::Local;
 use crate::colored::Colorize;
 use env_logger::Builder;
 use std::io::Write;
+use crate::args::{EzkvmArguments, EzkvmCommand};
 
 extern crate colored;
 
 fn main() {
+    let args = EzkvmArguments::new(env::args().collect());
+    init_logger(args.log_level);
+
+    debug!("main({:?})",args.command);
+    //let resource_manager = DataManager::instance();
+
+    match args.command {
+        EzkvmCommand::Start { name } => {
+            //let config = load_file(format!("/etc/ezkvm/{}.yaml",name));
+            let config = load_file(format!("etc/{}.yaml",name));
+            match serde_yaml::from_str::<Config>(config.as_str()) {
+                Ok(config) => {
+                    // start the vm
+                    let _ = config.get_args(0);
+                }
+                Err(e) => {
+                    println!("Unable to parse the config file");
+                    debug!("Error: {}", e);
+                }
+            }
+        }
+        EzkvmCommand::Stop { name } => {
+            todo!()
+        }
+        EzkvmCommand::Hibernate { name } => {
+            todo!()
+        }
+        _ => {
+            args.print_usage();
+        }
+    }
+
+/*
     init_logger(LevelFilter::Trace);
 
     let content = load_file("etc/gyndine.yaml");
     let config: Config = serde_yaml::from_str(content.as_str()).unwrap();
-/*
-    let config = Config {
-        network: vec![
-            Network::Pool   { pool: "x550t2".to_string(), mac: "BC:24:11:FF:76:89".to_string() },
-            Network::Bridge { bridge: "vmbr0".to_string(), mac: "BC:24:11:FF:76:89".to_string(), driver: "virtio-net-pci".to_string() }
-        ]
-    };
-    let config = serde_yaml::to_string(&config);
- */
 
     println!("{:?}",config);
     let _ = config.get_args(0);
+*/
 }
 
-fn load_file(file: &str) -> String {
+fn load_file(file: String) -> String {
     let mut file = File::open(file).expect("Unable to open file");
     let mut content = String::new();
 
