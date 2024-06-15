@@ -12,6 +12,7 @@ use chrono::Local;
 use crate::colored::Colorize;
 use env_logger::Builder;
 use std::io::Write;
+use std::process::Command;
 use crate::args::{EzkvmArguments, EzkvmCommand};
 
 extern crate colored;
@@ -30,7 +31,16 @@ fn main() {
             match serde_yaml::from_str::<Config>(config.as_str()) {
                 Ok(config) => {
                     // start the vm
-                    let _ = config.get_args(0);
+                    let args = config.get_args(0);
+
+                    let mut qemu_cmd = Command::new("/usr/bin/env");
+                    qemu_cmd.args(args);
+                    if let Ok(child) = qemu_cmd.spawn() {
+                        debug!("start_vm(): Started qemu with pid {}",child.id());
+                    } else {
+                        debug!("start_vm(): Failed to start qemu");
+                        //Err(EzkvmError::ExecError { file: name })
+                    }
                 }
                 Err(e) => {
                     println!("Unable to parse the config file");

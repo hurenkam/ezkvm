@@ -12,8 +12,6 @@ gpu:
 
 storage:
 - { type: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
-- { type: "ide-cd",  file: "endeavoros.iso", boot_index: "0" }
 
 network:
-- { type: "pool",   pool:   "x550t2", mac: "BC:24:11:FF:76:89" }
 - { type: "bridge", bridge: "vmbr0",  mac: "BC:24:11:FF:76:89", driver: "virtio-net-pci" }
