@@ -56,8 +56,6 @@ impl QemuDevice for Config {
             format!("-monitor unix:/var/ezkvm/{}.monitor,server,nowait",self.name),
             format!("-chardev socket,id=qmp,path=/var/ezkvm/{}.qmp,server=on,wait=off",self.name),
             "-mon chardev=qmp,mode=control".to_string(),
-            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5".to_string(),
-            "-mon chardev=qmp-event,mode=control".to_string(),
         ];
 
         result.extend(self.system.get_args(0));

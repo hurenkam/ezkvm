@@ -303,6 +303,7 @@ dependencies = [
  "env_logger",
  "getopts",
  "log",
+ "once_cell",
  "serde",
  "serde_yaml",
  "typetag",

@@ -6,6 +6,7 @@ use log::{LevelFilter};
 #[derive(Debug)]
 pub enum EzkvmCommand {
     Help,
+    Check { name: String },
     Start { name: String },
     Stop { name: String },
     Hibernate { name: String }
@@ -28,6 +29,12 @@ impl EzkvmArguments {
             "",
             "help",
             "print usage message",
+            "",
+        );
+        opts.optopt(
+            "",
+            "check",
+            "perform sanity check",
             "",
         );
         opts.optopt(
@@ -81,6 +88,13 @@ impl EzkvmArguments {
             match matches.opt_str("help") {
                 None => {},
                 Some(name) => { command = EzkvmCommand::Help }
+            }
+        }
+
+        if matches.opt_present("check") {
+            match matches.opt_str("check") {
+                None => {},
+                Some(name) => { command = EzkvmCommand::Check { name } }
             }
         }
 

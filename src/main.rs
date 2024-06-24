@@ -1,12 +1,13 @@
 pub mod config;
 mod args;
+mod lock;
+mod resource;
+mod types;
 
 use std::env;
-use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use log::{debug, Level, LevelFilter};
-use serde::{Deserialize, Deserializer, Serialize};
 use crate::config::config::{Config, QemuDevice};
 use chrono::Local;
 use crate::colored::Colorize;
@@ -14,6 +15,7 @@ use env_logger::Builder;
 use std::io::Write;
 use std::process::Command;
 use crate::args::{EzkvmArguments, EzkvmCommand};
+use crate::resource::resource_collection::ResourceCollection;
 
 extern crate colored;
 
@@ -22,31 +24,18 @@ fn main() {
     init_logger(args.log_level);
 
     debug!("main({:?})",args.command);
-    //let resource_manager = DataManager::instance();
+    let resource_collection = ResourceCollection::instance();
 
     match args.command {
         EzkvmCommand::Start { name } => {
-            //let config = load_file(format!("/etc/ezkvm/{}.yaml",name));
-            let config = load_file(format!("etc/{}.yaml",name));
-            match serde_yaml::from_str::<Config>(config.as_str()) {
-                Ok(config) => {
-                    // start the vm
-                    let args = config.get_args(0);
-
-                    let mut qemu_cmd = Command::new("/usr/bin/env");
-                    qemu_cmd.args(args);
-                    if let Ok(child) = qemu_cmd.spawn() {
-                        debug!("start_vm(): Started qemu with pid {}",child.id());
-                    } else {
-                        debug!("start_vm(): Failed to start qemu");
-                        //Err(EzkvmError::ExecError { file: name })
-                    }
-                }
-                Err(e) => {
-                    println!("Unable to parse the config file");
-                    debug!("Error: {}", e);
-                }
+            if let Ok(config) = read_config(format!("etc/{}.yaml",name)) {
+                start_vm(config);
+            } else {
+                println!("Unable to start the vm");
             }
+        }
+        EzkvmCommand::Check { name } => {
+            debug!("resource_collection: {:?}", resource_collection)
         }
         EzkvmCommand::Stop { name } => {
             todo!()
@@ -58,16 +47,6 @@ fn main() {
             args.print_usage();
         }
     }
-
-/*
-    init_logger(LevelFilter::Trace);
-
-    let content = load_file("etc/gyndine.yaml");
-    let config: Config = serde_yaml::from_str(content.as_str()).unwrap();
-
-    println!("{:?}",config);
-    let _ = config.get_args(0);
-*/
 }
 
 fn load_file(file: String) -> String {
@@ -78,6 +57,32 @@ fn load_file(file: String) -> String {
         .expect("Unable to read file");
 
     content
+}
+
+fn read_config(file: String) -> Result<Config,()> {
+    let config = load_file(file);
+    match serde_yaml::from_str::<Config>(config.as_str()) {
+        Ok(config) => {
+            Ok(config)
+        }
+        Err(e) => {
+            println!("Unable to parse the config file");
+            debug!("Error: {}", e);
+            Err(())
+        }
+    }
+}
+
+fn start_vm(config: Config) {
+    let args = config.get_args(0);
+
+    let mut qemu_cmd = Command::new("/usr/bin/env");
+    qemu_cmd.args(args);
+    if let Ok(child) = qemu_cmd.spawn() {
+        debug!("start_vm(): Started qemu with pid {}",child.id());
+    } else {
+        debug!("start_vm(): Failed to start qemu");
+    }
 }
 
 fn init_logger(log_level: LevelFilter) {
