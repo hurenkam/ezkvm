@@ -1,5 +1,5 @@
 id: p2200
 devices:
-  - { id: nvidia12, type: "host_gpu", tags: [ gpu, audio, nvidia, p2200 ], multifunction: true, pci: [ "0000:12:00.0", "0000:12:00.1" ] }
-  - { id: nvidia43, type: "host_gpu", tags: [ gpu, audio, nvidia, p2200 ], multifunction: true, pci: [ "0000:43:00.0", "0000:43:00.1" ] }
-  - { id: nvidia44, type: "host_gpu", tags: [ gpu, audio, nvidia, p2200 ], multifunction: true, pci: [ "0000:44:00.0", "0000:44:00.1" ] }
+  - { id: nvidia12, type: "host_gpu", tags: [ gpu, audio, nvidia, p2200 ], multifunction: true, pci_id: [ "0000:12:00.0", "0000:12:00.1" ] }
+  - { id: nvidia43, type: "host_gpu", tags: [ gpu, audio, nvidia, p2200 ], multifunction: true, pci_id: [ "0000:43:00.0", "0000:43:00.1" ] }
+  - { id: nvidia44, type: "host_gpu", tags: [ gpu, audio, nvidia, p2200 ], multifunction: true, pci_id: [ "0000:44:00.0", "0000:44:00.1" ] }
