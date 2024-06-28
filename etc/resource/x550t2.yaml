@@ -1,0 +1,18 @@
+id: x550t2
+devices:
+  - { id:  "lan0", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "0", pci: "0000:0e:10.0" }
+  - { id:  "lan1", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "1", pci: "0000:0e:10.2" }
+  - { id:  "lan2", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "2", pci: "0000:0e:10.4" }
+  - { id:  "lan3", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "3", pci: "0000:0e:10.6" }
+  - { id:  "lan4", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "4", pci: "0000:0e:11.0" }
+  - { id:  "lan5", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "5", pci: "0000:0e:11.2" }
+  - { id:  "lan6", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "6", pci: "0000:0e:11.4" }
+  - { id:  "lan7", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s0", vf: "7", pci: "0000:0e:11.6" }
+  - { id:  "lan8", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "0", pci: "0000:0e:10.1" }
+  - { id:  "lan9", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "1", pci: "0000:0e:10.3" }
+  - { id: "lan10", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "2", pci: "0000:0e:10.5" }
+  - { id: "lan11", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "3", pci: "0000:0e:10.7" }
+  - { id: "lan12", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "4", pci: "0000:0e:11.1" }
+  - { id: "lan13", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "5", pci: "0000:0e:11.3" }
+  - { id: "lan14", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "6", pci: "0000:0e:11.5" }
+  - { id: "lan15", type: "x550_vf", tags: [ lan, x550 ], parent: "enp14s1", vf: "7", pci: "0000:0e:11.7" }

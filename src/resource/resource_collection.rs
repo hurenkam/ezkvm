@@ -5,29 +5,12 @@ use log::{debug, trace};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use crate::resource::FromFile;
+use crate::resource::resource::Resource;
 use crate::resource::resource_pool::ResourcePool;
 use crate::types::EzkvmError;
 
-const CONFIG_DIRECTORY: &str = "etc";
-const RESOURCE_DIRECTORY: &str = "etc/resource";
+pub const RESOURCE_DIRECTORY: &str = "etc/resource";
 static RESOURCE_MANAGER: Lazy<Arc<ResourceCollection>> = Lazy::new(||Arc::new(ResourceCollection::new()));
-
-#[derive(Clone,Debug,Deserialize)]
-pub struct Resource {
-    id: String,
-    tags: Vec<String>,
-    pci: Vec<String>,
-    parent: Option<String>,
-    vf: Option<String>,
-    multifunction: Option<bool>,
-}
-
-impl Resource {
-    pub fn get_id(&self) -> String {
-        trace!("Resource.get_id()");
-        self.id.clone()
-    }
-}
 
 #[derive(Debug)]
 pub struct ResourceCollection {
@@ -61,7 +44,7 @@ impl ResourceCollection {
         }
     }
 
-    pub fn get_resource(&self, pool: String, id: String) -> Option<Resource> {
+    pub fn get_resource(&self, pool: String, id: String) -> Option<Box<dyn Resource>> {
         debug!("ResourceCollection.get_resource()");
         if let Some(pool) = self.resource_pools.get(&pool) {
             pool.get_resource(id)

@@ -3,13 +3,14 @@ use std::io::Read;
 use log::debug;
 use serde::Deserialize;
 use crate::resource::FromFile;
-use crate::resource::resource_collection::Resource;
+use crate::resource::resource::Resource;
+use crate::resource::resource_collection::RESOURCE_DIRECTORY;
 use crate::types::EzkvmError;
 
 #[derive(Debug,Deserialize)]
 pub struct ResourcePool {
     id: String,
-    devices: Vec<Resource>
+    devices: Vec<Box<dyn Resource>>
 }
 impl ResourcePool {
     pub fn get_resource_ids(&self) -> Vec<String> {
@@ -23,7 +24,7 @@ impl ResourcePool {
         result
     }
 
-    pub fn get_resource(&self, id: String) -> Option<Resource> {
+    pub fn get_resource(&self, id: String) -> Option<Box<dyn Resource>> {
         debug!("ResourcePool.get_resource_ids()");
 
         for resource in &self.devices {
@@ -41,7 +42,7 @@ impl FromFile for ResourcePool {
     fn from_file(file_name: &str) -> Result<Self, Self::Error> {
         debug!("ResourcePool::from_file({})",file_name);
 
-        let mut file = File::open(format!("/etc/ezkvm/resources/{}.yaml", file_name)).expect("Unable to open file");
+        let mut file = File::open(format!("{}/{}.yaml", RESOURCE_DIRECTORY, file_name)).expect("Unable to open file");
         let mut contents = String::new();
 
         file.read_to_string(&mut contents)

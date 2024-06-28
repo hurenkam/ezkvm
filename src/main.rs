@@ -15,6 +15,7 @@ use env_logger::Builder;
 use std::io::Write;
 use std::process::Command;
 use crate::args::{EzkvmArguments, EzkvmCommand};
+use crate::lock::lock_manager::LockManager;
 use crate::resource::resource_collection::ResourceCollection;
 
 extern crate colored;
@@ -25,6 +26,7 @@ fn main() {
 
     debug!("main({:?})",args.command);
     let resource_collection = ResourceCollection::instance();
+    let lock_manager = LockManager::instance();
 
     match args.command {
         EzkvmCommand::Start { name } => {
@@ -35,7 +37,9 @@ fn main() {
             }
         }
         EzkvmCommand::Check { name } => {
-            debug!("resource_collection: {:?}", resource_collection)
+            debug!("resource_collection: {:?}\n\n", resource_collection);
+            let lock = lock_manager.create_lock("gyndine".to_string());
+            debug!("lock_manager: {:?}\n\n", lock_manager);
         }
         EzkvmCommand::Stop { name } => {
             todo!()
