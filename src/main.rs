@@ -40,6 +40,10 @@ fn main() {
             debug!("resource_collection: {:?}\n\n", resource_collection);
             let lock = lock_manager.create_lock("gyndine".to_string());
             debug!("lock_manager: {:?}\n\n", lock_manager);
+
+            if let Ok(config) = read_config(format!("etc/{}.yaml",name)) {
+                let _args = config.get_args(0);
+            }
         }
         EzkvmCommand::Stop { name } => {
             todo!()

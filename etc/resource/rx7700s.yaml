@@ -1,0 +1,3 @@
+id: rx7700s
+devices:
+  - { id: amd3, type: "host_gpu", tags: [ gpu, audio, amd, rx7700s ], multifunction: true, pci_id: [ "0000:3:00.0", "0000:3:00.1" ] }

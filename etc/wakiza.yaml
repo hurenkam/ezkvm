@@ -7,6 +7,9 @@ memory:  { max: 16384, balloon: true }
 spice:   { port: 5903, addr: "0.0.0.0" }
 lg_host: { path: "/dev/shm/lg03", size: "128M" }
 
+gpu:
+  - { type: "pool", pool_id: "rx7700s", resource_id: "amd3" }
+
 storage:
   - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: "0" }
   - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
@@ -15,6 +18,4 @@ network:
   - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
 
 host:
-  - { type: "pci", vm_id: "0.0", host_id: "0000:03:00.0", multi_function: true }
-  - { type: "pci", vm_id: "0.1", host_id: "0000:03:00.1" }
   - { type: "usb", vm_port: "1", host_bus: "1", host_port: "2.2" }
