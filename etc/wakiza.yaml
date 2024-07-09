@@ -17,5 +17,5 @@ storage:
 network:
   - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
 
-host:
-  - { type: "usb", vm_port: "1", host_bus: "1", host_port: "2.2" }
+#host:
+#  - { type: "usb", vm_port: "1", host_bus: "1", host_port: "2.2" }
