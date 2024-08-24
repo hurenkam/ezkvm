@@ -1,5 +1,6 @@
 use serde::Deserialize;
-use crate::yaml::QemuArgs;
+use crate::yaml::{LgClientArgs, QemuArgs};
+use crate::yaml::looking_glass::LookingGlass;
 
 #[derive(Debug,Deserialize)]
 pub struct Spice {
@@ -17,6 +18,16 @@ impl QemuArgs for Spice {
             "-audiodev spice,id=spice-backend0".to_string(),
             "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc".to_string(),
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0".to_string(),
+        ]
+    }
+}
+
+// looking-glass-client app:shmFile=/dev/kvmfr0 spice:host=0.0.0.0 spice:port=5903 input:escapeKey=KEY_F12 input:grabKeyboard win:size=1707x1067 win:fullscreen
+impl LgClientArgs for Spice {
+    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+        vec![
+            format!("spice:host={}",self.addr),
+            format!("spice:port={}",self.port),
         ]
     }
 }

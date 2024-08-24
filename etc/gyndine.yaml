@@ -20,4 +20,4 @@ storage:
 
 network:
   - { controller: "bridge", bridge: "vmbr0",  driver: "virtio-net-pci", mac: "BC:24:11:FF:76:89" }
-  - { controller: "pool",   pool:   "x550t2", driver: "pool", mac: "BC:24:11:FF:76:89" }
+  #  - { controller: "pool",   pool:   "x550t2", driver: "pool", mac: "BC:24:11:FF:76:89" }

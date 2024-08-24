@@ -1,5 +1,6 @@
 use serde::Deserialize;
-use crate::yaml::QemuArgs;
+use crate::yaml::config::Config;
+use crate::yaml::{QemuArgs, SwtpmArgs};
 
 #[derive(Debug,Deserialize)]
 pub struct System {
@@ -7,11 +8,20 @@ pub struct System {
     bios: Bios,
     cpu: Cpu,
     memory: Memory,
+    tpm: Tpm
 }
 
 const PVE_CONFIG_FILE: &str = "/mnt/usr/share/qemu-server/pve-q35-4.0.cfg";
 const BOOT_SPLASH_FILE: &str = "/mnt/usr/share/qemu-server/bootsplash.jpg";
 const OVMF_BIOS_FILE: &str = "/mnt/usr/share/pve-edk2-firmware//OVMF_CODE_4M.secboot.fd";
+
+impl SwtpmArgs for System {
+    fn get_swtpm_args(&self, index: usize) -> Vec<String> {
+        let mut result = vec![];
+        result.extend(self.tpm.get_swtpm_args(0));
+        result
+    }
+}
 
 impl QemuArgs for System {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
@@ -45,6 +55,7 @@ impl QemuArgs for System {
         result.extend(self.bios.get_qemu_args(0));
         result.extend(self.cpu.get_qemu_args(0));
         result.extend(self.memory.get_qemu_args(0));
+        result.extend(self.tpm.get_qemu_args(0));
 
         result
     }
@@ -57,7 +68,8 @@ impl Default for System {
             chipset: "q35".to_string(),
             //version: None,
             cpu: Cpu::default(),
-            memory: Memory::default()
+            memory: Memory::default(),
+            tpm: Tpm::default()
         }
     }
 }
@@ -146,6 +158,67 @@ impl Default for Memory {
         Self {
             max: 4096,
             balloon: false
+        }
+    }
+}
+
+
+#[derive(Debug,Deserialize)]
+struct Tpm {
+    model: String,
+    version: Option<f32>,
+    disk: Option<String>,
+    socket: Option<String>
+}
+
+// swtpm socket --tpmstate dir=/tmp/wakiza/tpm --ctrl type=unixio,path=/var/ezkvm/wakiza-tpm.socket --tpm2
+impl SwtpmArgs for Tpm {
+    fn get_swtpm_args(&self, index: usize) -> Vec<String> {
+        match self.model.as_str() {
+            "none" => vec![],
+            "passthrough" => {
+                todo!()
+            },
+            "swtpm" => {
+                let tpmstate_path = "/tmp/wakiza/tpm";
+                let socket_path= "/var/ezkvm/wakiza-tpm.socket";
+                vec![
+                    "socket".to_string(),
+                    "--tpmstate".to_string(),
+                    format!("dir={}",tpmstate_path),
+                    "--ctrl".to_string(),
+                    format!("type=unixio,path={}",socket_path),
+                    "--tpm2".to_string()
+                ]
+            },
+            _ => vec![]
+        }
+    }
+}
+impl QemuArgs for Tpm {
+    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+        match self.model.as_str() {
+            "none" => vec![],
+            "passthrough" => {
+                todo!()
+            },
+            "swtpm" => vec![
+                format!("-chardev socket,id=chrtpm{},path={}", index, self.socket.clone().unwrap()),
+                format!("-tpmdev emulator,id=tpm{},chardev=chrtpm{}", index, index),
+                format!("-device tpm-tis,tpmdev=tpm{}", index),
+            ],
+            _ => vec![]
+        }
+    }
+}
+
+impl Default for Tpm {
+    fn default() -> Self {
+        Self {
+            model: "none".to_string(),
+            version: None,
+            disk: None,
+            socket: None
         }
     }
 }

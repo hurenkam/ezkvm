@@ -4,11 +4,11 @@ mod resource;
 
 extern crate colored;
 
-use std::{env, fmt, fs};
+use std::{env, fmt, fs, thread};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use home::home_dir;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use crate::args::{EzkvmArguments, EzkvmCommand};
@@ -19,12 +19,13 @@ use log::{debug, info, Level, LevelFilter};
 use crate::colored::Colorize;
 use std::io::Write;
 use std::path::Path;
+use std::time::Duration;
 use serde::de::{MapAccess, Visitor};
 use crate::resource::lock::{EzkvmError, Lock};
 use crate::resource::data_manager::DataManager;
 use crate::resource::resource_pool::ResourcePool;
 use crate::yaml::config::Config;
-use crate::yaml::QemuArgs;
+use crate::yaml::{SwtpmArgs,QemuArgs,LgClientArgs};
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
@@ -37,11 +38,16 @@ fn main() {
         EzkvmCommand::Start { name } => {
             let config = load_vm(format!("/etc/ezkvm/{}.yaml",name).as_str());
 
-            if let Ok(lock) = start_vm(name,config) {
+            let _ = start_tpm(&name,&config);
+
+            if let Ok(lock) = start_vm(&name,&config) {
                 // use lock
             } else {
                 debug!("Unable to start the vm");
             }
+
+            thread::sleep(Duration::from_secs(5));
+            let _ = start_lg_client(&name,&config);
         }
         EzkvmCommand::Stop { name } => {
             todo!()
@@ -79,7 +85,24 @@ fn load_pool(file: &str) -> ResourcePool {
     serde_yaml::from_str(contents.as_str()).unwrap()
 }
 
-fn start_vm(name: String, config: Config) -> Result<Lock, EzkvmError> {
+fn start_tpm(name: &String, config: &Config) -> Result<(), EzkvmError> {
+    debug!("start_vm()");
+
+    let mut args = vec!["swtpm".to_string()];
+    args.extend(config.get_swtpm_args(0));
+
+    let mut tpm_cmd = Command::new("/usr/bin/env");
+    tpm_cmd.args(args.clone());
+    if let Ok(child) = tpm_cmd.spawn() {
+        debug!("start_tpm(): Started swtpm with pid {}:\n{}",child.id(), args.join(" "));
+        Ok(())
+    } else {
+        debug!("start_tpm(): Failed to start swtpm");
+        Err(EzkvmError::ExecError { file: name.clone() })
+    }
+}
+
+fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
     debug!("start_vm()");
 
     let args = config.get_qemu_args(0);
@@ -91,13 +114,30 @@ fn start_vm(name: String, config: Config) -> Result<Lock, EzkvmError> {
         debug!("start_vm(): Started qemu with pid {}",child.id());
 
         Ok(Lock::new(
-            name,
+            name.clone(),
             child.id(),
             resources
         ))
     } else {
         debug!("start_vm(): Failed to start qemu");
-        Err(EzkvmError::ExecError { file: name })
+        Err(EzkvmError::ExecError { file: name.clone() })
+    }
+}
+
+fn start_lg_client(name: &String, config: &Config) -> Result<(), EzkvmError> {
+    debug!("start_lg_client()");
+
+    let mut args = vec!["looking-glass-client".to_string()];
+    args.extend(config.get_lg_client_args(0));
+
+    let mut lg_cmd = Command::new("/usr/bin/env");
+    lg_cmd.args(args.clone());
+    if let Ok(child) = lg_cmd.spawn() {
+        debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
+        Ok(())
+    } else {
+        debug!("start_lg_client()(): Failed to start looking-glass-client");
+        Err(EzkvmError::ExecError { file: name.clone() })
     }
 }
 

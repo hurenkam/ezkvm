@@ -7,9 +7,9 @@ use crate::yaml::display::Display;
 use crate::yaml::general::General;
 use crate::yaml::gpu::Gpu;
 use crate::yaml::host::Host;
-use crate::yaml::looking_glass::LookingGlassHost;
+use crate::yaml::looking_glass::LookingGlass;
 use crate::yaml::network::Network;
-use crate::yaml::QemuArgs;
+use crate::yaml::{SwtpmArgs,QemuArgs,LgClientArgs};
 use crate::yaml::spice::Spice;
 use crate::yaml::storage::Storage;
 use crate::yaml::system::System;
@@ -21,10 +21,10 @@ pub struct Config {
     display: Option<Display>,
     gpu: Option<Gpu>,
     spice: Option<Spice>,
-    looking_glass_host: Option<LookingGlassHost>,
+    looking_glass: Option<LookingGlass>,
     host: Option<Host>,
     storage: Vec<Storage>,
-    network: Vec<Network>
+    network: Vec<Network>,
 }
 
 impl Config {
@@ -41,11 +41,19 @@ impl Default for Config {
             display: None,
             gpu: None,
             spice: None,
-            looking_glass_host: None,
+            looking_glass: None,
             host: None,
             storage: vec![],
             network: vec![],
         }
+    }
+}
+
+impl SwtpmArgs for Config {
+    fn get_swtpm_args(&self, index: usize) -> Vec<String> {
+        let mut result = vec![];
+        result.extend(self.system.get_swtpm_args(0));
+        result
     }
 }
 
@@ -76,7 +84,7 @@ impl QemuArgs for Config {
             }
         }
 
-        match &self.looking_glass_host {
+        match &self.looking_glass {
             None => {}
             Some(looking_glass_host) => {
                 result.extend(looking_glass_host.get_qemu_args(0));
@@ -108,6 +116,28 @@ impl QemuArgs for Config {
     }
 }
 
+impl LgClientArgs for Config {
+    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+        let mut result = vec![];
+
+        match &self.spice {
+            None => {}
+            Some(spice) => {
+                result.extend(spice.get_lg_client_args(0));
+            }
+        }
+
+        match &self.looking_glass {
+            None => {}
+            Some(looking_glass) => {
+                result.extend(looking_glass.get_lg_client_args(0));
+            }
+        }
+
+        result
+    }
+}
+
 impl<'de> Deserialize<'de> for Config {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
 
@@ -119,7 +149,7 @@ impl<'de> Deserialize<'de> for Config {
             Display,
             Gpu,
             Spice,
-            LookingGlassHost,
+            LookingGlass,
             Host,
             Storage,
             Network
@@ -156,8 +186,8 @@ impl<'de> Deserialize<'de> for Config {
                         Field::Spice => {
                             config.spice = map.next_value()?;
                         }
-                        Field::LookingGlassHost => {
-                            config.looking_glass_host = map.next_value()?;
+                        Field::LookingGlass => {
+                            config.looking_glass = map.next_value()?;
                         }
                         Field::Host => {
                             config.host = map.next_value()?;
