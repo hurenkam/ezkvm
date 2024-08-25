@@ -58,8 +58,9 @@ incorporate changes to make it run on other distro's or platforms.
  - Look into QCFG, things may become a lot easier if i use that as an (intermediate) format:
 https://wiki.qemu.org/Features/QCFG
 
+ - Drop priviledges where appropriate; Currently some use cases require qemu to run with
+   root priviledges (e.g. pci passthrough), some other use cases refuse to run with root
+   priviledges (Gtk ui). Also swtpm & lg client don't need to run with root priviledges.
 
- - Look into the quickemu project, which seems to be attempting the same thing, but is
-already quite mature. However, it does seem to be lacking GPU passthrough support, which
-is a deal breaker for me:
-https://github.com/quickemu-project
+
+
