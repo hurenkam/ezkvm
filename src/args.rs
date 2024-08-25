@@ -84,7 +84,7 @@ impl EzkvmArguments {
             }
         }
 
-        let log_level = LevelFilter::Info;
+        let log_level = LevelFilter::Off;
         EzkvmArguments {
             program,
             command,

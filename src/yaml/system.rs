@@ -8,7 +8,12 @@ pub struct System {
     bios: Bios,
     cpu: Cpu,
     memory: Memory,
-    tpm: Tpm
+    tpm: Option<Tpm>
+}
+impl System {
+    pub fn get_tpm(&self) -> Option<Tpm> {
+        self.tpm.clone()
+    }
 }
 
 const PVE_CONFIG_FILE: &str = "/mnt/usr/share/qemu-server/pve-q35-4.0.cfg";
@@ -18,7 +23,9 @@ const OVMF_BIOS_FILE: &str = "/mnt/usr/share/pve-edk2-firmware//OVMF_CODE_4M.sec
 impl SwtpmArgs for System {
     fn get_swtpm_args(&self, index: usize) -> Vec<String> {
         let mut result = vec![];
-        result.extend(self.tpm.get_swtpm_args(0));
+        if let Some(tpm) = &self.tpm {
+            result.extend(tpm.get_swtpm_args(0));
+        }
         result
     }
 }
@@ -55,7 +62,10 @@ impl QemuArgs for System {
         result.extend(self.bios.get_qemu_args(0));
         result.extend(self.cpu.get_qemu_args(0));
         result.extend(self.memory.get_qemu_args(0));
-        result.extend(self.tpm.get_qemu_args(0));
+
+        if let Some(tpm) = &self.tpm {
+            result.extend(tpm.get_qemu_args(0));
+        }
 
         result
     }
@@ -69,7 +79,7 @@ impl Default for System {
             //version: None,
             cpu: Cpu::default(),
             memory: Memory::default(),
-            tpm: Tpm::default()
+            tpm: None
         }
     }
 }
@@ -163,8 +173,8 @@ impl Default for Memory {
 }
 
 
-#[derive(Debug,Deserialize)]
-struct Tpm {
+#[derive(Debug,Deserialize,PartialEq,Clone)]
+pub struct Tpm {
     model: String,
     version: Option<f32>,
     disk: Option<String>,
@@ -175,7 +185,6 @@ struct Tpm {
 impl SwtpmArgs for Tpm {
     fn get_swtpm_args(&self, index: usize) -> Vec<String> {
         match self.model.as_str() {
-            "none" => vec![],
             "passthrough" => {
                 todo!()
             },

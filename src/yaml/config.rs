@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use std::fmt;
 use log::info;
 use serde::{de, Deserialize, Deserializer};
@@ -30,6 +31,14 @@ pub struct Config {
 impl Config {
     pub(crate) fn allocate_resources(&self) -> Result<Vec<String>, EzkvmError> {
         Ok(vec![])
+    }
+
+    pub fn has_tpm(&self) -> bool {
+        self.system.get_tpm() != None
+    }
+
+    pub fn has_lg(&self) -> bool {
+        return self.looking_glass != None
     }
 }
 
