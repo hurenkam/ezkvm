@@ -1,10 +1,13 @@
 use serde::Deserialize;
 use crate::yaml::QemuArgs;
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug,Deserialize,Clone)]
 pub struct Display {
     driver: String,
     gl: bool
+}
+impl Display {
+    pub fn get_driver(&self) -> String { self.driver.clone() }
 }
 
 impl QemuArgs for Display {

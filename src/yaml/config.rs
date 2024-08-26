@@ -40,6 +40,10 @@ impl Config {
     pub fn has_lg(&self) -> bool {
         return self.looking_glass != None
     }
+
+    pub fn get_display(&self) -> Option<Display> {
+        return self.display.clone()
+    }
 }
 
 impl Default for Config {

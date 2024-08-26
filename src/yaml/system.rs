@@ -76,7 +76,6 @@ impl Default for System {
         Self {
             bios: Bios::default(),
             chipset: "q35".to_string(),
-            //version: None,
             cpu: Cpu::default(),
             memory: Memory::default(),
             tpm: None

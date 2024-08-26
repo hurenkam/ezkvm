@@ -19,8 +19,11 @@ use env_logger::Builder;
 use log::{debug, info, Level, LevelFilter};
 use crate::colored::Colorize;
 use std::io::Write;
+use std::os::unix::prelude::CommandExt;
 use std::path::Path;
+use std::thread::spawn;
 use std::time::Duration;
+use nix::libc::geteuid;
 use serde::de::{MapAccess, Visitor};
 use crate::resource::lock::{EzkvmError, Lock};
 use crate::resource::data_manager::DataManager;
@@ -32,7 +35,13 @@ fn main() {
     let args = EzkvmArguments::new(env::args().collect());
     init_logger(args.log_level);
 
+    let uid = nix::unistd::getuid();
+    let gid = nix::unistd::getgid();
+    let euid = nix::unistd::geteuid();
+    let egid = nix::unistd::getegid();
+    debug!("main(): euid: {}, egid: {}, uid: {}, gid: {}", euid, egid, uid, gid);
     debug!("main({:?})",args.command);
+
     let resource_manager = DataManager::instance();
 
     match args.command {
@@ -40,7 +49,7 @@ fn main() {
             let config = load_vm(format!("/etc/ezkvm/{}.yaml",name).as_str());
 
             if config.has_tpm() {
-                if let Ok(child) = start_tpm(&name, &config) {
+                if let Ok(child) = start_swtpm(&name, &config) {
                     // nothing to do with child yet
                 }
             }
@@ -95,23 +104,6 @@ fn load_pool(file: &str) -> ResourcePool {
     serde_yaml::from_str(contents.as_str()).unwrap()
 }
 
-fn start_tpm(name: &String, config: &Config) -> Result<Child, EzkvmError> {
-    debug!("start_vm()");
-
-    let mut args = vec!["swtpm".to_string()];
-    args.extend(config.get_swtpm_args(0));
-
-    let mut tpm_cmd = Command::new("/usr/bin/env");
-    tpm_cmd.args(args.clone());
-    if let Ok(child) = tpm_cmd.spawn() {
-        debug!("start_tpm(): Started swtpm with pid {}:\n{}",child.id(), args.join(" "));
-        Ok(child)
-    } else {
-        debug!("start_tpm(): Failed to start swtpm");
-        Err(EzkvmError::ExecError { file: name.clone() })
-    }
-}
-
 fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
     debug!("start_vm()");
 
@@ -120,6 +112,15 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
 
     let mut qemu_cmd = Command::new("/usr/bin/env");
     qemu_cmd.args(args);
+
+    if let Some(display) = config.get_display() {
+        if display.get_driver() == "gtk" {
+            let uid = u32::from(nix::unistd::getuid());
+            let gid = u32::from(nix::unistd::getgid());
+            qemu_cmd.uid(uid).gid(gid);
+        }
+    }
+
     if let Ok(child) = qemu_cmd.spawn() {
         debug!("start_vm(): Started qemu with pid {}",child.id());
 
@@ -134,21 +135,61 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
     }
 }
 
+fn start_swtpm(name: &String, config: &Config) -> Result<Child, EzkvmError> {
+    debug!("start_swtpm()");
+
+    let mut args = vec!["swtpm".to_string()];
+    args.extend(config.get_swtpm_args(0));
+
+    let (sender,receiver) = std::sync::mpsc::channel();
+
+    let handler = spawn(move || {
+
+        //drop_privileges();
+        let uid = u32::from(nix::unistd::getuid());
+        let gid = u32::from(nix::unistd::getgid());
+
+        let mut lg_cmd = Command::new("/usr/bin/env");
+        lg_cmd
+            .uid(uid)
+            .gid(gid)
+            .args(args.clone());
+        if let Ok(child) = lg_cmd.spawn() {
+            debug!("start_swtpm(): Started swtpm with pid {}\n{}",child.id(),args.join(" "));
+            sender.send(child);
+        }
+    });
+    receiver.recv().map_err(|_| EzkvmError::ExecError { file: name.clone() })
+
+    //handler.join().unwrap();
+}
+
 fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> {
     debug!("start_lg_client()");
 
     let mut args = vec!["looking-glass-client".to_string()];
     args.extend(config.get_lg_client_args(0));
 
-    let mut lg_cmd = Command::new("/usr/bin/env");
-    lg_cmd.args(args.clone());
-    if let Ok(child) = lg_cmd.spawn() {
-        debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
-        Ok(child)
-    } else {
-        debug!("start_lg_client()(): Failed to start looking-glass-client");
-        Err(EzkvmError::ExecError { file: name.clone() })
-    }
+    let (sender,receiver) = std::sync::mpsc::channel();
+
+    let handler = spawn(move || {
+
+        let uid = u32::from(nix::unistd::getuid());
+        let gid = u32::from(nix::unistd::getgid());
+
+        let mut lg_cmd = Command::new("/usr/bin/env");
+        lg_cmd
+            .uid(uid)
+            .gid(gid)
+            .args(args.clone());
+        if let Ok(child) = lg_cmd.spawn() {
+            debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
+            sender.send(child);
+        }
+    });
+    receiver.recv().map_err(|_| EzkvmError::ExecError { file: name.clone() })
+
+    //handler.join().unwrap();
 }
 
 fn init_logger(log_level: LevelFilter) {
