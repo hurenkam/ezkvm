@@ -180,7 +180,6 @@ pub struct Tpm {
     socket: Option<String>
 }
 
-// swtpm socket --tpmstate dir=/tmp/wakiza/tpm --ctrl type=unixio,path=/var/ezkvm/wakiza-tpm.socket --tpm2
 impl SwtpmArgs for Tpm {
     fn get_swtpm_args(&self, index: usize) -> Vec<String> {
         match self.model.as_str() {
@@ -188,16 +187,18 @@ impl SwtpmArgs for Tpm {
                 todo!()
             },
             "swtpm" => {
-                let tpmstate_path = "/tmp/wakiza/tpm";
-                let socket_path= "/var/ezkvm/wakiza-tpm.socket";
-                vec![
-                    "socket".to_string(),
-                    "--tpmstate".to_string(),
-                    format!("dir={}",tpmstate_path),
-                    "--ctrl".to_string(),
-                    format!("type=unixio,path={}",socket_path),
-                    "--tpm2".to_string()
-                ]
+                if let Some(socket_path) = self.socket.clone() {
+                    if let Some(tpmstate_path) = self.disk.clone() {
+                        vec![
+                            "socket".to_string(),
+                            "--tpmstate".to_string(),
+                            format!("backend-uri=file://{},mode=0600", tpmstate_path),
+                            "--ctrl".to_string(),
+                            format!("type=unixio,path={},mode=0600", socket_path),
+                            "--tpm2".to_string()
+                        ]
+                    } else { vec![] }
+                } else { vec![] }
             },
             _ => vec![]
         }

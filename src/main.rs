@@ -141,27 +141,14 @@ fn start_swtpm(name: &String, config: &Config) -> Result<Child, EzkvmError> {
     let mut args = vec!["swtpm".to_string()];
     args.extend(config.get_swtpm_args(0));
 
-    let (sender,receiver) = std::sync::mpsc::channel();
+    let mut lg_cmd = Command::new("/usr/bin/env");
+    lg_cmd.args(args.clone());
+    if let Ok(child) = lg_cmd.spawn() {
+        debug!("start_swtpm(): Started swtpm with pid {}\n{}",child.id(),args.join(" "));
+        return Ok(child)
+    }
 
-    let handler = spawn(move || {
-
-        //drop_privileges();
-        let uid = u32::from(nix::unistd::getuid());
-        let gid = u32::from(nix::unistd::getgid());
-
-        let mut lg_cmd = Command::new("/usr/bin/env");
-        lg_cmd
-            .uid(uid)
-            .gid(gid)
-            .args(args.clone());
-        if let Ok(child) = lg_cmd.spawn() {
-            debug!("start_swtpm(): Started swtpm with pid {}\n{}",child.id(),args.join(" "));
-            sender.send(child);
-        }
-    });
-    receiver.recv().map_err(|_| EzkvmError::ExecError { file: name.clone() })
-
-    //handler.join().unwrap();
+    Err(EzkvmError::ExecError { file: name.clone() })
 }
 
 fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> {
@@ -170,26 +157,22 @@ fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> 
     let mut args = vec!["looking-glass-client".to_string()];
     args.extend(config.get_lg_client_args(0));
 
-    let (sender,receiver) = std::sync::mpsc::channel();
+    // in case ezkvm is running as suid root,
+    // we need to drop root permissions for looking-glass-client
+    let uid = u32::from(nix::unistd::getuid());
+    let gid = u32::from(nix::unistd::getgid());
 
-    let handler = spawn(move || {
+    let mut lg_cmd = Command::new("/usr/bin/env");
+    lg_cmd
+        .uid(uid)
+        .gid(gid)
+        .args(args.clone());
+    if let Ok(child) = lg_cmd.spawn() {
+        debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
+        return Ok(child)
+    }
 
-        let uid = u32::from(nix::unistd::getuid());
-        let gid = u32::from(nix::unistd::getgid());
-
-        let mut lg_cmd = Command::new("/usr/bin/env");
-        lg_cmd
-            .uid(uid)
-            .gid(gid)
-            .args(args.clone());
-        if let Ok(child) = lg_cmd.spawn() {
-            debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
-            sender.send(child);
-        }
-    });
-    receiver.recv().map_err(|_| EzkvmError::ExecError { file: name.clone() })
-
-    //handler.join().unwrap();
+    Err(EzkvmError::ExecError { file: name.clone() })
 }
 
 fn init_logger(log_level: LevelFilter) {
