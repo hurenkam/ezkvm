@@ -16,9 +16,9 @@ impl System {
     }
 }
 
-const PVE_CONFIG_FILE: &str = "/mnt/usr/share/qemu-server/pve-q35-4.0.cfg";
-const BOOT_SPLASH_FILE: &str = "/mnt/usr/share/qemu-server/bootsplash.jpg";
-const OVMF_BIOS_FILE: &str = "/mnt/usr/share/pve-edk2-firmware//OVMF_CODE_4M.secboot.fd";
+const PVE_CONFIG_FILE: &str = "/usr/share/ezkvm/pve-q35-4.0.cfg";
+const OVMF_BIOS_FILE: &str = "/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd";
+const BOOT_SPLASH_FILE: &str = "/usr/share/ezkvm/bootsplash.jpg";
 
 impl SwtpmArgs for System {
     fn get_swtpm_args(&self, index: usize) -> Vec<String> {
@@ -95,17 +95,23 @@ impl QemuArgs for Bios {
         match self.model.as_str() {
             "ovmf" => {
                 vec![
-                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}",BOOT_SPLASH_FILE),
+                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}", BOOT_SPLASH_FILE),
                     format!("-smbios type=1,uuid={}",self.uuid.clone().unwrap()),
                     format!("-drive if=pflash,unit=0,format=raw,readonly=on,file={}",OVMF_BIOS_FILE),
                     format!("-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file={},size=540672",self.disk.clone().unwrap()),
                 ]
             },
             "seabios" => {
-                todo!()
+                vec![
+                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}", BOOT_SPLASH_FILE),
+                    format!("-smbios type=1,uuid={}",self.uuid.clone().unwrap()),
+                ]
             }
             _ => {
-                todo!()
+                vec![
+                    // no bios defined, but qemu will still fallback to seabios
+                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}", BOOT_SPLASH_FILE),
+                ]
             }
         }
     }
@@ -113,6 +119,7 @@ impl QemuArgs for Bios {
 
 impl Default for Bios {
     fn default() -> Self {
+
         Self {
             model: "seabios".to_string(),
             uuid: None,
