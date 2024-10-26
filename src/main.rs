@@ -97,12 +97,16 @@ fn get_qemu_uid_and_gid(config: &Config) -> (u32,u32) {
     (uid,gid)
 }
 
-fn get_swtpm_uid_and_gid(_config: &Config) -> (u32,u32) {
-    (u32::from(nix::unistd::getuid()),u32::from(nix::unistd::getgid()))
+fn get_swtpm_uid_and_gid(config: &Config) -> (u32,u32) {
+    // swtpm must run with same permissions as qemu otherwise
+    // it can not connect to the socket created by qemu
+    get_qemu_uid_and_gid(config)
 }
 
-fn get_lg_uid_and_gid(config: &Config) -> (u32,u32) {
-    get_qemu_uid_and_gid(config)
+fn get_lg_uid_and_gid(_config: &Config) -> (u32,u32) {
+    // looking-glass-client can not be run as root
+    // so drop to actual uid/gid instead of euid/egid
+    (u32::from(nix::unistd::getuid()),u32::from(nix::unistd::getgid()))
 }
 
 fn load_vm(file: &str) -> Config {
@@ -135,17 +139,7 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
     let args = config.get_qemu_args(0);
     let resources: Vec<String> = config.allocate_resources()?;
 
-    let mut uid = u32::from(nix::unistd::geteuid());
-    let mut gid = u32::from(nix::unistd::getegid());
-
-    // gtk ui only works when qemu is started with non-root user
-    if let Some(display) = config.get_display() {
-        if display.get_driver() == "gtk" {
-            uid = u32::from(nix::unistd::getuid());
-            gid = u32::from(nix::unistd::getgid());
-        }
-    }
-
+    let (uid,gid) = get_qemu_uid_and_gid(config);
     if let Ok(child) = Command::new("/usr/bin/env")
         .args(args)
         .uid(uid)
@@ -171,20 +165,7 @@ fn start_swtpm(name: &String, config: &Config) -> Result<Child, EzkvmError> {
     let mut args = vec!["swtpm".to_string()];
     args.extend(config.get_swtpm_args(0));
 
-    // swtpm needs to run with the same permissions
-    // as the qemu process
-    let mut uid = u32::from(nix::unistd::geteuid());
-    let mut gid = u32::from(nix::unistd::getegid());
-
-    // gtk ui only works when qemu is started with non-root user
-    // so swtpm needs to start with same permissions
-    if let Some(display) = config.get_display() {
-        if display.get_driver() == "gtk" {
-            uid = u32::from(nix::unistd::getuid());
-            gid = u32::from(nix::unistd::getgid());
-        }
-    }
-
+    let (uid,gid) = get_swtpm_uid_and_gid(config);
     if let Ok(child) = Command::new("/usr/bin/env")
         .args(args.clone())
         .uid(uid)
@@ -204,10 +185,7 @@ fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> 
     let mut args = vec!["looking-glass-client".to_string()];
     args.extend(config.get_lg_client_args(0));
 
-    // in case ezkvm is running as suid root,
-    // we need to drop root permissions for looking-glass-client
-    let uid = u32::from(nix::unistd::getuid());
-    let gid = u32::from(nix::unistd::getgid());
+    let (uid,gid) = get_lg_uid_and_gid(config);
     debug!("start_lg_client() uid: {}, gid: {}",uid,gid);
 
     let log_file = File::create("looking-glass-client.log").unwrap();
