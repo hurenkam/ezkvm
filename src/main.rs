@@ -4,7 +4,7 @@ mod resource;
 
 extern crate colored;
 
-use std::{env, fmt, fs, thread};
+use std::{env, fmt, fs, process, thread};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -16,12 +16,13 @@ use crate::args::{EzkvmArguments, EzkvmCommand};
 
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, info, Level, LevelFilter};
+use log::{debug, info, warn, Level, LevelFilter};
 use crate::colored::Colorize;
 use std::io::Write;
+use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::CommandExt;
 use std::path::Path;
-use std::thread::spawn;
+use std::thread::{sleep, spawn};
 use std::time::Duration;
 use nix::libc::geteuid;
 use serde::de::{MapAccess, Visitor};
@@ -39,8 +40,8 @@ fn main() {
     let gid = nix::unistd::getgid();
     let euid = nix::unistd::geteuid();
     let egid = nix::unistd::getegid();
-    debug!("main(): euid: {}, egid: {}, uid: {}, gid: {}", euid, egid, uid, gid);
-    debug!("main({:?})",args.command);
+    debug!("main()  euid: {}, egid: {}, uid: {}, gid: {}", euid, egid, uid, gid);
+    debug!("main( {:?} )",args.command);
 
     let resource_manager = DataManager::instance();
 
@@ -80,6 +81,30 @@ fn main() {
     }
 }
 
+fn get_qemu_uid_and_gid(config: &Config) -> (u32,u32) {
+    let mut uid = u32::from(nix::unistd::geteuid());
+    let mut gid = u32::from(nix::unistd::getegid());
+
+    // if gtk ui is selected, qemu can not be run as root
+    // so drop to actual uid/gid instead of euid/egid
+    if let Some(display) = config.get_display() {
+        if display.get_driver() == "gtk" {
+            uid = u32::from(nix::unistd::getuid());
+            gid = u32::from(nix::unistd::getgid());
+        }
+    }
+
+    (uid,gid)
+}
+
+fn get_swtpm_uid_and_gid(_config: &Config) -> (u32,u32) {
+    (u32::from(nix::unistd::getuid()),u32::from(nix::unistd::getgid()))
+}
+
+fn get_lg_uid_and_gid(config: &Config) -> (u32,u32) {
+    get_qemu_uid_and_gid(config)
+}
+
 fn load_vm(file: &str) -> Config {
     debug!("load_vm({})",file);
 
@@ -110,18 +135,23 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
     let args = config.get_qemu_args(0);
     let resources: Vec<String> = config.allocate_resources()?;
 
-    let mut qemu_cmd = Command::new("/usr/bin/env");
-    qemu_cmd.args(args);
+    let mut uid = u32::from(nix::unistd::geteuid());
+    let mut gid = u32::from(nix::unistd::getegid());
 
+    // gtk ui only works when qemu is started with non-root user
     if let Some(display) = config.get_display() {
         if display.get_driver() == "gtk" {
-            let uid = u32::from(nix::unistd::getuid());
-            let gid = u32::from(nix::unistd::getgid());
-            qemu_cmd.uid(uid).gid(gid);
+            uid = u32::from(nix::unistd::getuid());
+            gid = u32::from(nix::unistd::getgid());
         }
     }
 
-    if let Ok(child) = qemu_cmd.spawn() {
+    if let Ok(child) = Command::new("/usr/bin/env")
+        .args(args)
+        .uid(uid)
+        .gid(gid)
+        .spawn()
+    {
         debug!("start_vm(): Started qemu with pid {}",child.id());
 
         Ok(Lock::new(
@@ -141,10 +171,27 @@ fn start_swtpm(name: &String, config: &Config) -> Result<Child, EzkvmError> {
     let mut args = vec!["swtpm".to_string()];
     args.extend(config.get_swtpm_args(0));
 
-    let mut lg_cmd = Command::new("/usr/bin/env");
-    lg_cmd.args(args.clone());
-    if let Ok(child) = lg_cmd.spawn() {
-        debug!("start_swtpm(): Started swtpm with pid {}\n{}",child.id(),args.join(" "));
+    // swtpm needs to run with the same permissions
+    // as the qemu process
+    let mut uid = u32::from(nix::unistd::geteuid());
+    let mut gid = u32::from(nix::unistd::getegid());
+
+    // gtk ui only works when qemu is started with non-root user
+    // so swtpm needs to start with same permissions
+    if let Some(display) = config.get_display() {
+        if display.get_driver() == "gtk" {
+            uid = u32::from(nix::unistd::getuid());
+            gid = u32::from(nix::unistd::getgid());
+        }
+    }
+
+    if let Ok(child) = Command::new("/usr/bin/env")
+        .args(args.clone())
+        .uid(uid)
+        .gid(gid)
+        .spawn()
+    {
+        debug!("start_swtpm(): Started swtpm with pid: {}, uid: {}, gid: {}\n{}",child.id(),uid,gid,args.join(" "));
         return Ok(child)
     }
 
@@ -161,15 +208,30 @@ fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> 
     // we need to drop root permissions for looking-glass-client
     let uid = u32::from(nix::unistd::getuid());
     let gid = u32::from(nix::unistd::getgid());
+    debug!("start_lg_client() uid: {}, gid: {}",uid,gid);
+
+    let log_file = File::create("looking-glass-client.log").unwrap();
+    let log = process::Stdio::from(log_file);
+    let err_file = File::create("looking-glass-client.err").unwrap();
+    let err = process::Stdio::from(err_file);
 
     let mut lg_cmd = Command::new("/usr/bin/env");
     lg_cmd
         .uid(uid)
         .gid(gid)
         .args(args.clone());
-    if let Ok(child) = lg_cmd.spawn() {
-        debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
-        return Ok(child)
+    match lg_cmd
+        .stdout(log)
+        .stderr(err)
+        .spawn()
+    {
+        Ok(child) => {
+            debug!("start_lg_client(): Started looking-glass-client with pid {}\n{}",child.id(),args.join(" "));
+            return Ok(child)
+        }
+        Err(e) => {
+            warn!("start_lg_client(): unable to start looking-glass-client due to error {}\n",e);
+        }
     }
 
     Err(EzkvmError::ExecError { file: name.clone() })
