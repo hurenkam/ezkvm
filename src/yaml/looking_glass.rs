@@ -1,11 +1,11 @@
-use serde::Deserialize;
 use crate::yaml::{LgClientArgs, QemuArgs};
+use serde::Deserialize;
 
-#[derive(Debug,Deserialize,PartialEq)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct LookingGlass {
     device: Device,
     window: Option<Window>,
-    input: Option<Input>
+    input: Option<Input>,
 }
 impl QemuArgs for LookingGlass {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
@@ -38,45 +38,46 @@ impl LgClientArgs for LookingGlass {
     }
 }
 
-#[derive(Debug,Deserialize,PartialEq)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct Device {
     path: String,
-    size: String
+    size: String,
 }
 
 impl QemuArgs for Device {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         vec![
-            format!("-device ivshmem-plain,memdev=ivshmem{},bus=pcie.0",index),
-            format!("-object memory-backend-file,id=ivshmem{},share=on,mem-path={},size={}",index,self.path,self.size),
+            format!("-device ivshmem-plain,memdev=ivshmem{},bus=pcie.0", index),
+            format!(
+                "-object memory-backend-file,id=ivshmem{},share=on,mem-path={},size={}",
+                index, self.path, self.size
+            ),
         ]
     }
 }
 
 impl LgClientArgs for Device {
     fn get_lg_client_args(&self, index: usize) -> Vec<String> {
-        vec![
-            format!("app:shmFile={}",self.path),
-        ]
+        vec![format!("app:shmFile={}", self.path)]
     }
 }
 
-#[derive(Debug,Deserialize,PartialEq)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct Window {
     size: String,
-    full_screen: bool
+    full_screen: bool,
 }
 
 impl LgClientArgs for Window {
     fn get_lg_client_args(&self, index: usize) -> Vec<String> {
         vec![
-            format!("win:fullScreen={}",self.full_screen),
-            format!("win:size={}",self.size),
+            format!("win:fullScreen={}", self.full_screen),
+            format!("win:size={}", self.size),
         ]
     }
 }
 
-#[derive(Debug,Deserialize,PartialEq)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct Input {
     grab_keyboard: bool,
     escape_key: String,
@@ -85,8 +86,8 @@ pub struct Input {
 impl LgClientArgs for Input {
     fn get_lg_client_args(&self, index: usize) -> Vec<String> {
         vec![
-            format!("input:grabKeyboard={}",self.grab_keyboard),
-            format!("input:escapeKey={}",self.escape_key),
+            format!("input:grabKeyboard={}", self.grab_keyboard),
+            format!("input:escapeKey={}", self.escape_key),
         ]
     }
 }

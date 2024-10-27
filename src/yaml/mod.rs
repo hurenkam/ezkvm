@@ -1,13 +1,13 @@
 pub mod config;
-pub mod host;
-pub mod system;
+mod display;
 pub mod general;
+mod gpu;
+pub mod host;
+pub mod looking_glass;
+pub mod network;
 pub mod spice;
 pub mod storage;
-pub mod network;
-pub mod looking_glass;
-mod gpu;
-mod display;
+pub mod system;
 
 pub trait SwtpmArgs {
     fn get_swtpm_args(&self, index: usize) -> Vec<String>;

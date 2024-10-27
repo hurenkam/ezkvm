@@ -1,8 +1,3 @@
-use std::cmp::PartialEq;
-use std::fmt;
-use log::info;
-use serde::{de, Deserialize, Deserializer};
-use serde::de::{MapAccess, Visitor};
 use crate::resource::lock::EzkvmError;
 use crate::yaml::display::Display;
 use crate::yaml::general::General;
@@ -10,10 +5,15 @@ use crate::yaml::gpu::Gpu;
 use crate::yaml::host::Host;
 use crate::yaml::looking_glass::LookingGlass;
 use crate::yaml::network::Network;
-use crate::yaml::{SwtpmArgs,QemuArgs,LgClientArgs};
 use crate::yaml::spice::Spice;
 use crate::yaml::storage::Storage;
 use crate::yaml::system::System;
+use crate::yaml::{LgClientArgs, QemuArgs, SwtpmArgs};
+use log::info;
+use serde::de::{MapAccess, Visitor};
+use serde::{de, Deserialize, Deserializer};
+use std::cmp::PartialEq;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Config {
@@ -38,11 +38,11 @@ impl Config {
     }
 
     pub fn has_lg(&self) -> bool {
-        return self.looking_glass != None
+        return self.looking_glass != None;
     }
 
     pub fn get_display(&self) -> Option<Display> {
-        return self.display.clone()
+        return self.display.clone();
     }
 }
 
@@ -111,18 +111,18 @@ impl QemuArgs for Config {
             }
         }
 
-        for (i,disk) in self.storage.iter().enumerate() {
+        for (i, disk) in self.storage.iter().enumerate() {
             result.extend(disk.get_qemu_args(i));
         }
 
-        for (i,network) in self.network.iter().enumerate() {
+        for (i, network) in self.network.iter().enumerate() {
             result.extend(network.get_qemu_args(i));
         }
 
         let mut args = "qemu-system-x86_64".to_string();
         for arg in result {
-            info!("{}",arg);
-            args = format!("{} {}",args,arg).to_string();
+            info!("{}", arg);
+            args = format!("{} {}", args, arg).to_string();
         }
 
         args.split_whitespace().map(str::to_string).collect()
@@ -152,8 +152,10 @@ impl LgClientArgs for Config {
 }
 
 impl<'de> Deserialize<'de> for Config {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         #[derive(Deserialize)]
         #[serde(field_identifier, rename_all = "snake_case")]
         enum Field {
@@ -165,7 +167,7 @@ impl<'de> Deserialize<'de> for Config {
             LookingGlass,
             Host,
             Storage,
-            Network
+            Network,
         }
 
         struct ConfigVisitor;
@@ -178,8 +180,8 @@ impl<'de> Deserialize<'de> for Config {
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<Config, V::Error>
-                where
-                    V: MapAccess<'de>,
+            where
+                V: MapAccess<'de>,
             {
                 let mut config = Config::default();
                 while let Some(key) = map.next_key()? {
@@ -218,7 +220,17 @@ impl<'de> Deserialize<'de> for Config {
             }
         }
 
-        const FIELDS: &[&str] = &["general", "system", "display", "gpu", "spice", "looking_glass_host", "host", "storage", "network"];
+        const FIELDS: &[&str] = &[
+            "general",
+            "system",
+            "display",
+            "gpu",
+            "spice",
+            "looking_glass_host",
+            "host",
+            "storage",
+            "network",
+        ];
         deserializer.deserialize_struct("Config", FIELDS, ConfigVisitor)
     }
 }

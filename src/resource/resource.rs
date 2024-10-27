@@ -1,10 +1,10 @@
+use crate::resource::lock::Lock;
+use crate::yaml::QemuArgs;
+use serde::de::{MapAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
-use serde::{Deserialize, Deserializer};
-use serde::de::{MapAccess, Visitor};
-use crate::resource::lock::Lock;
-use crate::yaml::QemuArgs;
 
 #[derive(Debug)]
 pub struct Resource {
@@ -27,7 +27,12 @@ impl QemuArgs for Resource {
         let mut result = vec![];
         let offset = 10;
         for (id, pci) in self.pci.iter().enumerate() {
-            result.push(format!("-device vfio-pci,host={},id=hostvf{},bus=ich9-pcie-port-1,addr=0x{}", pci, id, id+offset));
+            result.push(format!(
+                "-device vfio-pci,host={},id=hostvf{},bus=ich9-pcie-port-1,addr=0x{}",
+                pci,
+                id,
+                id + offset
+            ));
         }
         result
     }
@@ -47,8 +52,10 @@ impl Default for Resource {
 }
 
 impl<'de> Deserialize<'de> for Resource {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         #[derive(Deserialize)]
         #[serde(field_identifier, rename_all = "snake_case")]
         enum Field {
@@ -70,8 +77,8 @@ impl<'de> Deserialize<'de> for Resource {
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<Resource, V::Error>
-                where
-                    V: MapAccess<'de>,
+            where
+                V: MapAccess<'de>,
             {
                 let mut pool_device = Resource::default();
                 while let Some(key) = map.next_key()? {

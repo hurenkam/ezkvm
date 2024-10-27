@@ -1,22 +1,22 @@
-use serde::Deserialize;
 use crate::yaml::QemuArgs;
+use serde::Deserialize;
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Storage {
     driver: String,
     file: String,
     discard: Option<bool>,
-    boot_index: Option<String>
+    boot_index: Option<String>,
 }
 
 impl QemuArgs for Storage {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         let boot_index = match self.boot_index.clone() {
             None => "".to_string(),
-            Some(boot_index) => format!(",bootindex={}",boot_index)
+            Some(boot_index) => format!(",bootindex={}", boot_index),
         };
         let discard = match self.discard {
-            None => { "" }
+            None => "",
             Some(discard) => {
                 if (discard) {
                     ",discard=on"
@@ -34,11 +34,19 @@ impl QemuArgs for Storage {
             }
             "ide-cd" => {
                 vec![
-                    format!("-drive file={},if=none,id=drive-ide{},media=cdrom,aio=io_uring",self.file,index),
-                    format!("-device ide-cd,bus=ide.{},unit=0,drive=drive-ide{},id=ide{},bootindex={}",index,index,index,boot_index),
+                    format!(
+                        "-drive file={},if=none,id=drive-ide{},media=cdrom,aio=io_uring",
+                        self.file, index
+                    ),
+                    format!(
+                        "-device ide-cd,bus=ide.{},unit=0,drive=drive-ide{},id=ide{},bootindex={}",
+                        index, index, index, boot_index
+                    ),
                 ]
             }
-            _ => { vec![] }
+            _ => {
+                vec![]
+            }
         }
     }
 }

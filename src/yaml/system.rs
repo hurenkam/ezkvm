@@ -1,14 +1,14 @@
-use serde::Deserialize;
 use crate::yaml::config::Config;
 use crate::yaml::{QemuArgs, SwtpmArgs};
+use serde::Deserialize;
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct System {
     chipset: String,
     bios: Bios,
     cpu: Cpu,
     memory: Memory,
-    tpm: Option<Tpm>
+    tpm: Option<Tpm>,
 }
 impl System {
     pub fn get_tpm(&self) -> Option<Tpm> {
@@ -18,6 +18,9 @@ impl System {
 
 const PVE_CONFIG_FILE: &str = "/usr/share/ezkvm/pve-q35-4.0.cfg";
 const OVMF_BIOS_FILE: &str = "/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd";
+//const OVMF_BIOS_FILE: &str = "/usr/share/edk2/x64/OVMF_CODE.4m.fd";
+//const OVMF_BIOS_FILE: &str = "/usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd";
+
 const BOOT_SPLASH_FILE: &str = "/usr/share/ezkvm/bootsplash.jpg";
 
 impl SwtpmArgs for System {
@@ -39,7 +42,7 @@ impl QemuArgs for System {
                     "-machine hpet=off,type=pc-q35-8.1".to_string(),
                     "-rtc driftfix=slew,base=localtime".to_string(),
                     "-global kvm-pit.lost_tick_policy=discard".to_string(),
-                    format!("-readconfig {}",PVE_CONFIG_FILE),
+                    format!("-readconfig {}", PVE_CONFIG_FILE),
                     "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b".to_string(),
                     "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b".to_string(),
                     "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5".to_string(),
@@ -50,13 +53,14 @@ impl QemuArgs for System {
                     // -device ich9-intel-hda,id=sound0,bus=pcie.0,addr=0x1b \
                     // -device hda-duplex,id=sound0-codec0,bus=sound0.0,cad=0 \
                     // -global ICH9-LPC.disable_s3=1 -global ICH9-LPC.disable_s4=1
-
                 ]);
             }
             "i440fx" => {
                 todo!()
             }
-            _ => { panic!("{}", format!("Unsupported chipset {}", self.chipset)); }
+            _ => {
+                panic!("{}", format!("Unsupported chipset {}", self.chipset));
+            }
         }
 
         result.extend(self.bios.get_qemu_args(0));
@@ -78,16 +82,16 @@ impl Default for System {
             chipset: "q35".to_string(),
             cpu: Cpu::default(),
             memory: Memory::default(),
-            tpm: None
+            tpm: None,
         }
     }
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Bios {
     model: String,
     uuid: Option<String>,
-    disk: Option<String>
+    disk: Option<String>,
 }
 
 impl QemuArgs for Bios {
@@ -95,22 +99,37 @@ impl QemuArgs for Bios {
         match self.model.as_str() {
             "ovmf" => {
                 vec![
-                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}", BOOT_SPLASH_FILE),
-                    format!("-smbios type=1,uuid={}",self.uuid.clone().unwrap()),
-                    format!("-drive if=pflash,unit=0,format=raw,readonly=on,file={}",OVMF_BIOS_FILE),
-                    format!("-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file={},size=540672",self.disk.clone().unwrap()),
+                    format!(
+                        "-boot menu=on,strict=on,reboot-timeout=1000,splash={}",
+                        BOOT_SPLASH_FILE
+                    ),
+                    format!("-smbios type=1,uuid={}", self.uuid.clone().unwrap()),
+                    format!(
+                        "-drive if=pflash,unit=0,format=raw,readonly=on,file={}",
+                        OVMF_BIOS_FILE
+                    ),
+                    format!(
+                        "-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file={},size=540672",
+                        self.disk.clone().unwrap()
+                    ),
                 ]
-            },
+            }
             "seabios" => {
                 vec![
-                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}", BOOT_SPLASH_FILE),
-                    format!("-smbios type=1,uuid={}",self.uuid.clone().unwrap()),
+                    format!(
+                        "-boot menu=on,strict=on,reboot-timeout=1000,splash={}",
+                        BOOT_SPLASH_FILE
+                    ),
+                    format!("-smbios type=1,uuid={}", self.uuid.clone().unwrap()),
                 ]
             }
             _ => {
                 vec![
                     // no bios defined, but qemu will still fallback to seabios
-                    format!("-boot menu=on,strict=on,reboot-timeout=1000,splash={}", BOOT_SPLASH_FILE),
+                    format!(
+                        "-boot menu=on,strict=on,reboot-timeout=1000,splash={}",
+                        BOOT_SPLASH_FILE
+                    ),
                 ]
             }
         }
@@ -119,28 +138,30 @@ impl QemuArgs for Bios {
 
 impl Default for Bios {
     fn default() -> Self {
-
         Self {
             model: "seabios".to_string(),
             uuid: None,
-            disk: None
+            disk: None,
         }
     }
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Cpu {
     model: String,
     flags: String,
     sockets: u16,
-    cores: u16
+    cores: u16,
 }
 impl QemuArgs for Cpu {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         let total = self.sockets * self.cores;
         vec![
-            format!("-smp {},sockets={},cores={},maxcpus={}", total,self.sockets,self.cores,total),
-            format!("-cpu {},{}", self.model,self.flags),
+            format!(
+                "-smp {},sockets={},cores={},maxcpus={}",
+                total, self.sockets, self.cores, total
+            ),
+            format!("-cpu {},{}", self.model, self.flags),
         ]
     }
 }
@@ -151,21 +172,19 @@ impl Default for Cpu {
             model: "qemu64".to_string(),
             flags: "hv_vendor_id=ezkvm".to_string(),
             sockets: 1,
-            cores: 4
+            cores: 4,
         }
     }
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Memory {
     max: u64,
-    balloon:bool
+    balloon: bool,
 }
 impl QemuArgs for Memory {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
-        vec![
-            format!("-m {}", self.max),
-        ]
+        vec![format!("-m {}", self.max)]
     }
 }
 
@@ -173,18 +192,17 @@ impl Default for Memory {
     fn default() -> Self {
         Self {
             max: 4096,
-            balloon: false
+            balloon: false,
         }
     }
 }
 
-
-#[derive(Debug,Deserialize,PartialEq,Clone)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Tpm {
     model: String,
     version: Option<f32>,
     disk: Option<String>,
-    socket: Option<String>
+    socket: Option<String>,
 }
 
 impl SwtpmArgs for Tpm {
@@ -192,7 +210,7 @@ impl SwtpmArgs for Tpm {
         match self.model.as_str() {
             "passthrough" => {
                 todo!()
-            },
+            }
             "swtpm" => {
                 if let Some(socket_path) = self.socket.clone() {
                     if let Some(tpmstate_path) = self.disk.clone() {
@@ -202,12 +220,16 @@ impl SwtpmArgs for Tpm {
                             format!("backend-uri=file://{},mode=0600", tpmstate_path),
                             "--ctrl".to_string(),
                             format!("type=unixio,path={},mode=0600", socket_path),
-                            "--tpm2".to_string()
+                            "--tpm2".to_string(),
                         ]
-                    } else { vec![] }
-                } else { vec![] }
-            },
-            _ => vec![]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                }
+            }
+            _ => vec![],
         }
     }
 }
@@ -217,13 +239,17 @@ impl QemuArgs for Tpm {
             "none" => vec![],
             "passthrough" => {
                 todo!()
-            },
+            }
             "swtpm" => vec![
-                format!("-chardev socket,id=chrtpm{},path={}", index, self.socket.clone().unwrap()),
+                format!(
+                    "-chardev socket,id=chrtpm{},path={}",
+                    index,
+                    self.socket.clone().unwrap()
+                ),
                 format!("-tpmdev emulator,id=tpm{},chardev=chrtpm{}", index, index),
                 format!("-device tpm-tis,tpmdev=tpm{}", index),
             ],
-            _ => vec![]
+            _ => vec![],
         }
     }
 }
@@ -234,7 +260,7 @@ impl Default for Tpm {
             model: "none".to_string(),
             version: None,
             disk: None,
-            socket: None
+            socket: None,
         }
     }
 }

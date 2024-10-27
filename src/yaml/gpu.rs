@@ -1,7 +1,7 @@
-use std::fmt;
-use serde::{de, Deserialize, Deserializer};
-use serde::de::{MapAccess, Visitor};
 use crate::yaml::QemuArgs;
+use serde::de::{MapAccess, Visitor};
+use serde::{de, Deserialize, Deserializer};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Gpu {
@@ -20,18 +20,20 @@ impl QemuArgs for Gpu {
                 ]
             }
             "virtio-gpu-pci" => {
-                vec![
-                    format!("-device {},id=vga,bus=pcie.0,addr={}",
-                            self.driver, self.pci_address),
-                ]
+                vec![format!(
+                    "-device {},id=vga,bus=pcie.0,addr={}",
+                    self.driver, self.pci_address
+                )]
             }
             "virtio-vga-gl" => {
-                vec![
-                    format!("-device {},id=vga,bus=pcie.0,addr={}",
-                            self.driver, self.pci_address),
-                ]
+                vec![format!(
+                    "-device {},id=vga,bus=pcie.0,addr={}",
+                    self.driver, self.pci_address
+                )]
             }
-            _ => { vec![] }
+            _ => {
+                vec![]
+            }
         }
     }
 }
@@ -41,14 +43,16 @@ impl Default for Gpu {
         Self {
             driver: "qxl-vga".to_string(),
             memory: 64,
-            pci_address: "0x2".to_string()
+            pci_address: "0x2".to_string(),
         }
     }
 }
 
 impl<'de> Deserialize<'de> for Gpu {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         #[derive(Deserialize)]
         #[serde(field_identifier, rename_all = "snake_case")]
         enum Field {
@@ -67,8 +71,8 @@ impl<'de> Deserialize<'de> for Gpu {
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<Gpu, V::Error>
-                where
-                    V: MapAccess<'de>,
+            where
+                V: MapAccess<'de>,
             {
                 let mut gpu = Gpu::default();
 
