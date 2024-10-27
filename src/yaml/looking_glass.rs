@@ -57,7 +57,7 @@ impl QemuArgs for Device {
 }
 
 impl LgClientArgs for Device {
-    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+    fn get_lg_client_args(&self, _index: usize) -> Vec<String> {
         vec![format!("app:shmFile={}", self.path)]
     }
 }
@@ -69,7 +69,7 @@ pub struct Window {
 }
 
 impl LgClientArgs for Window {
-    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+    fn get_lg_client_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!("win:fullScreen={}", self.full_screen),
             format!("win:size={}", self.size),
@@ -84,7 +84,7 @@ pub struct Input {
 }
 
 impl LgClientArgs for Input {
-    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+    fn get_lg_client_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!("input:grabKeyboard={}", self.grab_keyboard),
             format!("input:escapeKey={}", self.escape_key),

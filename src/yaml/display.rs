@@ -13,7 +13,7 @@ impl Display {
 }
 
 impl QemuArgs for Display {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let gl = if self.gl { ",gl=on" } else { "" };
         vec![
             format!("-display {}{}", self.driver, gl),

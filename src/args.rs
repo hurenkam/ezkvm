@@ -60,7 +60,7 @@ impl EzkvmArguments {
         if matches.opt_present("help") {
             match matches.opt_str("help") {
                 None => {}
-                Some(name) => command = EzkvmCommand::Help,
+                Some(_name) => command = EzkvmCommand::Help,
             }
         }
 

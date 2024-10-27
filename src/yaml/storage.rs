@@ -18,7 +18,7 @@ impl QemuArgs for Storage {
         let discard = match self.discard {
             None => "",
             Some(discard) => {
-                if (discard) {
+                if discard {
                     ",discard=on"
                 } else {
                     ",discard=off"

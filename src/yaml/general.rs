@@ -16,7 +16,7 @@ impl Default for General {
 }
 
 impl QemuArgs for General {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             "-accel kvm".to_string(),
             //"-daemonize".to_string(),

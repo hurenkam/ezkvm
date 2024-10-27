@@ -5,8 +5,6 @@ use log::{debug, info};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;
-use std::fs::File;
-use std::io::Read;
 use std::sync::{Arc, Mutex};
 
 static RESOURCE_MANAGER: Lazy<Arc<Mutex<DataManager>>> =
@@ -21,8 +19,8 @@ pub struct DataManager {
 }
 
 impl DataManager {
-    fn new(path: &str) -> Self {
-        let mut resources = load_resource_pools().unwrap_or_default();
+    fn new(_path: &str) -> Self {
+        let resources = load_resource_pools().unwrap_or_default();
         info!("ResourceManager::new() resources:\n{:?}", resources);
 
         let locks = load_machine_locks().unwrap_or_default();
@@ -34,15 +32,12 @@ impl DataManager {
             locked_resources
         );
 
-        let result = Self {
+        Self {
             resources,
             locks,
             locked_resources,
             current_lock: Lock::default(),
-        };
-
-        //info!("ResourceManager::new():\n{:?}",result);
-        result
+        }
     }
 
     pub fn instance() -> Arc<Mutex<DataManager>> {
@@ -132,7 +127,7 @@ fn load_machine_locks() -> Result<HashMap<String, Lock>, EzkvmError> {
 }
 
 fn find_locked_resources(
-    resources: &HashMap<String, ResourcePool>,
+    _resources: &HashMap<String, ResourcePool>,
     locks: &HashMap<String, Lock>,
 ) -> HashMap<String, String> {
     let mut result = HashMap::from([]);

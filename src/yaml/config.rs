@@ -11,11 +11,10 @@ use crate::yaml::system::System;
 use crate::yaml::{LgClientArgs, QemuArgs, SwtpmArgs};
 use log::info;
 use serde::de::{MapAccess, Visitor};
-use serde::{de, Deserialize, Deserializer};
-use std::cmp::PartialEq;
+use serde::{Deserialize, Deserializer};
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Config {
     general: General,
     system: System,
@@ -46,24 +45,8 @@ impl Config {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            general: General::default(),
-            system: System::default(),
-            display: None,
-            gpu: None,
-            spice: None,
-            looking_glass: None,
-            host: None,
-            storage: vec![],
-            network: vec![],
-        }
-    }
-}
-
 impl SwtpmArgs for Config {
-    fn get_swtpm_args(&self, index: usize) -> Vec<String> {
+    fn get_swtpm_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         result.extend(self.system.get_swtpm_args(0));
         result
@@ -71,7 +54,7 @@ impl SwtpmArgs for Config {
 }
 
 impl QemuArgs for Config {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         result.extend(self.general.get_qemu_args(0));
         result.extend(self.system.get_qemu_args(0));
@@ -130,7 +113,7 @@ impl QemuArgs for Config {
 }
 
 impl LgClientArgs for Config {
-    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+    fn get_lg_client_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
 
         match &self.spice {

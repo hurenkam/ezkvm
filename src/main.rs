@@ -4,15 +4,12 @@ mod yaml;
 
 extern crate colored;
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::process::{Child, Command};
-use std::{env, fmt, fs, process, thread};
+use std::{env, process};
 
 use crate::args::{EzkvmArguments, EzkvmCommand};
-use home::home_dir;
-use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::colored::Colorize;
 use crate::resource::data_manager::DataManager;
@@ -22,15 +19,9 @@ use crate::yaml::config::Config;
 use crate::yaml::{LgClientArgs, QemuArgs, SwtpmArgs};
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, info, warn, Level, LevelFilter};
-use nix::libc::geteuid;
-use serde::de::{MapAccess, Visitor};
+use log::{debug, warn, Level, LevelFilter};
 use std::io::Write;
-use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::CommandExt;
-use std::path::Path;
-use std::thread::{sleep, spawn};
-use std::time::Duration;
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
@@ -46,36 +37,36 @@ fn main() {
     );
     debug!("main( {:?} )", args.command);
 
-    let resource_manager = DataManager::instance();
+    let _resource_manager = DataManager::instance();
 
     match args.command {
         EzkvmCommand::Start { name } => {
             let config = load_vm(format!("/etc/ezkvm/{}.yaml", name).as_str());
 
             if config.has_tpm() {
-                if let Ok(child) = start_swtpm(&name, &config) {
+                if let Ok(_child) = start_swtpm(&name, &config) {
                     // nothing to do with child yet
                 }
             }
 
-            if let Ok(lock) = start_vm(&name, &config) {
+            if let Ok(_lock) = start_vm(&name, &config) {
                 // use lock
             } else {
                 debug!("Unable to start the vm");
             }
 
             if config.has_lg() {
-                if let Ok(child) = start_lg_client(&name, &config) {
+                if let Ok(_child) = start_lg_client(&name, &config) {
                     //let output = child
                     //    .wait_with_output().unwrap();
                     //println!("Done {}", std::str::from_utf8(&output.stdout).unwrap());
                 }
             }
         }
-        EzkvmCommand::Stop { name } => {
+        EzkvmCommand::Stop { .. } => {
             todo!()
         }
-        EzkvmCommand::Hibernate { name } => {
+        EzkvmCommand::Hibernate { .. } => {
             todo!()
         }
         _ => {
@@ -128,7 +119,7 @@ fn load_vm(file: &str) -> Config {
 }
 
 fn load_pool(file: &str) -> ResourcePool {
-    debug!("load_vm({})", file);
+    debug!("load_pool({})", file);
 
     let mut file = File::open(file).expect("Unable to open file");
     let mut contents = String::new();
@@ -236,7 +227,7 @@ fn init_logger(log_level: LevelFilter) {
                 record.args()
             );
 
-            let mut colorized_line = match record.level() {
+            let colorized_line = match record.level() {
                 Level::Error => {
                     format!("{}", line.red().bold())
                 }

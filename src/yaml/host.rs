@@ -7,7 +7,7 @@ pub struct Host {
     usb: Vec<Usb>,
 }
 impl QemuArgs for Host {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
 
         for (index, item) in self.pci.iter().enumerate() {
@@ -30,7 +30,7 @@ struct Pci {
 }
 
 impl QemuArgs for Pci {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let multi_function = match self.multi_function {
             None => "".to_string(),
             Some(multi_function) => match multi_function {

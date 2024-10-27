@@ -1,10 +1,7 @@
-use crate::resource::lock::Lock;
 use crate::yaml::QemuArgs;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Resource {
@@ -23,7 +20,7 @@ impl Resource {
 }
 
 impl QemuArgs for Resource {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         let offset = 10;
         for (id, pci) in self.pci.iter().enumerate() {

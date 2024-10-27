@@ -1,4 +1,3 @@
-use crate::yaml::config::Config;
 use crate::yaml::{QemuArgs, SwtpmArgs};
 use serde::Deserialize;
 
@@ -24,7 +23,7 @@ const OVMF_BIOS_FILE: &str = "/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd";
 const BOOT_SPLASH_FILE: &str = "/usr/share/ezkvm/bootsplash.jpg";
 
 impl SwtpmArgs for System {
-    fn get_swtpm_args(&self, index: usize) -> Vec<String> {
+    fn get_swtpm_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         if let Some(tpm) = &self.tpm {
             result.extend(tpm.get_swtpm_args(0));
@@ -34,7 +33,7 @@ impl SwtpmArgs for System {
 }
 
 impl QemuArgs for System {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         match self.chipset.as_str() {
             "q35" => {
@@ -95,7 +94,7 @@ struct Bios {
 }
 
 impl QemuArgs for Bios {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         match self.model.as_str() {
             "ovmf" => {
                 vec![
@@ -154,7 +153,7 @@ struct Cpu {
     cores: u16,
 }
 impl QemuArgs for Cpu {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let total = self.sockets * self.cores;
         vec![
             format!(
@@ -183,7 +182,7 @@ struct Memory {
     balloon: bool,
 }
 impl QemuArgs for Memory {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![format!("-m {}", self.max)]
     }
 }
@@ -206,7 +205,7 @@ pub struct Tpm {
 }
 
 impl SwtpmArgs for Tpm {
-    fn get_swtpm_args(&self, index: usize) -> Vec<String> {
+    fn get_swtpm_args(&self, _index: usize) -> Vec<String> {
         match self.model.as_str() {
             "passthrough" => {
                 todo!()

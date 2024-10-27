@@ -1,4 +1,3 @@
-use crate::yaml::looking_glass::LookingGlass;
 use crate::yaml::{LgClientArgs, QemuArgs};
 use serde::Deserialize;
 
@@ -9,7 +8,7 @@ pub struct Spice {
 }
 
 impl QemuArgs for Spice {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!(
                 "-spice port={},addr={},disable-ticketing=on",
@@ -28,7 +27,7 @@ impl QemuArgs for Spice {
 
 // looking-glass-client app:shmFile=/dev/kvmfr0 spice:host=0.0.0.0 spice:port=5903 input:escapeKey=KEY_F12 input:grabKeyboard win:size=1707x1067 win:fullscreen
 impl LgClientArgs for Spice {
-    fn get_lg_client_args(&self, index: usize) -> Vec<String> {
+    fn get_lg_client_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!("spice:host={}", self.addr),
             format!("spice:port={}", self.port),

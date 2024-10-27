@@ -1,5 +1,4 @@
 use crate::resource::data_manager::DataManager;
-use crate::resource::lock::{EzkvmError, Lock};
 use crate::yaml::QemuArgs;
 use serde::Deserialize;
 

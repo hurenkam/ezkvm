@@ -1,5 +1,4 @@
-use crate::args::EzkvmArguments;
-use crate::resource::lock::{EzkvmError, Lock};
+use crate::resource::lock::EzkvmError;
 use crate::resource::resource::Resource;
 use log::debug;
 use serde::Deserialize;
