@@ -176,6 +176,7 @@ impl Default for Cpu {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct Memory {
     max: u64,

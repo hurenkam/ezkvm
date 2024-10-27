@@ -4,6 +4,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 
+#[allow(dead_code)]
 pub enum EzkvmError {
     OpenError { file: String },
     ReadError { file: String },
@@ -34,6 +35,7 @@ impl Lock {
         self.name.clone()
     }
 
+    #[allow(dead_code)]
     pub fn get_pid(&self) -> u32 {
         self.pid
     }
@@ -67,6 +69,7 @@ impl Lock {
         Ok(result)
     }
 
+    #[allow(dead_code)]
     pub fn write(&self) -> Result<(), EzkvmError> {
         let filename = format!("/var/ezkvm/lock/{}.yaml", self.name);
         let yaml = serde_yaml::to_string(&self).map_err(|_| EzkvmError::ParseError {
@@ -78,6 +81,7 @@ impl Lock {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn delete(&self) -> Result<(), EzkvmError> {
         debug!("Lock[{}].delete()", self.name);
         let filename = format!("/var/ezkvm/lock/{}.yaml", self.name);

@@ -3,6 +3,7 @@ extern crate getopts;
 use getopts::Options;
 use log::LevelFilter;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum EzkvmCommand {
     Help,

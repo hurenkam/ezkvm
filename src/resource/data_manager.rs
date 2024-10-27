@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 static RESOURCE_MANAGER: Lazy<Arc<Mutex<DataManager>>> =
     Lazy::new(|| Arc::new(Mutex::new(DataManager::new("/etc/ezkvm/resource"))));
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct DataManager {
     resources: HashMap<String, ResourcePool>,

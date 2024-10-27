@@ -118,6 +118,7 @@ fn load_vm(file: &str) -> Config {
     serde_yaml::from_str(contents.as_str()).unwrap()
 }
 
+#[allow(dead_code)]
 fn load_pool(file: &str) -> ResourcePool {
     debug!("load_pool({})", file);
 
