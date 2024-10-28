@@ -80,6 +80,16 @@ setup permissions correctly. The ezkvm application can be used in two ways:
 
 1) using group permissions in combination with custom udev rules (recommended)
 
+   create the ezkvm group:
+   ```
+   groupadd ezkvm
+   ```
+
+   make the user from which you start ezkvm part of this group:
+   ```
+   useradd -G ezkvm <your_user_name>
+   ```
+
    add the following items in your /etc/security/limits.conf:
    ```
    @ezkvm          hard    memlock         100000000
@@ -92,7 +102,10 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    SUBSYSTEM=="vfio-dev", MODE="660", GROUP="ezkvm"
    ```
 
-2) setup with suid root permissions
+   After setting all this up, you should reboot for all changes to take effect.
+
+
+2) setup ezkvm with suid root permissions
 
    change ownership and permissions of the ezkvm binary:
    ```
