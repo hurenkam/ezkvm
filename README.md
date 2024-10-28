@@ -82,12 +82,12 @@ setup permissions correctly. The ezkvm application can be used in two ways:
 
    create the ezkvm group:
    ```
-   groupadd ezkvm
+   sudo groupadd ezkvm
    ```
 
    make the user from which you start ezkvm part of this group:
    ```
-   useradd -G ezkvm <your_user_name>
+   sudo useradd -G ezkvm <your_user_name>
    ```
 
    add the following items in your /etc/security/limits.conf:
