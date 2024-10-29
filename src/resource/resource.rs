@@ -1,4 +1,5 @@
-use crate::yaml::QemuArgs;
+//use crate::yaml::QemuDevice;
+use crate::config::QemuDevice;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
@@ -19,7 +20,7 @@ impl Resource {
     }
 }
 
-impl QemuArgs for Resource {
+impl QemuDevice for Resource {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         let offset = 10;

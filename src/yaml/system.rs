@@ -1,4 +1,6 @@
-use crate::yaml::{QemuArgs, SwtpmArgs};
+/*
+use crate::config::QemuDevice;
+use crate::yaml::SwtpmArgs;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -32,7 +34,7 @@ impl SwtpmArgs for System {
     }
 }
 
-impl QemuArgs for System {
+impl QemuDevice for System {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         match self.chipset.as_str() {
@@ -93,7 +95,7 @@ struct Bios {
     disk: Option<String>,
 }
 
-impl QemuArgs for Bios {
+impl QemuDevice for Bios {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         match self.model.as_str() {
             "ovmf" => {
@@ -152,7 +154,7 @@ struct Cpu {
     sockets: u16,
     cores: u16,
 }
-impl QemuArgs for Cpu {
+impl QemuDevice for Cpu {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let total = self.sockets * self.cores;
         vec![
@@ -182,7 +184,7 @@ struct Memory {
     max: u64,
     balloon: bool,
 }
-impl QemuArgs for Memory {
+impl QemuDevice for Memory {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![format!("-m {}", self.max)]
     }
@@ -233,7 +235,7 @@ impl SwtpmArgs for Tpm {
         }
     }
 }
-impl QemuArgs for Tpm {
+impl QemuDevice for Tpm {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         match self.model.as_str() {
             "none" => vec![],
@@ -264,3 +266,4 @@ impl Default for Tpm {
         }
     }
 }
+*/

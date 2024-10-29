@@ -1,4 +1,5 @@
-use crate::yaml::{LgClientArgs, QemuArgs};
+use crate::config::QemuDevice;
+use crate::yaml::LgClientArgs;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -7,7 +8,7 @@ pub struct LookingGlass {
     window: Option<Window>,
     input: Option<Input>,
 }
-impl QemuArgs for LookingGlass {
+impl QemuDevice for LookingGlass {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         let mut result = vec![
             "-vga none".to_string(),
@@ -44,7 +45,7 @@ pub struct Device {
     size: String,
 }
 
-impl QemuArgs for Device {
+impl QemuDevice for Device {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         vec![
             format!("-device ivshmem-plain,memdev=ivshmem{},bus=pcie.0", index),

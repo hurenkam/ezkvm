@@ -1,8 +1,10 @@
-use crate::yaml::QemuArgs;
+use derive_getters::Getters;
+//use crate::yaml::QemuDevice;
+use crate::config::QemuDevice;
 use serde::Deserialize;
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Getters)]
 pub struct General {
     name: String,
     uuid: Option<String>,
@@ -16,7 +18,7 @@ impl Default for General {
     }
 }
 
-impl QemuArgs for General {
+impl QemuDevice for General {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             "-accel kvm".to_string(),

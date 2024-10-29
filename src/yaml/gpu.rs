@@ -1,4 +1,5 @@
-use crate::yaml::QemuArgs;
+//use crate::yaml::QemuDevice;
+use crate::config::QemuDevice;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
@@ -10,7 +11,7 @@ pub struct Gpu {
     pci_address: String,
 }
 
-impl QemuArgs for Gpu {
+impl QemuDevice for Gpu {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         match self.driver.as_str() {
             "qxl-vga" => {

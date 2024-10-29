@@ -7,12 +7,14 @@ use crate::yaml::looking_glass::LookingGlass;
 use crate::yaml::network::Network;
 use crate::yaml::spice::Spice;
 use crate::yaml::storage::Storage;
-use crate::yaml::system::System;
-use crate::yaml::{LgClientArgs, QemuArgs, SwtpmArgs};
+use derive_getters::Getters;
+//use crate::yaml::system::System;
+use crate::config::{QemuDevice, System};
+use crate::yaml::LgClientArgs;
 use log::info;
 use serde::{Deserialize, Deserializer};
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
     #[serde(default, deserialize_with = "default_when_missing")]
     general: General,
@@ -39,10 +41,6 @@ impl Config {
         Ok(vec![])
     }
 
-    pub fn has_tpm(&self) -> bool {
-        self.system.get_tpm() != None
-    }
-
     pub fn has_lg(&self) -> bool {
         return self.looking_glass != None;
     }
@@ -51,16 +49,16 @@ impl Config {
         return self.display.clone();
     }
 }
-
+/*
 impl SwtpmArgs for Config {
     fn get_swtpm_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
-        result.extend(self.system.get_swtpm_args(0));
+        //result.extend(self.system.get_swtpm_args(0));
         result
     }
 }
-
-impl QemuArgs for Config {
+*/
+impl QemuDevice for Config {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         result.extend(self.general.get_qemu_args(0));
@@ -116,6 +114,10 @@ impl QemuArgs for Config {
         }
 
         args.split_whitespace().map(str::to_string).collect()
+    }
+
+    fn start(&self, config: &Config) {
+        self.system.start(config);
     }
 }
 

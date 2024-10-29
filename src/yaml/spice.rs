@@ -1,4 +1,5 @@
-use crate::yaml::{LgClientArgs, QemuArgs};
+use crate::config::QemuDevice;
+use crate::yaml::LgClientArgs;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -7,7 +8,7 @@ pub struct Spice {
     addr: String,
 }
 
-impl QemuArgs for Spice {
+impl QemuDevice for Spice {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!(

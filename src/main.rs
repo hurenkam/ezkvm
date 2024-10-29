@@ -1,4 +1,5 @@
 mod args;
+mod config;
 mod resource;
 mod yaml;
 
@@ -12,11 +13,12 @@ use std::{env, process};
 use crate::args::{EzkvmArguments, EzkvmCommand};
 
 use crate::colored::Colorize;
+use crate::config::QemuDevice;
 use crate::resource::data_manager::DataManager;
 use crate::resource::lock::{EzkvmError, Lock};
 use crate::resource::resource_pool::ResourcePool;
 use crate::yaml::config::Config;
-use crate::yaml::{LgClientArgs, QemuArgs, SwtpmArgs};
+use crate::yaml::LgClientArgs;
 use chrono::Local;
 use env_logger::Builder;
 use log::{debug, warn, Level, LevelFilter};
@@ -26,51 +28,32 @@ use std::os::unix::prelude::CommandExt;
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
     init_logger(args.log_level);
-
-    let uid = nix::unistd::getuid();
-    let gid = nix::unistd::getgid();
-    let euid = nix::unistd::geteuid();
-    let egid = nix::unistd::getegid();
-    debug!(
-        "main()  euid: {}, egid: {}, uid: {}, gid: {}",
-        euid, egid, uid, gid
-    );
     debug!("main( {:?} )", args.command);
 
     let _resource_manager = DataManager::instance();
 
     match args.command {
-        EzkvmCommand::Start { name } => {
-            let config = load_vm(format!("/etc/ezkvm/{}.yaml", name).as_str());
+        EzkvmCommand::Start { name } => handle_start_command(name),
+        EzkvmCommand::Stop { .. } => todo!(),
+        EzkvmCommand::Hibernate { .. } => todo!(),
+        _ => args.print_usage(),
+    }
+}
 
-            if config.has_tpm() {
-                if let Ok(_child) = start_swtpm(&name, &config) {
-                    // nothing to do with child yet
-                }
-            }
+fn handle_start_command(name: String) {
+    let config = load_vm(format!("/etc/ezkvm/{}.yaml", name).as_str());
 
-            if let Ok(_lock) = start_vm(&name, &config) {
-                // use lock
-            } else {
-                debug!("Unable to start the vm");
-            }
+    config.start(&config);
 
-            if config.has_lg() {
-                if let Ok(_child) = start_lg_client(&name, &config) {
-                    //let output = child
-                    //    .wait_with_output().unwrap();
-                    //println!("Done {}", std::str::from_utf8(&output.stdout).unwrap());
-                }
-            }
-        }
-        EzkvmCommand::Stop { .. } => {
-            todo!()
-        }
-        EzkvmCommand::Hibernate { .. } => {
-            todo!()
-        }
-        _ => {
-            args.print_usage();
+    if let Ok(_lock) = start_vm(&name, &config) {
+        // use lock
+    } else {
+        debug!("Unable to start the vm");
+    }
+
+    if config.has_lg() {
+        if let Ok(_child) = start_lg_client(&name, &config) {
+            // nothing to do with child yet
         }
     }
 }
@@ -151,32 +134,6 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
         debug!("start_vm(): Failed to start qemu");
         Err(EzkvmError::ExecError { file: name.clone() })
     }
-}
-
-fn start_swtpm(name: &String, config: &Config) -> Result<Child, EzkvmError> {
-    debug!("start_swtpm()");
-
-    let mut args = vec!["swtpm".to_string()];
-    args.extend(config.get_swtpm_args(0));
-
-    let (uid, gid) = get_swtpm_uid_and_gid(config);
-    if let Ok(child) = Command::new("/usr/bin/env")
-        .args(args.clone())
-        .uid(uid)
-        .gid(gid)
-        .spawn()
-    {
-        debug!(
-            "start_swtpm(): Started swtpm with pid: {}, uid: {}, gid: {}\n{}",
-            child.id(),
-            uid,
-            gid,
-            args.join(" ")
-        );
-        return Ok(child);
-    }
-
-    Err(EzkvmError::ExecError { file: name.clone() })
 }
 
 fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> {

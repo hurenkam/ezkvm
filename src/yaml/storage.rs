@@ -1,4 +1,5 @@
-use crate::yaml::QemuArgs;
+//use crate::yaml::QemuDevice;
+use crate::config::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -9,7 +10,7 @@ pub struct Storage {
     boot_index: Option<String>,
 }
 
-impl QemuArgs for Storage {
+impl QemuDevice for Storage {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         let boot_index = match self.boot_index.clone() {
             None => "".to_string(),

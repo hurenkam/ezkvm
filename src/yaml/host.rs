@@ -1,4 +1,5 @@
-use crate::yaml::QemuArgs;
+//use crate::yaml::QemuDevice;
+use crate::config::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -6,7 +7,7 @@ pub struct Host {
     pci: Vec<Pci>,
     usb: Vec<Usb>,
 }
-impl QemuArgs for Host {
+impl QemuDevice for Host {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
 
@@ -29,7 +30,7 @@ struct Pci {
     multi_function: Option<bool>,
 }
 
-impl QemuArgs for Pci {
+impl QemuDevice for Pci {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let multi_function = match self.multi_function {
             None => "".to_string(),
@@ -52,7 +53,7 @@ struct Usb {
     host_bus: String,
 }
 
-impl QemuArgs for Usb {
+impl QemuDevice for Usb {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         vec![format!(
             "-device usb-host,bus=xhci.0,port={},hostbus={},hostport={},id=usb{}",

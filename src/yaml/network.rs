@@ -1,5 +1,6 @@
 use crate::resource::data_manager::DataManager;
-use crate::yaml::QemuArgs;
+//use crate::yaml::QemuDevice;
+use crate::config::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -9,7 +10,7 @@ pub struct Network {
     pool: Option<String>,
     mac: String,
 }
-impl QemuArgs for Network {
+impl QemuDevice for Network {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
         match self.controller.as_str() {
             "pool" => {
