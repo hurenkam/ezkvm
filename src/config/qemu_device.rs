@@ -1,4 +1,4 @@
-use crate::yaml::config::Config;
+use crate::config::Config;
 use std::fmt::Debug;
 
 pub trait QemuDevice: Debug {

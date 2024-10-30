@@ -1,8 +1,7 @@
-use crate::config::default_when_missing;
 use crate::config::QemuDevice;
+use crate::config::{default_when_missing, Config};
 use crate::get_lg_uid_and_gid;
 use crate::resource::lock::EzkvmError;
-use crate::yaml::config::Config;
 use derive_getters::Getters;
 use log::{debug, warn};
 use serde::Deserialize;

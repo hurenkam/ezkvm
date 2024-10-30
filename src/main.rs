@@ -13,11 +13,10 @@ use std::{env, process};
 use crate::args::{EzkvmArguments, EzkvmCommand};
 
 use crate::colored::Colorize;
-use crate::config::QemuDevice;
+use crate::config::{Config, QemuDevice};
 use crate::resource::data_manager::DataManager;
 use crate::resource::lock::{EzkvmError, Lock};
 use crate::resource::resource_pool::ResourcePool;
-use crate::yaml::config::Config;
 use chrono::Local;
 use env_logger::Builder;
 use log::{debug, Level, LevelFilter};
@@ -62,7 +61,7 @@ fn get_qemu_uid_and_gid(config: &Config) -> (u32, u32) {
 
     // if gtk ui is selected, qemu can not be run as root
     // so drop to actual uid/gid instead of euid/egid
-    if let Some(display) = config.get_display() {
+    if let Some(display) = config.display() {
         if display.get_driver() == "gtk" {
             uid = u32::from(nix::unistd::getuid());
             gid = u32::from(nix::unistd::getgid());

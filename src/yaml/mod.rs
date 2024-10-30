@@ -1,10 +1,6 @@
-pub mod config;
-mod display;
+pub mod display;
 pub mod general;
-mod gpu;
+pub mod gpu;
 pub mod host;
-pub mod looking_glass;
 pub mod network;
-pub mod spice;
 pub mod storage;
-pub mod system;

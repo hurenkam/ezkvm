@@ -1,8 +1,8 @@
 use crate::config::qemu_device::QemuDevice;
 use crate::config::system::tpm::Tpm;
+use crate::config::Config;
 use crate::get_swtpm_uid_and_gid;
 use crate::resource::lock::EzkvmError;
-use crate::yaml::config::Config;
 use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::process::CommandExt;
