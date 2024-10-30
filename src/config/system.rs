@@ -1,3 +1,4 @@
+use crate::config::default_when_missing;
 use crate::config::qemu_device::QemuDevice;
 use crate::config::system::bios::Bios;
 use crate::config::system::chipset::Chipset;
@@ -6,7 +7,7 @@ use crate::config::system::memory::Memory;
 use crate::config::system::tpm::Tpm;
 use crate::yaml::config::Config;
 use derive_getters::Getters;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use typetag::serde;
 
 mod bios;
@@ -41,16 +42,7 @@ impl QemuDevice for System {
         result
     }
 
-    fn start(&self, config: &Config) {
-        self.tpm.start(config);
+    fn pre_start(&self, config: &Config) {
+        self.tpm.pre_start(config);
     }
-}
-
-pub fn default_when_missing<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de> + Default,
-{
-    let option = Option::deserialize(deserializer)?;
-    Ok(option.unwrap_or_default())
 }

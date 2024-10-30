@@ -1,5 +1,4 @@
 use crate::config::qemu_device::QemuDevice;
-use crate::config::system::tpm::notpm::NoTpm;
 use crate::config::system::tpm::Tpm;
 use crate::get_swtpm_uid_and_gid;
 use crate::resource::lock::EzkvmError;
@@ -55,14 +54,14 @@ impl QemuDevice for SwTpm {
         ]
     }
 
-    fn start(&self, config: &Config) {
+    fn pre_start(&self, config: &Config) {
         debug!("SwTpm::start()");
 
         let (uid, gid) = get_swtpm_uid_and_gid(config);
         let name = config.general().name().clone();
         match self.spawn(uid, gid, name) {
-            Ok(_child) => debug!("SwTpm::start() succeeded"),
-            Err(_error) => warn!("SwTpm::start() failed"),
+            Ok(_child) => debug!("SwTpm::pre_start() succeeded"),
+            Err(_error) => warn!("SwTpm::pre_start() failed"),
         }
     }
 }

@@ -7,7 +7,7 @@ extern crate colored;
 
 use std::fs::File;
 use std::io::Read;
-use std::process::{Child, Command};
+use std::process::Command;
 use std::{env, process};
 
 use crate::args::{EzkvmArguments, EzkvmCommand};
@@ -18,12 +18,13 @@ use crate::resource::data_manager::DataManager;
 use crate::resource::lock::{EzkvmError, Lock};
 use crate::resource::resource_pool::ResourcePool;
 use crate::yaml::config::Config;
-use crate::yaml::LgClientArgs;
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, warn, Level, LevelFilter};
+use log::{debug, Level, LevelFilter};
 use std::io::Write;
 use std::os::unix::prelude::CommandExt;
+use std::thread::sleep;
+use std::time::Duration;
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
@@ -43,7 +44,7 @@ fn main() {
 fn handle_start_command(name: String) {
     let config = load_vm(format!("/etc/ezkvm/{}.yaml", name).as_str());
 
-    config.start(&config);
+    config.pre_start(&config);
 
     if let Ok(_lock) = start_vm(&name, &config) {
         // use lock
@@ -51,11 +52,8 @@ fn handle_start_command(name: String) {
         debug!("Unable to start the vm");
     }
 
-    if config.has_lg() {
-        if let Ok(_child) = start_lg_client(&name, &config) {
-            // nothing to do with child yet
-        }
-    }
+    //sleep(Duration::from_secs(5));
+    config.post_start(&config);
 }
 
 fn get_qemu_uid_and_gid(config: &Config) -> (u32, u32) {
@@ -120,56 +118,26 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, EzkvmError> {
     let args = config.get_qemu_args(0);
     let resources: Vec<String> = config.allocate_resources()?;
 
+    let log_file = File::create("qemu.log").unwrap();
+    let log = process::Stdio::from(log_file);
+    let err_file = File::create("qemu.err").unwrap();
+    let err = process::Stdio::from(err_file);
+
     let (uid, gid) = get_qemu_uid_and_gid(config);
     if let Ok(child) = Command::new("/usr/bin/env")
         .args(args)
         .uid(uid)
         .gid(gid)
+        .stdout(log)
+        .stderr(err)
         .spawn()
     {
         debug!("start_vm(): Started qemu with pid {}", child.id());
-
         Ok(Lock::new(name.clone(), child.id(), resources))
     } else {
         debug!("start_vm(): Failed to start qemu");
         Err(EzkvmError::ExecError { file: name.clone() })
     }
-}
-
-fn start_lg_client(name: &String, config: &Config) -> Result<Child, EzkvmError> {
-    debug!("start_lg_client()");
-
-    let mut args = vec!["looking-glass-client".to_string()];
-    args.extend(config.get_lg_client_args(0));
-
-    let (uid, gid) = get_lg_uid_and_gid(config);
-    debug!("start_lg_client() uid: {}, gid: {}", uid, gid);
-
-    let log_file = File::create("looking-glass-client.log").unwrap();
-    let log = process::Stdio::from(log_file);
-    let err_file = File::create("looking-glass-client.err").unwrap();
-    let err = process::Stdio::from(err_file);
-
-    let mut lg_cmd = Command::new("/usr/bin/env");
-    lg_cmd.uid(uid).gid(gid).args(args.clone());
-    match lg_cmd.stdout(log).stderr(err).spawn() {
-        Ok(child) => {
-            debug!(
-                "start_lg_client(): Started looking-glass-client with pid {}\n{}",
-                child.id(),
-                args.join(" ")
-            );
-            return Ok(child);
-        }
-        Err(e) => {
-            warn!(
-                "start_lg_client(): unable to start looking-glass-client due to error {}\n",
-                e
-            );
-        }
-    }
-
-    Err(EzkvmError::ExecError { file: name.clone() })
 }
 
 fn init_logger(log_level: LevelFilter) {

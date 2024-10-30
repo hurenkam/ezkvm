@@ -1,3 +1,5 @@
+use crate::config::default_when_missing;
+use crate::config::{QemuDevice, System};
 use crate::resource::lock::EzkvmError;
 use crate::yaml::display::Display;
 use crate::yaml::general::General;
@@ -8,11 +10,8 @@ use crate::yaml::network::Network;
 use crate::yaml::spice::Spice;
 use crate::yaml::storage::Storage;
 use derive_getters::Getters;
-//use crate::yaml::system::System;
-use crate::config::{QemuDevice, System};
-use crate::yaml::LgClientArgs;
 use log::info;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -49,15 +48,7 @@ impl Config {
         return self.display.clone();
     }
 }
-/*
-impl SwtpmArgs for Config {
-    fn get_swtpm_args(&self, _index: usize) -> Vec<String> {
-        let mut result = vec![];
-        //result.extend(self.system.get_swtpm_args(0));
-        result
-    }
-}
-*/
+
 impl QemuDevice for Config {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
@@ -116,38 +107,18 @@ impl QemuDevice for Config {
         args.split_whitespace().map(str::to_string).collect()
     }
 
-    fn start(&self, config: &Config) {
-        self.system.start(config);
+    fn pre_start(&self, config: &Config) {
+        self.system.pre_start(config);
     }
-}
 
-impl LgClientArgs for Config {
-    fn get_lg_client_args(&self, _index: usize) -> Vec<String> {
-        let mut result = vec![];
-
-        match &self.spice {
-            None => {}
-            Some(spice) => {
-                result.extend(spice.get_lg_client_args(0));
-            }
-        }
+    fn post_start(&self, config: &Config) {
+        self.system.post_start(config);
 
         match &self.looking_glass {
             None => {}
-            Some(looking_glass) => {
-                result.extend(looking_glass.get_lg_client_args(0));
+            Some(looking_glass_host) => {
+                looking_glass_host.post_start(config);
             }
         }
-
-        result
     }
-}
-
-fn default_when_missing<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de> + Default,
-{
-    let option = Option::deserialize(deserializer)?;
-    Ok(option.unwrap_or_default())
 }
