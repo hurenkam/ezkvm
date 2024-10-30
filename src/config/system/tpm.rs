@@ -1,6 +1,5 @@
 use crate::config::qemu_device::QemuDevice;
-pub use crate::config::system::tpm::no_tpm::NoTpm;
-pub use crate::config::system::tpm::swtpm::SwTpm;
+use crate::config::system::tpm::no_tpm::NoTpm;
 
 mod no_tpm;
 mod pass_through_tpm;

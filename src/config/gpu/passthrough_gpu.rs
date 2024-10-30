@@ -8,14 +8,6 @@ pub struct PassthroughGpu {
     pci: Vec<Pci>,
 }
 
-impl PassthroughGpu {
-    pub fn boxed_default() -> Box<Self> {
-        Box::new(Self {
-            pci: Default::default(),
-        })
-    }
-}
-
 impl QemuDevice for PassthroughGpu {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];

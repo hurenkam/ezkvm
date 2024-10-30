@@ -1,16 +1,10 @@
 use crate::config::display::Display;
-use crate::config::gpu::Gpu;
 use crate::config::qemu_device::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Gtk {
     gl: bool,
-}
-impl Gtk {
-    pub fn boxed_default() -> Box<Self> {
-        Box::new(Self { gl: true })
-    }
 }
 
 impl QemuDevice for Gtk {

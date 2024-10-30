@@ -27,12 +27,6 @@ impl QemuDevice for Q35 {
     }
 }
 
-impl Q35 {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 #[typetag::deserialize(name = "q35")]
 impl Chipset for Q35 {}
 

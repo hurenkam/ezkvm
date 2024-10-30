@@ -11,12 +11,6 @@ pub struct OVMF {
     uuid: String,
 }
 
-impl OVMF {
-    pub fn new(file: String, uuid: String) -> Self {
-        Self { file, uuid }
-    }
-}
-
 impl QemuDevice for OVMF {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![

@@ -8,14 +8,6 @@ pub struct VirtioVgaGl {
     pci_address: String,
 }
 
-impl VirtioVgaGl {
-    pub fn boxed_default() -> Box<Self> {
-        Box::new(Self {
-            pci_address: default_pci_address(),
-        })
-    }
-}
-
 fn default_pci_address() -> String {
     "0x2".to_string()
 }
