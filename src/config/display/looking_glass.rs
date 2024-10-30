@@ -1,4 +1,5 @@
-use crate::config::QemuDevice;
+use crate::config::display::Display;
+use crate::config::qemu_device::QemuDevice;
 use crate::config::{default_when_missing, Config};
 use crate::get_lg_uid_and_gid;
 use crate::resource::lock::EzkvmError;
@@ -6,38 +7,17 @@ use derive_getters::Getters;
 use log::{debug, warn};
 use serde::Deserialize;
 use std::fs::File;
-use std::os::unix::process::CommandExt;
+use std::os::unix::prelude::CommandExt;
 use std::process;
 use std::process::{Child, Command};
 
-#[derive(Debug, Deserialize, PartialEq, Getters)]
+#[derive(Deserialize, Debug, Getters)]
 pub struct LookingGlass {
     device: Device,
     #[serde(default, deserialize_with = "default_when_missing")]
     window: Option<Window>,
     #[serde(default, deserialize_with = "default_when_missing")]
     input: Option<Input>,
-}
-impl QemuDevice for LookingGlass {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
-        let mut result = vec![
-            "-vga none".to_string(),
-            "-nographic".to_string(),
-            "-device virtio-mouse".to_string(),
-            "-device virtio-keyboard".to_string(),
-        ];
-
-        result.extend(self.device.get_qemu_args(index));
-
-        result
-    }
-
-    fn post_start(&self, config: &Config) {
-        match self.start_lg_client(&config) {
-            Ok(_child) => debug!("LookingGlass::post_start() succeeded"),
-            Err(_error) => warn!("LookingGlass::post_start() failed"),
-        }
-    }
 }
 
 impl LookingGlass {
@@ -106,6 +86,31 @@ impl LookingGlass {
     }
 }
 
+impl QemuDevice for LookingGlass {
+    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+        let mut result = vec![
+            "-vga none".to_string(),
+            "-nographic".to_string(),
+            "-device virtio-mouse".to_string(),
+            "-device virtio-keyboard".to_string(),
+        ];
+
+        result.extend(self.device.get_qemu_args(index));
+
+        result
+    }
+
+    fn post_start(&self, config: &Config) {
+        match self.start_lg_client(&config) {
+            Ok(_child) => debug!("LookingGlass::post_start() succeeded"),
+            Err(_error) => warn!("LookingGlass::post_start() failed"),
+        }
+    }
+}
+
+#[typetag::deserialize(name = "looking_glass")]
+impl Display for LookingGlass {}
+
 #[derive(Debug, Deserialize, PartialEq, Getters)]
 pub struct Device {
     path: String,
@@ -134,4 +139,23 @@ pub struct Window {
 pub struct Input {
     grab_keyboard: bool,
     escape_key: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unit_test() {
+        let display = LookingGlass {
+            device: Device {
+                path: "".to_string(),
+                size: "".to_string(),
+            },
+            window: None,
+            input: None,
+        };
+        let expected: Vec<String> = vec![];
+        assert_eq!(display.get_qemu_args(0), expected);
+    }
 }

@@ -49,13 +49,14 @@ fn handle_start_command(name: String) {
         debug!("Unable to start the vm");
     }
 
-    //sleep(Duration::from_secs(5));
     config.post_start(&config);
 }
 
 fn get_qemu_uid_and_gid(config: &Config) -> (u32, u32) {
     let mut uid = u32::from(nix::unistd::geteuid());
     let mut gid = u32::from(nix::unistd::getegid());
+
+    /* Todo: fix this again
 
     // if gtk ui is selected, qemu can not be run as root
     // so drop to actual uid/gid instead of euid/egid
@@ -65,6 +66,7 @@ fn get_qemu_uid_and_gid(config: &Config) -> (u32, u32) {
             gid = u32::from(nix::unistd::getgid());
         }
     }
+    */
 
     (uid, gid)
 }

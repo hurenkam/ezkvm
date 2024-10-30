@@ -1,23 +1,23 @@
+use crate::config::display::Display;
 use crate::config::qemu_device::QemuDevice;
-use crate::config::system::tpm::Tpm;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct NoTpm {}
-impl NoTpm {
+pub struct NoDisplay {}
+impl NoDisplay {
     pub fn boxed_default() -> Box<Self> {
         Box::new(Self {})
     }
 }
 
-impl QemuDevice for NoTpm {
+impl QemuDevice for NoDisplay {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![]
     }
 }
 
-#[typetag::deserialize(name = "notpm")]
-impl Tpm for NoTpm {}
+#[typetag::deserialize(name = "no_display")]
+impl Display for NoDisplay {}
 
 #[cfg(test)]
 mod tests {
@@ -25,8 +25,8 @@ mod tests {
 
     #[test]
     fn unit_test() {
-        let notpm = NoTpm {};
+        let display = NoDisplay {};
         let expected: Vec<String> = vec![];
-        assert_eq!(notpm.get_qemu_args(0), expected);
+        assert_eq!(display.get_qemu_args(0), expected);
     }
 }

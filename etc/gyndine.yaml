@@ -7,12 +7,13 @@ system:
   cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
   memory: { max: 16384, balloon: false }
 
-display:
-  driver: gtk
-  gl: true
-
 gpu:
-  driver: virtio-vga-gl
+  type: "virtio-vga-gl"
+  memory: 256
+
+display:
+  type: "gtk"
+  gl: true
 
 storage:
   - { driver: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
