@@ -1,3 +1,4 @@
+use crate::config::default_when_missing;
 use crate::config::QemuDevice;
 use crate::get_lg_uid_and_gid;
 use crate::resource::lock::EzkvmError;
@@ -13,7 +14,9 @@ use std::process::{Child, Command};
 #[derive(Debug, Deserialize, PartialEq, Getters)]
 pub struct LookingGlass {
     device: Device,
+    #[serde(default, deserialize_with = "default_when_missing")]
     window: Option<Window>,
+    #[serde(default, deserialize_with = "default_when_missing")]
     input: Option<Input>,
 }
 impl QemuDevice for LookingGlass {
