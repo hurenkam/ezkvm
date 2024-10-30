@@ -5,7 +5,7 @@ system:
   chipset: { type: "q35", version: "8.1" }
   bios: { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
   cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
-  # below are the desired cpu flags, but the hv & kvm flags seem to cause dxgi_init to fail when starting looking-glass-host
+  # below are the desired cpu flags, but the hv & kvm flags seem to cause dxgi_init to fail when starting looking-glass-host using my AMD 7700S
   #flags: "+aes,enforce,hv_ipi,hv_relaxed,hv_reset,hv_runtime,hv_spinlocks=0x1fff,hv_stimer,hv_synic,hv_time,hv_vapic,hv_vendor_id=ezkvm,hv_vpindex,kvm=off,+kvm_pv_eoi,+kvm_pv_unhalt,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3"
   memory: { max: 16384, balloon: false }
   tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/vm-108-tpmstate", socket: "/var/ezkvm/wakiza-tpm.socket" }

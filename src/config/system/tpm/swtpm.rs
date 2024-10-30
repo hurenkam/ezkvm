@@ -19,6 +19,10 @@ pub struct SwTpm {
 impl Tpm for SwTpm {}
 
 impl SwTpm {
+    pub fn new(disk: String, socket: String) -> Self {
+        Self { disk, socket }
+    }
+
     fn spawn(&self, uid: u32, gid: u32, name: String) -> Result<Child, EzkvmError> {
         Command::new("/usr/bin/env")
             .args(self.get_args())

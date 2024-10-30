@@ -4,7 +4,7 @@ general:
 system:
   chipset: { type: "q35", version: "8.1" }
   bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
-  cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,enforce,+kvm_pv_eoi,+kvm_pv_unhalt,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3" }
+  cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
   memory: { max: 16384, balloon: false }
 
 display:

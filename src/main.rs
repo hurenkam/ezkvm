@@ -22,8 +22,6 @@ use env_logger::Builder;
 use log::{debug, Level, LevelFilter};
 use std::io::Write;
 use std::os::unix::prelude::CommandExt;
-use std::thread::sleep;
-use std::time::Duration;
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());

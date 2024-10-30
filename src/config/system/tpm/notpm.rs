@@ -18,3 +18,15 @@ impl QemuDevice for NoTpm {
 
 #[typetag::deserialize(name = "notpm")]
 impl Tpm for NoTpm {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unit_test() {
+        let notpm = NoTpm {};
+        let expected: Vec<String> = vec![];
+        assert_eq!(notpm.get_qemu_args(0), expected);
+    }
+}
