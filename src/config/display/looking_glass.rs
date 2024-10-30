@@ -155,7 +155,14 @@ mod tests {
             window: None,
             input: None,
         };
-        let expected: Vec<String> = vec![];
+        let expected: Vec<String> = vec![
+            "-vga none".to_string(),
+            "-nographic".to_string(),
+            "-device virtio-mouse".to_string(),
+            "-device virtio-keyboard".to_string(),
+            "-device ivshmem-plain,memdev=ivshmem0,bus=pcie.0".to_string(),
+            "-object memory-backend-file,id=ivshmem0,share=on,mem-path=,size=".to_string(),
+        ];
         assert_eq!(display.get_qemu_args(0), expected);
     }
 }

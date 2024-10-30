@@ -16,7 +16,7 @@ impl Memory {
 impl Default for Memory {
     fn default() -> Self {
         Self {
-            max: 2048,
+            max: 16384,
             balloon: None,
         }
     }

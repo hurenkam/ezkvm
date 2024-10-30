@@ -35,8 +35,6 @@ pub struct Config {
     gpu: Box<dyn Gpu>,
     #[serde(default, deserialize_with = "default_when_missing")]
     spice: Option<Spice>,
-    //#[serde(default, deserialize_with = "default_when_missing")]
-    //looking_glass: Option<LookingGlass>,
     #[serde(default, deserialize_with = "default_when_missing")]
     host: Option<Host>,
     #[serde(default, deserialize_with = "default_when_missing")]
@@ -145,7 +143,6 @@ mod tests {
                       name: wakiza
                     
                     system:
-                      chipset: { type: "q35", version: "8.1" }
                       bios: { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
                       cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
                       memory: { max: 16384, balloon: false }
@@ -242,10 +239,7 @@ mod tests {
                       name: gyndine
                     
                     system:
-                      chipset: { type: "q35", version: "8.1" }
                       bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
-                      cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
-                      memory: { max: 16384, balloon: false }
                     
                     gpu:
                       type: "virtio-vga-gl"
@@ -287,7 +281,7 @@ mod tests {
             "-drive", "if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd",
             "-drive", "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-950-disk-0,size=540672",
             "-m", "16384",
-            "-smp", "8,sockets=1,cores=8,maxcpus=8",
+            "-smp", "4,sockets=1,cores=4,maxcpus=4",
             "-cpu", "qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
             "-display", "gtk,gl=on",
             "-audiodev", "pipewire,id=audiodev0",
