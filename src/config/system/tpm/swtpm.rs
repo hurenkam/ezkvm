@@ -19,6 +19,7 @@ pub struct SwTpm {
 impl Tpm for SwTpm {}
 
 impl SwTpm {
+    #[cfg(test)]
     pub fn new(disk: String, socket: String) -> Self {
         Self { disk, socket }
     }
