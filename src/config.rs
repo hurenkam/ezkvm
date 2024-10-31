@@ -6,13 +6,13 @@ mod spice;
 mod system;
 mod types;
 
+use std::any::{Any, TypeId};
+use std::ops::Deref;
 use derive_getters::Getters;
-use log::info;
+use log::{debug, info};
 use serde::{Deserialize, Deserializer};
-
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
-use crate::resource::lock::EzkvmError;
 use crate::yaml::network::Network;
 use crate::yaml::storage::Storage;
 
@@ -23,6 +23,8 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
+pub use display::Gtk;
+use crate::osal::OsalError;
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -45,8 +47,49 @@ pub struct Config {
 }
 
 impl Config {
-    pub(crate) fn allocate_resources(&self) -> Result<Vec<String>, EzkvmError> {
+    pub(crate) fn allocate_resources(&self) -> Result<Vec<String>, OsalError> {
         Ok(vec![])
+    }
+
+    fn has_gtk_display_configured(&self) -> bool {
+        self.get_gtk_display().is_some()
+    }
+    fn get_gtk_display(&self) -> Option<Gtk> {
+        let display = self.display();
+
+        let gtk_display = if (*display).type_id() == TypeId::of::<Box<dyn Display>>() && (*display.deref()).type_id() == TypeId::of::<Gtk>() {
+            let t = unsafe { &*(display as *const dyn Any as *const Box<Gtk>) };
+            Some(t.deref().clone())
+        } else {
+            None
+        };
+
+        gtk_display
+    }
+
+    pub fn get_escalated_uid_and_gid(&self) -> (u32, u32) {
+        // if gtk display is enabled, qemu (and swtpm) can not be run with escalated privileges
+        // so in this case return default uid/gid instead
+        if self.has_gtk_display_configured() {
+            debug!("get_qemu_uid_and_gid(): Gtk display configured, dropping to default uid/gid");
+            return self.get_default_uid_and_gid()
+        }
+
+        // return euid/egid so that main processes (qemu & swtpm)
+        // can run with escalated privileges
+        (
+            u32::from(nix::unistd::geteuid()),
+            u32::from(nix::unistd::getegid()),
+        )
+    }
+
+    pub fn get_default_uid_and_gid(&self) -> (u32, u32) {
+        // ui processes can not be run as root
+        // so return actual uid/gid instead of euid/egid
+        (
+            u32::from(nix::unistd::getuid()),
+            u32::from(nix::unistd::getgid()),
+        )
     }
 }
 
@@ -165,48 +208,47 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    const DEFAULT_WINDOWS_CONFIG: &str = r#"
+        general:
+            name: wakiza
+
+        system:
+            bios: { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
+            cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
+            memory: { max: 16384, balloon: false }
+            tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/vm-108-tpmstate", socket: "/var/ezkvm/wakiza-tpm.socket" }
+
+        spice:
+            port: 5903
+            addr: 0.0.0.0
+
+        gpu:
+            type: "passthrough"
+            pci:
+            - { vm_id: "0.0", host_id: "0000:03:00.0", multi_function: true }
+            - { vm_id: "0.1", host_id: "0000:03:00.1" }
+
+        display:
+            type: "looking_glass"
+            device: { path: /dev/kvmfr0, size: 128M }
+            input: { grab_keyboard: true, escape_key: KEY_F12 }
+            window: { size: 1707x1067, full_screen: true }
+
+        host:
+            usb:
+            - { vm_port: "1", host_bus: "1", host_port: "2.2" }
+
+        storage:
+        - { driver: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: "0" }
+        - { driver: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
+
+        network:
+        - { controller: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
+    "#;
+
     #[test]
     fn test_windows_defaults() {
-        let config: Config = serde_yaml::from_str(
-            r#"
-                    general:
-                      name: wakiza
-                    
-                    system:
-                      bios: { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
-                      cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
-                      memory: { max: 16384, balloon: false }
-                      tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/vm-108-tpmstate", socket: "/var/ezkvm/wakiza-tpm.socket" }
-                    
-                    spice:
-                      port: 5903
-                      addr: 0.0.0.0
-                      
-                    gpu:
-                      type: "passthrough"
-                      pci:
-                        - { vm_id: "0.0", host_id: "0000:03:00.0", multi_function: true }
-                        - { vm_id: "0.1", host_id: "0000:03:00.1" }
-                    
-                    display:
-                      type: "looking_glass"
-                      device: { path: /dev/kvmfr0, size: 128M }
-                      input: { grab_keyboard: true, escape_key: KEY_F12 }
-                      window: { size: 1707x1067, full_screen: true }
-                    
-                    host:
-                      usb:
-                        - { vm_port: "1", host_bus: "1", host_port: "2.2" }
-                    
-                    storage:
-                      - { driver: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: "0" }
-                      - { driver: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
-                    
-                    network:
-                      - { controller: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
-              "#,
-        )
-        .unwrap();
+        let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
 
         let tmp = config.get_qemu_args(0);
         let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
@@ -261,33 +303,31 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    const DEFAULT_UBUNTU_CONFIG: &str = r#"
+        general:
+            name: gyndine
+
+        system:
+            bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
+
+        gpu:
+            type: "virtio-vga-gl"
+            memory: 256
+
+        display:
+            type: "gtk"
+            gl: true
+
+        storage:
+        - { driver: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
+
+        network:
+        - { controller: "bridge", bridge: "vmbr0",  driver: "virtio-net-pci", mac: "BC:24:11:FF:76:89" }
+    "#;
+
     #[test]
     fn test_ubuntu_defaults() {
-        let config: Config = serde_yaml::from_str(
-            r#"
-                    general:
-                      name: gyndine
-                    
-                    system:
-                      bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
-
-                    gpu:
-                      type: "virtio-vga-gl"
-                      memory: 256
-                    
-                    display:
-                      type: "gtk"
-                      gl: true
-                    
-                    storage:
-                      - { driver: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
-                    
-                    network:
-                      - { controller: "bridge", bridge: "vmbr0",  driver: "virtio-net-pci", mac: "BC:24:11:FF:76:89" }
-              "#,
-        )
-            .unwrap();
-
+        let config: Config = serde_yaml::from_str(DEFAULT_UBUNTU_CONFIG).unwrap();
         let tmp = config.get_qemu_args(0);
         let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
         let expected: Vec<&str> = vec![
@@ -326,5 +366,17 @@ mod tests {
         ];
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_has_gtk_display_configured() {
+        let config: Config = serde_yaml::from_str(DEFAULT_UBUNTU_CONFIG).unwrap();
+        assert!(config.has_gtk_display_configured())
+    }
+
+    #[test]
+    fn test_has_no_gtk_display_configured() {
+        let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
+        assert_eq!(config.has_gtk_display_configured(), false)
     }
 }

@@ -1,3 +1,4 @@
+use std::any::Any;
 #[allow(unused)]
 pub use crate::config::display::gtk::Gtk;
 #[allow(unused)]
@@ -12,7 +13,7 @@ mod looking_glass;
 mod no_display;
 
 #[typetag::deserialize(tag = "type")]
-pub trait Display: QemuDevice {}
+pub trait Display:  'static + Any + QemuDevice {}
 impl Default for Box<dyn Display> {
     fn default() -> Self {
         NoDisplay::boxed_default()

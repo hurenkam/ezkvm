@@ -1,4 +1,4 @@
-use crate::resource::lock::{EzkvmError, Lock};
+use crate::resource::lock::{Lock};
 use crate::resource::resource::Resource;
 use crate::resource::resource_pool::ResourcePool;
 use log::{debug, info};
@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::{Arc, Mutex};
+use crate::osal::OsalError;
 
 static RESOURCE_MANAGER: Lazy<Arc<Mutex<DataManager>>> =
     Lazy::new(|| Arc::new(Mutex::new(DataManager::new("/etc/ezkvm/resource"))));
@@ -45,22 +46,22 @@ impl DataManager {
         RESOURCE_MANAGER.clone()
     }
 
-    pub fn claim_resource(&mut self, pool: String) -> Result<String, EzkvmError> {
+    pub fn claim_resource(&mut self, pool: String) -> Result<String, OsalError> {
         debug!("DataManager::claim_resource('{}')", pool);
 
         if let Some(resource_pool) = self.resources.get(&pool) {
             let id = resource_pool.claim_resource(&self.locked_resources)?;
             self.current_lock.add_resource(id.clone());
             self.locked_resources
-                .insert(id.clone(), self.current_lock.get_name());
+                .insert(id.clone(), self.current_lock.name().clone());
             return Ok(id);
         }
 
         debug!(
             "DataManager::claim_resource() Resource '{}' not available.",
-            pool
+            pool.clone()
         );
-        Err(EzkvmError::ResourceNotAvailable { pool })
+        Err(OsalError::Busy(Some(pool)))
     }
 
     pub fn get_resource(&self, pool: &String, id: &String) -> Option<&Resource> {
@@ -81,13 +82,11 @@ impl DataManager {
     */
 }
 
-fn load_resource_pools() -> Result<HashMap<String, ResourcePool>, EzkvmError> {
+fn load_resource_pools() -> Result<HashMap<String, ResourcePool>, OsalError> {
     debug!("read_locks()");
     let mut resource_pools = HashMap::from([]);
 
-    let files = fs::read_dir("/etc/ezkvm/resources/").map_err(|_| EzkvmError::OpenError {
-        file: "/etc/ezkvm/resources/".to_string(),
-    })?;
+    let files = fs::read_dir("/etc/ezkvm/resources/").map_err(|_| OsalError::OpenError(None) )?;
     for file in files {
         if let Ok(entry) = file {
             if let Ok(file_name) = entry.file_name().into_string() {
@@ -104,13 +103,11 @@ fn load_resource_pools() -> Result<HashMap<String, ResourcePool>, EzkvmError> {
     Ok(resource_pools)
 }
 
-fn load_machine_locks() -> Result<HashMap<String, Lock>, EzkvmError> {
+fn load_machine_locks() -> Result<HashMap<String, Lock>, OsalError> {
     debug!("read_locks()");
     let mut locks = HashMap::from([]);
 
-    let files = fs::read_dir("/var/ezkvm/lock/").map_err(|_| EzkvmError::OpenError {
-        file: "/var/ezkvm/lock/".to_string(),
-    })?;
+    let files = fs::read_dir("/var/ezkvm/lock/").map_err(|_| OsalError::OpenError(None))?;
     for file in files {
         if let Ok(entry) = file {
             if let Ok(file_name) = entry.file_name().into_string() {
@@ -134,8 +131,8 @@ fn find_locked_resources(
     let mut result = HashMap::from([]);
 
     for (_, lock) in locks {
-        for locked_resource in lock.get_resources() {
-            result.insert(locked_resource, lock.get_name());
+        for locked_resource in lock.resources() {
+            result.insert(locked_resource.clone(), lock.name().clone());
         }
     }
 

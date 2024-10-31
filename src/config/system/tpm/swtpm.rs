@@ -1,12 +1,12 @@
 use crate::config::system::tpm::Tpm;
 use crate::config::types::QemuDevice;
 use crate::config::Config;
-use crate::get_swtpm_uid_and_gid;
-use crate::resource::lock::EzkvmError;
+//use crate::{get_swtpm_uid_and_gid};
 use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command};
+use crate::osal::{Osal, OsalError};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug, Clone)]
@@ -23,13 +23,24 @@ impl SwTpm {
     pub fn new(disk: String, socket: String) -> Self {
         Self { disk, socket }
     }
-    fn spawn(&self, uid: u32, gid: u32, name: String) -> Result<Child, EzkvmError> {
+    fn spawn(&self, uid: u32, gid: u32, name: String) -> Result<Child, OsalError> {
+        debug!("SwTpm::spawn() uid: {}, gid: {}, name: {}", uid, gid, name.to_string());
+
+        Osal::execute_command(
+            Command::new("/usr/bin/env")
+                .args(self.get_args())
+                .uid(uid)
+                .gid(gid),
+            Some("swtpm".to_string())
+        )
+/*
         Command::new("/usr/bin/env")
             .args(self.get_args())
             .uid(uid)
             .gid(gid)
             .spawn()
-            .map_err(|_| EzkvmError::ExecError { file: name })
+            .map_err(|_| OsalError::ExecError(Some(name)))
+ */
     }
 
     fn get_args(&self) -> Vec<String> {
@@ -61,7 +72,8 @@ impl QemuDevice for SwTpm {
     fn pre_start(&self, config: &Config) {
         debug!("SwTpm::start()");
 
-        let (uid, gid) = get_swtpm_uid_and_gid(config);
+        //let (uid, gid) = get_swtpm_uid_and_gid(config);
+        let (uid,gid) = config.get_escalated_uid_and_gid();
         let name = config.general().name().clone();
         match self.spawn(uid, gid, name) {
             Ok(_child) => debug!("SwTpm::pre_start() succeeded"),

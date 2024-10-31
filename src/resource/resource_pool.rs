@@ -1,10 +1,10 @@
-use crate::resource::lock::EzkvmError;
 use crate::resource::resource::Resource;
 use log::debug;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use crate::osal::OsalError;
 
 #[derive(Debug, Deserialize)]
 pub struct ResourcePool {
@@ -12,7 +12,7 @@ pub struct ResourcePool {
     devices: Vec<Resource>,
 }
 impl ResourcePool {
-    pub fn read(name: &str) -> Result<ResourcePool, EzkvmError> {
+    pub fn read(name: &str) -> Result<ResourcePool, OsalError> {
         debug!("ResourcePool::read({})", name);
 
         let mut file =
@@ -23,9 +23,7 @@ impl ResourcePool {
             .expect("Unable to read file");
 
         let resource_pool: ResourcePool =
-            serde_yaml::from_str(contents.as_str()).map_err(|_| EzkvmError::ParseError {
-                file: name.to_string(),
-            })?;
+            serde_yaml::from_str(contents.as_str()).map_err(|_| OsalError::ParseError(Some(name.to_string())))?;
         Ok(resource_pool)
     }
 
@@ -36,7 +34,7 @@ impl ResourcePool {
     pub fn claim_resource(
         &self,
         locked_resources: &HashMap<String, String>,
-    ) -> Result<String, EzkvmError> {
+    ) -> Result<String, OsalError> {
         debug!("ResourcePool::claim_resource()");
         for id in self.get_ids() {
             if !locked_resources.contains_key(&id) {
@@ -48,9 +46,7 @@ impl ResourcePool {
             "ResourcePool::claim_resource() Resource {} not available.",
             self.id.clone()
         );
-        Err(EzkvmError::ResourceNotAvailable {
-            pool: self.id.clone(),
-        })
+        Err(OsalError::Busy(Some(self.id.clone())))
     }
 
     pub fn get_resource(&self, id: &String) -> Option<&Resource> {

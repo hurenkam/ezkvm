@@ -1,15 +1,13 @@
 use crate::config::display::Display;
 use crate::config::types::QemuDevice;
 use crate::config::{default_when_missing, Config};
-use crate::get_lg_uid_and_gid;
-use crate::resource::lock::EzkvmError;
+//use crate::get_lg_uid_and_gid;
 use derive_getters::Getters;
 use log::{debug, warn};
 use serde::Deserialize;
-use std::fs::File;
 use std::os::unix::prelude::CommandExt;
-use std::process;
 use std::process::{Child, Command};
+use crate::osal::{Osal, OsalError};
 
 #[derive(Deserialize, Debug, Getters)]
 pub struct LookingGlass {
@@ -48,15 +46,22 @@ impl LookingGlass {
         result
     }
 
-    fn start_lg_client(&self, config: &Config) -> Result<Child, EzkvmError> {
-        debug!("start_lg_client()");
+    fn start_lg_client(&self, config: &Config) -> Result<Child, OsalError> {
+        //let (uid, gid) = get_lg_uid_and_gid(config);
+        let (uid,gid) = config.get_default_uid_and_gid();
+        debug!("start_lg_client() uid: {}, gid: {}", uid, gid);
 
         let mut args = vec!["looking-glass-client".to_string()];
         args.extend(self.get_lg_client_args(config));
 
-        let (uid, gid) = get_lg_uid_and_gid(config);
-        debug!("start_lg_client() uid: {}, gid: {}", uid, gid);
-
+        Osal::execute_command(
+            Command::new("/usr/bin/env")
+                .args(args)
+                .uid(uid)
+                .gid(gid),
+            Some("looking-glass-client".to_string())
+        )
+/*
         let log_file = File::create("looking-glass-client.log").unwrap();
         let log = process::Stdio::from(log_file);
         let err_file = File::create("looking-glass-client.err").unwrap();
@@ -80,9 +85,8 @@ impl LookingGlass {
                 );
             }
         }
-
-        let name = config.general().name();
-        Err(EzkvmError::ExecError { file: name.clone() })
+        Err(OsalError::ExecError(Some(config.general().name().clone())))
+*/
     }
 }
 
