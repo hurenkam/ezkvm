@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yaml-rust = "0.4.5"
 log = "0.4.21"
 serde = { version = "1.0.200", features = ["derive"] }
 toml = "0.8.12"
@@ -16,7 +15,6 @@ getopts = "0.2.21"
 home = "0.5.9"
 env_logger = "0.11.3"
 chrono = "0.4.38"
-minimal-yaml = "0.1.5"
 serde_yaml = "0.9.34+deprecated"
 tokio = { version = "1.39.3", features = ["sync"] }
 nix = { version = "0.29.0", features = ["user"] }
@@ -25,3 +23,4 @@ derive-getters = "0.5.0"
 mockall = "0.13.0"
 mockall_double = "0.3.1"
 serial_test = "3.1.1"
+rand = { version = "0.8.5", features = ["small_rng"] }

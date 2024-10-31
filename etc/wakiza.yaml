@@ -31,4 +31,4 @@ storage:
   - { driver: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
 
 network:
-  - { controller: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
+  - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }

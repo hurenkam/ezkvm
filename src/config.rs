@@ -2,13 +2,15 @@ mod display;
 mod general;
 mod gpu;
 mod host;
+mod network;
 mod spice;
+mod storage;
 mod system;
 mod types;
 
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
-use crate::yaml::network::Network;
+//use crate::yaml::network::Network;
 use crate::yaml::storage::Storage;
 use derive_getters::Getters;
 use log::{debug, info};
@@ -16,6 +18,7 @@ use serde::{Deserialize, Deserializer};
 use std::any::{Any, TypeId};
 use std::ops::Deref;
 
+use crate::config::network::Network;
 #[mockall_double::double]
 use crate::osal::Osal;
 use crate::osal::OsalError;
@@ -45,7 +48,7 @@ pub struct Config {
     #[serde(default, deserialize_with = "default_when_missing")]
     storage: Vec<Storage>,
     #[serde(default, deserialize_with = "default_when_missing")]
-    network: Vec<Network>,
+    network: Vec<Box<dyn Network>>,
 }
 
 impl Config {
@@ -246,7 +249,7 @@ mod tests {
         - { driver: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
 
         network:
-        - { controller: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
+        - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
     "#;
 
     #[test]
@@ -325,7 +328,7 @@ mod tests {
         - { driver: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
 
         network:
-        - { controller: "bridge", bridge: "vmbr0",  driver: "virtio-net-pci", mac: "BC:24:11:FF:76:89" }
+        - { type: "bridge", mac: "BC:24:11:FF:76:89" }
     "#;
 
     #[test]
