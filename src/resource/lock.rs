@@ -1,9 +1,9 @@
+#[mockall_double::double]
+use crate::osal::Osal;
+use crate::osal::OsalError;
 use derive_getters::Getters;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use crate::osal::OsalError;
-#[mockall_double::double]
-use crate::osal::Osal;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Getters)]
 pub struct Lock {
@@ -28,17 +28,18 @@ impl Lock {
     pub fn read(name: &str) -> Result<Self, OsalError> {
         let filename = format!("/var/ezkvm/lock/{}.yaml", name);
         let content = Osal::read_file(filename.clone())?;
-        let result =
-            serde_yaml::from_str(content.as_str()).map_err(|_| OsalError::ParseError(Some(filename)))?;
+        let result = serde_yaml::from_str(content.as_str())
+            .map_err(|_| OsalError::ParseError(Some(filename)))?;
         Ok(result)
     }
 
     #[allow(dead_code)]
     pub fn write(&self) -> Result<(), OsalError> {
         let filename = format!("/var/ezkvm/lock/{}.yaml", self.name);
-        let content = serde_yaml::to_string(&self).map_err(|_| OsalError::ParseError(Some(filename.clone())))?;
+        let content = serde_yaml::to_string(&self)
+            .map_err(|_| OsalError::ParseError(Some(filename.clone())))?;
 
-        Ok(Osal::write_file(filename, content)?)
+        Osal::write_file(filename, content)
     }
 
     #[allow(dead_code)]
@@ -46,41 +47,40 @@ impl Lock {
         debug!("Lock[{}].delete()", self.name);
         let filename = format!("/var/ezkvm/lock/{}.yaml", self.name);
 
-        Ok(Osal::delete_file(filename)?)
+        Osal::delete_file(filename)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use serial_test::serial;
     use super::*;
+    use serial_test::serial;
 
     #[test]
     #[serial]
     pub fn read_empty_lock_file_results_in_parse_error() {
         let ctx = Osal::read_file_context();
-        ctx.expect()
-            .returning(|_path: String|
-                Ok("".to_string())
-            );
+        ctx.expect().returning(|_path: String| Ok("".to_string()));
 
         let actual = Lock::read("name");
-        let expectation = Err(OsalError::ParseError(Some("/var/ezkvm/lock/name.yaml".to_string())));
-        assert_eq!(actual,expectation)
+        let expectation = Err(OsalError::ParseError(Some(
+            "/var/ezkvm/lock/name.yaml".to_string(),
+        )));
+        assert_eq!(actual, expectation)
     }
 
     #[test]
     #[serial]
     pub fn read_valid_lock_file_succeeds() {
         let ctx = Osal::read_file_context();
-        ctx.expect()
-            .returning(|_path: String|
-                Ok(r#"
+        ctx.expect().returning(|_path: String| {
+            Ok(r#"
                     name: "wakiza"
                     pid: 12345
                     resources:
-                "#.to_string())
-            );
+                "#
+            .to_string())
+        });
 
         let actual = Lock::read("wakiza").unwrap();
         let expectation = Lock {
@@ -88,6 +88,6 @@ mod test {
             pid: 12345,
             resources: vec![],
         };
-        assert_eq!(actual,expectation)
+        assert_eq!(actual, expectation)
     }
 }
