@@ -1,10 +1,15 @@
 use crate::config::display::Display;
-use crate::config::qemu_device::QemuDevice;
+use crate::config::types::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Gtk {
+    #[serde(default = "default_gl")]
     gl: bool,
+}
+
+pub fn default_gl() -> bool {
+    true
 }
 
 impl QemuDevice for Gtk {

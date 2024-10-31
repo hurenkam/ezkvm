@@ -1,5 +1,5 @@
-use crate::config::qemu_device::QemuDevice;
 use crate::config::system::bios::Bios;
+use crate::config::types::QemuDevice;
 use serde::Deserialize;
 
 const OVMF_BIOS_FILE: &str = "/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd";
@@ -9,6 +9,13 @@ const BOOT_SPLASH_FILE: &str = "/usr/share/ezkvm/bootsplash.jpg";
 pub struct OVMF {
     file: String,
     uuid: String,
+}
+
+impl OVMF {
+    #[cfg(test)]
+    pub fn new(file: String, uuid: String) -> Self {
+        Self { file, uuid }
+    }
 }
 
 impl QemuDevice for OVMF {

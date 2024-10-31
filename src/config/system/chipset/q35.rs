@@ -1,5 +1,5 @@
-use crate::config::qemu_device::QemuDevice;
 use crate::config::system::chipset::Chipset;
+use crate::config::types::QemuDevice;
 use serde::Deserialize;
 
 const PVE_CONFIG_FILE: &str = "/usr/share/ezkvm/pve-q35-4.0.cfg";
@@ -8,6 +8,10 @@ const PVE_CONFIG_FILE: &str = "/usr/share/ezkvm/pve-q35-4.0.cfg";
 pub struct Q35 {}
 
 impl Q35 {
+    #[cfg(test)]
+    pub fn new() -> Self {
+        Self {}
+    }
     pub fn boxed_default() -> Box<Self> {
         Box::new(Self {})
     }

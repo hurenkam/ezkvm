@@ -1,4 +1,10 @@
-use crate::config::display::no_display::NoDisplay;
+#[allow(unused)]
+pub use crate::config::display::gtk::Gtk;
+#[allow(unused)]
+pub use crate::config::display::looking_glass::LookingGlass;
+#[allow(unused)]
+pub use crate::config::display::no_display::NoDisplay;
+
 use crate::config::QemuDevice;
 
 mod gtk;

@@ -1,4 +1,10 @@
+#[allow(unused)]
 pub use crate::config::gpu::no_gpu::NoGpu;
+#[allow(unused)]
+pub use crate::config::gpu::passthrough_gpu::PassthroughGpu;
+#[allow(unused)]
+pub use crate::config::gpu::virtio_vga_gl::VirtioVgaGl;
+
 use crate::config::QemuDevice;
 
 mod no_gpu;

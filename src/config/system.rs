@@ -1,9 +1,9 @@
-use crate::config::qemu_device::QemuDevice;
 use crate::config::system::bios::Bios;
 use crate::config::system::chipset::Chipset;
 use crate::config::system::cpu::Cpu;
 use crate::config::system::memory::Memory;
 use crate::config::system::tpm::Tpm;
+use crate::config::types::QemuDevice;
 use crate::config::{default_when_missing, Config};
 use derive_getters::Getters;
 use serde::Deserialize;

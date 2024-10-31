@@ -1,7 +1,9 @@
 mod q35;
 
-use crate::config::qemu_device::QemuDevice;
+#[allow(unused)]
 pub use crate::config::system::chipset::q35::Q35;
+
+use crate::config::types::QemuDevice;
 
 #[typetag::deserialize(tag = "type")]
 pub trait Chipset: QemuDevice {}

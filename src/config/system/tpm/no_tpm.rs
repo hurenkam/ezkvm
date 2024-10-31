@@ -1,5 +1,5 @@
-use crate::config::qemu_device::QemuDevice;
 use crate::config::system::tpm::Tpm;
+use crate::config::types::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]

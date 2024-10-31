@@ -1,5 +1,8 @@
-use crate::config::qemu_device::QemuDevice;
-use crate::config::system::bios::seabios::SeaBios;
+#[allow(unused)]
+pub use crate::config::system::bios::ovmf::OVMF;
+#[allow(unused)]
+pub use crate::config::system::bios::seabios::SeaBios;
+use crate::config::types::QemuDevice;
 
 mod ovmf;
 mod seabios;

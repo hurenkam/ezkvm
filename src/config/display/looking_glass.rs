@@ -1,5 +1,5 @@
 use crate::config::display::Display;
-use crate::config::qemu_device::QemuDevice;
+use crate::config::types::QemuDevice;
 use crate::config::{default_when_missing, Config};
 use crate::get_lg_uid_and_gid;
 use crate::resource::lock::EzkvmError;

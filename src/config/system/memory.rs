@@ -1,4 +1,4 @@
-use crate::config::qemu_device::QemuDevice;
+use crate::config::types::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]

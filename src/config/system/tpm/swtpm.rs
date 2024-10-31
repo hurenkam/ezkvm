@@ -1,5 +1,5 @@
-use crate::config::qemu_device::QemuDevice;
 use crate::config::system::tpm::Tpm;
+use crate::config::types::QemuDevice;
 use crate::config::Config;
 use crate::get_swtpm_uid_and_gid;
 use crate::resource::lock::EzkvmError;
@@ -19,6 +19,9 @@ pub struct SwTpm {
 impl Tpm for SwTpm {}
 
 impl SwTpm {
+    pub fn new(disk: String, socket: String) -> Self {
+        Self { disk, socket }
+    }
     fn spawn(&self, uid: u32, gid: u32, name: String) -> Result<Child, EzkvmError> {
         Command::new("/usr/bin/env")
             .args(self.get_args())

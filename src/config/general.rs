@@ -1,9 +1,7 @@
-use derive_getters::Getters;
-//use crate::yaml::QemuDevice;
 use crate::config::QemuDevice;
+use derive_getters::Getters;
 use serde::Deserialize;
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize, Getters)]
 pub struct General {
     name: String,

@@ -1,6 +1,6 @@
 use crate::config::gpu::Gpu;
-use crate::config::qemu_device::QemuDevice;
-use crate::config::Pci;
+use crate::config::types::Pci;
+use crate::config::types::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

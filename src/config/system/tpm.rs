@@ -1,5 +1,11 @@
-use crate::config::qemu_device::QemuDevice;
-use crate::config::system::tpm::no_tpm::NoTpm;
+#[allow(unused)]
+pub use crate::config::system::tpm::no_tpm::NoTpm;
+#[allow(unused)]
+pub use crate::config::system::tpm::pass_through_tpm::PassThroughTpm;
+#[allow(unused)]
+pub use crate::config::system::tpm::swtpm::SwTpm;
+
+use crate::config::types::QemuDevice;
 
 mod no_tpm;
 mod pass_through_tpm;

@@ -1,9 +1,10 @@
 mod display;
+mod general;
 mod gpu;
-mod pci;
-mod qemu_device;
+mod host;
 mod spice;
 mod system;
+mod types;
 
 use derive_getters::Getters;
 use log::info;
@@ -12,16 +13,16 @@ use serde::{Deserialize, Deserializer};
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
 use crate::resource::lock::EzkvmError;
-use crate::yaml::general::General;
-use crate::yaml::host::Host;
 use crate::yaml::network::Network;
 use crate::yaml::storage::Storage;
 
-//pub use looking_glass::LookingGlass;
-pub use pci::Pci;
-pub use qemu_device::QemuDevice;
+pub use general::General;
+pub use host::Host;
 pub use spice::Spice;
 pub use system::System;
+pub use types::Pci;
+pub use types::QemuDevice;
+pub use types::Usb;
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -63,14 +64,7 @@ impl QemuDevice for Config {
                 result.extend(spice.get_qemu_args(0));
             }
         }
-        /*
-                match self.looking_glass() {
-                    None => {}
-                    Some(looking_glass_host) => {
-                        result.extend(looking_glass_host.get_qemu_args(0));
-                    }
-                }
-        */
+
         match self.host() {
             None => {}
             Some(host) => {
@@ -102,14 +96,6 @@ impl QemuDevice for Config {
     fn post_start(&self, config: &Config) {
         self.system.post_start(config);
         self.display.post_start(config);
-        /*
-               match &self.looking_glass {
-                   None => {}
-                   Some(looking_glass_host) => {
-                       looking_glass_host.post_start(config);
-                   }
-               }
-        */
     }
 }
 
@@ -133,6 +119,50 @@ mod tests {
               "#,
         )
         .unwrap();
+
+        let tmp = config.get_qemu_args(0);
+        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let expected: Vec<&str> = vec![
+            "qemu-system-x86_64",
+            "-accel",
+            "kvm",
+            "-nodefaults",
+            "-monitor",
+            "unix:/var/ezkvm/anonymous.monitor,server,nowait",
+            "-chardev",
+            "socket,id=qmp,path=/var/ezkvm/anonymous.qmp,server=on,wait=off",
+            "-mon",
+            "chardev=qmp,mode=control",
+            "-chardev",
+            "socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon",
+            "chardev=qmp-event,mode=control",
+            "-machine",
+            "hpet=off,type=pc-q35-8.1",
+            "-rtc",
+            "driftfix=slew,base=localtime",
+            "-global",
+            "kvm-pit.lost_tick_policy=discard",
+            "-readconfig",
+            "/usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-device",
+            "qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
+            "-iscsi",
+            "initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
+            "-device",
+            "pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
+            "-boot",
+            "menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
+            "-smbios",
+            "type=1,uuid=",
+            "-m",
+            "16384",
+            "-smp",
+            "4,sockets=1,cores=4,maxcpus=4",
+            "-cpu",
+            "qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
+        ];
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -240,7 +270,7 @@ mod tests {
                     
                     system:
                       bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
-                    
+
                     gpu:
                       type: "virtio-vga-gl"
                       memory: 256

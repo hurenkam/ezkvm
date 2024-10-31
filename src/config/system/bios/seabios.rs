@@ -1,11 +1,10 @@
-use crate::config::qemu_device::QemuDevice;
 use crate::config::system::bios::Bios;
+use crate::config::types::QemuDevice;
 use derive_getters::Getters;
 use serde::Deserialize;
 
 const BOOT_SPLASH_FILE: &str = "/usr/share/ezkvm/bootsplash.jpg";
 
-#[allow(dead_code)]
 #[derive(Deserialize, Debug, Clone, Getters)]
 pub struct SeaBios {
     uuid: String,
