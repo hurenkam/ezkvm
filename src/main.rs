@@ -1,28 +1,28 @@
 mod args;
 mod config;
+mod osal;
 mod resource;
 mod yaml;
-mod osal;
 
 extern crate colored;
 
+use crate::args::{EzkvmArguments, EzkvmCommand};
+use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::process::{Command};
-use std::{env};
-use crate::args::{EzkvmArguments, EzkvmCommand};
+use std::process::Command;
 
 use crate::colored::Colorize;
 use crate::config::{Config, QemuDevice};
+use crate::osal::{Osal, OsalError};
 use crate::resource::data_manager::DataManager;
-use crate::resource::lock::{Lock};
+use crate::resource::lock::Lock;
 use crate::resource::resource_pool::ResourcePool;
 use chrono::Local;
 use env_logger::Builder;
 use log::{debug, Level, LevelFilter};
 use std::io::Write;
 use std::os::unix::prelude::CommandExt;
-use crate::osal::{Osal, OsalError};
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
@@ -52,47 +52,7 @@ fn handle_start_command(name: String) {
 
     config.post_start(&config);
 }
-/*
-fn get_qemu_uid_and_gid(config: &Config) -> (u32, u32) {
-    let mut uid = u32::from(nix::unistd::geteuid());
-    let mut gid = u32::from(nix::unistd::getegid());
 
-    // if gtk ui is selected, qemu can not be run as root
-    // so drop to actual uid/gid instead of euid/egid
-    // Todo: Check if this works as alternative for the code commented out below
-    if let Some(_gtk_display) = <dyn Any>::downcast_ref::<Gtk>(config.display()) {
-        debug!("get_qemu_uid_and_gid(): Has Gtk display configured");
-        uid = u32::from(nix::unistd::getuid());
-        gid = u32::from(nix::unistd::getgid());
-    }
-
-    /*
-    if let Some(display) = config.display() {
-        if display.get_driver() == "gtk" {
-            uid = u32::from(nix::unistd::getuid());
-            gid = u32::from(nix::unistd::getgid());
-        }
-    }
-    */
-
-    (uid, gid)
-}
-
-fn get_swtpm_uid_and_gid(config: &Config) -> (u32, u32) {
-    // swtpm must run with same permissions as qemu otherwise
-    // it can not connect to the socket created by qemu
-    get_qemu_uid_and_gid(config)
-}
-
-fn get_lg_uid_and_gid(_config: &Config) -> (u32, u32) {
-    // looking-glass-client can not be run as root
-    // so drop to actual uid/gid instead of euid/egid
-    (
-        u32::from(nix::unistd::getuid()),
-        u32::from(nix::unistd::getgid()),
-    )
-}
-*/
 fn load_vm(file: &str) -> Config {
     debug!("load_vm({})", file);
 
@@ -121,43 +81,17 @@ fn load_pool(file: &str) -> ResourcePool {
 fn start_vm(name: &String, config: &Config) -> Result<Lock, OsalError> {
     debug!("start_vm()");
 
-    //let (uid, gid) = get_qemu_uid_and_gid(config);
-    let (uid,gid) = config.get_escalated_uid_and_gid();
+    let (uid, gid) = config.get_escalated_uid_and_gid();
     let args = config.get_qemu_args(0);
     let resources: Vec<String> = config.allocate_resources()?;
 
     match Osal::execute_command(
-        Command::new("/usr/bin/env")
-            .args(args)
-            .uid(uid)
-            .gid(gid),
-        Some("qemu".to_string()))
-    {
+        Command::new("/usr/bin/env").args(args).uid(uid).gid(gid),
+        Some("qemu".to_string()),
+    ) {
         Ok(child) => Ok(Lock::new(name.clone(), child.id(), resources)),
-        Err(error) => Err(error)
+        Err(error) => Err(error),
     }
-/*
-    let log_file = File::create("qemu.log").unwrap();
-    let log = process::Stdio::from(log_file);
-    let err_file = File::create("qemu.err").unwrap();
-    let err = process::Stdio::from(err_file);
-
-    let (uid, gid) = get_qemu_uid_and_gid(config);
-    if let Ok(child) = Command::new("/usr/bin/env")
-        .args(args)
-        .uid(uid)
-        .gid(gid)
-        .stdout(log)
-        .stderr(err)
-        .spawn()
-    {
-        debug!("start_vm(): Started qemu with pid {}", child.id());
-        Ok(Lock::new(name.clone(), child.id(), resources))
-    } else {
-        debug!("start_vm(): Failed to start qemu");
-        Err(OsalError::ExecError(Some(name.clone())))
-    }
-*/
 }
 
 fn init_logger(log_level: LevelFilter) {

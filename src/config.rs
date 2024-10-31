@@ -6,16 +6,20 @@ mod spice;
 mod system;
 mod types;
 
-use std::any::{Any, TypeId};
-use std::ops::Deref;
-use derive_getters::Getters;
-use log::{debug, info};
-use serde::{Deserialize, Deserializer};
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
 use crate::yaml::network::Network;
 use crate::yaml::storage::Storage;
+use derive_getters::Getters;
+use log::{debug, info};
+use serde::{Deserialize, Deserializer};
+use std::any::{Any, TypeId};
+use std::ops::Deref;
 
+#[mockall_double::double]
+use crate::osal::Osal;
+use crate::osal::OsalError;
+pub use display::Gtk;
 pub use general::General;
 pub use host::Host;
 pub use spice::Spice;
@@ -23,8 +27,6 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
-pub use display::Gtk;
-use crate::osal::OsalError;
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -54,42 +56,42 @@ impl Config {
     fn has_gtk_display_configured(&self) -> bool {
         self.get_gtk_display().is_some()
     }
+
     fn get_gtk_display(&self) -> Option<Gtk> {
         let display = self.display();
 
-        let gtk_display = if (*display).type_id() == TypeId::of::<Box<dyn Display>>() && (*display.deref()).type_id() == TypeId::of::<Gtk>() {
+        // make sure display contains an &Box<Gtk> instance
+        if (*display).type_id() == TypeId::of::<Box<dyn Display>>()
+            && (*display.deref()).type_id() == TypeId::of::<Gtk>()
+        {
+            // since we now know display is an &Box<Gtk>, we can do a cast to it
             let t = unsafe { &*(display as *const dyn Any as *const Box<Gtk>) };
+
+            // and return a clone wrapped in an Option<>
             Some(t.deref().clone())
         } else {
+            // display is not an &Box<Gtk>, so return None
             None
-        };
-
-        gtk_display
+        }
     }
 
     pub fn get_escalated_uid_and_gid(&self) -> (u32, u32) {
         // if gtk display is enabled, qemu (and swtpm) can not be run with escalated privileges
         // so in this case return default uid/gid instead
         if self.has_gtk_display_configured() {
-            debug!("get_qemu_uid_and_gid(): Gtk display configured, dropping to default uid/gid");
-            return self.get_default_uid_and_gid()
+            debug!(
+                "get_escalated_uid_and_gid(): Gtk display configured, dropping to default uid/gid"
+            );
+            return self.get_default_uid_and_gid();
         }
 
-        // return euid/egid so that main processes (qemu & swtpm)
-        // can run with escalated privileges
-        (
-            u32::from(nix::unistd::geteuid()),
-            u32::from(nix::unistd::getegid()),
-        )
+        // otherwise return escalated privileges if available
+        Osal::get_euid_and_egid()
     }
 
     pub fn get_default_uid_and_gid(&self) -> (u32, u32) {
-        // ui processes can not be run as root
-        // so return actual uid/gid instead of euid/egid
-        (
-            u32::from(nix::unistd::getuid()),
-            u32::from(nix::unistd::getgid()),
-        )
+        // return actual uid/gid instead of euid/egid
+        Osal::get_uid_and_gid()
     }
 }
 
@@ -154,6 +156,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
     fn test_empty_config() {
@@ -378,5 +381,37 @@ mod tests {
     fn test_has_no_gtk_display_configured() {
         let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
         assert_eq!(config.has_gtk_display_configured(), false)
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_escalated_uid_and_gid_returns_defaults_when_gtk_display_configured() {
+        let config: Config = serde_yaml::from_str(DEFAULT_UBUNTU_CONFIG).unwrap();
+
+        let get_euid_and_egid_context = Osal::get_euid_and_egid_context();
+        get_euid_and_egid_context.expect().returning(|| (0, 0));
+
+        let get_uid_and_gid_context = Osal::get_uid_and_gid_context();
+        get_uid_and_gid_context.expect().returning(|| (1000, 1000));
+
+        let actual = config.get_escalated_uid_and_gid();
+        let expected: (u32, u32) = (1000, 1000);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_escalated_uid_and_gid_returns_escalated_when_gtk_display_not_configured() {
+        let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
+
+        let get_euid_and_egid_context = Osal::get_euid_and_egid_context();
+        get_euid_and_egid_context.expect().returning(|| (0, 0));
+
+        let get_uid_and_gid_context = Osal::get_uid_and_gid_context();
+        get_uid_and_gid_context.expect().returning(|| (1000, 1000));
+
+        let actual = config.get_escalated_uid_and_gid();
+        let expected: (u32, u32) = (0, 0);
+        assert_eq!(actual, expected)
     }
 }

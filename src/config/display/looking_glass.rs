@@ -1,13 +1,12 @@
 use crate::config::display::Display;
 use crate::config::types::QemuDevice;
 use crate::config::{default_when_missing, Config};
-//use crate::get_lg_uid_and_gid;
+use crate::osal::{Osal, OsalError};
 use derive_getters::Getters;
 use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Child, Command};
-use crate::osal::{Osal, OsalError};
 
 #[derive(Deserialize, Debug, Getters)]
 pub struct LookingGlass {
@@ -47,46 +46,16 @@ impl LookingGlass {
     }
 
     fn start_lg_client(&self, config: &Config) -> Result<Child, OsalError> {
-        //let (uid, gid) = get_lg_uid_and_gid(config);
-        let (uid,gid) = config.get_default_uid_and_gid();
+        let (uid, gid) = config.get_default_uid_and_gid();
         debug!("start_lg_client() uid: {}, gid: {}", uid, gid);
 
         let mut args = vec!["looking-glass-client".to_string()];
         args.extend(self.get_lg_client_args(config));
 
         Osal::execute_command(
-            Command::new("/usr/bin/env")
-                .args(args)
-                .uid(uid)
-                .gid(gid),
-            Some("looking-glass-client".to_string())
+            Command::new("/usr/bin/env").args(args).uid(uid).gid(gid),
+            Some("looking-glass-client".to_string()),
         )
-/*
-        let log_file = File::create("looking-glass-client.log").unwrap();
-        let log = process::Stdio::from(log_file);
-        let err_file = File::create("looking-glass-client.err").unwrap();
-        let err = process::Stdio::from(err_file);
-
-        let mut lg_cmd = Command::new("/usr/bin/env");
-        lg_cmd.uid(uid).gid(gid).args(args.clone());
-        match lg_cmd.stdout(log).stderr(err).spawn() {
-            Ok(child) => {
-                debug!(
-                    "start_lg_client(): Started looking-glass-client with pid {}\n{}",
-                    child.id(),
-                    args.join(" ")
-                );
-                return Ok(child);
-            }
-            Err(e) => {
-                warn!(
-                    "start_lg_client(): unable to start looking-glass-client due to error {}\n",
-                    e
-                );
-            }
-        }
-        Err(OsalError::ExecError(Some(config.general().name().clone())))
-*/
     }
 }
 
