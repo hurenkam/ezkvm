@@ -122,7 +122,9 @@ setup permissions correctly. The ezkvm application can be used in two ways:
 - ~~Drop priviledges where appropriate; Currently some use cases require qemu to run with
   root priviledges (e.g. pci passthrough), some other use cases refuse to run with root
   priviledges (Gtk ui). Also swtpm & lg client don't need to run with root priviledges.~~
+  ~~- Add unit tests~~
 - Refactor config files and move them into config directory as done in poc branch
+
   Todo:
     - network
     - storage
