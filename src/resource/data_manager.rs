@@ -20,6 +20,7 @@ pub struct DataManager {
     current_lock: Lock,
 }
 
+#[allow(dead_code)]
 impl DataManager {
     fn new(_path: &str) -> Self {
         let resources = load_resource_pools().unwrap_or_default();

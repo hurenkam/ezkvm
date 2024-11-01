@@ -12,7 +12,7 @@ display:
   type: "gtk"
 
 storage:
-  - { driver: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
+  - { type: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: 0 }
 
 network:
   - { type: "bridge", mac: "BC:24:11:FF:76:89" }

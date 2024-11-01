@@ -2,7 +2,6 @@ mod args;
 mod config;
 mod osal;
 mod resource;
-mod yaml;
 
 extern crate colored;
 

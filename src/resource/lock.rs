@@ -12,6 +12,7 @@ pub struct Lock {
     resources: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl Lock {
     pub fn new(name: String, pid: u32, resources: Vec<String>) -> Self {
         Self {

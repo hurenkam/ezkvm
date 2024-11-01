@@ -11,6 +11,8 @@ pub struct ResourcePool {
     id: String,
     devices: Vec<Resource>,
 }
+
+#[allow(dead_code)]
 impl ResourcePool {
     pub fn read(name: &str) -> Result<ResourcePool, OsalError> {
         debug!("ResourcePool::read({})", name);

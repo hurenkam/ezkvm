@@ -11,7 +11,7 @@ mod types;
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
 //use crate::yaml::network::Network;
-use crate::yaml::storage::Storage;
+//use crate::yaml::storage::Storage;
 use derive_getters::Getters;
 use log::{debug, info};
 use serde::{Deserialize, Deserializer};
@@ -30,6 +30,7 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
+use crate::config::storage::Storage;
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -46,9 +47,11 @@ pub struct Config {
     #[serde(default, deserialize_with = "default_when_missing")]
     host: Option<Host>,
     #[serde(default, deserialize_with = "default_when_missing")]
-    storage: Vec<Storage>,
+    storage: Vec<Box<dyn Storage>>,
     #[serde(default, deserialize_with = "default_when_missing")]
     network: Vec<Box<dyn Network>>,
+    #[serde(default, deserialize_with = "default_when_missing")]
+    extras: Vec<String>
 }
 
 impl Config {
@@ -245,8 +248,8 @@ mod tests {
             - { vm_port: "1", host_bus: "1", host_port: "2.2" }
 
         storage:
-        - { driver: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: "0" }
-        - { driver: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
+        - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: 0 }
+        - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
 
         network:
         - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
@@ -298,10 +301,10 @@ mod tests {
             "-device", "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
             "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
             "-device", "usb-host,bus=xhci.0,port=1,hostbus=1,hostport=2.2,id=usb0",
-            "-drive", "file=/dev/vm1/vm-108-boot,if=none,id=drive-scsi0,discard=on,format=raw,cache=none,aio=io_uring,detect-zeroes=unmap",
-            "-device", "scsi-hd,bus=scsihw0.0,scsi-id=0,drive=drive-scsi0,id=scsi0,rotation_rate=1,bootindex=0",
-            "-drive", "file=/dev/vm1/vm-108-tmp,if=none,id=drive-scsi1,discard=on,format=raw,cache=none,aio=io_uring,detect-zeroes=unmap",
-            "-device", "scsi-hd,bus=scsihw0.0,scsi-id=1,drive=drive-scsi1,id=scsi1,rotation_rate=1",
+            "-drive", "file=/dev/vm1/vm-108-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device", "bootindex=0,scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1",
+            "-drive", "file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device", "scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
             "-netdev", "id=hostnet0,type=bridge,br=vmbr0",
             "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,mac=BC:24:11:3A:21:B7,bus=pci.1,addr=0x0"
         ];
@@ -325,7 +328,8 @@ mod tests {
             gl: true
 
         storage:
-        - { driver: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", discard: true, boot_index: "1" }
+        - { type: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", boot_index: 1 }
+        - { type: "ide-cd", file: "ubuntu.iso" }
 
         network:
         - { type: "bridge", mac: "BC:24:11:FF:76:89" }
@@ -365,8 +369,10 @@ mod tests {
             "-device", "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
             "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=audiodev0",
             "-device", "virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2",
-            "-drive", "file=/dev/vm1/vm-950-disk-1,if=none,id=drive-scsi0,discard=on,format=raw,cache=none,aio=io_uring,detect-zeroes=unmap",
-            "-device", "scsi-hd,bus=scsihw0.0,scsi-id=0,drive=drive-scsi0,id=scsi0,rotation_rate=1,bootindex=1",
+            "-drive", "file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
+            "-device", "bootindex=1,scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1",
+            "-drive", "file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
+            "-device", "ide-cd,bus=ide.1,drive=drive-ide1,id=ide1,unit=0",
             "-netdev", "id=hostnet0,type=bridge,br=vmbr0",
             "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,mac=BC:24:11:FF:76:89,bus=pci.1,addr=0x0"
         ];

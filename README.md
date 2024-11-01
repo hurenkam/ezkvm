@@ -123,11 +123,7 @@ setup permissions correctly. The ezkvm application can be used in two ways:
   root priviledges (e.g. pci passthrough), some other use cases refuse to run with root
   priviledges (Gtk ui). Also swtpm & lg client don't need to run with root priviledges.~~
 - ~~Add unit tests~~
-- Refactor config files and move them into config directory as done in poc branch
-
-  Todo:
-    - network
-    - storage
+- ~~Refactor config files and move them into config directory as done in poc branch~~
 - Merge other improvements from the poc branch into the stable branch
 - Run macos using ezkvm (and create an example config file for it)
 - Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm
