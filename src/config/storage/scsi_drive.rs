@@ -17,14 +17,24 @@ pub struct ScsiDrive {
     #[serde(default = "default_bus")]
     bus: String,
     #[serde(default = "default_rotation_rate")]
-    rotation_rate: u8
+    rotation_rate: u8,
 }
 
-fn default_cache() -> String { "none".to_string() }
-fn default_format() -> String { "raw".to_string() }
-fn default_detect_zeroes() -> String { "unmap".to_string() }
-fn default_bus() -> String { "scsihw0.0".to_string() }
-fn default_rotation_rate() -> u8 { 1 }
+fn default_cache() -> String {
+    "none".to_string()
+}
+fn default_format() -> String {
+    "raw".to_string()
+}
+fn default_detect_zeroes() -> String {
+    "unmap".to_string()
+}
+fn default_bus() -> String {
+    "scsihw0.0".to_string()
+}
+fn default_rotation_rate() -> u8 {
+    1
+}
 
 impl QemuDevice for ScsiDrive {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
@@ -40,14 +50,14 @@ impl QemuDevice for ScsiDrive {
         };
 
         vec![
-            self.base.drive(vec![
-                format!("id=drive-scsi{}{},format={},cache={},detect-zeroes={}",
-                        index, discard, self.format, self.cache, self.detect_zeroes)
-            ]),
-            self.base.device(vec![
-                format!("scsi-hd,scsi-id={},drive=drive-scsi{},id=scsi{},bus={},rotation_rate={}",
-                        index, index, index, self.bus, self.rotation_rate)
-            ])
+            self.base.drive(vec![format!(
+                "id=drive-scsi{}{},format={},cache={},detect-zeroes={}",
+                index, discard, self.format, self.cache, self.detect_zeroes
+            )]),
+            self.base.device(vec![format!(
+                "scsi-hd,scsi-id={},drive=drive-scsi{},id=scsi{},bus={},rotation_rate={}",
+                index, index, index, self.bus, self.rotation_rate
+            )]),
         ]
     }
 }
@@ -128,7 +138,7 @@ mod tests {
 
         let expected: Vec<String> = vec![
             "-drive file=valid_file,if=none,aio=io_uring,id=drive-scsi5,discard=on,format=qcow2,cache=write-back,detect-zeroes=off,option_1,option_2".to_string(),
-            "-device bootindex=1,scsi-hd,scsi-id=5,drive=drive-scsi5,id=scsi5,bus=scsihw1.2,rotation_rate=3,option_1,option_2".to_string()
+            "-device scsi-hd,scsi-id=5,drive=drive-scsi5,id=scsi5,bus=scsihw1.2,rotation_rate=3,bootindex=1,option_1,option_2".to_string()
         ];
 
         assert_eq!(storage.get_qemu_args(5), expected);

@@ -19,6 +19,7 @@ use std::any::{Any, TypeId};
 use std::ops::Deref;
 
 use crate::config::network::Network;
+use crate::config::storage::Storage;
 #[mockall_double::double]
 use crate::osal::Osal;
 use crate::osal::OsalError;
@@ -30,7 +31,6 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
-use crate::config::storage::Storage;
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -51,7 +51,7 @@ pub struct Config {
     #[serde(default, deserialize_with = "default_when_missing")]
     network: Vec<Box<dyn Network>>,
     #[serde(default, deserialize_with = "default_when_missing")]
-    extras: Vec<String>
+    extras: Vec<String>,
 }
 
 impl Config {
@@ -302,7 +302,7 @@ mod tests {
             "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
             "-device", "usb-host,bus=xhci.0,port=1,hostbus=1,hostport=2.2,id=usb0",
             "-drive", "file=/dev/vm1/vm-108-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap",
-            "-device", "bootindex=0,scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1",
+            "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
             "-drive", "file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
             "-device", "scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
             "-netdev", "id=hostnet0,type=bridge,br=vmbr0",
@@ -370,7 +370,7 @@ mod tests {
             "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=audiodev0",
             "-device", "virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2",
             "-drive", "file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
-            "-device", "bootindex=1,scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1",
+            "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
             "-drive", "file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
             "-device", "ide-cd,bus=ide.1,drive=drive-ide1,id=ide1,unit=0",
             "-netdev", "id=hostnet0,type=bridge,br=vmbr0",
