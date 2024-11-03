@@ -1,5 +1,7 @@
 use crate::config::storage::{Storage, StorageData};
 use crate::config::types::QemuDevice;
+use crate::{optional_value_getter, required_value_getter};
+use paste::paste;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -7,56 +9,46 @@ pub struct ScsiDrive {
     #[serde(flatten)]
     base: StorageData,
     #[serde(default)]
-    discard: Option<bool>,
-    #[serde(default = "default_cache")]
+    discard: Option<String>,
+    #[serde(default = "ScsiDrive::cache_default")]
     cache: String,
-    #[serde(default = "default_format")]
+    #[serde(default = "ScsiDrive::format_default")]
     format: String,
-    #[serde(default = "default_detect_zeroes")]
+    #[serde(default = "ScsiDrive::detect_zeroes_default")]
     detect_zeroes: String,
-    #[serde(default = "default_bus")]
+    #[serde(default = "ScsiDrive::bus_default")]
     bus: String,
-    #[serde(default = "default_rotation_rate")]
+    #[serde(default = "ScsiDrive::rotation_rate_default")]
     rotation_rate: u8,
 }
 
-fn default_cache() -> String {
-    "none".to_string()
-}
-fn default_format() -> String {
-    "raw".to_string()
-}
-fn default_detect_zeroes() -> String {
-    "unmap".to_string()
-}
-fn default_bus() -> String {
-    "scsihw0.0".to_string()
-}
-fn default_rotation_rate() -> u8 {
-    1
+impl ScsiDrive {
+    optional_value_getter!(discard("discard"): String);
+    required_value_getter!(cache("cache"): String = "none".to_string());
+    required_value_getter!(format("format"): String = "raw".to_string());
+    required_value_getter!(detect_zeroes("detect-zeroes"): String = "unmap".to_string());
+    required_value_getter!(bus("bus"): String = "scsihw0.0".to_string());
+    required_value_getter!(rotation_rate("rotation_rate"): u8 = 1);
 }
 
 impl QemuDevice for ScsiDrive {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
-        let discard = match self.discard {
-            None => "",
-            Some(discard) => {
-                if discard {
-                    ",discard=on"
-                } else {
-                    ",discard=off"
-                }
-            }
-        };
-
         vec![
             self.base.drive(vec![format!(
-                "id=drive-scsi{}{},format={},cache={},detect-zeroes={}",
-                index, discard, self.format, self.cache, self.detect_zeroes
+                "id=drive-scsi{}{}{}{}{}",
+                index,
+                self.discard(),
+                self.format(),
+                self.cache(),
+                self.detect_zeroes()
             )]),
             self.base.device(vec![format!(
-                "scsi-hd,scsi-id={},drive=drive-scsi{},id=scsi{},bus={},rotation_rate={}",
-                index, index, index, self.bus, self.rotation_rate
+                "scsi-hd,scsi-id={},drive=drive-scsi{},id=scsi{}{}{}",
+                index,
+                index,
+                index,
+                self.bus(),
+                self.rotation_rate()
             )]),
         ]
     }
@@ -79,11 +71,11 @@ mod tests {
                 extra_device_options: vec![],
             },
             discard: None,
-            cache: default_cache(),
-            format: default_format(),
-            detect_zeroes: default_detect_zeroes(),
-            bus: default_bus(),
-            rotation_rate: default_rotation_rate(),
+            cache: ScsiDrive::cache_default(),
+            format: ScsiDrive::format_default(),
+            detect_zeroes: ScsiDrive::detect_zeroes_default(),
+            bus: ScsiDrive::bus_default(),
+            rotation_rate: 1,
         };
 
         let yaml = r#"
@@ -108,7 +100,7 @@ mod tests {
                 extra_drive_options: vec!["option_1".to_string(), "option_2".to_string()],
                 extra_device_options: vec!["option_3".to_string()],
             },
-            discard: Some(true),
+            discard: Some("on".to_string()),
             cache: "write-back".to_string(),
             format: "qcow2".to_string(),
             detect_zeroes: "off".to_string(),
@@ -119,7 +111,7 @@ mod tests {
         let yaml = r#"
             file: "valid_file"
             boot_index: 1
-            discard: true
+            discard: "on"
             cache: "write-back"
             format: "qcow2"
             detect_zeroes: "off"

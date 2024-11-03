@@ -10,8 +10,6 @@ mod types;
 
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
-//use crate::yaml::network::Network;
-//use crate::yaml::storage::Storage;
 use derive_getters::Getters;
 use log::{debug, info};
 use serde::{Deserialize, Deserializer};
@@ -31,6 +29,34 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
+
+#[macro_export]
+macro_rules! optional_value_getter {
+    ($id: ident($lit: literal): $ty: ty) => {
+        pub fn $id(&self) -> String {
+            match &self.$id {
+                None => "".to_string(),
+                Some(option) => {
+                    format!(",{}={}", $lit, option.clone())
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! required_value_getter {
+    ($id: ident($lit: literal): $ty: ty = $default: expr) => {
+        paste! {
+            pub fn $id(&self) -> String {
+                format!(",{}={}", $lit, self.$id)
+            }
+            pub fn [<$id _default>]() -> $ty {
+                $default
+            }
+        }
+    };
+}
 
 #[derive(Deserialize, Debug, Default, Getters)]
 pub struct Config {
@@ -248,8 +274,8 @@ mod tests {
             - { vm_port: "1", host_bus: "1", host_port: "2.2" }
 
         storage:
-        - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: true, boot_index: 0 }
-        - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: true }
+        - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
+        - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: "on" }
 
         network:
         - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
