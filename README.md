@@ -124,11 +124,10 @@ so development is very much aimed at the features that i use myself on a
 daily basis, since that is what makes sense to me, and that is what i can
 easily and regularly test.
 
-When you find this tool useful, then feel free to do so, as per the license
-agreement. When you do, you may run into missing features, or perhaps discover
+When you find this tool useful, then feel free to use it, as per the license
+terms. When you use it, you may run into missing features, or perhaps discover
 bugs or other problems. Please report these in the issues list.
-It would be even better if you can send a patch, that makes it easier for me to
-review your contribution, and merge it into the main repo.
+It would be even better if you can attach a patch that addresses the issue.
 
 ### Creating an issue ###
 
@@ -139,13 +138,13 @@ to aid triage:
    released versions yet, so please refer to the git commit (hash) that you
    noticed the behavior on. Also provide versions of qemu, and swtpm.
 2) OS (and version) on which you are trying to run ezkvm.
-3) Hardware (and versions) that you are running ezkvm on, especially if you are passing
-   hardware to the VM.
+3) Hardware (and versions) that you are running ezkvm on, especially if you
+   are passing hardware to the VM.
 4) The ezkvm config file that you use to startup the vm
 
 ### Providing a patch ###
 
-Please have your patch refer to an issue id which it intends to address,
+Please have your patch refer to an issue which it intends to address,
 create an issue if one does not exist yet.
 Chop big changes into smaller (non breaking) changesets such that they each
 address a small aspect. That makes the changes easier to review.
