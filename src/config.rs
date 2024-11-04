@@ -17,7 +17,7 @@ use std::any::{Any, TypeId};
 use std::ops::Deref;
 
 use crate::config::network::Network;
-use crate::config::storage::Storage;
+use crate::config::storage::StorageItem;
 #[mockall_double::double]
 use crate::osal::Osal;
 use crate::osal::OsalError;
@@ -72,9 +72,9 @@ pub struct Config {
     spice: Option<Spice>,
     #[serde(default, deserialize_with = "default_when_missing")]
     host: Option<Host>,
-    #[serde(default, deserialize_with = "default_when_missing")]
-    storage: Vec<Box<dyn Storage>>,
-    #[serde(default, deserialize_with = "default_when_missing")]
+    #[serde(default)]
+    storage: Vec<StorageItem>,
+    #[serde(default)]
     network: Vec<Box<dyn Network>>,
     #[serde(default, deserialize_with = "default_when_missing")]
     extras: Vec<String>,
