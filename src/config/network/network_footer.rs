@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct NetworkFooter {
+    // bus=pci.<#n>,
+    // addr=<#>.
     #[serde(default = "NetworkFooter::mac_default")]
     mac: String,
     #[serde(default)]
@@ -22,12 +24,18 @@ impl NetworkFooter {
         }
         result.join(":")
     }
-    pub fn get_netdev_options(&self) -> Vec<String> {
-        self.extra_netdev_options.clone()
+
+    pub fn get_netdev_options(&self, index: usize) -> Vec<String> {
+        let mut result = vec![format!("id=netdev{}", index)];
+        result.extend(self.extra_netdev_options.clone());
+        result
     }
 
-    pub fn get_device_options(&self) -> Vec<String> {
-        let mut result = vec![format!("mac={}", self.mac)];
+    pub fn get_device_options(&self, index: usize) -> Vec<String> {
+        let mut result = vec![
+            format!("netdev=netdev{}", index),
+            format!("mac={}", self.mac),
+        ];
         result.extend(self.extra_device_options.clone());
         result
     }

@@ -21,12 +21,12 @@ impl QemuDevice for NetworkItem {
         let mut netdev_args: Vec<String> = vec![];
         netdev_args.extend(self.header().get_netdev_options());
         netdev_args.extend(self.payload().get_netdev_options(index));
-        netdev_args.extend(self.footer().get_netdev_options());
+        netdev_args.extend(self.footer().get_netdev_options(index));
 
         let mut device_args: Vec<String> = vec![];
         device_args.extend(self.header().get_device_options());
         device_args.extend(self.payload().get_device_options(index));
-        device_args.extend(self.footer().get_device_options());
+        device_args.extend(self.footer().get_device_options(index));
 
         vec![
             format!("-netdev {}", netdev_args.join(",")),

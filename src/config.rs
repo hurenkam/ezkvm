@@ -334,8 +334,8 @@ mod tests {
             "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
             "-drive", "file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
             "-device", "scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
-            "-netdev", "type=bridge,br=vmbr0,id=hostnet0",
-            "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,bus=pci.1,addr=0x0,mac=BC:24:11:3A:21:B7"
+            "-netdev", "type=bridge,br=vmbr0,id=netdev0",
+            "-device", "virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:B7"
         ];
 
         assert_eq!(actual, expected);
@@ -402,8 +402,8 @@ mod tests {
             "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
             "-drive", "file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
             "-device", "ide-cd,bus=ide.1,drive=drive-ide1,id=ide1,unit=0",
-            "-netdev", "type=bridge,br=vmbr0,id=hostnet0",
-            "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,bus=pci.1,addr=0x0,mac=BC:24:11:FF:76:89"
+            "-netdev", "type=bridge,br=vmbr0,id=netdev0",
+            "-device", "virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:FF:76:89"
         ];
 
         assert_eq!(actual, expected);
