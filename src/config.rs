@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer};
 use std::any::{Any, TypeId};
 use std::ops::Deref;
 
-use crate::config::network::Network;
+use crate::config::network::NetworkItem;
 use crate::config::storage::StorageItem;
 #[mockall_double::double]
 use crate::osal::Osal;
@@ -33,6 +33,7 @@ pub use types::Usb;
 #[macro_export]
 macro_rules! optional_value_getter {
     ($id: ident($lit: literal): $ty: ty) => {
+        #[allow(dead_code)]
         pub fn $id(&self) -> String {
             match &self.$id {
                 None => "".to_string(),
@@ -48,9 +49,11 @@ macro_rules! optional_value_getter {
 macro_rules! required_value_getter {
     ($id: ident($lit: literal): $ty: ty = $default: expr) => {
         paste! {
+            #[allow(dead_code)]
             pub fn $id(&self) -> String {
                 format!(",{}={}", $lit, self.$id)
             }
+            #[allow(dead_code)]
             pub fn [<$id _default>]() -> $ty {
                 $default
             }
@@ -75,7 +78,7 @@ pub struct Config {
     #[serde(default)]
     storage: Vec<StorageItem>,
     #[serde(default)]
-    network: Vec<Box<dyn Network>>,
+    network: Vec<NetworkItem>,
     #[serde(default, deserialize_with = "default_when_missing")]
     extras: Vec<String>,
 }
@@ -331,8 +334,8 @@ mod tests {
             "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
             "-drive", "file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
             "-device", "scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
-            "-netdev", "id=hostnet0,type=bridge,br=vmbr0",
-            "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,mac=BC:24:11:3A:21:B7,bus=pci.1,addr=0x0"
+            "-netdev", "type=bridge,br=vmbr0,id=hostnet0",
+            "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,bus=pci.1,addr=0x0,mac=BC:24:11:3A:21:B7"
         ];
 
         assert_eq!(actual, expected);
@@ -399,8 +402,8 @@ mod tests {
             "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
             "-drive", "file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
             "-device", "ide-cd,bus=ide.1,drive=drive-ide1,id=ide1,unit=0",
-            "-netdev", "id=hostnet0,type=bridge,br=vmbr0",
-            "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,mac=BC:24:11:FF:76:89,bus=pci.1,addr=0x0"
+            "-netdev", "type=bridge,br=vmbr0,id=hostnet0",
+            "-device", "id=net0,driver=virtio-net-pci,netdev=hostnet0,bus=pci.1,addr=0x0,mac=BC:24:11:FF:76:89"
         ];
 
         assert_eq!(actual, expected);

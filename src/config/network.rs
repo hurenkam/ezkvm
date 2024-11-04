@@ -1,6 +1,7 @@
 mod bridge;
+mod network_footer;
+mod network_header;
+mod network_item;
+mod network_payload;
 
-use crate::config::QemuDevice;
-
-#[typetag::deserialize(tag = "type")]
-pub trait Network: QemuDevice {}
+pub use network_item::NetworkItem;

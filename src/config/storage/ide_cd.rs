@@ -1,4 +1,4 @@
-use crate::config::storage::StoragePayload;
+use crate::config::storage::storage_payload::StoragePayload;
 use crate::required_value_getter;
 use paste::paste;
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,7 @@ mod tests {
             type: "ide-cd"
             file: "default_file"
         "#;
-        let from_yaml = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: IdeCd = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
         let drive_args: Vec<String> = vec!["id=drive-ide0,media=cdrom".to_string()];

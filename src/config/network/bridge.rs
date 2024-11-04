@@ -1,88 +1,68 @@
-use crate::config::network::Network;
-use crate::config::types::QemuDevice;
-use rand::Rng;
-use serde::Deserialize;
+use crate::config::network::network_payload::NetworkPayload;
+use crate::required_value_getter;
+use paste::paste;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Bridge {
-    #[serde(default = "default_bridge")]
+    #[serde(default = "Bridge::bridge_default")]
     bridge: String,
-    #[serde(default = "default_driver")]
+    #[serde(default = "Bridge::driver_default")]
     driver: String,
-    #[serde(default = "default_mac")]
-    mac: String,
+}
+
+impl Bridge {
+    required_value_getter!(bridge("bridge"): String = "vmbr0".to_string());
+    required_value_getter!(driver("driver"): String = "virtio-net-pci".to_string());
 }
 
 #[typetag::deserialize(name = "bridge")]
-impl Network for Bridge {}
-
-impl Default for Bridge {
-    fn default() -> Self {
-        Self {
-            bridge: default_bridge(),
-            driver: default_driver(),
-            mac: default_mac(),
-        }
+impl NetworkPayload for Bridge {
+    fn get_netdev_options(&self, index: usize) -> Vec<String> {
+        vec![format!(
+            "type=bridge,br={},id=hostnet{}",
+            self.bridge, index
+        )]
     }
-}
 
-fn default_bridge() -> String {
-    "vmbr0".to_string()
-}
-
-fn default_driver() -> String {
-    "virtio-net-pci".to_string()
-}
-
-fn default_mac() -> String {
-    let mut rng = rand::thread_rng();
-    let mut result: Vec<String> = vec![];
-    for _ in 0..=5 {
-        result.push(format!("{:02X}", rng.gen_range(0..=255)));
-    }
-    result.join(":")
-}
-
-impl QemuDevice for Bridge {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
-        vec![
-            format!("-netdev id=hostnet{},type=bridge,br={}", index, self.bridge),
-            format!(
-                "-device id=net{},driver={},netdev=hostnet{},mac={},bus=pci.1,addr=0x0",
-                index, self.driver, index, self.mac
-            ),
-        ]
+    fn get_device_options(&self, index: usize) -> Vec<String> {
+        vec![format!(
+            "id=net{},driver={},netdev=hostnet{},bus=pci.1,addr=0x0",
+            index, self.driver, index,
+        )]
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_defaults() {
-        let network = Bridge::default();
-        let expected: Vec<String> = vec![
-            "-netdev id=hostnet0,type=bridge,br=vmbr0".to_string(),
-            format!(
-                "-device id=net0,driver=virtio-net-pci,netdev=hostnet0,mac={},bus=pci.1,addr=0x0",
-                network.mac
-            ),
-        ];
-        assert_eq!(network.get_qemu_args(0), expected);
+        let network = Bridge {
+            bridge: Bridge::bridge_default(),
+            driver: Bridge::driver_default(),
+        };
+
+        let expected_netdev_options = vec!["type=bridge,br=vmbr0,id=hostnet0".to_string()];
+        assert_eq!(expected_netdev_options, network.get_netdev_options(0));
+
+        let expected_device_options =
+            vec!["id=net0,driver=virtio-net-pci,netdev=hostnet0,bus=pci.1,addr=0x0".to_string()];
+        assert_eq!(expected_device_options, network.get_device_options(0));
     }
 
     #[test]
     fn test_valid() {
         let network = Bridge {
-            bridge: "vmbr0".to_string(),
-            driver: "virtio-net-pci".to_string(),
-            mac: "BC:24:11:FF:76:89".to_string(),
+            bridge: "vmbr2".to_string(),
+            driver: "ne2000".to_string(),
         };
-        let expected: Vec<String> = vec![
-            "-netdev id=hostnet0,type=bridge,br=vmbr0".to_string(),
-            "-device id=net0,driver=virtio-net-pci,netdev=hostnet0,mac=BC:24:11:FF:76:89,bus=pci.1,addr=0x0".to_string()
-        ];
-        assert_eq!(network.get_qemu_args(0), expected);
+
+        let expected_netdev_options = vec!["type=bridge,br=vmbr2,id=hostnet3".to_string()];
+        assert_eq!(expected_netdev_options, network.get_netdev_options(3));
+
+        let expected_device_options =
+            vec!["id=net3,driver=ne2000,netdev=hostnet3,bus=pci.1,addr=0x0".to_string()];
+        assert_eq!(expected_device_options, network.get_device_options(3));
     }
 }

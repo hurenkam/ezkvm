@@ -1,4 +1,4 @@
-use crate::config::storage::StoragePayload;
+use crate::config::storage::storage_payload::StoragePayload;
 use crate::{optional_value_getter, required_value_getter};
 use paste::paste;
 use serde::{Deserialize, Serialize};
@@ -125,7 +125,7 @@ mod tests {
             extra_device_options:
                 - "option_3"
         "#;
-        let from_yaml = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: ScsiDrive = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
         let drive_args: Vec<String> = vec![
