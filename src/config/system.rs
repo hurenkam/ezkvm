@@ -1,3 +1,4 @@
+use crate::config::system::applesmc::AppleSmc;
 use crate::config::system::bios::Bios;
 use crate::config::system::chipset::Chipset;
 use crate::config::system::cpu::Cpu;
@@ -9,6 +10,7 @@ use derive_getters::Getters;
 use serde::Deserialize;
 use typetag::serde;
 
+mod applesmc;
 mod bios;
 mod chipset;
 mod cpu;
@@ -28,6 +30,8 @@ pub struct System {
     cpu: Cpu,
     #[serde(default, deserialize_with = "default_when_missing")]
     tpm: Box<dyn Tpm>,
+    #[serde(default)]
+    applesmc: Option<AppleSmc>,
 }
 
 impl System {
@@ -44,6 +48,7 @@ impl System {
             memory,
             cpu,
             tpm,
+            applesmc: None
         }
     }
 }
