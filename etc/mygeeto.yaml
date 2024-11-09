@@ -1,0 +1,32 @@
+general:
+  name: mygeeto
+
+system:
+  bios: { type: "ovmf", uuid: "05cba597-8096-47c6-9cd7-1481dbb3b95a", file: "/dev/vm1/vm-402-efidisk" }
+  cpu: { model: "Haswell-noTSX", sockets: 1, cores: 8, flags: "vendor=GenuineIntel,+invtsc,+hypervisor,+pcid,+invpcid,+erms,kvm=on,vmware-cpuid-freq=on" }
+  memory: { max: 16384, balloon: false }
+  applesmc: { osk: "<put_the_osk_key_here>" }
+
+spice:
+  port: 5903
+  addr: 0.0.0.0
+
+gpu:
+  type: "vmware-svga"
+
+display:
+  type: "looking_glass"
+  device: { path: /dev/kvmfr0, size: 128M }
+  input: { grab_keyboard: true, escape_key: KEY_F12 }
+  window: { size: 1707x1067, full_screen: true }
+
+host:
+  usb:
+    - { vm_port: "1", host_bus: "1", host_port: "2.2" }
+
+storage:
+  - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
+  - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: "on" }
+
+network:
+  - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
