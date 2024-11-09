@@ -4,22 +4,22 @@ use paste::paste;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
-pub struct ScsiDrive {
+pub struct ScsiHd {
     #[serde(default)]
     discard: Option<String>,
-    #[serde(default = "ScsiDrive::cache_default")]
+    #[serde(default = "ScsiHd::cache_default")]
     cache: String,
-    #[serde(default = "ScsiDrive::format_default")]
+    #[serde(default = "ScsiHd::format_default")]
     format: String,
-    #[serde(default = "ScsiDrive::detect_zeroes_default")]
+    #[serde(default = "ScsiHd::detect_zeroes_default")]
     detect_zeroes: String,
-    #[serde(default = "ScsiDrive::bus_default")]
+    #[serde(default = "ScsiHd::bus_default")]
     bus: String,
-    #[serde(default = "ScsiDrive::rotation_rate_default")]
+    #[serde(default = "ScsiHd::rotation_rate_default")]
     rotation_rate: u8,
 }
 
-impl ScsiDrive {
+impl ScsiHd {
     optional_value_getter!(discard("discard"): String);
     required_value_getter!(cache("cache"): String = "none".to_string());
     required_value_getter!(format("format"): String = "raw".to_string());
@@ -29,7 +29,7 @@ impl ScsiDrive {
 }
 
 #[typetag::deserialize(name = "scsi-hd")]
-impl StoragePayload for ScsiDrive {
+impl StoragePayload for ScsiHd {
     fn get_drive_options(&self, index: usize) -> Vec<String> {
         vec![format!(
             "id=drive-scsi{}{}{}{}{}",
@@ -61,12 +61,12 @@ mod tests {
 
     #[test]
     fn test_all_default_values() {
-        let storage = ScsiDrive {
+        let storage = ScsiHd {
             discard: None,
-            cache: ScsiDrive::cache_default(),
-            format: ScsiDrive::format_default(),
-            detect_zeroes: ScsiDrive::detect_zeroes_default(),
-            bus: ScsiDrive::bus_default(),
+            cache: ScsiHd::cache_default(),
+            format: ScsiHd::format_default(),
+            detect_zeroes: ScsiHd::detect_zeroes_default(),
+            bus: ScsiHd::bus_default(),
             rotation_rate: 1,
         };
 
@@ -74,7 +74,7 @@ mod tests {
             type: "scsi-hd"
             file: "default_file"
         "#;
-        let from_yaml: ScsiDrive = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: ScsiHd = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
         let drive_args: Vec<String> =
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_all_valid_values() {
-        let storage = ScsiDrive {
+        let storage = ScsiHd {
             discard: Some("on".to_string()),
             cache: "write-back".to_string(),
             format: "qcow2".to_string(),
@@ -125,7 +125,7 @@ mod tests {
             extra_device_options:
                 - "option_3"
         "#;
-        let from_yaml: ScsiDrive = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: ScsiHd = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
         let drive_args: Vec<String> = vec![
