@@ -48,7 +48,7 @@ impl System {
             memory,
             cpu,
             tpm,
-            applesmc: None
+            applesmc: None,
         }
     }
 }
