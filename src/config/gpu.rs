@@ -10,6 +10,7 @@ use crate::config::QemuDevice;
 mod no_gpu;
 mod passthrough_gpu;
 mod virtio_vga_gl;
+mod vmware_svga;
 
 #[typetag::deserialize(tag = "type")]
 pub trait Gpu: QemuDevice {}
