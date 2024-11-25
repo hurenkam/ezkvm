@@ -4,15 +4,21 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Getters)]
 pub struct Spice {
-    port: u16,
     addr: String,
+    port: u16,
+}
+
+impl Spice {
+    pub fn new(addr: String, port: u16) -> Self {
+        Self { addr, port }
+    }
 }
 
 impl QemuDevice for Spice {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!(
-                "-spice port={},addr={},disable-ticketing",
+                "-spice port={},addr={},disable-ticketing=on",
                 self.port, self.addr
             ),
             "-device virtio-serial-pci".to_string(),

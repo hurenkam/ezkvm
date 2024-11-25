@@ -15,6 +15,7 @@ pub struct RemoteViewer {
     auto_resize: bool,
     #[serde(default)]
     full_screen: bool,
+    render_node: Option<String>
     // cursor
     // hotkeys
     // keymap
@@ -26,13 +27,13 @@ impl RemoteViewer {
         match config.spice() {
             None => {}
             Some(spice) => result.extend(vec![
-                "--connect".to_string(),
+                //"--connect".to_string(),
                 format!("spice://{}:{}",spice.addr(),spice.port())
             ]),
         }
 
-        if *self.auto_resize() {
-            result.extend(vec!["--auto-resize".to_string()]);
+        if !*self.auto_resize() {
+            result.extend(vec!["--auto-resize=never".to_string()]);
         }
         if *self.full_screen() {
             result.extend(vec!["--full-screen".to_string()]);
@@ -57,32 +58,59 @@ impl RemoteViewer {
 
 impl QemuDevice for RemoteViewer {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
-        vec![]
+        let render_node = match &self.render_node {
+            Some(render_node) => format!(",rendernode={}",render_node),
+            None => "".to_string()
+        };
+
+        vec![
+            format!("-display egl-headless{}",render_node)
+        ]
     }
 
     fn post_start(&self, config: &Config) {
         match self.start(&config) {
-            Ok(_child) => debug!("LookingGlass::post_start() succeeded"),
-            Err(_error) => warn!("LookingGlass::post_start() failed"),
+            Ok(_child) => debug!("RemoteViewer::post_start() succeeded"),
+            Err(_error) => warn!("RemoteViewer::post_start() failed"),
         }
     }
 }
 
-#[typetag::deserialize(name = "remote_viewer")]
+#[typetag::deserialize(name = "remote-viewer")]
 impl Display for RemoteViewer {}
 
 
 #[cfg(test)]
 mod tests {
+    use crate::config::Spice;
     use super::*;
-
     #[test]
-    fn unit_test() {
+    fn test_defaults() {
+        let display = RemoteViewer {
+            auto_resize: true,
+            full_screen: true,
+            render_node: None,
+        };
+        let expected: Vec<String> = vec!["-display egl-headless".to_string()];
+        assert_eq!(display.get_qemu_args(0), expected);
+
+        let expected: Vec<String> = vec!["--full-screen".to_string()];
+        assert_eq!(display.get_args(&Config::default()), expected);
+    }
+    #[test]
+    fn test_sane_values() {
         let display = RemoteViewer {
             auto_resize: false,
             full_screen: false,
+            render_node: Some("/dev/dri/renderD128".to_string()),
         };
-        let expected: Vec<String> = vec![];
+        let expected: Vec<String> = vec!["-display egl-headless,rendernode=/dev/dri/renderD128".to_string()];
         assert_eq!(display.get_qemu_args(0), expected);
+
+        let expected: Vec<String> = vec!["spice://127.0.0.1:5900".to_string(),"--auto-resize=never".to_string()];
+        assert_eq!(display.get_args(
+            &Config::default()
+                .with_spice(Some(Spice::new("127.0.0.1".to_string(),5900)))
+        ), expected);
     }
 }

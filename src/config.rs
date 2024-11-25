@@ -84,6 +84,42 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn with_general(self, general: General) -> Config {
+        Config { general, ..self }
+    }
+
+    pub fn with_system(self, system: System) -> Config {
+        Config { system, ..self }
+    }
+
+    pub fn with_display(self, display: Box<dyn Display>) -> Config {
+        Config { display, ..self }
+    }
+
+    pub fn with_gpu(self, gpu: Box<dyn Gpu>) -> Config {
+        Config { gpu, ..self }
+    }
+
+    pub fn with_spice(self, spice: Option<Spice>) -> Config {
+        Config { spice, ..self }
+    }
+
+    pub fn with_host(self, host: Option<Host>) -> Config {
+        Config { host, ..self }
+    }
+
+    pub fn with_storage(self, storage: Vec<StorageItem>) -> Config {
+        Config { storage, ..self }
+    }
+
+    pub fn with_network(self, network: Vec<NetworkItem>) -> Config {
+        Config { network, ..self }
+    }
+
+    pub fn with_extras(self, extras: Vec<String>) -> Config {
+        Config { extras, ..self }
+    }
+
     pub fn read<S>(name: S) -> Option<Self>
         where S: AsRef<str>
     {
@@ -339,7 +375,7 @@ mod tests {
             "-object", "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M",
             "-device", "vfio-pci,host=0000:03:00.0,id=hostpci0.0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
             "-device", "vfio-pci,host=0000:03:00.1,id=hostpci0.1,bus=ich9-pcie-port-1,addr=0x0.1",
-            "-spice", "port=5903,addr=0.0.0.0,disable-ticketing",
+            "-spice", "port=5903,addr=0.0.0.0,disable-ticketing=on",
             "-device", "virtio-serial-pci",
             "-chardev", "spicevmc,id=vdagent,name=vdagent",
             "-device", "virtserialport,chardev=vdagent,name=com.redhat.spice.0",
