@@ -95,7 +95,7 @@ mod tests {
                 "swtpm".to_string(),
                 "socket".to_string(),
                 "--tpmstate".to_string(),
-                "backend-uri=file://the_disk,mode=0600".to_string(),
+                "backend-uri=file://the_disk".to_string(),
                 "--ctrl".to_string(),
                 "type=unixio,path=the_socket,mode=0600".to_string(),
                 "--tpm2".to_string()
