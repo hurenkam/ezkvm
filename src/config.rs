@@ -84,6 +84,20 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn read<S>(name: S) -> Option<Self>
+        where S: AsRef<str>
+    {
+        let name = format!("{}.yaml",name.as_ref());
+        let candidates = Osal::find_files(name,vec![".","~/.ezkvm","/etc/ezkvm"]);
+
+        if let Some(candidate) = candidates.get(0) {
+            if let Ok(config) = Osal::read_yaml_file(candidate.clone()) {
+                return Some(config);
+            }
+        }
+
+        None
+    }
     pub(crate) fn allocate_resources(&self) -> Result<Vec<String>, OsalError> {
         Ok(vec![])
     }
@@ -190,8 +204,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::path::{PathBuf};
     use super::*;
     use serial_test::serial;
+    use crate::config::display::NoDisplay;
+    use crate::config::gpu::NoGpu;
 
     #[test]
     fn test_empty_config() {
@@ -322,7 +339,7 @@ mod tests {
             "-object", "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M",
             "-device", "vfio-pci,host=0000:03:00.0,id=hostpci0.0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
             "-device", "vfio-pci,host=0000:03:00.1,id=hostpci0.1,bus=ich9-pcie-port-1,addr=0x0.1",
-            "-spice", "port=5903,addr=0.0.0.0,disable-ticketing=on",
+            "-spice", "port=5903,addr=0.0.0.0,disable-ticketing",
             "-device", "virtio-serial-pci",
             "-chardev", "spicevmc,id=vdagent,name=vdagent",
             "-device", "virtserialport,chardev=vdagent,name=com.redhat.spice.0",
@@ -451,5 +468,55 @@ mod tests {
         let actual = config.get_escalated_uid_and_gid();
         let expected: (u32, u32) = (0, 0);
         assert_eq!(actual, expected)
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_read_file_not_found() {
+        let find_files = Osal::find_files_context();
+        find_files
+            .expect()
+            .returning(|p: String,l: Vec<&str>| {
+                assert_eq!(p,"wakiza.yaml");
+                assert_eq!(l,vec![".","~/.ezkvm","/etc/ezkvm"]);
+                vec![]
+            });
+        let result = Config::read("wakiza");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_read_file_success() {
+        let find_files = Osal::find_files_context();
+        find_files
+            .expect()
+            .returning(|p: String,l: Vec<&str>| {
+                assert_eq!(p,"wakiza.yaml");
+                assert_eq!(l,vec![".","~/.ezkvm","/etc/ezkvm"]);
+                vec![
+                    PathBuf::from("/etc/ezkvm/wakiza.yaml")
+                ]
+            });
+
+        let read_yaml_file = Osal::read_yaml_file_context();
+        read_yaml_file
+            .expect()
+            .returning(|n:PathBuf|{
+                assert_eq!(n,PathBuf::from("/etc/ezkvm/wakiza.yaml"));
+                Ok(Config {
+                    general: Default::default(),
+                    system: Default::default(),
+                    display: Box::new(NoDisplay {}),
+                    gpu: Box::new(NoGpu {}),
+                    spice: None,
+                    host: None,
+                    storage: vec![],
+                    network: vec![],
+                    extras: vec![],
+                })
+            });
+
+        let _config = Config::read("wakiza").unwrap();
     }
 }

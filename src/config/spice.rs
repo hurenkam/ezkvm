@@ -12,7 +12,7 @@ impl QemuDevice for Spice {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             format!(
-                "-spice port={},addr={},disable-ticketing=on",
+                "-spice port={},addr={},disable-ticketing",
                 self.port, self.addr
             ),
             "-device virtio-serial-pci".to_string(),
