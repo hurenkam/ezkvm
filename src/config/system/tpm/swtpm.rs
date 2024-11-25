@@ -45,7 +45,7 @@ impl SwTpm {
             "swtpm".to_string(),
             "socket".to_string(),
             "--tpmstate".to_string(),
-            format!("backend-uri=file://{},mode=0600", self.disk),
+            format!("backend-uri=file://{}", self.disk),
             "--ctrl".to_string(),
             format!("type=unixio,path={},mode=0600", self.socket),
             "--tpm2".to_string(),
