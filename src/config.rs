@@ -409,6 +409,95 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    const DEFAULT_MACOS_CONFIG: &str = r#"
+        general:
+            name: mygeeto
+
+        system:
+            bios: { type: "ovmf", uuid: "05cba597-8096-47c6-9cd7-1481dbb3b95a", file: "/dev/vm1/vm-402-efidisk" }
+            cpu: { model: "Haswell-noTSX", sockets: 1, cores: 8, flags: "vendor=GenuineIntel,+invtsc,+hypervisor,+pcid,+invpcid,+erms,kvm=on,vmware-cpuid-freq=on" }
+            memory: { max: 16384, balloon: false }
+            applesmc: { osk: "<my_osk_key>" }
+
+        spice:
+            port: 5903
+            addr: 0.0.0.0
+
+        gpu:
+            type: "passthrough"
+            pci:
+            - { vm_id: "0.0", host_id: "0000:03:00.0", multi_function: true }
+            - { vm_id: "0.1", host_id: "0000:03:00.1" }
+
+        display:
+            type: "looking_glass"
+            device: { path: /dev/kvmfr0, size: 128M }
+            input: { grab_keyboard: true, escape_key: KEY_F12 }
+            window: { size: 1707x1067, full_screen: true }
+
+        host:
+            usb:
+            - { vm_port: "1", host_bus: "1", host_port: "2.2" }
+
+        storage:
+        - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
+        - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: "on" }
+
+        network:
+        - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
+    "#;
+
+    #[test]
+    fn test_macos_defaults() {
+        let expected: Vec<&str> = vec![
+            "qemu-system-x86_64",
+            "-accel", "kvm", "-nodefaults",
+            "-monitor", "unix:/var/ezkvm/wakiza.monitor,server,nowait",
+            "-chardev", "socket,id=qmp,path=/var/ezkvm/wakiza.qmp,server=on,wait=off",
+            "-mon", "chardev=qmp,mode=control",
+            "-chardev", "socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon", "chardev=qmp-event,mode=control",
+            "-machine", "hpet=off,type=pc-q35-8.1",
+            "-rtc", "driftfix=slew,base=localtime",
+            "-global", "kvm-pit.lost_tick_policy=discard",
+            "-readconfig", "/usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-device", "qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
+            "-iscsi", "initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
+            "-device", "pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
+            "-boot", "menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
+            "-smbios", "type=1,uuid=04d064c3-66a1-4aa7-9589-f8b3ecf91cd7",
+            "-drive", "if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd",
+            "-drive", "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-108-efidisk,size=540672",
+            "-m", "16384",
+            "-smp", "8,sockets=1,cores=8,maxcpus=8",
+            "-cpu", "qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
+            "-chardev", "socket,id=chrtpm0,path=/var/ezkvm/wakiza-tpm.socket",
+            "-tpmdev", "emulator,id=tpm0,chardev=chrtpm0",
+            "-device", "tpm-tis,tpmdev=tpm0",
+            "-vga", "none", "-nographic",
+            "-device", "virtio-mouse",
+            "-device", "virtio-keyboard",
+            "-device", "ivshmem-plain,memdev=ivshmem0,bus=pcie.0",
+            "-object", "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M",
+            "-device", "vfio-pci,host=0000:03:00.0,id=hostpci0.0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
+            "-device", "vfio-pci,host=0000:03:00.1,id=hostpci0.1,bus=ich9-pcie-port-1,addr=0x0.1",
+            "-spice", "port=5903,addr=0.0.0.0,disable-ticketing=on",
+            "-device", "virtio-serial-pci",
+            "-chardev", "spicevmc,id=vdagent,name=vdagent",
+            "-device", "virtserialport,chardev=vdagent,name=com.redhat.spice.0",
+            "-audiodev", "spice,id=spice-backend0",
+            "-device", "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
+            "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
+            "-device", "usb-host,bus=xhci.0,port=1,hostbus=1,hostport=2.2,id=usb0",
+            "-drive", "file=/dev/vm1/vm-108-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
+            "-drive", "file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device", "scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
+            "-netdev", "type=bridge,br=vmbr0,id=netdev0",
+            "-device", "virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:B7"
+        ];
+    }
+
     #[test]
     fn test_has_gtk_display_configured() {
         let config: Config = serde_yaml::from_str(DEFAULT_UBUNTU_CONFIG).unwrap();
