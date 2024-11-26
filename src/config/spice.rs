@@ -4,8 +4,14 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Getters)]
 pub struct Spice {
-    port: u16,
     addr: String,
+    port: u16,
+}
+
+impl Spice {
+    pub fn new(addr: String, port: u16) -> Self {
+        Self { addr, port }
+    }
 }
 
 impl QemuDevice for Spice {

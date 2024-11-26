@@ -159,17 +159,29 @@ current one.
 
 ## Todo ##
 
+### short term ###
 - ~~Drop priviledges where appropriate; Currently some use cases require qemu to run with
   root priviledges (e.g. pci passthrough), some other use cases refuse to run with root
   priviledges (Gtk ui). Also swtpm & lg client don't need to run with root priviledges.~~
 - ~~Add unit tests~~
 - ~~Refactor config files and move them into config directory as done in poc branch~~
-- Merge other improvements from the poc branch into the stable branch
+- ~~Merge other improvements from the poc branch into the stable branch~~
 - Run macos using ezkvm (and create an example config file for it)
+- Create & test examples using intel 440fx and seabios
+- Improve support for network and storage devices
+
+### long term ###
 - Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm
 - Create installers for popular distro's:
     - Arch based distro's (since i develop on EndeavorOS)
     - Debian based distro's
     - Others by popular demand (please submit a feature request)
-- Create examples using intel 440fx and seabios
 - Add missing features by popular demand (please submit a feature request)
+
+### things to investigate ###
+- Checkout config crates, one of these could make it easier to look for config files in various
+standard places like /etc/ezkvm/, ~/.ezkvm/ and ./
+- Split storage and network items into netdev+device and drive+device items
+- A templating system could make things easier and more generic, where type indicates a template
+  rather than a type, and set defaults for netdev/drive/device sections rather than implement
+  complete structs for them.

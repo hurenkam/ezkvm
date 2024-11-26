@@ -11,6 +11,7 @@ use crate::config::QemuDevice;
 mod gtk;
 mod looking_glass;
 mod no_display;
+mod remote_viewer;
 
 #[typetag::deserialize(tag = "type")]
 pub trait Display:  'static + Any + QemuDevice {}

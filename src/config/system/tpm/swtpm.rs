@@ -45,7 +45,7 @@ impl SwTpm {
             "swtpm".to_string(),
             "socket".to_string(),
             "--tpmstate".to_string(),
-            format!("backend-uri=file://{},mode=0600", self.disk),
+            format!("backend-uri=file://{}", self.disk),
             "--ctrl".to_string(),
             format!("type=unixio,path={},mode=0600", self.socket),
             "--tpm2".to_string(),
@@ -95,7 +95,7 @@ mod tests {
                 "swtpm".to_string(),
                 "socket".to_string(),
                 "--tpmstate".to_string(),
-                "backend-uri=file://the_disk,mode=0600".to_string(),
+                "backend-uri=file://the_disk".to_string(),
                 "--ctrl".to_string(),
                 "type=unixio,path=the_socket,mode=0600".to_string(),
                 "--tpm2".to_string()

@@ -1,9 +1,10 @@
 use log::{debug, error};
 use std::fmt::Display;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::{fs, process};
+use serde::Deserialize;
 
 #[derive(Debug, PartialEq)]
 pub enum OsalError {
@@ -32,10 +33,36 @@ impl Osal {
             u32::from(nix::unistd::getegid()),
         )
     }
+    pub fn find_files<S,T>(pattern: S, locations: Vec<T>) -> Vec<PathBuf>
+        where
+            S: 'static + AsRef<str>,
+            T: 'static + AsRef<str>
+    {
+        let mut result = vec![];
+
+        let pattern = pattern.as_ref();
+        if let Ok(matches) = glob::glob(pattern) {
+            for path in matches {
+                if let Ok(path) = path {
+                    result.push(path.to_owned());
+                }
+            }
+        }
+
+        result
+    }
     pub fn read_file<P: 'static + AsRef<Path>>(path: P) -> Result<String, OsalError> {
         let file = format!("{:?}", path.as_ref());
         let content = fs::read(path).map_err(|_| OsalError::ReadError(Some(file.clone())))?;
         Ok(String::from_utf8(content).map_err(|_| OsalError::ParseError(Some(file)))?)
+    }
+    pub fn read_yaml_file<P,T>(path: P) -> Result<T, OsalError>
+        where
+            P: 'static + AsRef<Path>,
+            T: 'static + for<'a> Deserialize<'a>
+    {
+        let content = Self::read_file(path)?;
+        serde_yaml::from_str(content.as_str()).map_err(|_| OsalError::ParseError(None))
     }
     pub fn write_file<P: 'static + AsRef<Path>, S: 'static + AsRef<str>>(
         path: P,

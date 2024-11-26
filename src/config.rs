@@ -84,6 +84,56 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn with_general(self, general: General) -> Config {
+        Config { general, ..self }
+    }
+
+    pub fn with_system(self, system: System) -> Config {
+        Config { system, ..self }
+    }
+
+    pub fn with_display(self, display: Box<dyn Display>) -> Config {
+        Config { display, ..self }
+    }
+
+    pub fn with_gpu(self, gpu: Box<dyn Gpu>) -> Config {
+        Config { gpu, ..self }
+    }
+
+    pub fn with_spice(self, spice: Option<Spice>) -> Config {
+        Config { spice, ..self }
+    }
+
+    pub fn with_host(self, host: Option<Host>) -> Config {
+        Config { host, ..self }
+    }
+
+    pub fn with_storage(self, storage: Vec<StorageItem>) -> Config {
+        Config { storage, ..self }
+    }
+
+    pub fn with_network(self, network: Vec<NetworkItem>) -> Config {
+        Config { network, ..self }
+    }
+
+    pub fn with_extras(self, extras: Vec<String>) -> Config {
+        Config { extras, ..self }
+    }
+
+    pub fn read<S>(name: S) -> Option<Self>
+        where S: AsRef<str>
+    {
+        let name = format!("{}.yaml",name.as_ref());
+        let candidates = Osal::find_files(name,vec![".","~/.ezkvm","/etc/ezkvm"]);
+
+        if let Some(candidate) = candidates.get(0) {
+            if let Ok(config) = Osal::read_yaml_file(candidate.clone()) {
+                return Some(config);
+            }
+        }
+
+        None
+    }
     pub(crate) fn allocate_resources(&self) -> Result<Vec<String>, OsalError> {
         Ok(vec![])
     }
@@ -190,8 +240,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::path::{PathBuf};
     use super::*;
     use serial_test::serial;
+    use crate::config::display::NoDisplay;
+    use crate::config::gpu::NoGpu;
 
     #[test]
     fn test_empty_config() {
@@ -540,5 +593,55 @@ mod tests {
         let actual = config.get_escalated_uid_and_gid();
         let expected: (u32, u32) = (0, 0);
         assert_eq!(actual, expected)
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_read_file_not_found() {
+        let find_files = Osal::find_files_context();
+        find_files
+            .expect()
+            .returning(|p: String,l: Vec<&str>| {
+                assert_eq!(p,"wakiza.yaml");
+                assert_eq!(l,vec![".","~/.ezkvm","/etc/ezkvm"]);
+                vec![]
+            });
+        let result = Config::read("wakiza");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_read_file_success() {
+        let find_files = Osal::find_files_context();
+        find_files
+            .expect()
+            .returning(|p: String,l: Vec<&str>| {
+                assert_eq!(p,"wakiza.yaml");
+                assert_eq!(l,vec![".","~/.ezkvm","/etc/ezkvm"]);
+                vec![
+                    PathBuf::from("/etc/ezkvm/wakiza.yaml")
+                ]
+            });
+
+        let read_yaml_file = Osal::read_yaml_file_context();
+        read_yaml_file
+            .expect()
+            .returning(|n:PathBuf|{
+                assert_eq!(n,PathBuf::from("/etc/ezkvm/wakiza.yaml"));
+                Ok(Config {
+                    general: Default::default(),
+                    system: Default::default(),
+                    display: Box::new(NoDisplay {}),
+                    gpu: Box::new(NoGpu {}),
+                    spice: None,
+                    host: None,
+                    storage: vec![],
+                    network: vec![],
+                    extras: vec![],
+                })
+            });
+
+        let _config = Config::read("wakiza").unwrap();
     }
 }
