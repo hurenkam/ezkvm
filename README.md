@@ -12,6 +12,23 @@ for use on a laptop, and it only runs on debian.
 The aim for ezkvm is to not be limited to a single distro, and ideally it would run on
 any system that can run qemu.
 
+## Current status ##
+This is still very much a work in progress, however I do use it myself on a daily basis
+to run several VM's (which i initially created on my proxmox cloud server) on my Framework 
+16 laptop.
+
+### What works (and I use this on a daily basis): ###
+- Windows 11 gaming with GPU passthrough and looking-glass
+- Windows 11 office work with remote-viewer and spice-gl via unix-socket
+- Linux VM with gtk UI or remote-viewer to host/port
+
+### What does not (yet) work: ###
+- macOS
+
+### Open issues: ###
+- still depends on libvirt, mainly for networking
+- still depends on some proxmox files (ovmf bios and qemu config file)
+
 ## How does it work ##
 
 The idea is to use a small and simple config file, which will be expanded by the ezkvm
@@ -166,8 +183,37 @@ current one.
 - ~~Add unit tests~~
 - ~~Refactor config files and move them into config directory as done in poc branch~~
 - ~~Merge other improvements from the poc branch into the stable branch~~
+- Support for sdl UI
+- Support for vnc protocol
+- Support 440fx
+- Support seabios
 - Run macos using ezkvm (and create an example config file for it)
-- Create & test examples using intel 440fx and seabios
+- Restructure example config files to include at least:
+  - Multiple operating systems:
+    - Windows
+    - Linux
+    - macOS
+  - Multiple gpu options (from fast to slow):
+    - passthrough-gpu
+    - virtio-vga-gl
+    - vmware-svga
+    - no-gpu
+  - Multiple display options (from fast to slow):
+    - looking-glass
+    - sdl
+    - gtk
+    - remote-viewer using spice with direct gl support to unix socket
+    - remote-viewer using spice with egl-headless gl support to host+port
+    - remote-viewer using vnc to host+port
+  - Multiple TPM options
+    - no-tpm
+    - swtpm
+  - Multiple system options
+    - q35
+    - 440fx
+  - Multiple BIOS options
+    - seabios (BIOS)
+    - ovmf (UEFI)
 - Improve support for network and storage devices
 
 ### long term ###
@@ -179,8 +225,8 @@ current one.
 - Add missing features by popular demand (please submit a feature request)
 
 ### things to investigate ###
-- Checkout config crates, one of these could make it easier to look for config files in various
-standard places like /etc/ezkvm/, ~/.ezkvm/ and ./
+~~- Checkout config crates, one of these could make it easier to look for config files in various
+standard places like /etc/ezkvm/, ~/.ezkvm/ and ./~~
 - Split storage and network items into netdev+device and drive+device items
 - A templating system could make things easier and more generic, where type indicates a template
   rather than a type, and set defaults for netdev/drive/device sections rather than implement
