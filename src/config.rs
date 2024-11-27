@@ -121,10 +121,11 @@ impl Config {
     }
 
     pub fn read<S>(name: S) -> Option<Self>
-        where S: AsRef<str>
+    where
+        S: AsRef<str>,
     {
-        let name = format!("{}.yaml",name.as_ref());
-        let candidates = Osal::find_files(name,vec![".","~/.ezkvm","/etc/ezkvm"]);
+        let name = format!("{}.yaml", name.as_ref());
+        let candidates = Osal::find_files(name, vec![".", "~/.ezkvm", "/etc/ezkvm"]);
 
         if let Some(candidate) = candidates.get(0) {
             if let Ok(config) = Osal::read_yaml_file(candidate.clone()) {
@@ -234,11 +235,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::path::{PathBuf};
     use super::*;
-    use serial_test::serial;
     use crate::config::display::NoDisplay;
     use crate::config::gpu::NoGpu;
+    use serial_test::serial;
+    use std::path::PathBuf;
 
     #[test]
     fn test_empty_config() {
@@ -249,8 +250,8 @@ mod tests {
         .unwrap();
 
         let tmp = config.get_qemu_args(0);
-        let mut actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
-        let mut expected: Vec<&str> = vec![
+        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
             "-monitor unix:/var/ezkvm/anonymous.monitor,server,nowait",
@@ -275,15 +276,15 @@ mod tests {
         assert_argument_lists_are_equal(actual, expected);
     }
 
-    const DEFAULT_WINDOWS_CONFIG: &str = r#"
+    const WINDOWS_GAMING_CONFIG: &str = r#"
         general:
-            name: wakiza
+            name: windows_gaming_config
 
         system:
             bios: { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
             cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
             memory: { max: 16384, balloon: false }
-            tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/vm-108-tpmstate", socket: "/var/ezkvm/wakiza-tpm.socket" }
+            tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/vm-108-tpmstate", socket: "/var/ezkvm/windows_gaming_config-tpm.socket" }
 
         spice:
             port: 5903
@@ -314,16 +315,16 @@ mod tests {
     "#;
 
     #[test]
-    fn test_windows_defaults() {
-        let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
+    fn test_windows_gaming_config() {
+        let config: Config = serde_yaml::from_str(WINDOWS_GAMING_CONFIG).unwrap();
 
         let tmp = config.get_qemu_args(0);
-        let mut actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
-        let mut expected: Vec<&str> = vec![
+        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
-            "-monitor unix:/var/ezkvm/wakiza.monitor,server,nowait",
-            "-chardev socket,id=qmp,path=/var/ezkvm/wakiza.qmp,server=on,wait=off",
+            "-monitor unix:/var/ezkvm/windows_gaming_config.monitor,server,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/windows_gaming_config.qmp,server=on,wait=off",
             "-mon chardev=qmp,mode=control",
             "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
             "-mon chardev=qmp-event,mode=control",
@@ -341,7 +342,7 @@ mod tests {
             "-m 16384",
             "-smp 8,sockets=1,cores=8,maxcpus=8",
             "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
-            "-chardev socket,id=chrtpm0,path=/var/ezkvm/wakiza-tpm.socket",
+            "-chardev socket,id=chrtpm0,path=/var/ezkvm/windows_gaming_config-tpm.socket",
             "-tpmdev emulator,id=tpm0,chardev=chrtpm0",
             "-device tpm-tis,tpmdev=tpm0",
             "-vga none", "-nographic",
@@ -370,9 +371,86 @@ mod tests {
         assert_argument_lists_are_equal(actual, expected);
     }
 
+    const WINDOWS_DESKTOP_CONFIG: &str = r#"
+        general:
+            name: windows_desktop_config
+
+        system:
+          chipset: { type: "q35", version: "8.1" }
+          bios: { type: "ovmf", uuid: "181f1a56-e0e2-42d1-a916-bc16dd415a59", file: "/dev/vm1/vm-111-efidisk" }
+          cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
+          memory: { max: 16384, balloon: false }
+          tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/vm-111-tpmstate", socket: "/var/ezkvm/windows_desktop_config-tpm.socket" }
+
+        spice:
+          path: /var/ezkvm/windows_desktop_config-spice.socket
+          gl: true
+          render_node: /dev/dri/renderD128
+
+        gpu:
+          type: "virtio-vga-gl"
+
+        display:
+          type: "remote-viewer"
+
+        storage:
+          - { type: "scsi-hd", file: "/dev/vm1/vm-111-boot", discard: "on", boot_index: 0 }
+
+        network:
+          - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:7B" }
+    "#;
+
+    #[test]
+    fn test_windows_desktop_config() {
+        let config: Config = serde_yaml::from_str(WINDOWS_DESKTOP_CONFIG).unwrap();
+
+        let tmp = config.get_qemu_args(0);
+        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let expected: Vec<&str> = vec![
+            "-accel kvm",
+            "-nodefaults",
+            "-monitor unix:/var/ezkvm/windows_desktop_config.monitor,server,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/windows_desktop_config.qmp,server=on,wait=off", 
+            "-mon chardev=qmp,mode=control", 
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5", 
+            "-mon chardev=qmp-event,mode=control", 
+            "-machine hpet=off,type=pc-q35-8.1", 
+            "-rtc driftfix=slew,base=localtime", 
+            "-global kvm-pit.lost_tick_policy=discard", 
+            "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg", 
+            "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b", 
+            "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b", 
+            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5", 
+            "-boot menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg", 
+            "-smbios type=1,uuid=181f1a56-e0e2-42d1-a916-bc16dd415a59", 
+            "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd", 
+            "-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-111-efidisk,size=540672", 
+            "-m 16384", 
+            "-smp 8,sockets=1,cores=8,maxcpus=8", 
+            "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce", 
+            "-chardev socket,id=chrtpm0,path=/var/ezkvm/windows_desktop_config-tpm.socket", 
+            "-tpmdev emulator,id=tpm0,chardev=chrtpm0", 
+            "-device tpm-tis,tpmdev=tpm0", 
+            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2", 
+            "-spice unix=on,addr=/var/ezkvm/windows_desktop_config-spice.socket,disable-ticketing=on", 
+            "-device virtio-serial-pci", 
+            "-chardev spicevmc,id=vdagent,name=vdagent", 
+            "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0", 
+            "-audiodev spice,id=spice-backend0", 
+            "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc", 
+            "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0", 
+            "-drive file=/dev/vm1/vm-111-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap", 
+            "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0", 
+            "-netdev type=bridge,br=vmbr0,id=netdev0", 
+            "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:7B"
+        ];
+
+        assert_argument_lists_are_equal(actual, expected);
+    }
+
     const DEFAULT_UBUNTU_CONFIG: &str = r#"
         general:
-            name: gyndine
+            name: ubuntu_desktop
 
         system:
             bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
@@ -397,12 +475,12 @@ mod tests {
     fn test_ubuntu_defaults() {
         let config: Config = serde_yaml::from_str(DEFAULT_UBUNTU_CONFIG).unwrap();
         let tmp = config.get_qemu_args(0);
-        let mut actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
-        let mut expected: Vec<&str> = vec![
+        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
-            "-monitor unix:/var/ezkvm/gyndine.monitor,server,nowait",
-            "-chardev socket,id=qmp,path=/var/ezkvm/gyndine.qmp,server=on,wait=off",
+            "-monitor unix:/var/ezkvm/ubuntu_desktop.monitor,server,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/ubuntu_desktop.qmp,server=on,wait=off",
             "-mon chardev=qmp,mode=control",
             "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
             "-mon chardev=qmp-event,mode=control",
@@ -534,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_has_no_gtk_display_configured() {
-        let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
+        let config: Config = serde_yaml::from_str(WINDOWS_GAMING_CONFIG).unwrap();
         assert_eq!(config.has_gtk_display_configured(), false)
     }
 
@@ -557,7 +635,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_get_escalated_uid_and_gid_returns_escalated_when_gtk_display_not_configured() {
-        let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
+        let config: Config = serde_yaml::from_str(WINDOWS_GAMING_CONFIG).unwrap();
 
         let get_euid_and_egid_context = Osal::get_euid_and_egid_context();
         get_euid_and_egid_context.expect().returning(|| (0, 0));
@@ -575,13 +653,11 @@ mod tests {
     #[serial]
     fn test_config_read_file_not_found() {
         let find_files = Osal::find_files_context();
-        find_files
-            .expect()
-            .returning(|p: String,l: Vec<&str>| {
-                assert_eq!(p,"wakiza.yaml");
-                assert_eq!(l,vec![".","~/.ezkvm","/etc/ezkvm"]);
-                vec![]
-            });
+        find_files.expect().returning(|p: String, l: Vec<&str>| {
+            assert_eq!(p, "wakiza.yaml");
+            assert_eq!(l, vec![".", "~/.ezkvm", "/etc/ezkvm"]);
+            vec![]
+        });
         let result = Config::read("wakiza");
         assert!(result.is_none());
     }
@@ -590,33 +666,27 @@ mod tests {
     #[serial]
     fn test_config_read_file_success() {
         let find_files = Osal::find_files_context();
-        find_files
-            .expect()
-            .returning(|p: String,l: Vec<&str>| {
-                assert_eq!(p,"wakiza.yaml");
-                assert_eq!(l,vec![".","~/.ezkvm","/etc/ezkvm"]);
-                vec![
-                    PathBuf::from("/etc/ezkvm/wakiza.yaml")
-                ]
-            });
+        find_files.expect().returning(|p: String, l: Vec<&str>| {
+            assert_eq!(p, "wakiza.yaml");
+            assert_eq!(l, vec![".", "~/.ezkvm", "/etc/ezkvm"]);
+            vec![PathBuf::from("/etc/ezkvm/wakiza.yaml")]
+        });
 
         let read_yaml_file = Osal::read_yaml_file_context();
-        read_yaml_file
-            .expect()
-            .returning(|n:PathBuf|{
-                assert_eq!(n,PathBuf::from("/etc/ezkvm/wakiza.yaml"));
-                Ok(Config {
-                    general: Default::default(),
-                    system: Default::default(),
-                    display: Box::new(NoDisplay {}),
-                    gpu: Box::new(NoGpu {}),
-                    spice: None,
-                    host: None,
-                    storage: vec![],
-                    network: vec![],
-                    extras: vec![],
-                })
-            });
+        read_yaml_file.expect().returning(|n: PathBuf| {
+            assert_eq!(n, PathBuf::from("/etc/ezkvm/wakiza.yaml"));
+            Ok(Config {
+                general: Default::default(),
+                system: Default::default(),
+                display: Box::new(NoDisplay {}),
+                gpu: Box::new(NoGpu {}),
+                spice: None,
+                host: None,
+                storage: vec![],
+                network: vec![],
+                extras: vec![],
+            })
+        });
 
         let _config = Config::read("wakiza").unwrap();
     }
@@ -636,12 +706,11 @@ pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<
 
 /// helper function to compare argument options independent of order
 pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
-
     // arguments take the form '-<argument> [option,...]'
     // so split them further
     let actual_split: Vec<String> = actual.split_whitespace().map(str::to_string).collect();
     let expected_split: Vec<String> = expected.split_whitespace().map(str::to_string).collect();
-    assert_eq!(actual_split.len(),expected_split.len());
+    assert_eq!(actual_split.len(), expected_split.len());
 
     // there should be at most one space, so length after splitting must be 1 or 2
     assert!(actual_split.len() == 1 || actual_split.len() == 2);
@@ -653,13 +722,23 @@ pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
 
     // if there are options, then split them
     if actual_split.len() == 2 {
-        let mut actual_split: Vec<String> = actual_split.get(1).unwrap().split(",").map(str::to_string).collect();
-        let mut expected_split: Vec<String> = expected_split.get(1).unwrap().split(",").map(str::to_string).collect();
+        let mut actual_split: Vec<String> = actual_split
+            .get(1)
+            .unwrap()
+            .split(",")
+            .map(str::to_string)
+            .collect();
+        let mut expected_split: Vec<String> = expected_split
+            .get(1)
+            .unwrap()
+            .split(",")
+            .map(str::to_string)
+            .collect();
 
         // for the first option in the arguments, order may still be relevant, so compare those first, and the rest after sorting
         assert_eq!(actual_split.get(0).unwrap(), expected_split.get(0).unwrap());
         actual_split.sort();
         expected_split.sort();
-        assert_eq!(actual_split.len(),expected_split.len());
+        assert_eq!(actual_split.len(), expected_split.len());
     }
 }
