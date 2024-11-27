@@ -1,12 +1,13 @@
 use crate::config::display::Display;
 use crate::config::types::QemuDevice;
-use crate::config::{default_when_missing, Config};
+use crate::config::{default_when_missing, Config, Spice};
 use crate::osal::{Osal, OsalError};
 use derive_getters::Getters;
 use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Child, Command};
+use crate::config::spice::SpiceSocket;
 
 #[derive(Deserialize, Debug, Getters)]
 pub struct LookingGlass {
@@ -35,11 +36,24 @@ impl LookingGlass {
             ]),
         }
         match config.spice() {
-            None => {}
-            Some(spice) => result.extend(vec![
-                format!("spice:host={}", spice.addr()),
-                format!("spice:port={}", spice.port()),
-            ]),
+            None => {},
+            Some(spice) => {
+                match spice.socket() {
+                    SpiceSocket::TcpPort { addr, port } => {
+                        result.extend(vec![
+                            format!("spice:host={}", addr),
+                            format!("spice:port={}", port),
+                        ])
+                    },
+                    SpiceSocket::UnixSocket { path, .. } => {
+                        result.extend(vec![
+                            format!("spice:host={}", path),
+                            format!("spice:port={}", 0),
+                        ])
+                    }
+                    SpiceSocket::None => {}
+                }
+            }
         }
 
         result

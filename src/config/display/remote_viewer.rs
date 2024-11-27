@@ -7,6 +7,7 @@ use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Child, Command};
+use crate::config::spice::SpiceSocket;
 
 fn yes() -> bool { true }
 #[derive(Deserialize, Debug, Getters)]
@@ -25,11 +26,22 @@ impl RemoteViewer {
     fn get_args(&self, config: &Config) -> Vec<String> {
         let mut result = vec![];
         match config.spice() {
-            None => {}
-            Some(spice) => result.extend(vec![
-                //"--connect".to_string(),
-                format!("spice://{}:{}",spice.addr(),spice.port())
-            ]),
+            None => {},
+            Some(spice) => {
+                match spice.socket() {
+                    SpiceSocket::TcpPort { addr, port } => {
+                        result.extend(vec![
+                            format!("spice://{}:{}", addr, port)
+                        ])
+                    },
+                    SpiceSocket::UnixSocket { path, .. } => {
+                        result.extend(vec![
+                            format!("spice+unix://{}", path)
+                        ])
+                    }
+                    SpiceSocket::None => {}
+                }
+            }
         }
 
         if !*self.auto_resize() {
@@ -58,14 +70,7 @@ impl RemoteViewer {
 
 impl QemuDevice for RemoteViewer {
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
-        let render_node = match &self.render_node {
-            Some(render_node) => format!(",rendernode={}",render_node),
-            None => "".to_string()
-        };
-
-        vec![
-            format!("-display egl-headless{}",render_node)
-        ]
+        vec![]
     }
 
     fn post_start(&self, config: &Config) {
@@ -91,7 +96,7 @@ mod tests {
             full_screen: true,
             render_node: None,
         };
-        let expected: Vec<String> = vec!["-display egl-headless".to_string()];
+        let expected: Vec<String> = vec![];
         assert_eq!(display.get_qemu_args(0), expected);
 
         let expected: Vec<String> = vec!["--full-screen".to_string()];
@@ -104,13 +109,13 @@ mod tests {
             full_screen: false,
             render_node: Some("/dev/dri/renderD128".to_string()),
         };
-        let expected: Vec<String> = vec!["-display egl-headless,rendernode=/dev/dri/renderD128".to_string()];
+        let expected: Vec<String> = vec![];
         assert_eq!(display.get_qemu_args(0), expected);
 
         let expected: Vec<String> = vec!["spice://127.0.0.1:5900".to_string(),"--auto-resize=never".to_string()];
         assert_eq!(display.get_args(
             &Config::default()
-                .with_spice(Some(Spice::new("127.0.0.1".to_string(),5900)))
+                .with_spice(Some(Spice::new_with_address_and_port("127.0.0.1".to_string(), 5900)))
         ), expected);
     }
 }

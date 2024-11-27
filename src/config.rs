@@ -229,7 +229,7 @@ impl QemuDevice for Config {
     }
 }
 
-pub fn default_when_missing<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+fn default_when_missing<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de> + Default,
