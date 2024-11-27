@@ -54,20 +54,6 @@ impl QemuDevice for Spice {
                         port, addr
                     ),
                 ]);
-                match &self.display {
-                    SpiceDisplay::Disabled => {}
-                    SpiceDisplay::Enabled { render_node } => {
-                        let render_node = match render_node {
-                            Some(render_node) => format!(",rendernode={}",render_node),
-                            None => "".to_string()
-                        };
-                        result.extend(vec![
-                            format!(
-                                "--display egl-headless{}", render_node
-                            ),
-                        ]);
-                    }
-                }
             },
 
             SpiceSocket::UnixSocket { ref path } => {
@@ -88,6 +74,21 @@ impl QemuDevice for Spice {
             }
 
             SpiceSocket::None => {}
+        }
+
+        match &self.display {
+            SpiceDisplay::Disabled => {}
+            SpiceDisplay::Enabled { render_node } => {
+                let render_node = match render_node {
+                    Some(render_node) => format!(",rendernode={}", render_node),
+                    None => "".to_string()
+                };
+                result.extend(vec![
+                    format!(
+                        "--display egl-headless{}", render_node
+                    ),
+                ]);
+            }
         }
 
         result.extend(vec![
