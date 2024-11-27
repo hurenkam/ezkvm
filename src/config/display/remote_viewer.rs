@@ -69,7 +69,7 @@ impl RemoteViewer {
 }
 
 impl QemuDevice for RemoteViewer {
-    fn get_qemu_args(&self, index: usize) -> Vec<String> {
+    fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![]
     }
 

@@ -1,6 +1,6 @@
 use crate::config::display::Display;
 use crate::config::types::QemuDevice;
-use crate::config::{default_when_missing, Config, Spice};
+use crate::config::{default_when_missing, Config};
 use crate::osal::{Osal, OsalError};
 use derive_getters::Getters;
 use log::{debug, warn};
