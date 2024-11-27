@@ -210,6 +210,8 @@ impl QemuDevice for Config {
             result.extend(network.get_qemu_args(i));
         }
 
+        result
+/*
         let mut args = "qemu-system-x86_64".to_string();
         for arg in result {
             info!("{}", arg);
@@ -217,6 +219,7 @@ impl QemuDevice for Config {
         }
 
         args.split_whitespace().map(str::to_string).collect()
+ */
     }
 
     fn pre_start(&self, config: &Config) {
@@ -255,48 +258,30 @@ mod tests {
         .unwrap();
 
         let tmp = config.get_qemu_args(0);
-        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
-        let expected: Vec<&str> = vec![
-            "qemu-system-x86_64",
-            "-accel",
-            "kvm",
+        let mut actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let mut expected: Vec<&str> = vec![
+            "-accel kvm",
             "-nodefaults",
-            "-monitor",
-            "unix:/var/ezkvm/anonymous.monitor,server,nowait",
-            "-chardev",
-            "socket,id=qmp,path=/var/ezkvm/anonymous.qmp,server=on,wait=off",
-            "-mon",
-            "chardev=qmp,mode=control",
-            "-chardev",
-            "socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
-            "-mon",
-            "chardev=qmp-event,mode=control",
-            "-machine",
-            "hpet=off,type=pc-q35-8.1",
-            "-rtc",
-            "driftfix=slew,base=localtime",
-            "-global",
-            "kvm-pit.lost_tick_policy=discard",
-            "-readconfig",
-            "/usr/share/ezkvm/pve-q35-4.0.cfg",
-            "-device",
-            "qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
-            "-iscsi",
-            "initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
-            "-device",
-            "pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
-            "-boot",
-            "menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
-            "-smbios",
-            "type=1,uuid=",
-            "-m",
-            "16384",
-            "-smp",
-            "4,sockets=1,cores=4,maxcpus=4",
-            "-cpu",
-            "qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
+            "-monitor unix:/var/ezkvm/anonymous.monitor,server,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/anonymous.qmp,server=on,wait=off",
+            "-mon chardev=qmp,mode=control",
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon chardev=qmp-event,mode=control",
+            "-machine hpet=off,type=pc-q35-8.1",
+            "-rtc driftfix=slew,base=localtime",
+            "-global kvm-pit.lost_tick_policy=discard",
+            "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
+            "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
+            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
+            "-boot menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
+            "-smbios type=1,uuid=",
+            "-m 16384",
+            "-smp 4,sockets=1,cores=4,maxcpus=4",
+            "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
         ];
-        assert_eq!(actual, expected);
+
+        assert_argument_lists_are_equal(actual, expected);
     }
 
     const DEFAULT_WINDOWS_CONFIG: &str = r#"
@@ -342,56 +327,56 @@ mod tests {
         let config: Config = serde_yaml::from_str(DEFAULT_WINDOWS_CONFIG).unwrap();
 
         let tmp = config.get_qemu_args(0);
-        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
-        let expected: Vec<&str> = vec![
-            "qemu-system-x86_64",
-            "-accel", "kvm", "-nodefaults",
-            "-monitor", "unix:/var/ezkvm/wakiza.monitor,server,nowait",
-            "-chardev", "socket,id=qmp,path=/var/ezkvm/wakiza.qmp,server=on,wait=off",
-            "-mon", "chardev=qmp,mode=control",
-            "-chardev", "socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
-            "-mon", "chardev=qmp-event,mode=control",
-            "-machine", "hpet=off,type=pc-q35-8.1",
-            "-rtc", "driftfix=slew,base=localtime",
-            "-global", "kvm-pit.lost_tick_policy=discard",
-            "-readconfig", "/usr/share/ezkvm/pve-q35-4.0.cfg",
-            "-device", "qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
-            "-iscsi", "initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
-            "-device", "pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
-            "-boot", "menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
-            "-smbios", "type=1,uuid=04d064c3-66a1-4aa7-9589-f8b3ecf91cd7",
-            "-drive", "if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd",
-            "-drive", "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-108-efidisk,size=540672",
-            "-m", "16384",
-            "-smp", "8,sockets=1,cores=8,maxcpus=8",
-            "-cpu", "qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
-            "-chardev", "socket,id=chrtpm0,path=/var/ezkvm/wakiza-tpm.socket",
-            "-tpmdev", "emulator,id=tpm0,chardev=chrtpm0",
-            "-device", "tpm-tis,tpmdev=tpm0",
-            "-vga", "none", "-nographic",
-            "-device", "virtio-mouse",
-            "-device", "virtio-keyboard",
-            "-device", "ivshmem-plain,memdev=ivshmem0,bus=pcie.0",
-            "-object", "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M",
-            "-device", "vfio-pci,host=0000:03:00.0,id=hostpci0.0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
-            "-device", "vfio-pci,host=0000:03:00.1,id=hostpci0.1,bus=ich9-pcie-port-1,addr=0x0.1",
-            "-spice", "port=5903,addr=0.0.0.0,disable-ticketing=on",
-            "-device", "virtio-serial-pci",
-            "-chardev", "spicevmc,id=vdagent,name=vdagent",
-            "-device", "virtserialport,chardev=vdagent,name=com.redhat.spice.0",
-            "-audiodev", "spice,id=spice-backend0",
-            "-device", "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
-            "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
-            "-device", "usb-host,bus=xhci.0,port=1,hostbus=1,hostport=2.2,id=usb0",
-            "-drive", "file=/dev/vm1/vm-108-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap",
-            "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
-            "-drive", "file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
-            "-device", "scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
-            "-netdev", "type=bridge,br=vmbr0,id=netdev0",
-            "-device", "virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:B7"
+        let mut actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let mut expected: Vec<&str> = vec![
+            "-accel kvm",
+            "-nodefaults",
+            "-monitor unix:/var/ezkvm/wakiza.monitor,server,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/wakiza.qmp,server=on,wait=off",
+            "-mon chardev=qmp,mode=control",
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon chardev=qmp-event,mode=control",
+            "-machine hpet=off,type=pc-q35-8.1",
+            "-rtc driftfix=slew,base=localtime",
+            "-global kvm-pit.lost_tick_policy=discard",
+            "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
+            "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
+            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
+            "-boot menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
+            "-smbios type=1,uuid=04d064c3-66a1-4aa7-9589-f8b3ecf91cd7",
+            "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd",
+            "-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-108-efidisk,size=540672",
+            "-m 16384",
+            "-smp 8,sockets=1,cores=8,maxcpus=8",
+            "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
+            "-chardev socket,id=chrtpm0,path=/var/ezkvm/wakiza-tpm.socket",
+            "-tpmdev emulator,id=tpm0,chardev=chrtpm0",
+            "-device tpm-tis,tpmdev=tpm0",
+            "-vga none", "-nographic",
+            "-device virtio-mouse",
+            "-device virtio-keyboard",
+            "-device ivshmem-plain,memdev=ivshmem0,bus=pcie.0",
+            "-object memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M",
+            "-device vfio-pci,host=0000:03:00.0,id=hostpci0.0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
+            "-device vfio-pci,host=0000:03:00.1,id=hostpci0.1,bus=ich9-pcie-port-1,addr=0x0.1",
+            "-spice port=5903,addr=0.0.0.0,disable-ticketing=on",
+            "-device virtio-serial-pci",
+            "-chardev spicevmc,id=vdagent,name=vdagent",
+            "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0",
+            "-audiodev spice,id=spice-backend0",
+            "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
+            "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
+            "-device usb-host,bus=xhci.0,port=1,hostbus=1,hostport=2.2,id=usb0",
+            "-drive file=/dev/vm1/vm-108-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
+            "-drive file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
+            "-netdev type=bridge,br=vmbr0,id=netdev0",
+            "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:B7"
         ];
 
-        assert_eq!(actual, expected);
+        assert_argument_lists_are_equal(actual, expected);
     }
 
     const DEFAULT_UBUNTU_CONFIG: &str = r#"
@@ -421,45 +406,44 @@ mod tests {
     fn test_ubuntu_defaults() {
         let config: Config = serde_yaml::from_str(DEFAULT_UBUNTU_CONFIG).unwrap();
         let tmp = config.get_qemu_args(0);
-        let actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
-        let expected: Vec<&str> = vec![
-            "qemu-system-x86_64",
-            "-accel", "kvm",
+        let mut actual: Vec<&str> = tmp.iter().map(std::ops::Deref::deref).collect();
+        let mut expected: Vec<&str> = vec![
+            "-accel kvm",
             "-nodefaults",
-            "-monitor", "unix:/var/ezkvm/gyndine.monitor,server,nowait",
-            "-chardev", "socket,id=qmp,path=/var/ezkvm/gyndine.qmp,server=on,wait=off",
-            "-mon", "chardev=qmp,mode=control",
-            "-chardev", "socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
-            "-mon", "chardev=qmp-event,mode=control",
-            "-machine", "hpet=off,type=pc-q35-8.1",
-            "-rtc", "driftfix=slew,base=localtime",
-            "-global", "kvm-pit.lost_tick_policy=discard",
-            "-readconfig", "/usr/share/ezkvm/pve-q35-4.0.cfg",
-            "-device", "qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
-            "-iscsi", "initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
-            "-device", "pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
-            "-boot", "menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
-            "-smbios", "type=1,uuid=c0e240a5-859a-4378-a2d9-95088f531142",
-            "-drive", "if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd",
-            "-drive", "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-950-disk-0,size=540672",
-            "-m", "16384",
-            "-smp", "4,sockets=1,cores=4,maxcpus=4",
-            "-cpu", "qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
-            "-display", "gtk,gl=on",
-            "-audiodev", "pipewire,id=audiodev0",
-            "-device", "usb-tablet",
-            "-device", "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
-            "-device", "hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=audiodev0",
-            "-device", "virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2",
-            "-drive", "file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
-            "-device", "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
-            "-drive", "file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
-            "-device", "ide-cd,bus=ide.1,drive=drive-ide1,id=ide1,unit=0",
-            "-netdev", "type=bridge,br=vmbr0,id=netdev0",
-            "-device", "virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:FF:76:89"
+            "-monitor unix:/var/ezkvm/gyndine.monitor,server,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/gyndine.qmp,server=on,wait=off",
+            "-mon chardev=qmp,mode=control",
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon chardev=qmp-event,mode=control",
+            "-machine hpet=off,type=pc-q35-8.1",
+            "-rtc driftfix=slew,base=localtime",
+            "-global kvm-pit.lost_tick_policy=discard",
+            "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
+            "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
+            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
+            "-boot menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
+            "-smbios type=1,uuid=c0e240a5-859a-4378-a2d9-95088f531142",
+            "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE.secboot.4m.fd",
+            "-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-950-disk-0,size=540672",
+            "-m 16384",
+            "-smp 4,sockets=1,cores=4,maxcpus=4",
+            "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
+            "-display gtk,gl=on",
+            "-audiodev pipewire,id=audiodev0",
+            "-device usb-tablet",
+            "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
+            "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=audiodev0",
+            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2",
+            "-drive file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
+            "-drive file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
+            "-device ide-cd,bus=ide.1,drive=drive-ide1,id=ide1,unit=0",
+            "-netdev type=bridge,br=vmbr0,id=netdev0",
+            "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:FF:76:89"
         ];
 
-        assert_eq!(actual, expected);
+        assert_argument_lists_are_equal(actual, expected);
     }
 
     const DEFAULT_MACOS_CONFIG: &str = r#"
@@ -643,5 +627,40 @@ mod tests {
             });
 
         let _config = Config::read("wakiza").unwrap();
+    }
+}
+
+/// helper function to compare argument lists independent of order
+pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<&str>) {
+    actual.sort();
+    expected.sort();
+
+    assert_eq!(actual.len(), expected.len());
+    let mut count = 0;
+    while count < actual.len() {
+        assert_eq!(actual[count], expected[count]);
+        count += 1;
+    }
+}
+
+/// helper function to compare argument options independent of order
+pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
+    let actual_split: Vec<String> = actual.split_whitespace().map(str::to_string).collect();
+    let expected_split: Vec<String> = expected.split_whitespace().map(str::to_string).collect();
+    assert_eq!(actual_split.len(),expected_split.len());
+    assert!(actual_split.len() == 1 || actual_split.len() == 2);
+
+    let actual_left = actual_split.get(0).unwrap().clone();
+    let expected_left = expected_split.get(0).unwrap().clone();
+    assert_eq!(actual_left, expected_left);
+
+    if actual_split.len() == 2 {
+        let mut actual_split: Vec<String> = actual_split.get(1).unwrap().split(",").map(str::to_string).collect();
+        let mut expected_split: Vec<String> = expected_split.get(1).unwrap().split(",").map(str::to_string).collect();
+
+        assert_eq!(actual_split.get(0).unwrap(), expected_split.get(0).unwrap());
+        actual_split.sort();
+        expected_split.sort();
+        assert_eq!(actual_split.len(),expected_split.len());
     }
 }

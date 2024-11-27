@@ -19,7 +19,7 @@ use crate::resource::lock::Lock;
 use crate::resource::resource_pool::ResourcePool;
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, Level, LevelFilter};
+use log::{debug, info, Level, LevelFilter};
 use std::io::Write;
 use std::os::unix::prelude::CommandExt;
 
@@ -81,7 +81,15 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, OsalError> {
     debug!("start_vm()");
 
     let (uid, gid) = config.get_escalated_uid_and_gid();
-    let args = config.get_qemu_args(0);
+
+    let config_qemu_args = config.get_qemu_args(0);
+    let mut args = "qemu-system-x86_64".to_string();
+    for arg in config_qemu_args {
+        info!("{}", arg);
+        args = format!("{} {}", args, arg).to_string();
+    }
+    let args: Vec<String> = args.split_whitespace().map(str::to_string).collect();
+
     let resources: Vec<String> = config.allocate_resources()?;
 
     match Osal::execute_command(
