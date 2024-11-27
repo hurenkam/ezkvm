@@ -211,15 +211,6 @@ impl QemuDevice for Config {
         }
 
         result
-/*
-        let mut args = "qemu-system-x86_64".to_string();
-        for arg in result {
-            info!("{}", arg);
-            args = format!("{} {}", args, arg).to_string();
-        }
-
-        args.split_whitespace().map(str::to_string).collect()
- */
     }
 
     fn pre_start(&self, config: &Config) {
@@ -572,6 +563,7 @@ mod tests {
         get_euid_and_egid_context.expect().returning(|| (0, 0));
 
         let get_uid_and_gid_context = Osal::get_uid_and_gid_context();
+
         get_uid_and_gid_context.expect().returning(|| (1000, 1000));
 
         let actual = config.get_escalated_uid_and_gid();
@@ -632,10 +624,9 @@ mod tests {
 
 /// helper function to compare argument lists independent of order
 pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<&str>) {
+    assert_eq!(actual.len(), expected.len());
     actual.sort();
     expected.sort();
-
-    assert_eq!(actual.len(), expected.len());
     let mut count = 0;
     while count < actual.len() {
         assert_eq!(actual[count], expected[count]);
@@ -645,19 +636,27 @@ pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<
 
 /// helper function to compare argument options independent of order
 pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
+
+    // arguments take the form '-<argument> [option,...]'
+    // so split them further
     let actual_split: Vec<String> = actual.split_whitespace().map(str::to_string).collect();
     let expected_split: Vec<String> = expected.split_whitespace().map(str::to_string).collect();
     assert_eq!(actual_split.len(),expected_split.len());
+
+    // there should be at most one space, so length after splitting must be 1 or 2
     assert!(actual_split.len() == 1 || actual_split.len() == 2);
 
+    // the argument itself must match
     let actual_left = actual_split.get(0).unwrap().clone();
     let expected_left = expected_split.get(0).unwrap().clone();
     assert_eq!(actual_left, expected_left);
 
+    // if there are options, then split them
     if actual_split.len() == 2 {
         let mut actual_split: Vec<String> = actual_split.get(1).unwrap().split(",").map(str::to_string).collect();
         let mut expected_split: Vec<String> = expected_split.get(1).unwrap().split(",").map(str::to_string).collect();
 
+        // for the first option in the arguments, order may still be relevant, so compare those first, and the rest after sorting
         assert_eq!(actual_split.get(0).unwrap(), expected_split.get(0).unwrap());
         actual_split.sort();
         expected_split.sort();
