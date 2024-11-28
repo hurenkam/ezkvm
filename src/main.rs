@@ -1,9 +1,8 @@
+extern crate colored;
 mod args;
 mod config;
 mod osal;
 mod resource;
-
-extern crate colored;
 
 use crate::args::{EzkvmArguments, EzkvmCommand};
 use std::env;
@@ -85,9 +84,10 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, OsalError> {
     let config_qemu_args = config.get_qemu_args(0);
     let mut args = "qemu-system-x86_64".to_string();
     for arg in config_qemu_args {
-        info!("{}", arg);
+        //info!("{}", arg);
         args = format!("{} {}", args, arg).to_string();
     }
+    info!("{}", args);
     let args: Vec<String> = args.split_whitespace().map(str::to_string).collect();
 
     let resources: Vec<String> = config.allocate_resources()?;
