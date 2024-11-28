@@ -205,30 +205,30 @@ current one.
 - Run macos using ezkvm (and create an example config file for it)
 - Restructure example config files to include at least:
     - Multiple operating systems:
-        - Windows
-        - Linux
+        - ~~Windows~~
+        - ~~Linux~~
         - macOS
     - Multiple gpu options (from fast to slow):
-        - passthrough-gpu
-        - virtio-vga-gl
-        - vmware-svga
+        - ~~passthrough-gpu~~
+        - ~~virtio-vga-gl~~
+        - ~~vmware-svga~~
         - no-gpu
     - Multiple display options (from fast to slow):
-        - looking-glass
+        - ~~looking-glass~~
         - sdl
-        - gtk
-        - remote-viewer using spice with direct gl support to unix socket
-        - remote-viewer using spice with egl-headless gl support to host+port
+        - ~~gtk~~
+        - ~~remote-viewer using spice with direct gl support to unix socket~~
+        - ~~remote-viewer using spice with egl-headless gl support to host+port~~
         - remote-viewer using vnc to host+port
     - Multiple TPM options
-        - no-tpm
-        - swtpm
+        - ~~no-tpm~~
+        - ~~swtpm~~
     - Multiple system options
-        - q35
+        - ~~q35~~
         - 440fx
     - Multiple BIOS options
         - seabios (BIOS)
-        - ovmf (UEFI)
+        - ~~ovmf (UEFI)~~
 - Improve support for network and storage devices
 
 ### long term ###
