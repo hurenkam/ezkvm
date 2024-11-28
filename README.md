@@ -95,10 +95,7 @@ incorporate changes to make it run on other distro's or platforms.
 ## Running ezkvm ##
 
 The ezkvm application will look for config files in /etc/ezkvm, some example files can be
-found in the repository:
-
-- wakiza.yaml: This is a config file for my windows 11 vm, which uses gpu passthrough & looking-glass
-- gyndine.yaml: This is a config file for my linux (suse tumbleweed) vm, which uses virgl-gpu
+found in the repository, see above in the config section.
 
 The application will also expect some files in /usr/share/ezkvm:
 
