@@ -1,17 +1,23 @@
-use crate::config::{QemuDevice};
+use crate::config::{default_when_missing, QemuDevice};
 use derive_getters::Getters;
-use serde::{Deserialize};
+use serde::{Deserialize, Deserializer};
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub enum SpiceSocket {
     TcpPort { addr: String, port: u16 },
     UnixSocket { path: String },
-    #[default]
-    None
+}
+impl Default for SpiceSocket {
+    fn default() -> Self {
+        SpiceSocket::TcpPort {
+            addr: "127.0.0.1".to_string(),
+            port: 5900
+        }
+    }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, PartialEq, Deserialize)]
 #[serde(tag="gl")]
 pub enum SpiceDisplay {
     #[default]
@@ -21,11 +27,12 @@ pub enum SpiceDisplay {
     Enabled { render_node: Option<String> }
 }
 
-#[derive(Debug, Deserialize, Getters)]
+#[derive(Debug, PartialEq, Default, Deserialize, Getters)]
+#[serde(default)]
 pub struct Spice {
-    #[serde(flatten)]
+    #[serde(default,flatten,deserialize_with="default_when_missing")]
     socket: SpiceSocket,
-    #[serde(default)]
+    #[serde(default,flatten,deserialize_with="default_when_missing")]
     display: SpiceDisplay
 }
 
@@ -54,6 +61,20 @@ impl QemuDevice for Spice {
                         port, addr
                     ),
                 ]);
+                match &self.display {
+                    SpiceDisplay::Disabled => {}
+                    SpiceDisplay::Enabled { render_node } => {
+                        let render_node = match render_node {
+                            Some(render_node) => format!(",rendernode={}", render_node),
+                            None => "".to_string()
+                        };
+                        result.extend(vec![
+                            format!(
+                                "-display egl-headless{}", render_node
+                            ),
+                        ]);
+                    }
+                }
             },
 
             SpiceSocket::UnixSocket { ref path } => {
@@ -70,23 +91,6 @@ impl QemuDevice for Spice {
 
                 result.extend(vec![
                     format!("-spice unix=on,addr={}{},disable-ticketing=on",path,gl_options)
-                ]);
-            }
-
-            SpiceSocket::None => {}
-        }
-
-        match &self.display {
-            SpiceDisplay::Disabled => {}
-            SpiceDisplay::Enabled { render_node } => {
-                let render_node = match render_node {
-                    Some(render_node) => format!(",rendernode={}", render_node),
-                    None => "".to_string()
-                };
-                result.extend(vec![
-                    format!(
-                        "-display egl-headless{}", render_node
-                    ),
                 ]);
             }
         }
@@ -111,12 +115,15 @@ mod tests {
     use super::*;
     #[test]
     fn test_defaults() {
-        let spice = Spice {
+        let input = r#""#;
+
+        let data = Spice {
             socket: Default::default(),
             display: Default::default(),
         };
 
-        let expected: Vec<String> = vec![
+        let output: Vec<String> = vec![
+            "-spice port=5900,addr=127.0.0.1,disable-ticketing=on".to_string(),
             "-device virtio-serial-pci".to_string(),
             "-chardev spicevmc,id=vdagent,name=vdagent".to_string(),
             "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0".to_string(),
@@ -124,17 +131,26 @@ mod tests {
             "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc".to_string(),
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0".to_string()
         ];
-        assert_eq!(spice.get_qemu_args(0), expected);
+
+        assert_eq!(serde_yaml::from_str::<Spice>(input).unwrap(),data);
+        assert_eq!(data.get_qemu_args(0), output);
     }
 
     #[test]
-    fn test_tcp_port() {
-        let spice = Spice {
+    fn test_tcp_port_with_gl() {
+        let input = r#"
+            addr: 127.0.0.1
+            port: 5900
+            gl: on
+            render_node: /dev/dri/renderD128
+        "#;
+
+        let data = Spice {
             socket: SpiceSocket::TcpPort { addr: "127.0.0.1".to_string(), port: 5900 },
             display: SpiceDisplay::Enabled { render_node: Some("/dev/dri/renderD128".to_string()) },
         };
 
-        let expected: Vec<String> = vec![
+        let output: Vec<String> = vec![
             "-spice port=5900,addr=127.0.0.1,disable-ticketing=on".to_string(),
             "-display egl-headless,rendernode=/dev/dri/renderD128".to_string(),
             "-device virtio-serial-pci".to_string(),
@@ -145,39 +161,25 @@ mod tests {
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0".to_string()
         ];
 
-        assert_eq!(spice.get_qemu_args(0), expected);
+        assert_eq!(serde_yaml::from_str::<Spice>(input).unwrap(),data);
+        assert_eq!(data.get_qemu_args(0), output);
     }
 
     #[test]
-    fn test_tcp_port_no_gl() {
-        let spice = Spice {
-            socket: SpiceSocket::TcpPort { addr: "127.0.0.1".to_string(), port: 5900 },
-            display: SpiceDisplay::Disabled,
-        };
+    fn test_unix_socket_with_gl() {
+        let input = r#"
+            path: /var/ezkvm/unix.socket
+            gl: on
+            render_node: /dev/dri/renderD128
+        "#;
 
-        let expected: Vec<String> = vec![
-            "-spice port=5900,addr=127.0.0.1,disable-ticketing=on".to_string(),
-            "-device virtio-serial-pci".to_string(),
-            "-chardev spicevmc,id=vdagent,name=vdagent".to_string(),
-            "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0".to_string(),
-            "-audiodev spice,id=spice-backend0".to_string(),
-            "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc".to_string(),
-            "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0".to_string()
-        ];
-
-        assert_eq!(spice.get_qemu_args(0), expected);
-    }
-
-    #[test]
-    fn test_socket() {
-        let spice = Spice {
-            socket: SpiceSocket::TcpPort { addr: "127.0.0.1".to_string(), port: 5900 },
+        let data = Spice {
+            socket: SpiceSocket::UnixSocket { path: "/var/ezkvm/unix.socket".to_string() },
             display: SpiceDisplay::Enabled { render_node: Some("/dev/dri/renderD128".to_string()) },
         };
 
-        let expected: Vec<String> = vec![
-            "-spice port=5900,addr=127.0.0.1,disable-ticketing=on".to_string(),
-            "-display egl-headless,rendernode=/dev/dri/renderD128".to_string(),
+        let output: Vec<String> = vec![
+            "-spice unix=on,addr=/var/ezkvm/unix.socket,gl=on,rendernode=/dev/dri/renderD128,disable-ticketing=on".to_string(),
             "-device virtio-serial-pci".to_string(),
             "-chardev spicevmc,id=vdagent,name=vdagent".to_string(),
             "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0".to_string(),
@@ -186,6 +188,7 @@ mod tests {
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0".to_string()
         ];
 
-        assert_eq!(spice.get_qemu_args(0), expected);
+        assert_eq!(serde_yaml::from_str::<Spice>(input).unwrap(),data);
+        assert_eq!(data.get_qemu_args(0), output);
     }
 }

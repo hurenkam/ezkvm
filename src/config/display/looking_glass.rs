@@ -51,7 +51,6 @@ impl LookingGlass {
                             format!("spice:port={}", 0),
                         ])
                     }
-                    SpiceSocket::None => {}
                 }
             }
         }
