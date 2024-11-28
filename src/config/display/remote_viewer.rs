@@ -39,7 +39,6 @@ impl RemoteViewer {
                             format!("spice+unix://{}", path)
                         ])
                     }
-                    SpiceSocket::None => {}
                 }
             }
         }
