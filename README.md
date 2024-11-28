@@ -56,7 +56,8 @@ Some examples can be found in etc directory:
   virtio-vga-gl, and remote-viewer, but does seem to use a bit more cpu cycles than my
   current ubuntu oriole desktop (see below).
 - ### windows-11-gaming.yaml ###
-  This is a config file that i derived from my proxmox windows 11 gaming VM, and with
+  This is a config file that i derived from my proxmox windows 11 gaming VM, it is
+  configured with GPU passthrough and looking-glass as viewer, and with
   the current ezkvm in combination with this config file, i can run that VM just fine
   from my EndeavourOS Gemini installation.
 - ### ubuntu-oriole-desktop.yaml ###
