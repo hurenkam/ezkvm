@@ -1,0 +1,26 @@
+general:
+  name: windows-11-desktop
+
+system:
+  chipset: { type: "q35", version: "8.1" }
+  bios: { type: "ovmf", uuid: "181f1a56-e0e2-42d1-a916-bc16dd415a59", file: "/dev/vm1/windows-11-desktop-efidisk" }
+  cpu: { model: "qemu64", sockets: 1, cores: 8, flags: "+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce" }
+  memory: { max: 16384, balloon: false }
+  tpm: { type: "swtpm", version: 2.0, disk: "/dev/vm1/windows-11-desktop-tpmstate", socket: "/var/ezkvm/windows-11-desktop-tpm.socket" }
+
+spice:
+  path: /var/ezkvm/windows-11-desktop-spice.socket
+  gl: on
+  render_node: /dev/dri/renderD128
+
+gpu:
+  type: "virtio-vga-gl"
+
+display:
+  type: "remote-viewer"
+
+storage:
+  - { type: "scsi-hd", file: "/dev/vm1/windows-11-desktop-boot", discard: "on", boot_index: 0 }
+
+network:
+  - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:7B" }
