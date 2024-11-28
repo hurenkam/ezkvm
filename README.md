@@ -13,19 +13,23 @@ The aim for ezkvm is to not be limited to a single distro, and ideally it would 
 any system that can run qemu.
 
 ## Current status ##
+
 This is still very much a work in progress, however I do use it myself on a daily basis
-to run several VM's (which i initially created on my proxmox cloud server) on my Framework 
+to run several VM's (which i initially created on my proxmox cloud server) on my Framework
 16 laptop.
 
 ### What works (and I use this on a daily basis): ###
+
 - Windows 11 gaming with GPU passthrough and looking-glass
 - Windows 11 office work with remote-viewer and spice-gl via unix-socket
 - Linux VM with gtk UI or remote-viewer to host/port
 
 ### What does not (yet) work: ###
+
 - macOS
 
 ### Open issues: ###
+
 - still depends on libvirt, mainly for networking
 - still depends on some proxmox files (ovmf bios and qemu config file)
 
@@ -45,11 +49,23 @@ The syntax is still much in flux, and meanwhile I would like to use [StrictYAML]
 however there does not seem to be a good parser crate for rust yet. So for now I'm using
 the serde-yaml parser, but restrict the config file to not use advanced yaml features.
 
-An example can be found in etc/wakazi.yaml, this is a config file that i derived from my
-proxmox windows 11 gaming VM, and with the current ezkvm in combination with this config
-file, i can run that VM just fine from my EndeavourOS Gemini installation.
-Similarly, i have a gyndine.yaml config file defined, that uses virtio-gpu-gl as driver,
-and runs openTumbleweed with KDE Plasma (no hw passthrough).
+Some examples can be found in etc directory:
+
+- ### windows-11-desktop.yaml ###
+  This is VM based on my company desktop vm, it runs fine and responsive using
+  virtio-vga-gl, and remote-viewer, but does seem to use a bit more cpu cycles than my
+  current ubuntu oriole desktop (see below).
+- ### windows-11-gaming.yaml ###
+  This is a config file that i derived from my proxmox windows 11 gaming VM, and with
+  the current ezkvm in combination with this config file, i can run that VM just fine
+  from my EndeavourOS Gemini installation.
+- ### ubuntu-oriole-desktop.yaml ###
+  This works fine with the same settings as my windows 11 desktop settings, but for
+  the sake of showing some diversity, it is configured with the gtk client here.
+  I have also run opensuse tumbleweed with the same settings just fine.
+- ### macos-sequoia-desktop.yaml ###
+  A macos example, but as of yet untested. I have yet to try this on my laptop, but
+  the basics should be in place for this to work.
 
 I do still need to execute `systemctl start libvirtd` and run `virsh net-start default`
 to get the default bridge up. I'm still looking for a way to avoid the dependency on
@@ -177,6 +193,7 @@ current one.
 ## Todo ##
 
 ### short term ###
+
 - ~~Drop priviledges where appropriate; Currently some use cases require qemu to run with
   root priviledges (e.g. pci passthrough), some other use cases refuse to run with root
   priviledges (Gtk ui). Also swtpm & lg client don't need to run with root priviledges.~~
@@ -189,34 +206,35 @@ current one.
 - Support seabios
 - Run macos using ezkvm (and create an example config file for it)
 - Restructure example config files to include at least:
-  - Multiple operating systems:
-    - Windows
-    - Linux
-    - macOS
-  - Multiple gpu options (from fast to slow):
-    - passthrough-gpu
-    - virtio-vga-gl
-    - vmware-svga
-    - no-gpu
-  - Multiple display options (from fast to slow):
-    - looking-glass
-    - sdl
-    - gtk
-    - remote-viewer using spice with direct gl support to unix socket
-    - remote-viewer using spice with egl-headless gl support to host+port
-    - remote-viewer using vnc to host+port
-  - Multiple TPM options
-    - no-tpm
-    - swtpm
-  - Multiple system options
-    - q35
-    - 440fx
-  - Multiple BIOS options
-    - seabios (BIOS)
-    - ovmf (UEFI)
+    - Multiple operating systems:
+        - Windows
+        - Linux
+        - macOS
+    - Multiple gpu options (from fast to slow):
+        - passthrough-gpu
+        - virtio-vga-gl
+        - vmware-svga
+        - no-gpu
+    - Multiple display options (from fast to slow):
+        - looking-glass
+        - sdl
+        - gtk
+        - remote-viewer using spice with direct gl support to unix socket
+        - remote-viewer using spice with egl-headless gl support to host+port
+        - remote-viewer using vnc to host+port
+    - Multiple TPM options
+        - no-tpm
+        - swtpm
+    - Multiple system options
+        - q35
+        - 440fx
+    - Multiple BIOS options
+        - seabios (BIOS)
+        - ovmf (UEFI)
 - Improve support for network and storage devices
 
 ### long term ###
+
 - Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm
 - Create installers for popular distro's:
     - Arch based distro's (since i develop on EndeavorOS)
@@ -225,8 +243,10 @@ current one.
 - Add missing features by popular demand (please submit a feature request)
 
 ### things to investigate ###
+
 ~~- Checkout config crates, one of these could make it easier to look for config files in various
 standard places like /etc/ezkvm/, ~/.ezkvm/ and ./~~
+
 - Split storage and network items into netdev+device and drive+device items
 - A templating system could make things easier and more generic, where type indicates a template
   rather than a type, and set defaults for netdev/drive/device sections rather than implement
