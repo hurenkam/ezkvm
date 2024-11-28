@@ -242,8 +242,8 @@ current one.
 
 ### things to investigate ###
 
-~~- Checkout config crates, one of these could make it easier to look for config files in various
-standard places like /etc/ezkvm/, ~/.ezkvm/ and ./~~
+- ~~Checkout config crates, one of these could make it easier to look for config files in various
+  standard places like /etc/ezkvm/, /home/<user>/.ezkvm/ and ./~~
 
 - Split storage and network items into netdev+device and drive+device items
 - A templating system could make things easier and more generic, where type indicates a template
