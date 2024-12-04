@@ -74,6 +74,17 @@ libvirt, but for now I'll focus on maturing the parser and config file syntax.
 
 To start the qemu VM, it should suffice to run `ezkvm <configfile>`.
 
+## Installation ##
+
+No packages have been released yet, so installation is pretty much a manual job for now.
+That said, the Cargo.toml has been extended somewhat to allow cargo-deb to work, and
+build a debian package that contains the ezkvm executable.
+
+To build the ezkvm package:
+- install the cargo-dep package using cargo: cargo install cargo-deb
+- create the debian package by running: cargo dep 
+You will find a ezkvm-z.y.x-v.deb package in the target/debian directory.
+
 ## Building ezkvm ##
 
 The ezkvm application is written in [rust](https://www.rust-lang.org/), and so you need
