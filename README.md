@@ -84,7 +84,7 @@ To build the ezkvm package:
 - install the cargo-dep package using cargo: `cargo install cargo-deb`
 - create the debian package by running: `cargo dep` 
 
-You will find a ezkvm-z.y.x-v.deb package in the target/debian directory.
+You will find a `ezkvm-z.y.x-v.deb` package in the target/debian directory.
 
 ## Building ezkvm ##
 
