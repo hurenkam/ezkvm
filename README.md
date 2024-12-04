@@ -247,7 +247,7 @@ current one.
 - Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm
 - Create installers for popular distro's:
     - Arch based distro's (since i develop on EndeavorOS)
-    - Debian based distro's
+    - ~~Debian based distro's~~
     - Others by popular demand (please submit a feature request)
 - Add missing features by popular demand (please submit a feature request)
 
