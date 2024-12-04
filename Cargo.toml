@@ -38,4 +38,4 @@ priority = "optional"
 assets = [
  [ "target/release/ezkvm", "usr/bin/", "755" ]
 ]
-
+maintainer-scripts = "debian/maintainer-scripts/"

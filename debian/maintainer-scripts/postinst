@@ -1,0 +1,11 @@
+#!/bin/bash
+addgroup ezkvm
+
+mkdir /etc/ezkvm
+chmod 775 /etc/ezkvm
+chown root:ezkvm /etc/ezkvm
+
+mkdir /var/ezkvm
+chmod 775 /var/ezkvm
+chown root:ezkvm /var/ezkvm
+
