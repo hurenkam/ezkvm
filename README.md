@@ -81,8 +81,9 @@ That said, the Cargo.toml has been extended somewhat to allow cargo-deb to work,
 build a debian package that contains the ezkvm executable.
 
 To build the ezkvm package:
-- install the cargo-dep package using cargo: cargo install cargo-deb
-- create the debian package by running: cargo dep 
+- install the cargo-dep package using cargo: `cargo install cargo-deb`
+- create the debian package by running: `cargo dep` 
+
 You will find a ezkvm-z.y.x-v.deb package in the target/debian directory.
 
 ## Building ezkvm ##
