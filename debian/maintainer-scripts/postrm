@@ -1,0 +1,23 @@
+#!/bin/bash
+shopt -s extglob
+
+case $# in
+    0)	echo "Not enough arguments"
+	;;
+
+    1)	case $1 in
+	remove) delgroup ezkvm
+	        rm -rf /var/ezkvm
+		;;
+
+	purge)	rm -rf /etc/ezkvm
+		;;
+
+	*)	echo "Option '$1' not supported"
+		;;
+	esac
+	;;
+
+    *)	echo "Too many arguments"
+    	;;
+esac
