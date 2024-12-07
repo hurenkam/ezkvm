@@ -1,4 +1,8 @@
 [package]
+readme = "README.md"
+authors = ["Mark Hurenkamp <mark.hurenkamp@xs4all.nl>"]
+license = "GPL v2"
+description = """A helper program to run virtual machines using qemu"""
 name = "ezkvm"
 version = "0.1.0"
 edition = "2021"
@@ -26,7 +30,8 @@ serial_test = "3.1.1"
 rand = { version = "0.8.5", features = ["small_rng"] }
 paste = "1.0.15"
 glob = "0.3.1"
-cargo-deb = "2.9.1"
+#cargo-deb = "2.9.1"
+#cargo-arch = "0.1.5"
 
 [package.metadata.deb]
 maintainer = "Mark Hurenkamp <mark.hurenkamp@xs4all.nl>"
@@ -39,3 +44,13 @@ assets = [
  [ "target/release/ezkvm", "usr/bin/", "755" ]
 ]
 maintainer-scripts = "debian/maintainer-scripts/"
+
+
+[package.metadata.rpm]
+package = "ezkvm"
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+ezkvm = { path = "/usr/bin/ezkvm" }
