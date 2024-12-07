@@ -92,17 +92,36 @@ that is mature.
 That said, I am of course willing to review, and if found ok, to merge pull requests that
 incorporate changes to make it run on other distro's or platforms.
 
-## Installation ##
+### Building a package for a Linux distro ####
 
 No packages have been released yet, so installation is pretty much a manual job for now.
-That said, the Cargo.toml has been extended somewhat to allow cargo-deb to work, and
-build a debian package that contains the ezkvm executable.
+That said, the Cargo.toml has been updated to work with some of the cargo packagers:
 
-To build the ezkvm package:
+#### Building a debian/ubuntu package ####
+
+To build a debian ezkvm package:
 - install the cargo-dep package using cargo: `cargo install cargo-deb`
-- create the debian package by running: `cargo dep` 
+- create the package by running: `cargo dep`
 
-You will find a `ezkvm-z.y.x-v.deb` package in the target/debian directory.
+You will find a debian package in the target/debian directory.
+
+#### Building a fedora/opensuse package ####
+
+To build an rpm ezkvm package:
+- install the cargo-rpm package using cargo: `cargo install cargo-rpm`
+- create the package by running: `cargo rpm`
+
+You will find an rpm package in the target/release/rpmbuild/RPM directory.
+And a source rpm package in the target/release/rpmbuild/SRPM directory.
+
+#### Building an arch package ####
+
+To build an arch ezkvm package:
+- install the cargo-arch package using cargo: `cargo install cargo-arch`
+- create the package by running: `cargo arch`
+
+You will find a pkg.tar.zst package in the root of the repository, as well
+as a PKGBUILD file.
 
 ## Running ezkvm ##
 
