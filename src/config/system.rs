@@ -74,7 +74,7 @@ mod tests {
     use super::*;
     use crate::config::system::bios::SeaBios;
     use crate::config::system::tpm::{NoTpm, SwTpm};
-    use bios::OVMF;
+    use bios::{OVMF,OVMFArch,OVMFSize};
     use chipset::Q35;
 
     #[test]
@@ -108,10 +108,7 @@ mod tests {
 
         let expected = System::new(
             Box::new(Q35::new()),
-            Box::new(OVMF::new(
-                "/dev/vm1/vm-108-efidisk".to_string(),
-                "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7".to_string(),
-            )),
+            Box::new(OVMF::new("/dev/vm1/vm-108-efidisk".to_string(), Some("04d064c3-66a1-4aa7-9589-f8b3ecf91cd7".to_string()), None, None, OVMF::secure_boot_default())),
             Memory::new(16384, Some(false)),
             Cpu::new(
                 "qemu64".to_string(),
@@ -139,10 +136,7 @@ mod tests {
 
         let expected = System::new(
             Box::new(Q35::new()),
-            Box::new(OVMF::new(
-                "/dev/vm1/vm-950-disk-0".to_string(),
-                "c0e240a5-859a-4378-a2d9-95088f531142".to_string(),
-            )),
+            Box::new(OVMF::new("/dev/vm1/vm-950-disk-0".to_string(), Some("c0e240a5-859a-4378-a2d9-95088f531142".to_string()), None, None, OVMF::secure_boot_default())),
             Memory::new(16384, Some(false)),
             Cpu::new(
                 "qemu64".to_string(),
