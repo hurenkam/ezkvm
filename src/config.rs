@@ -11,7 +11,7 @@ mod types;
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
 use derive_getters::Getters;
-use log::{debug, info};
+use log::debug;
 use serde::{Deserialize, Deserializer};
 use std::any::{Any, TypeId};
 use std::ops::Deref;
@@ -693,6 +693,7 @@ mod tests {
 }
 
 /// helper function to compare argument lists independent of order
+#[allow(unused)]
 pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<&str>) {
     assert_eq!(actual.len(), expected.len());
     actual.sort();
@@ -705,6 +706,7 @@ pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<
 }
 
 /// helper function to compare argument options independent of order
+#[allow(unused)]
 pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
     // arguments take the form '-<argument> [option,...]'
     // so split them further
