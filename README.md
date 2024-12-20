@@ -30,8 +30,9 @@ to run several VM's (which i initially created on my proxmox cloud server) on my
 
 ### Open issues: ###
 
-- still depends on libvirt, mainly for networking
-- still depends on some proxmox files (ovmf bios and qemu config file)
+- still depends on libvirt to setup networking
+- still depends on a proxmox config file (pve-q35-4.0.cfg)
+- ~~still depends on proxmox ovmf rom files~~
 
 ## How does it work ##
 
@@ -100,6 +101,7 @@ That said, the Cargo.toml has been updated to work with some of the cargo packag
 #### Building a debian/ubuntu package ####
 
 To build a debian ezkvm package:
+
 - install the cargo-dep package using cargo: `cargo install cargo-deb`
 - create the package by running: `cargo dep`
 
@@ -108,6 +110,7 @@ You will find a debian package in the target/debian directory.
 #### Building a fedora/opensuse package ####
 
 To build an rpm ezkvm package:
+
 - install the cargo-rpm package using cargo: `cargo install cargo-rpm`
 - create the package by running: `cargo rpm`
 
@@ -117,6 +120,7 @@ And a source rpm package in the target/release/rpmbuild/SRPM directory.
 #### Building an arch package ####
 
 To build an arch ezkvm package:
+
 - install the cargo-arch package using cargo: `cargo install cargo-arch`
 - create the package by running: `cargo arch`
 
@@ -131,7 +135,7 @@ found in the repository, see above in the config section.
 The application will also expect some files in /usr/share/ezkvm:
 
 - pve-q35-4.0.cfg
-- OVMF_CODE.secboot.4m.fd
+- OVMF_CODE_4M.secboot.fd
 
 These are files that i copied over from proxmox. In the future ezkvm should become
 independent on these files, and either use the distro's defaults or a to be developed
@@ -178,6 +182,19 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    so that all needed devices can be claimed.
    Note: If you use the 'gtk' ui option, the qemu process will still be started
    as the normal user, as the ui won't start when executed with root permissions.
+
+### OVMF files ###
+
+For now, ezkvm depends on OVMF files to reside in /usr/share/ezkvm, but they
+are not currently put there by the packages.
+You can however easily link from there to the files from your distro's ovmf package,
+or copy the ones from proxmox.
+Note that I've made available a custom edk2-ovmf package for arch, since i noticed
+that the recent builds don't support pvscsi, which is still used by several of
+my VM's.
+Beware that this may also be the case for your distro's package, so you might
+want to copy the proxmox files, or build it yourself.
+See my arch-edk2-ovmf repository for the custom arch build.
 
 ## Contributing ##
 
@@ -229,10 +246,10 @@ current one.
 - ~~Add unit tests~~
 - ~~Refactor config files and move them into config directory as done in poc branch~~
 - ~~Merge other improvements from the poc branch into the stable branch~~
-- Support for sdl UI
+- ~~Support for sdl UI~~
 - Support for vnc protocol
 - Support 440fx
-- Support seabios
+- ~~Support seabios~~
 - Run macos using ezkvm (and create an example config file for it)
 - Restructure example config files to include at least:
     - Multiple operating systems:
@@ -266,7 +283,7 @@ current one.
 
 - Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm
 - Create installers for popular distro's:
-    - Arch based distro's (since i develop on EndeavorOS)
+    - ~~Arch based distro's (since i develop on EndeavorOS)~~
     - ~~Debian based distro's~~
     - Others by popular demand (please submit a feature request)
 - Add missing features by popular demand (please submit a feature request)
