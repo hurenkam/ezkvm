@@ -30,7 +30,7 @@ to run several VM's (which i initially created on my proxmox cloud server) on my
 
 ### Open issues: ###
 
-- still depends on libvirt to setup networking
+- ~~still depends on libvirt to setup networking~~
 - still depends on a proxmox config file (pve-q35-4.0.cfg)
 - ~~still depends on proxmox ovmf rom files~~
 
@@ -144,7 +144,7 @@ custom ezkvm variant for these files.
 Note that to allow gpu passthrough, or access to lvm volumes as disk backing, you need to
 setup permissions correctly. The ezkvm application can be used in two ways:
 
-1) using group permissions in combination with custom udev rules (recommended)
+1) #### using group permissions in combination with custom udev rules (recommended)
 
    create the ezkvm group:
    ```
@@ -171,7 +171,7 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    After setting all this up, you should reboot for all changes to take effect.
 
 
-2) setup ezkvm with suid root permissions
+2) #### setup ezkvm with suid root permissions
 
    change ownership and permissions of the ezkvm binary:
    ```
@@ -183,18 +183,40 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    Note: If you use the 'gtk' ui option, the qemu process will still be started
    as the normal user, as the ui won't start when executed with root permissions.
 
-### OVMF files ###
+3) #### setup networking
 
-For now, ezkvm depends on OVMF files to reside in /usr/share/ezkvm, but they
-are not currently put there by the packages.
-You can however easily link from there to the files from your distro's ovmf package,
-or copy the ones from proxmox.
-Note that I've made available a custom edk2-ovmf package for arch, since i noticed
-that the recent builds don't support pvscsi, which is still used by several of
-my VM's.
-Beware that this may also be the case for your distro's package, so you might
-want to copy the proxmox files, or build it yourself.
-See my arch-edk2-ovmf repository for the custom arch build.
+   There are many ways to setup networking, but what i use myself mostly, is
+   bridge networking. How to set this up differs per distro, and depends also
+   on the network tooling that are installed.
+
+   On my laptop with EndeavourOS (arch based) i have NetworkManager
+   installed. I've setup the bridge as follows using the nmcli tool:
+   ```
+   nmcli connection add type bridge ifname vmbr0 stp no
+   nmcli connection up bridge-vmbr0
+   nmcli connection modify bridge-vmbr0 ipv4.address <ip-address>
+   nmcli connection modify bridge-vmbr0 ipv4.dns <dns-address>
+   nmcli connection modify bridge-vmbr0 ipv4.method manual
+   nmcli connection up bridge-vmbr0
+   ```
+
+4) #### OVMF files ###
+
+   For now, ezkvm depends on OVMF files to reside in /usr/share/ezkvm, but they
+   are not currently put there by the packages.
+   You can however easily link from there to the files from your distro's ovmf package,
+   or copy the ones from proxmox.
+   Note that I've made available a custom edk2-ovmf package for arch, since i noticed
+   that the recent builds don't support pvscsi, which is still used by several of
+   my VM's.
+   Beware that this may also be the case for your distro's package, so you might
+   want to copy the proxmox files, or build it yourself.
+   See my arch-edk2-ovmf repository for the custom arch build.
+
+   ##### ezkvm expects the following files in /usr/share/ezkvm:
+    - `OVMF_CODE.fd`: This should point to a legacy 2M OVMF EFI (if present on the system)
+    - `OVMF_CODE_4M.fd`: This should point to the normal 4M OVMF EFI
+    - `OVMF_CODE_4M.secboot.fd`: This should point to the 4M secure boot enabled OVMF EFI
 
 ## Contributing ##
 
@@ -281,7 +303,7 @@ current one.
 
 ### long term ###
 
-- Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm
+- ~~Check out proxmox OVMF patches so that a compatible OVMF can be provided through ezkvm~~
 - Create installers for popular distro's:
     - ~~Arch based distro's (since i develop on EndeavorOS)~~
     - ~~Debian based distro's~~
