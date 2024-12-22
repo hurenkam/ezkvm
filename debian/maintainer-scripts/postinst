@@ -22,6 +22,10 @@ chmod 775 /etc/qemu
 chown root:ezkvm /etc/qemu
 echo "allow vmbr0" > /etc/qemu/bridge.conf
 
+# To allow the qemu-bridge-helper to work for normal
+# users, it needs to have the suid bit set.
+chmod +s /usr/lib/qemu/qemu-bridge-helper
+
 # Create the links to the pre-installed OVMF files
 # Note that this are the locations on ubuntu 24.04,
 # other distro's may be different, and may require
