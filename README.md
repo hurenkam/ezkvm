@@ -266,18 +266,17 @@ current one.
 
 ## Todo ##
 
-### short term ###
+### before 0.1.0 release ###
 
-- ~~Drop priviledges where appropriate; Currently some use cases require qemu to run with
-  root priviledges (e.g. pci passthrough), some other use cases refuse to run with root
-  priviledges (Gtk ui). Also swtpm & lg client don't need to run with root priviledges.~~
-- ~~Add unit tests~~
-- ~~Refactor config files and move them into config directory as done in poc branch~~
-- ~~Merge other improvements from the poc branch into the stable branch~~
-- ~~Support for sdl UI~~
 - Support for vnc protocol
 - Support 440fx
-- ~~Support seabios~~
+- Support sata hd & cd/dvd
+- installer for debian bookworm
+- installer for ubuntu noble numbat (24.04 LTS)
+- installer for arch linux
+
+### short term ###
+
 - Run macos using ezkvm (and create an example config file for it)
 - Restructure example config files to include at least:
     - Multiple operating systems:
