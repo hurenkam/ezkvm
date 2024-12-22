@@ -43,7 +43,6 @@ ln -s /usr/share/OVMF/OVMF_CODE_4M.secboot.fd /usr/share/ezkvm/OVMF_CODE_4M.secb
 nmcli connection add type bridge ifname vmbr0 stp no
 nmcli connection up bridge-vmbr0
 nmcli connection modify bridge-vmbr0 ipv4.address 192.168.92.1
-nmcli connection modify bridge-vmbr0 ipv4.dns 8.8.8.8
 nmcli connection modify bridge-vmbr0 ipv4.method manual
 nmcli connection up bridge-vmbr0
 
