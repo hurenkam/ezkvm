@@ -26,6 +26,9 @@ echo "allow vmbr0" > /etc/qemu/bridge.conf
 # Note that this are the locations on ubuntu 24.04,
 # other distro's may be different, and may require
 # manual intervention
+# Note that in recent versions of ovmf, the legacy
+# (2M) file at the top is not present anymore.
+ln -s /usr/share/OVMF/OVMF_CODE.fd /usr/share/ezkvm/OVMF_CODE.fd
 ln -s /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/ezkvm/OVMF_CODE_4M.fd
 ln -s /usr/share/OVMF/OVMF_CODE_4M.secboot.fd /usr/share/ezkvm/OVMF_CODE_4M.secboot.fd
 
