@@ -153,7 +153,7 @@ setup permissions correctly. The ezkvm application can be used in two ways:
 
    make the user from which you start ezkvm part of this group:
    ```
-   sudo useradd -G ezkvm <your_user_name>
+   sudo usermod -a -G ezkvm <your_user_name>
    ```
 
    add the following items in your /etc/security/limits.conf:
@@ -169,7 +169,6 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    ```
 
    After setting all this up, you should reboot for all changes to take effect.
-
 
 2) #### setup ezkvm with suid root permissions
 
@@ -199,6 +198,13 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    nmcli connection modify bridge-vmbr0 ipv4.method manual
    nmcli connection up bridge-vmbr0
    ```
+
+   The qemu-bridge-helper needs to have suid permissions, otherwise it
+   will fail to extend the bridge interface when you start a vm:
+   ```
+   chmod +s /usr/lib/qemu/qemu-bridge-helper
+   ```
+
 
 4) #### OVMF files ###
 
