@@ -271,8 +271,8 @@ current one.
 - Support for vnc protocol
 - Support 440fx
 - Support sata hd & cd/dvd
-- installer for debian bookworm
-- installer for ubuntu noble numbat (24.04 LTS)
+- ~~installer for debian bookworm~~
+- ~~installer for ubuntu noble numbat (24.04 LTS)~~
 - installer for arch linux
 
 ### short term ###
