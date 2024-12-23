@@ -129,7 +129,7 @@ To build an arch ezkvm package:
 - build the package:
     - `makepkg --skipinteg`
 
-You will find a ezkvm-<version>.tar.zst package in the build directory.
+You will find a `ezkvm-<version>.tar.zst` package in the build directory.
 
 #### Building a fedora/opensuse package ####
 
