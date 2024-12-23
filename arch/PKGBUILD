@@ -1,0 +1,29 @@
+# Maintainer: Mark Hurenkamp <mark.hurenkamp@xs4all.nl>
+pkgname=ezkvm
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A helper program to run virtual machines using qemu"
+license=("GPL v2")
+arch=("x86_64")
+#makedepends=("cargo>=1.83")
+makedepends=("cargo")
+depends=("qemu-system-x86>=9.1.2")
+optdepends=("edk2-ovmf")
+install="proto.install"
+source=("https://github.com/hurenkam/ezkvm/archive/refs/heads/stable.tar.gz")
+
+pkgver() {
+    (git describe --long --tags || echo "$pkgver") | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+build() {
+    return 0
+}
+
+package() {
+    cd ../src/ezkvm-stable
+    usrdir="$pkgdir/usr"
+    mkdir -p $usrdir
+    cargo install --no-track --path . --root "$usrdir"
+}
+

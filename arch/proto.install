@@ -1,0 +1,68 @@
+## arg 1:  the new package version
+post_install() {
+    addgroup ezkvm
+
+    # Create the config directory, users should be able to read, create, edit & delete files here
+    mkdir /etc/ezkvm
+    chmod 775 /etc/ezkvm
+    chown root:ezkvm /etc/ezkvm
+
+    # Create the var directory, user processes should be able to read, create, edit and delete files here
+    mkdir /var/ezkvm
+    chmod 775 /var/ezkvm
+    chown root:ezkvm /var/ezkvm
+
+    # Create the share directory, user processes should be able to read files here
+    mkdir /usr/share/ezkvm
+    chmod 775 /usr/share/ezkvm
+    chown root:ezkvm /usr/share/ezkvm
+
+    # This is needed to use the vmbr0 device from user space
+    mkdir /etc/qemu
+    chmod 775 /etc/qemu
+    chown root:ezkvm /etc/qemu
+    echo "allow vmbr0" > /etc/qemu/bridge.conf
+
+    # To allow the qemu-bridge-helper to work for normal
+    # users, it needs to have the suid bit set.
+    chmod +s /usr/lib/qemu/qemu-bridge-helper
+
+    # Create the links to the pre-installed OVMF files
+    # Note that this are the locations on ubuntu 24.04,
+    # other distro's may be different, and may require
+    # manual intervention
+    # Note that in recent versions of ovmf, the legacy
+    # (2M) file at the top is not present anymore.
+    ln -s /usr/share/OVMF/OVMF_CODE.fd /usr/share/ezkvm/OVMF_CODE.fd
+    ln -s /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/ezkvm/OVMF_CODE_4M.fd
+    ln -s /usr/share/OVMF/OVMF_CODE_4M.secboot.fd /usr/share/ezkvm/OVMF_CODE_4M.secboot.fd
+
+    # Create the vmbr0 bridge using NetworkManager
+    # Both EndeavorOS gemini as well as ubuntu 24.04 use
+    # this by default, and so this should work for these
+    # distro's. Other distro's may require manual intervention
+    nmcli connection add type bridge ifname vmbr0 stp no
+    nmcli connection up bridge-vmbr0
+    nmcli connection modify bridge-vmbr0 ipv4.address 192.168.92.1
+    nmcli connection modify bridge-vmbr0 ipv4.method manual
+    nmcli connection up bridge-vmbr0
+
+    # Since ezkvm is aimed at using proxmox vm's on other
+    # distro's, the following rules will give read/write
+    # access for the proxmxox vm drives to members of the
+    # ezkvm group
+    cat <<EOF > /etc/udev/rules.d/92_ezkvm.rules
+SUBSYSTEM=="block", ENV{DM_LV_NAME}=="vm-*", MODE="660", GROUP="ezkvm"
+SUBSYSTEM=="vfio", MODE="660", GROUP="ezkvm"
+SUBSYSTEM=="vfio-dev", MODE="660", GROUP="ezkvm"
+EOF
+
+    # To allow user processes to claim large amounts of
+    # RAM, the following will raise the limits so that
+    # vm's won't be killed by the OOM killer
+    cat <<EOF > /etc/security/limits.d/92_ezkvm.conf
+@ezkvm          hard    memlock         100000000
+@ezkvm          soft    memlock         100000000
+EOF
+}
+
