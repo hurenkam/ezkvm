@@ -12,4 +12,6 @@ mkdir $TARGET_DIR && tar xvzf $SOURCE -C $TARGET_DIR --strip-components 1
 tar cvzf $TARGET_ZIP $TARGET_DIR
 
 rm $SOURCE
+cd $TARGET_DIR
+debuild -us -uc
 
