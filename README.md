@@ -113,7 +113,7 @@ To build a debian ezkvm package:
     - `wget https://raw.githubusercontent.com/hurenkam/ezkvm/refs/heads/stable/debian/build.sh`
     - `sh build.sh`
 
-The resulting `ezkvm_<version>-1_amd64.deb` package should work on debian
+The resulting `ezkvm_<version>_amd64.deb` package should work on debian
 bookworm (12) and on ubuntu noble numbat (24.04). It will likely also work on
 later versions, but that has not been tested.
 
