@@ -117,6 +117,20 @@ The resulting `ezkvm_<version>_amd64.deb` package should work on debian
 bookworm (12) and on ubuntu noble numbat (24.04). It will likely also work on
 later versions, but that has not been tested.
 
+#### Building an arch package ####
+
+To build an arch ezkvm package:
+
+- create an empty build directory:
+    - `mkdir build && cd build`
+- fetch the build files:
+    - `wget https://raw.githubusercontent.com/hurenkam/ezkvm/refs/heads/stable/arch/PKGBUILD`
+    - `wget https://raw.githubusercontent.com/hurenkam/ezkvm/refs/heads/stable/arch/proto.install`
+- build the package:
+    - `makepkg --skipinteg`
+
+You will find a ezkvm-<version>.tar.zst package in the build directory.
+
 #### Building a fedora/opensuse package ####
 
 To build an rpm ezkvm package:
@@ -126,16 +140,6 @@ To build an rpm ezkvm package:
 
 You will find an rpm package in the target/release/rpmbuild/RPM directory.
 And a source rpm package in the target/release/rpmbuild/SRPM directory.
-
-#### Building an arch package ####
-
-To build an arch ezkvm package:
-
-- install the cargo-arch package using cargo: `cargo install cargo-arch`
-- create the package by running: `cargo arch`
-
-You will find a pkg.tar.zst package in the root of the repository, as well
-as a PKGBUILD file.
 
 ## Running ezkvm ##
 
@@ -283,7 +287,7 @@ current one.
 - Support sata hd & cd/dvd
 - ~~installer for debian bookworm~~
 - ~~installer for ubuntu noble numbat (24.04 LTS)~~
-- installer for arch linux
+- ~~installer for arch linux~~
 
 ### short term ###
 
