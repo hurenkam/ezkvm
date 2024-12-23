@@ -102,10 +102,13 @@ That said, the Cargo.toml has been updated to work with some of the cargo packag
 
 To build a debian ezkvm package:
 
-- install the cargo-dep package using cargo: `cargo install cargo-deb`
-- create the package by running: `cargo dep`
+- create an empty build directory:
+    - `mkdir build && cd build`
+- fetch the build script and execute:
+    - `wget https://raw.githubusercontent.com/hurenkam/ezkvm/refs/heads/stable/debian/build.sh`
+    - `sh build.sh`
 
-You will find a debian package in the target/debian directory.
+You will find a debian package in the build directory.
 
 #### Building a fedora/opensuse package ####
 
