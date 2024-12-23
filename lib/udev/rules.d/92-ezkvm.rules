@@ -1,0 +1,3 @@
+SUBSYSTEM=="block", ENV{DM_LV_NAME}=="vm-*", MODE="660", GROUP="ezkvm"
+SUBSYSTEM=="vfio", MODE="660", GROUP="ezkvm"
+SUBSYSTEM=="vfio-dev", MODE="660", GROUP="ezkvm"

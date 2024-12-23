@@ -46,21 +46,3 @@ nmcli connection modify bridge-vmbr0 ipv4.address 192.168.92.1
 nmcli connection modify bridge-vmbr0 ipv4.method manual
 nmcli connection up bridge-vmbr0
 
-# Since ezkvm is aimed at using proxmox vm's on other
-# distro's, the following rules will give read/write
-# access for the proxmxox vm drives to members of the
-# ezkvm group
-cat <<EOF > /etc/udev/rules.d/92_ezkvm.rules
-SUBSYSTEM=="block", ENV{DM_LV_NAME}=="vm-*", MODE="660", GROUP="ezkvm"
-SUBSYSTEM=="vfio", MODE="660", GROUP="ezkvm"
-SUBSYSTEM=="vfio-dev", MODE="660", GROUP="ezkvm"
-EOF
-
-# To allow user processes to claim large amounts of
-# RAM, the following will raise the limits so that
-# vm's won't be killed by the OOM killer
-cat <<EOF > /etc/security/limits.d/92_ezkvm.conf
-@ezkvm          hard    memlock         100000000
-@ezkvm          soft    memlock         100000000
-EOF
-
