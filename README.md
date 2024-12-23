@@ -98,17 +98,24 @@ incorporate changes to make it run on other distro's or platforms.
 No packages have been released yet, so installation is pretty much a manual job for now.
 That said, the Cargo.toml has been updated to work with some of the cargo packagers:
 
-#### Building a debian/ubuntu package ####
+#### Building a package for debian 12 & ubuntu 24.04 ####
+
+___Note:
+This does depend on the necessary build tooling being installed in accordance
+with debian package build guidelines, as well as a properly installed rust/cargo
+toolchain (version 1.83) on the build host.___
 
 To build a debian ezkvm package:
 
 - create an empty build directory:
     - `mkdir build && cd build`
-- fetch the build script and execute:
+- fetch the build script and execute it:
     - `wget https://raw.githubusercontent.com/hurenkam/ezkvm/refs/heads/stable/debian/build.sh`
     - `sh build.sh`
 
-You will find a debian package in the build directory.
+The resulting `ezkvm_<version>-1_amd64.deb` package should work on debian
+bookworm (12) and on ubuntu noble numbat (24.04). It will likely also work on
+later versions, but that has not been tested.
 
 #### Building a fedora/opensuse package ####
 
