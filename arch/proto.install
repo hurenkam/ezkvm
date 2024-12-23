@@ -1,6 +1,7 @@
 ## arg 1:  the new package version
 post_install() {
-    addgroup ezkvm
+    #addgroup ezkvm
+    groupadd ezkvm
 
     # Create the config directory, users should be able to read, create, edit & delete files here
     mkdir /etc/ezkvm
@@ -33,9 +34,9 @@ post_install() {
     # manual intervention
     # Note that in recent versions of ovmf, the legacy
     # (2M) file at the top is not present anymore.
-    ln -s /usr/share/OVMF/OVMF_CODE.fd /usr/share/ezkvm/OVMF_CODE.fd
-    ln -s /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/ezkvm/OVMF_CODE_4M.fd
-    ln -s /usr/share/OVMF/OVMF_CODE_4M.secboot.fd /usr/share/ezkvm/OVMF_CODE_4M.secboot.fd
+    ln -s /usr/share/edk2/x64/OVMF_CODE.fd /usr/share/ezkvm/OVMF_CODE.fd
+    ln -s /usr/share/edk2/x64/OVMF_CODE.4m.fd /usr/share/ezkvm/OVMF_CODE_4M.fd
+    ln -s /usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd /usr/share/ezkvm/OVMF_CODE_4M.secboot.fd
 
     # Create the vmbr0 bridge using NetworkManager
     # Both EndeavorOS gemini as well as ubuntu 24.04 use
@@ -51,6 +52,7 @@ post_install() {
     # distro's, the following rules will give read/write
     # access for the proxmxox vm drives to members of the
     # ezkvm group
+    mkdir -p /etc/udev/rules.d
     cat <<EOF > /etc/udev/rules.d/92_ezkvm.rules
 SUBSYSTEM=="block", ENV{DM_LV_NAME}=="vm-*", MODE="660", GROUP="ezkvm"
 SUBSYSTEM=="vfio", MODE="660", GROUP="ezkvm"
@@ -60,6 +62,7 @@ EOF
     # To allow user processes to claim large amounts of
     # RAM, the following will raise the limits so that
     # vm's won't be killed by the OOM killer
+    mkdir -p /etc/security/limits.d
     cat <<EOF > /etc/security/limits.d/92_ezkvm.conf
 @ezkvm          hard    memlock         100000000
 @ezkvm          soft    memlock         100000000
