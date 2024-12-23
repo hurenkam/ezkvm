@@ -1,0 +1,12 @@
+Source: ezkvm
+Maintainer: Mark Hurenkamp <mark.hurenkamp@xs4all.nl>
+Section: misc
+Priority: optional
+Standards-Version: 4.6.2
+Build-Depends: debhelper-compat (= 13)
+
+Package: ezkvm
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: wrapper around qemu
+ make it easier to configure and run virtual machines using qemu

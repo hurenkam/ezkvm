@@ -1,0 +1,6 @@
+etc/ezkvm
+etc/qemu
+etc/udev/rules.d
+etc/security/limits.d
+usr/bin
+usr/share/ezkvm
