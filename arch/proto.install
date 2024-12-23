@@ -69,3 +69,13 @@ EOF
 EOF
 }
 
+post_remove() {
+    rm -rf /var/ezkvm
+    rm -rf /usr/share/ezkvm
+    rm  -f /etc/qemu/bridge.conf
+    rm -f /etc/udev/rules.d/92_ezkvm.rules
+    rm -f /etc/security/limits.d/92_ezkvm.conf
+    nmcli connection delete bridge-vmbr0
+    chmod -s /usr/lib/qemu/qemu-bridge-helper
+}
+
