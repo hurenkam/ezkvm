@@ -7,6 +7,7 @@ mod spice;
 mod storage;
 mod system;
 mod types;
+mod vnc;
 
 use crate::config::display::Display;
 use crate::config::gpu::Gpu;
@@ -29,6 +30,7 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
+pub use vnc::VNC;
 
 #[macro_export]
 macro_rules! optional_value_getter {
@@ -73,6 +75,8 @@ pub struct Config {
     gpu: Box<dyn Gpu>,
     #[serde(default, deserialize_with = "default_when_missing")]
     spice: Option<Spice>,
+    #[serde(default, deserialize_with = "default_when_missing")]
+    vnc: Option<VNC>,
     #[serde(default, deserialize_with = "default_when_missing")]
     host: Option<Host>,
     #[serde(default)]
@@ -193,6 +197,13 @@ impl QemuDevice for Config {
             None => {}
             Some(spice) => {
                 result.extend(spice.get_qemu_args(0));
+            }
+        }
+
+        match self.vnc() {
+            None => {}
+            Some(vnc) => {
+                result.extend(vnc.get_qemu_args(0));
             }
         }
 
@@ -681,6 +692,7 @@ mod tests {
                 display: Box::new(NoDisplay {}),
                 gpu: Box::new(NoGpu {}),
                 spice: None,
+                vnc: None,
                 host: None,
                 storage: vec![],
                 network: vec![],

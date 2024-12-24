@@ -1,46 +1,54 @@
 use crate::config::display::Display;
+use crate::config::spice::SpiceSocket;
 use crate::config::types::QemuDevice;
-use crate::config::{Config};
+use crate::config::vnc::VNCSocket;
+use crate::config::Config;
 use crate::osal::{Osal, OsalError};
 use derive_getters::Getters;
 use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Child, Command};
-use crate::config::spice::SpiceSocket;
 
-fn yes() -> bool { true }
+fn yes() -> bool {
+    true
+}
 #[derive(Deserialize, Debug, Getters)]
 pub struct RemoteViewer {
-    #[serde(default="yes")]
+    #[serde(default = "yes")]
     auto_resize: bool,
     #[serde(default)]
     full_screen: bool,
-    render_node: Option<String>
-    // cursor
-    // hotkeys
-    // keymap
+    render_node: Option<String>, // cursor
+                                 // hotkeys
+                                 // keymap
 }
 
 impl RemoteViewer {
     fn get_args(&self, config: &Config) -> Vec<String> {
         let mut result = vec![];
         match config.spice() {
-            None => {},
-            Some(spice) => {
-                match spice.socket() {
-                    SpiceSocket::TcpPort { addr, port } => {
-                        result.extend(vec![
-                            format!("spice://{}:{}", addr, port)
-                        ])
-                    },
-                    SpiceSocket::UnixSocket { path, .. } => {
-                        result.extend(vec![
-                            format!("spice+unix://{}", path)
-                        ])
-                    }
+            None => {}
+            Some(spice) => match spice.socket() {
+                SpiceSocket::TcpPort { addr, port } => {
+                    result.extend(vec![format!("spice://{}:{}", addr, port)])
                 }
-            }
+                SpiceSocket::UnixSocket { path, .. } => {
+                    result.extend(vec![format!("spice+unix://{}", path)])
+                }
+            },
+        }
+
+        match config.vnc() {
+            None => {}
+            Some(vnc) => match vnc.socket() {
+                VNCSocket::TcpPort { addr, port } => {
+                    result.extend(vec![format!("vnc://{}:{}", addr, port)])
+                }
+                VNCSocket::UnixSocket { path, .. } => {
+                    result.extend(vec![format!("vnc+unix://{}", path)])
+                }
+            },
         }
 
         if !*self.auto_resize() {
@@ -83,11 +91,10 @@ impl QemuDevice for RemoteViewer {
 #[typetag::deserialize(name = "remote-viewer")]
 impl Display for RemoteViewer {}
 
-
 #[cfg(test)]
 mod tests {
-    use crate::config::Spice;
     use super::*;
+    use crate::config::Spice;
     #[test]
     fn test_defaults() {
         let display = RemoteViewer {
@@ -111,10 +118,15 @@ mod tests {
         let expected: Vec<String> = vec![];
         assert_eq!(display.get_qemu_args(0), expected);
 
-        let expected: Vec<String> = vec!["spice://127.0.0.1:5900".to_string(),"--auto-resize=never".to_string()];
-        assert_eq!(display.get_args(
-            &Config::default()
-                .with_spice(Some(Spice::new_with_address_and_port("127.0.0.1".to_string(), 5900)))
-        ), expected);
+        let expected: Vec<String> = vec![
+            "spice://127.0.0.1:5900".to_string(),
+            "--auto-resize=never".to_string(),
+        ];
+        assert_eq!(
+            display.get_args(&Config::default().with_spice(Some(
+                Spice::new_with_address_and_port("127.0.0.1".to_string(), 5900)
+            ))),
+            expected
+        );
     }
 }
