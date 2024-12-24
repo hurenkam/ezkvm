@@ -399,7 +399,9 @@ mod tests {
           render_node: /dev/dri/renderD128
 
         gpu:
-          type: "virtio-vga-gl"
+          type: "virtio"
+          pcie: {}
+          gl: yes
 
         display:
           type: "remote-viewer"
@@ -442,7 +444,7 @@ mod tests {
             "-chardev socket,id=chrtpm0,path=/var/ezkvm/windows_desktop_config-tpm.socket", 
             "-tpmdev emulator,id=tpm0,chardev=chrtpm0", 
             "-device tpm-tis,tpmdev=tpm0", 
-            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2", 
+            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2", 
             "-spice unix=on,addr=/var/ezkvm/windows_desktop_config-spice.socket,disable-ticketing=on", 
             "-device virtio-serial-pci", 
             "-chardev spicevmc,id=vdagent,name=vdagent", 
@@ -467,8 +469,9 @@ mod tests {
             bios: { type: "ovmf", uuid: "c0e240a5-859a-4378-a2d9-95088f531142", file: "/dev/vm1/vm-950-disk-0" }
 
         gpu:
-            type: "virtio-vga-gl"
-            memory: 256
+            type: "virtio"
+            pcie: {}
+            gl: yes
 
         display:
             type: "gtk"
@@ -514,7 +517,7 @@ mod tests {
             "-device usb-tablet",
             "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=audiodev0",
-            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=0x2",
+            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2",
             "-drive file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
             "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
             "-drive file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",

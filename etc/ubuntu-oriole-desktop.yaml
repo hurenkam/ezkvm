@@ -6,7 +6,9 @@ system:
   cpu: { cores: 8 }
 
 gpu:
-  type: "virtio-vga-gl"
+  type: "virtio"
+  gl: yes
+  pcie: { }
 
 display:
   type: "gtk"

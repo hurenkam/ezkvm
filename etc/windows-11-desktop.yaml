@@ -14,7 +14,9 @@ spice:
   render_node: /dev/dri/renderD128
 
 gpu:
-  type: "virtio-vga-gl"
+  type: "virtio"
+  pcie: { }
+  gl: yes
 
 display:
   type: "remote-viewer"

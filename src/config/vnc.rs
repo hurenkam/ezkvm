@@ -31,17 +31,7 @@ impl VNC {
         }
     }
 
-    pub fn new_with_address_port_and_render_node(
-        addr: String,
-        port: u16,
-        render_node: Option<String>,
-    ) -> Self {
-        Self {
-            socket: VNCSocket::TcpPort { addr, port },
-        }
-    }
-
-    pub fn new_with_socket_and_render_node(path: String, render_node: Option<String>) -> Self {
+    pub fn new_with_socket(path: String) -> Self {
         Self {
             socket: VNCSocket::UnixSocket { path },
         }
@@ -80,31 +70,9 @@ mod tests {
             socket: Default::default(),
         };
 
-        let output: Vec<String> = vec!["-vnc port=5900,addr=127.0.0.1".to_string()];
-
-        assert_eq!(serde_yaml::from_str::<VNC>(input).unwrap(), data);
-        assert_eq!(data.get_qemu_args(0), output);
-    }
-
-    #[test]
-    fn test_tcp_port_with_gl() {
-        let input = r#"
-            addr: 127.0.0.1
-            port: 5900
-            gl: on
-            render_node: /dev/dri/renderD128
-        "#;
-
-        let data = VNC {
-            socket: VNCSocket::TcpPort {
-                addr: "127.0.0.1".to_string(),
-                port: 5900,
-            },
-        };
-
         let output: Vec<String> = vec![
-            "-vnc port=5900,addr=127.0.0.1".to_string(),
-            "-display egl-headless,rendernode=/dev/dri/renderD128".to_string(),
+            "-vnc 127.0.0.1:5900".to_string(),
+            "-display vnc=:0".to_string(),
         ];
 
         assert_eq!(serde_yaml::from_str::<VNC>(input).unwrap(), data);
@@ -112,11 +80,9 @@ mod tests {
     }
 
     #[test]
-    fn test_unix_socket_with_gl() {
+    fn test_unix_socket() {
         let input = r#"
             path: /var/ezkvm/unix.socket
-            gl: on
-            render_node: /dev/dri/renderD128
         "#;
 
         let data = VNC {
@@ -125,10 +91,7 @@ mod tests {
             },
         };
 
-        let output: Vec<String> = vec![
-            "-vnc unix=on,addr=/var/ezkvm/unix.socket,gl=on,rendernode=/dev/dri/renderD128"
-                .to_string(),
-        ];
+        let output: Vec<String> = vec!["-vnc unix:/var/ezkvm/unix.socket".to_string()];
 
         assert_eq!(serde_yaml::from_str::<VNC>(input).unwrap(), data);
         assert_eq!(data.get_qemu_args(0), output);
