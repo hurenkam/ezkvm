@@ -211,7 +211,6 @@ setup permissions correctly. The ezkvm application can be used in two ways:
    nmcli connection add type bridge ifname vmbr0 stp no
    nmcli connection up bridge-vmbr0
    nmcli connection modify bridge-vmbr0 ipv4.address <ip-address>
-   nmcli connection modify bridge-vmbr0 ipv4.dns <dns-address>
    nmcli connection modify bridge-vmbr0 ipv4.method manual
    nmcli connection up bridge-vmbr0
    ```
