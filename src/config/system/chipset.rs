@@ -1,3 +1,4 @@
+mod i440fx;
 mod q35;
 
 #[allow(unused)]
