@@ -19,12 +19,10 @@ impl I440FX {
 impl QemuDevice for I440FX {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
-            // TODO: Below are the arguments passed by proxmox.
-            //       Default qemu does not seem to support them though.
-            //"-machine 'type=pc+pve'".to_string(),
-            //"-device 'pci-bridge,id=pci.1,chassis_nr=1,bus=pci.0,addr=0x1e'".to_string(),
-            //"-device 'pci-bridge,id=pci.2,chassis_nr=2,bus=pci.0,addr=0x1f'".to_string(),
-            //"-device 'piix3-usb-uhci,id=uhci,bus=pci.0,addr=0x1.0x2'".to_string(),
+            "-machine type=pc".to_string(),
+            "-device pci-bridge,id=pci.1,chassis_nr=1,bus=pci.0,addr=0x1e".to_string(),
+            "-device pci-bridge,id=pci.2,chassis_nr=2,bus=pci.0,addr=0x1f".to_string(),
+            "-device piix3-usb-uhci,id=uhci,bus=pci.0,addr=0x1.0x2".to_string(),
         ]
     }
 }
