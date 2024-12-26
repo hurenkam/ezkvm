@@ -1,4 +1,5 @@
 mod ide;
+mod sata;
 mod scsi_hd;
 mod storage_footer;
 mod storage_header;
