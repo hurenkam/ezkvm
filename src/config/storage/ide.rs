@@ -79,8 +79,6 @@ impl StoragePayload for Ide {
     }
 
     fn get_device_options(&self, index: usize) -> Vec<String> {
-        //"ide-cd,bus=ide.{},drive=drive-ide{},id=ide{},unit={}",
-        //  index, index, index, self.unit
         vec![format!(
             "ide-{}{}{}{}{}",
             self.device_type(),
@@ -137,17 +135,6 @@ mod tests {
         assert_eq!(from_yaml.get_qemu_args(5), expected);
     }
 
-    // -drive
-    //      file=/home/hurenkam/Workspace/ezkvm.stable/debian-30r6-dvd-i386-binary-1.iso,
-    //      if=none,
-    //      aio=io_uring,
-    //      id=ide0
-    // -device
-    //      ide-cd,
-    //      bus=ide.0,
-    //      drive=drive-ide0,
-    //      id=ide0,
-    //      unit=0
     #[test]
     fn test_ide_cd() {
         let storage = Ide {
@@ -228,96 +215,4 @@ mod tests {
 
         assert_eq!(from_yaml.get_qemu_args(5), expected);
     }
-
-    /*
-       #[test]
-       fn test_all_default_values() {
-           let storage = ScsiHd {
-               discard: None,
-               cache: ScsiHd::cache_default(),
-               format: ScsiHd::format_default(),
-               detect_zeroes: ScsiHd::detect_zeroes_default(),
-               bus: ScsiHd::bus_default(),
-               rotation_rate: 1,
-           };
-
-           let yaml = r#"
-               type: "scsi-hd"
-               file: "default_file"
-           "#;
-           let from_yaml: ScsiHd = serde_yaml::from_str(yaml).unwrap();
-           assert_eq!(storage, from_yaml);
-
-           let drive_args: Vec<String> =
-               vec!["id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap".to_string()];
-           assert_eq!(storage.get_drive_options(0), drive_args);
-
-           let device_args: Vec<String> = vec![
-               "scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1"
-                   .to_string(),
-           ];
-           assert_eq!(storage.get_device_options(0), device_args);
-
-           let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
-           let expected: Vec<String> = vec![
-               "-drive file=default_file,if=none,aio=io_uring,id=drive-scsi5,format=raw,cache=none,detect-zeroes=unmap".to_string(),
-               "-device scsi-hd,scsi-id=5,drive=drive-scsi5,id=scsi5,bus=scsihw0.0,rotation_rate=1".to_string()
-           ];
-
-           assert_eq!(from_yaml.get_qemu_args(5), expected);
-       }
-
-       #[test]
-       fn test_all_valid_values() {
-           let storage = ScsiHd {
-               discard: Some("on".to_string()),
-               cache: "write-back".to_string(),
-               format: "qcow2".to_string(),
-               detect_zeroes: "off".to_string(),
-               bus: "scsihw1.2".to_string(),
-               rotation_rate: 3,
-           };
-
-           let yaml = r#"
-               type: "scsi-hd"
-               file: "valid_file"
-               boot_index: 1
-               discard: "on"
-               cache: "write-back"
-               format: "qcow2"
-               detect_zeroes: "off"
-               bus: "scsihw1.2"
-               rotation_rate: 3
-
-               extra_drive_options:
-                   - "option_1"
-                   - "option_2"
-
-               extra_device_options:
-                   - "option_3"
-           "#;
-           let from_yaml: ScsiHd = serde_yaml::from_str(yaml).unwrap();
-           assert_eq!(storage, from_yaml);
-
-           let drive_args: Vec<String> = vec![
-               "id=drive-scsi5,discard=on,format=qcow2,cache=write-back,detect-zeroes=off".to_string(),
-           ];
-           assert_eq!(storage.get_drive_options(5), drive_args);
-
-           let device_args: Vec<String> = vec![
-               "scsi-hd,scsi-id=5,drive=drive-scsi5,id=scsi5,bus=scsihw1.2,rotation_rate=3"
-                   .to_string(),
-           ];
-           assert_eq!(storage.get_device_options(5), device_args);
-
-           let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
-           let expected: Vec<String> = vec![
-               "-drive file=valid_file,if=none,aio=io_uring,id=drive-scsi5,discard=on,format=qcow2,cache=write-back,detect-zeroes=off,option_1,option_2".to_string(),
-               "-device scsi-hd,scsi-id=5,drive=drive-scsi5,id=scsi5,bus=scsihw1.2,rotation_rate=3,bootindex=1,option_3".to_string()
-           ];
-
-           assert_eq!(from_yaml.get_qemu_args(5), expected);
-       }
-
-    */
 }
