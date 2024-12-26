@@ -520,7 +520,7 @@ mod tests {
             "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2",
             "-drive file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
             "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
-            "-drive file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,media=cdrom",
+            "-drive file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,format=raw,cache=none,detect-zeroes=unmap,media=cdrom",
             "-device ide-cd,bus=ide.0,drive=drive-ide1,id=ide1,unit=0",
             "-netdev type=bridge,br=vmbr0,id=netdev0",
             "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:FF:76:89"

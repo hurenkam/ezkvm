@@ -55,18 +55,25 @@ impl Sata {
     fn drive(&self, index: usize) -> String {
         format!(",drive=drive-sata{}", index)
     }
+    fn get_media(&self) -> String {
+        match &self.device_type {
+            SataDeviceType::Cd => self.media(),
+            _ => "".to_string(),
+        }
+    }
 }
 
 #[typetag::deserialize(name = "sata")]
 impl StoragePayload for Sata {
     fn get_drive_options(&self, index: usize) -> Vec<String> {
         vec![format!(
-            "id=drive-sata{}{}{}{}{}",
+            "id=drive-sata{}{}{}{}{}{}",
             index,
             self.discard(),
             self.format(),
             self.cache(),
-            self.detect_zeroes()
+            self.detect_zeroes(),
+            self.get_media()
         )]
     }
 
@@ -110,8 +117,9 @@ mod tests {
         let from_yaml: Sata = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
-        let drive_args: Vec<String> =
-            vec!["id=drive-sata0,format=raw,cache=none,detect-zeroes=unmap".to_string()];
+        let drive_args: Vec<String> = vec![
+            "id=drive-sata0,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string(),
+        ];
         assert_eq!(storage.get_drive_options(0), drive_args);
 
         let device_args: Vec<String> =
@@ -120,7 +128,7 @@ mod tests {
 
         let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
         let expected: Vec<String> = vec![
-            "-drive file=default_file,if=none,aio=io_uring,id=drive-sata5,format=raw,cache=none,detect-zeroes=unmap".to_string(),
+            "-drive file=default_file,if=none,aio=io_uring,id=drive-sata5,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string(),
             "-device sata-cd,bus=sata.0,drive=drive-sata5,id=sata5,unit=0".to_string(),
         ];
 
@@ -149,8 +157,9 @@ mod tests {
         let from_yaml: Sata = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
-        let drive_args: Vec<String> =
-            vec!["id=drive-sata0,format=raw,cache=none,detect-zeroes=unmap".to_string()];
+        let drive_args: Vec<String> = vec![
+            "id=drive-sata0,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string(),
+        ];
         assert_eq!(storage.get_drive_options(0), drive_args);
 
         let device_args: Vec<String> =
@@ -159,7 +168,7 @@ mod tests {
 
         let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
         let expected: Vec<String> = vec![
-            "-drive file=default_file,if=none,aio=io_uring,id=drive-sata5,format=raw,cache=none,detect-zeroes=unmap".to_string(),
+            "-drive file=default_file,if=none,aio=io_uring,id=drive-sata5,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string(),
             "-device sata-cd,bus=sata.0,drive=drive-sata5,id=sata5,unit=0".to_string(),
         ];
 
