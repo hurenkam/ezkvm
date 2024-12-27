@@ -13,6 +13,7 @@ pub enum SataDeviceType {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Sata {
+    //
     device_type: SataDeviceType,
     #[serde(default)]
     discard: Option<String>,
@@ -37,7 +38,7 @@ impl Sata {
     required_value_getter!(cache("cache"): String = "none".to_string());
     required_value_getter!(format("format"): String = "raw".to_string());
     required_value_getter!(detect_zeroes("detect-zeroes"): String = "unmap".to_string());
-    required_value_getter!(bus("bus"): String = "sata.0".to_string());
+    required_value_getter!(bus("bus"): String = "ahci0.0".to_string());
     required_value_getter!(rotation_rate("rotation_rate"): u8 = 1);
     required_value_getter!(unit("unit"): String = "0".to_string());
     required_value_getter!(media("media"): String = "cdrom".to_string());
@@ -49,11 +50,11 @@ impl Sata {
             SataDeviceType::Ssd => "ssd".to_string(),
         }
     }
-    fn id(&self, index: usize) -> String {
-        format!(",id=sata{}", index)
+    fn drive_id(&self, index: usize) -> String {
+        format!("drive-sata{}", index)
     }
-    fn drive(&self, index: usize) -> String {
-        format!(",drive=drive-sata{}", index)
+    fn device_id(&self, index: usize) -> String {
+        format!("sata{}", index)
     }
     fn get_media(&self) -> String {
         match &self.device_type {
@@ -67,8 +68,8 @@ impl Sata {
 impl StoragePayload for Sata {
     fn get_drive_options(&self, index: usize) -> Vec<String> {
         vec![format!(
-            "id=drive-sata{}{}{}{}{}{}",
-            index,
+            "id={}{}{}{}{}{}",
+            self.drive_id(index),
             self.discard(),
             self.format(),
             self.cache(),
@@ -79,11 +80,11 @@ impl StoragePayload for Sata {
 
     fn get_device_options(&self, index: usize) -> Vec<String> {
         vec![format!(
-            "sata-{}{}{}{}{}",
+            "ide-{},id={},drive={}{}{}",
             self.device_type(),
+            self.device_id(index),
+            self.drive_id(index),
             self.bus(),
-            self.drive(index),
-            self.id(index),
             self.unit(),
         )]
     }
@@ -214,5 +215,38 @@ mod tests {
         ];
 
         assert_eq!(from_yaml.get_qemu_args(5), expected);
+    }
+
+    #[derive(Serialize)]
+    struct Config {
+        controller: Vec<Controller>,
+    }
+    #[derive(Serialize)]
+    struct Controller {
+        model: String,
+        bus: String,
+        devices: Vec<Device>,
+    }
+
+    #[derive(Serialize)]
+    struct Device {
+        device_type: String,
+        file: String,
+    }
+
+    #[test]
+    fn test() {
+        let config = Config {
+            controller: vec![Controller {
+                model: "sata".to_string(),
+                bus: "ahci0.0".to_string(),
+                devices: vec![Device {
+                    device_type: "hd".to_string(),
+                    file: "some_file".to_string(),
+                }],
+            }],
+        };
+        let converted = serde_yaml::to_string(&config).unwrap();
+        println!("{}", converted);
     }
 }

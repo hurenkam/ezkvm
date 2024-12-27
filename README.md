@@ -298,7 +298,7 @@ current one.
     - Multiple operating systems:
         - ~~Windows~~
         - ~~Linux~~
-        - macOS
+        - ~~macOS~~
     - Multiple gpu options (from fast to slow):
         - ~~passthrough-gpu~~
         - ~~virtio-vga-gl~~
