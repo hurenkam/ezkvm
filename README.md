@@ -10,7 +10,7 @@ Packages for debian/ubuntu can be built from source, see the debian directory.
 
 Pre-built packages for arch and debian can be found for released versions in the releases section
 
-More documentation can be found in the doc directory:
+## More documentation
 
 - [BUILDING](doc/BUILDING.md)
 - [CONTRIBUTING](doc/CONTRIBUTING.md)
