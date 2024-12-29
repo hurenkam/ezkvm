@@ -4,7 +4,7 @@ use crate::config::QemuDevice;
 use serde::Deserialize;
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct SataController {
+pub struct PvScsiController {
     #[serde(default)]
     offset: usize,
     #[serde(default)]
@@ -12,26 +12,27 @@ pub struct SataController {
     drives: Vec<Drive>,
 }
 
-impl QemuDevice for SataController {
+impl QemuDevice for PvScsiController {
     fn get_qemu_args(&self, controller_index: usize) -> Vec<String> {
-        let id = format!("ahci{}", controller_index);
+        let id = format!("pvscsi{}", controller_index);
         let bus = "pci.0".to_string();
         let address = self.offset + controller_index;
         let mut result = vec![format!(
-            "-device ahci,id={},multifunction=on,bus={},addr={}",
+            "-device pvscsi,id={},bus={},addr={}",
             id.clone(),
             bus,
             address
         )];
         for (index, drive) in self.drives.iter().enumerate() {
-            let mut drive_args: Vec<String> = vec![format!("id=drive-sata{}", index)];
+            let mut drive_args: Vec<String> = vec![format!("id=drive-pvscsi{}", index)];
             drive_args.extend(drive.get_drive_options());
 
             let mut device_args: Vec<String> = vec![
-                format!("ide-{}", drive.get_drive_type()),
-                format!("id=sata{}", index),
-                format!("drive=drive-sata{}", index),
-                format!("bus=ahci{}.{}", controller_index, index),
+                format!("scsi-{}", drive.get_drive_type()),
+                format!("id=scsi{}", index),
+                format!("scsi-id={}", index),
+                format!("drive=drive-pvscsi{}", index),
+                format!("bus=pvscsi{}.{}", controller_index, index),
             ];
             device_args.extend(drive.get_device_options());
 
@@ -44,8 +45,8 @@ impl QemuDevice for SataController {
     }
 }
 
-#[typetag::deserialize(name = "sata")]
-impl Controller for SataController {}
+#[typetag::deserialize(name = "pvscsi")]
+impl Controller for PvScsiController {}
 
 #[cfg(test)]
 mod tests {
@@ -54,24 +55,23 @@ mod tests {
 
     #[test]
     fn test_all_default_values() {
-        let storage = SataController {
+        let storage = PvScsiController {
             offset: 0,
             drives: vec![],
         };
 
         let yaml = r#"
         "#;
-        let from_yaml: SataController = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: PvScsiController = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
-        let args: Vec<String> =
-            vec!["-device ahci,id=ahci0,multifunction=on,bus=pci.0,addr=0".to_string()];
+        let args: Vec<String> = vec!["-device pvscsi,id=pvscsi0,bus=pci.0,addr=0".to_string()];
         assert_eq!(storage.get_qemu_args(0), args);
     }
 
     #[test]
     fn test_defaults_with_two_drives() {
-        let storage = SataController {
+        let storage = PvScsiController {
             offset: 0,
             drives: vec![
                 Drive::new("cd".to_string(), "drive0.img".to_string()),
@@ -86,16 +86,16 @@ mod tests {
             - type: "hd"
               file: "drive1.img"
         "#;
-        let from_yaml: SataController = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: PvScsiController = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
         let args: Vec<String> = vec![
-            "-device ahci,id=ahci0,multifunction=on,bus=pci.0,addr=0".to_string(),
-            "-drive id=drive-sata0,file=drive0.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
-            "-device ide-cd,id=sata0,drive=drive-sata0,bus=ahci0.0"
+            "-device pvscsi,id=pvscsi0,bus=pci.0,addr=0".to_string(),
+            "-drive id=drive-pvscsi0,file=drive0.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
+            "-device scsi-cd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0"
                 .to_string(),
-            "-drive id=drive-sata1,file=drive1.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
-            "-device ide-hd,id=sata1,drive=drive-sata1,bus=ahci0.1"
+            "-drive id=drive-pvscsi1,file=drive1.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
+            "-device scsi-hd,id=scsi1,scsi-id=1,drive=drive-pvscsi1,bus=pvscsi0.1"
                 .to_string(),
         ];
         assert_eq!(storage.get_qemu_args(0), args);

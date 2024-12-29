@@ -1,6 +1,5 @@
 use crate::config::system::chipset::Chipset;
 use crate::config::types::QemuDevice;
-use colored::Colorize;
 use serde::Deserialize;
 
 const PVE_CONFIG_FILE: &str = "/usr/share/ezkvm/pve-q35-4.0.cfg";
@@ -27,8 +26,6 @@ impl QemuDevice for Q35 {
             format!("-readconfig {}", PVE_CONFIG_FILE),
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b".to_string(),
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b".to_string(),
-            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5".to_string(),
-            "-device ahci,id=ahci0,multifunction=on,bus=pci.0,addr=0x7".to_string(),
         ]
     }
 }
@@ -52,7 +49,6 @@ mod tests {
                 "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg".to_string(),
                 "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b".to_string(),
                 "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b".to_string(),
-                "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5".to_string()
             ]
         );
     }

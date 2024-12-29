@@ -1,218 +1,93 @@
-use crate::config::storage::storage_payload::StoragePayload;
-use crate::{optional_value_getter, required_value_getter};
-use paste::paste;
-use serde::{Deserialize, Serialize};
+use crate::config::storage::drive::Drive;
+use crate::config::storage::Controller;
+use crate::config::QemuDevice;
+use serde::Deserialize;
 
-#[derive(Serialize, Deserialize, PartialEq, Default, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum IdeDeviceType {
-    #[default]
-    Cd,
-    Hd,
-    Ssd,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
-pub struct Ide {
-    device_type: IdeDeviceType,
+#[derive(Deserialize, PartialEq, Debug, Clone)]
+pub struct IdeController {
     #[serde(default)]
-    discard: Option<String>,
-    #[serde(default = "Ide::cache_default")]
-    cache: String,
-    #[serde(default = "Ide::format_default")]
-    format: String,
-    #[serde(default = "Ide::detect_zeroes_default")]
-    detect_zeroes: String,
-    #[serde(default = "Ide::bus_default")]
-    bus: String,
-    #[serde(default = "Ide::rotation_rate_default")]
-    rotation_rate: u8,
-    #[serde(default = "Ide::unit_default")]
-    unit: String,
-    #[serde(default = "Ide::media_default")]
-    media: String,
+    offset: usize,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    drives: Vec<Drive>,
 }
 
-impl Ide {
-    optional_value_getter!(discard("discard"): String);
-    required_value_getter!(cache("cache"): String = "none".to_string());
-    required_value_getter!(format("format"): String = "raw".to_string());
-    required_value_getter!(detect_zeroes("detect-zeroes"): String = "unmap".to_string());
-    required_value_getter!(bus("bus"): String = "ide.0".to_string());
-    required_value_getter!(rotation_rate("rotation_rate"): u8 = 1);
-    required_value_getter!(unit("unit"): String = "0".to_string());
-    required_value_getter!(media("media"): String = "cdrom".to_string());
+impl QemuDevice for IdeController {
+    fn get_qemu_args(&self, _controller_index: usize) -> Vec<String> {
+        let mut result = vec![];
+        for (index, drive) in self.drives.iter().enumerate() {
+            let mut drive_args: Vec<String> = vec![format!("id=drive-ide{}", index)];
+            drive_args.extend(drive.get_drive_options());
 
-    fn device_type(&self) -> String {
-        match self.device_type {
-            IdeDeviceType::Cd { .. } => "cd".to_string(),
-            IdeDeviceType::Hd => "hd".to_string(),
-            IdeDeviceType::Ssd => "ssd".to_string(),
+            let mut device_args: Vec<String> = vec![
+                format!("ide-{}", drive.get_drive_type()),
+                format!("id=ide{}", index),
+                format!("drive=drive-ide{}", index),
+                format!("bus=ide.{}", index),
+            ];
+            device_args.extend(drive.get_device_options());
+
+            result.extend(vec![
+                format!("-drive {}", drive_args.join(",")),
+                format!("-device {}", device_args.join(",")),
+            ]);
         }
-    }
-    fn id(&self, index: usize) -> String {
-        format!(",id=ide{}", index)
-    }
-    fn drive(&self, index: usize) -> String {
-        format!(",drive=drive-ide{}", index)
-    }
-    fn get_media(&self) -> String {
-        match &self.device_type {
-            IdeDeviceType::Cd => self.media(),
-            _ => "".to_string(),
-        }
+        result
     }
 }
 
 #[typetag::deserialize(name = "ide")]
-impl StoragePayload for Ide {
-    fn get_drive_options(&self, index: usize) -> Vec<String> {
-        vec![format!(
-            "id=drive-ide{}{}{}{}{}{}",
-            index,
-            self.discard(),
-            self.format(),
-            self.cache(),
-            self.detect_zeroes(),
-            self.get_media()
-        )]
-    }
-
-    fn get_device_options(&self, index: usize) -> Vec<String> {
-        vec![format!(
-            "ide-{}{}{}{}{}",
-            self.device_type(),
-            self.bus(),
-            self.drive(index),
-            self.id(index),
-            self.unit(),
-        )]
-    }
-}
+impl Controller for IdeController {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::storage::StorageItem;
     use crate::config::QemuDevice;
 
     #[test]
     fn test_all_default_values() {
-        let storage = Ide {
-            device_type: IdeDeviceType::default(),
-            discard: None,
-            cache: Ide::cache_default(),
-            format: Ide::format_default(),
-            detect_zeroes: Ide::detect_zeroes_default(),
-            bus: Ide::bus_default(),
-            rotation_rate: Ide::rotation_rate_default(),
-            unit: Ide::unit_default(),
-            media: Ide::media_default(),
+        let storage = IdeController {
+            offset: 0,
+            drives: vec![],
         };
 
         let yaml = r#"
-            type: "ide"
-            device_type: "cd"
-            file: "default_file"
         "#;
-        let from_yaml: Ide = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: IdeController = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
-        let drive_args: Vec<String> =
-            vec!["id=drive-ide0,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string()];
-        assert_eq!(storage.get_drive_options(0), drive_args);
-
-        let device_args: Vec<String> =
-            vec!["ide-cd,bus=ide.0,drive=drive-ide0,id=ide0,unit=0".to_string()];
-        assert_eq!(storage.get_device_options(0), device_args);
-
-        let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
-        let expected: Vec<String> = vec![
-            "-drive file=default_file,if=none,aio=io_uring,id=drive-ide5,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string(),
-            "-device ide-cd,bus=ide.0,drive=drive-ide5,id=ide5,unit=0".to_string(),
-        ];
-
-        assert_eq!(from_yaml.get_qemu_args(5), expected);
+        let args: Vec<String> = vec![];
+        assert_eq!(storage.get_qemu_args(0), args);
     }
 
     #[test]
-    fn test_ide_cd() {
-        let storage = Ide {
-            device_type: IdeDeviceType::Cd,
-            discard: None,
-            cache: Ide::cache_default(),
-            format: Ide::format_default(),
-            detect_zeroes: Ide::detect_zeroes_default(),
-            bus: "ide.0".to_string(),
-            rotation_rate: Ide::rotation_rate_default(),
-            unit: "0".to_string(),
-            media: "cdrom".to_string(),
-        };
-        let converted = serde_yaml::to_string(&storage).unwrap();
-        println!("{}", converted);
-
-        let yaml = r#"
-            type: "ide"
-            device_type: "cd"
-            file: "default_file"
-        "#;
-        let from_yaml: Ide = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(storage, from_yaml);
-
-        let drive_args: Vec<String> =
-            vec!["id=drive-ide0,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string()];
-        assert_eq!(storage.get_drive_options(0), drive_args);
-
-        let device_args: Vec<String> =
-            vec!["ide-cd,bus=ide.0,drive=drive-ide0,id=ide0,unit=0".to_string()];
-        assert_eq!(storage.get_device_options(0), device_args);
-
-        let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
-        let expected: Vec<String> = vec![
-            "-drive file=default_file,if=none,aio=io_uring,id=drive-ide5,format=raw,cache=none,detect-zeroes=unmap,media=cdrom".to_string(),
-            "-device ide-cd,bus=ide.0,drive=drive-ide5,id=ide5,unit=0".to_string(),
-        ];
-
-        assert_eq!(from_yaml.get_qemu_args(5), expected);
-    }
-
-    #[test]
-    fn test_ide_hd() {
-        let storage = Ide {
-            device_type: IdeDeviceType::Hd,
-            discard: None,
-            cache: Ide::cache_default(),
-            format: Ide::format_default(),
-            detect_zeroes: Ide::detect_zeroes_default(),
-            bus: "ide.0".to_string(),
-            rotation_rate: Ide::rotation_rate_default(),
-            unit: "1".to_string(),
-            media: Ide::media_default(),
+    fn test_defaults_with_two_drives() {
+        let storage = IdeController {
+            offset: 0,
+            drives: vec![
+                Drive::new("cd".to_string(), "drive0.img".to_string()),
+                Drive::new("hd".to_string(), "drive1.img".to_string()),
+            ],
         };
 
         let yaml = r#"
-            type: "ide"
-            device_type: "hd"
-            file: "default_file"
-            unit: "1"
+            drives:
+            - type: "cd"
+              file: "drive0.img"
+            - type: "hd"
+              file: "drive1.img"
         "#;
-        let from_yaml: Ide = serde_yaml::from_str(yaml).unwrap();
+        let from_yaml: IdeController = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(storage, from_yaml);
 
-        let drive_args: Vec<String> =
-            vec!["id=drive-ide0,format=raw,cache=none,detect-zeroes=unmap".to_string()];
-        assert_eq!(storage.get_drive_options(0), drive_args);
-
-        let device_args: Vec<String> =
-            vec!["ide-hd,bus=ide.0,drive=drive-ide0,id=ide0,unit=1".to_string()];
-        assert_eq!(storage.get_device_options(0), device_args);
-
-        let from_yaml: StorageItem = serde_yaml::from_str(yaml).unwrap();
-        let expected: Vec<String> = vec![
-            "-drive file=default_file,if=none,aio=io_uring,id=drive-ide5,format=raw,cache=none,detect-zeroes=unmap".to_string(),
-            "-device ide-hd,bus=ide.0,drive=drive-ide5,id=ide5,unit=1".to_string(),
+        let args: Vec<String> = vec![
+            "-drive id=drive-ide0,file=drive0.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
+            "-device ide-cd,id=ide0,drive=drive-ide0,bus=ide.0"
+                .to_string(),
+            "-drive id=drive-ide1,file=drive1.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
+            "-device ide-hd,id=ide1,drive=drive-ide1,bus=ide.1"
+                .to_string(),
         ];
-
-        assert_eq!(from_yaml.get_qemu_args(5), expected);
+        assert_eq!(storage.get_qemu_args(0), args);
     }
 }

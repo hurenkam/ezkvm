@@ -1,10 +1,10 @@
+mod drive;
 mod ide;
+mod pvscsi;
 mod sata;
-mod scsi_hd;
-mod storage_footer;
-mod storage_header;
-mod storage_item;
-mod storage_payload;
-mod virtio_blk_pci;
 
-pub use storage_item::StorageItem;
+#[typetag::deserialize(tag = "controller")]
+pub trait Controller: 'static + Any + QemuDevice {}
+
+use crate::config::QemuDevice;
+use std::any::Any;

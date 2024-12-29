@@ -5,17 +5,6 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug, Clone)]
 pub struct I440FX {}
 
-impl I440FX {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Self {}
-    }
-    #[allow(unused)]
-    pub fn boxed_default() -> Box<Self> {
-        Box::new(Self {})
-    }
-}
-
 impl QemuDevice for I440FX {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![

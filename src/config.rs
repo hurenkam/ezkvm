@@ -18,7 +18,7 @@ use std::any::{Any, TypeId};
 use std::ops::Deref;
 
 use crate::config::network::NetworkItem;
-use crate::config::storage::StorageItem;
+use crate::config::storage::Controller;
 #[mockall_double::double]
 use crate::osal::Osal;
 use crate::osal::OsalError;
@@ -48,12 +48,41 @@ macro_rules! optional_value_getter {
 }
 
 #[macro_export]
+macro_rules! optional_value_getter2 {
+    ($id: ident($lit: literal): $ty: ty) => {
+        #[allow(dead_code)]
+        pub fn $id(&self) -> Option<String> {
+            match &self.$id {
+                None => None,
+                Some(option) => Some(format!("{}={}", $lit, option.clone())),
+            }
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! required_value_getter {
     ($id: ident($lit: literal): $ty: ty = $default: expr) => {
         paste! {
             #[allow(dead_code)]
             pub fn $id(&self) -> String {
                 format!(",{}={}", $lit, self.$id)
+            }
+            #[allow(dead_code)]
+            pub fn [<$id _default>]() -> $ty {
+                $default
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! required_value_getter2 {
+    ($id: ident($lit: literal): $ty: ty = $default: expr) => {
+        paste! {
+            #[allow(dead_code)]
+            pub fn $id(&self) -> Option<String> {
+                Some(format!("{}={}", $lit, self.$id))
             }
             #[allow(dead_code)]
             pub fn [<$id _default>]() -> $ty {
@@ -80,7 +109,7 @@ pub struct Config {
     #[serde(default, deserialize_with = "default_when_missing")]
     host: Option<Host>,
     #[serde(default)]
-    storage: Vec<StorageItem>,
+    storage: Vec<Box<dyn Controller>>,
     #[serde(default)]
     network: Vec<NetworkItem>,
     #[serde(default, deserialize_with = "default_when_missing")]
@@ -112,9 +141,9 @@ impl Config {
         Config { host, ..self }
     }
 
-    pub fn with_storage(self, storage: Vec<StorageItem>) -> Config {
-        Config { storage, ..self }
-    }
+    //pub fn with_storage(self, storage: Vec<StorageItem>) -> Config {
+    //    Config { storage, ..self }
+    //}
 
     pub fn with_network(self, network: Vec<NetworkItem>) -> Config {
         Config { network, ..self }
@@ -276,7 +305,6 @@ mod tests {
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
-            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
             "-boot menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
             "-smbios type=1,uuid=",
             "-m 16384",
@@ -318,8 +346,15 @@ mod tests {
             - { vm_port: "1", host_bus: "1", host_port: "2.2" }
 
         storage:
-        - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
-        - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: "on" }
+          - controller: pvscsi
+            drives:
+              - type: hd
+                file: "/dev/vm1/vm-108-boot"
+                discard: "on"
+                boot_index: 0
+              - type: hd
+                file: "/dev/vm1/vm-108-tmp"
+                discard: "on"
 
         network:
         - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
@@ -345,7 +380,6 @@ mod tests {
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
-            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
             "-boot menu=on,strict=on,reboot-timeout=1000",
             "-smbios type=1,uuid=04d064c3-66a1-4aa7-9589-f8b3ecf91cd7",
             "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE_4M.secboot.fd",
@@ -371,10 +405,11 @@ mod tests {
             "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
             "-device usb-host,bus=xhci.0,port=1,hostbus=1,hostport=2.2,id=usb0",
-            "-drive file=/dev/vm1/vm-108-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap",
-            "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0",
-            "-drive file=/dev/vm1/vm-108-tmp,if=none,aio=io_uring,id=drive-scsi1,discard=on,format=raw,cache=none,detect-zeroes=unmap",
-            "-device scsi-hd,scsi-id=1,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,rotation_rate=1",
+            "-device pvscsi,id=pvscsi0,bus=pci.0,addr=0",
+            "-drive id=drive-pvscsi0,file=/dev/vm1/vm-108-boot,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0,boot_index=0",
+            "-drive id=drive-pvscsi1,file=/dev/vm1/vm-108-tmp,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,id=scsi1,scsi-id=1,drive=drive-pvscsi1,bus=pvscsi0.1",
             "-netdev type=bridge,br=vmbr0,id=netdev0",
             "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:B7"
         ];
@@ -407,7 +442,12 @@ mod tests {
           type: "remote-viewer"
 
         storage:
-          - { type: "scsi-hd", file: "/dev/vm1/vm-111-boot", discard: "on", boot_index: 0 }
+          - controller: pvscsi
+            drives:
+              - type: hd
+                file: "/dev/vm1/vm-111-boot"
+                discard: "on"
+                boot_index: 0
 
         network:
           - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:7B" }
@@ -433,7 +473,6 @@ mod tests {
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg", 
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b", 
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b", 
-            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5", 
             "-boot menu=on,strict=on,reboot-timeout=1000",
             "-smbios type=1,uuid=181f1a56-e0e2-42d1-a916-bc16dd415a59", 
             "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE_4M.secboot.fd",
@@ -451,9 +490,10 @@ mod tests {
             "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0", 
             "-audiodev spice,id=spice-backend0", 
             "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc", 
-            "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0", 
-            "-drive file=/dev/vm1/vm-111-boot,if=none,aio=io_uring,id=drive-scsi0,discard=on,format=raw,cache=none,detect-zeroes=unmap", 
-            "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=0", 
+            "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
+            "-device pvscsi,id=pvscsi0,bus=pci.0,addr=0",
+            "-drive id=drive-pvscsi0,file=/dev/vm1/vm-111-boot,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap", 
+            "-device scsi-hd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0,boot_index=0", 
             "-netdev type=bridge,br=vmbr0,id=netdev0", 
             "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:7B"
         ];
@@ -478,8 +518,15 @@ mod tests {
             gl: true
 
         storage:
-        - { type: "scsi-hd", file: "/dev/vm1/vm-950-disk-1", boot_index: 1 }
-        - { type: "ide", device_type: "cd", file: "ubuntu.iso" }
+          - controller: pvscsi
+            drives:
+              - type: hd
+                file: "/dev/vm1/vm-950-disk-1"
+                boot_index: 1
+          - controller: ide
+            drives:
+              - type: cd
+                file: "ubuntu.iso"
 
         network:
         - { type: "bridge", mac: "BC:24:11:FF:76:89" }
@@ -504,7 +551,6 @@ mod tests {
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
-            "-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5",
             "-boot menu=on,strict=on,reboot-timeout=1000",
             "-smbios type=1,uuid=c0e240a5-859a-4378-a2d9-95088f531142",
             "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE_4M.secboot.fd",
@@ -518,10 +564,11 @@ mod tests {
             "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=audiodev0",
             "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2",
-            "-drive file=/dev/vm1/vm-950-disk-1,if=none,aio=io_uring,id=drive-scsi0,format=raw,cache=none,detect-zeroes=unmap",
-            "-device scsi-hd,scsi-id=0,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=1",
-            "-drive file=ubuntu.iso,if=none,aio=io_uring,id=drive-ide1,format=raw,cache=none,detect-zeroes=unmap,media=cdrom",
-            "-device ide-cd,bus=ide.0,drive=drive-ide1,id=ide1,unit=0",
+            "-device pvscsi,id=pvscsi0,bus=pci.0,addr=0",
+            "-drive id=drive-pvscsi0,file=/dev/vm1/vm-950-disk-1,if=none,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0,boot_index=1",
+            "-drive id=drive-ide0,file=ubuntu.iso,if=none,format=raw,cache=none,detect-zeroes=unmap",
+            "-device ide-cd,id=ide0,drive=drive-ide0,bus=ide.0",
             "-netdev type=bridge,br=vmbr0,id=netdev0",
             "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:FF:76:89"
         ];
@@ -529,6 +576,7 @@ mod tests {
         assert_argument_lists_are_equal(actual, expected);
     }
 
+    #[allow(unused)]
     const DEFAULT_MACOS_CONFIG: &str = r#"
         general:
             name: mygeeto
@@ -560,8 +608,15 @@ mod tests {
             - { vm_port: "1", host_bus: "1", host_port: "2.2" }
 
         storage:
-        - { type: "scsi-hd", file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
-        - { type: "scsi-hd", file: "/dev/vm1/vm-108-tmp", discard: "on" }
+          - controller: pvscsi
+            drives:
+              - type: hd
+                file: "/dev/vm1/vm-108-boot"
+                discard: "on"
+                boot_index: 0
+              - type: hd
+                file: "/dev/vm1/vm-108-tmp"
+                discard: "on"
 
         network:
         - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
@@ -569,6 +624,7 @@ mod tests {
 
     #[test]
     fn test_macos_defaults() {
+        #[allow(unused)]
         let expected: Vec<&str> = vec![
             "qemu-system-x86_64",
             "-accel", "kvm", "-nodefaults",

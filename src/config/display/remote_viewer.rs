@@ -19,6 +19,7 @@ pub struct RemoteViewer {
     auto_resize: bool,
     #[serde(default)]
     full_screen: bool,
+    #[allow(unused)]
     render_node: Option<String>, // cursor
                                  // hotkeys
                                  // keymap
