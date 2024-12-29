@@ -1,6 +1,6 @@
-# EZKVM #
+# EZKVM
 
-## TLDR ##
+## TLDR
 
 EZKVM is a wrapper around qemu, mainly intended to run proxmox VM's from other
 distro's (arch, lmde, ubuntu).
@@ -10,18 +10,9 @@ Packages for debian/ubuntu can be built from source, see the debian directory.
 
 Pre-built packages for arch and debian can be found for released versions in the releases section
 
-More documentation can be found in the doc directory.
-
-## Roadmap ##
-
-### Before next release ###
-
-### Short term ###
-
-- reduce overhead a.o. in storage subsystem
-- fix resources
-
-### Long term
-
-- automate tests for examples
-- implement templates
+More documentation can be found in the doc directory:
+https://github.com/hurenkam/ezkvm/blob/stable/doc/BUILDING.md
+https://github.com/hurenkam/ezkvm/blob/stable/doc/CONTRIBUTING.md
+https://github.com/hurenkam/ezkvm/blob/stable/doc/ROADMAP.md
+https://github.com/hurenkam/ezkvm/blob/stable/doc/STATUS.md
+https://github.com/hurenkam/ezkvm/blob/stable/doc/USER_MANUAL.md
