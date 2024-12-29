@@ -32,7 +32,7 @@ impl QemuDevice for PvScsiController {
                 format!("id=scsi{}", index),
                 format!("scsi-id={}", index),
                 format!("drive=drive-pvscsi{}", index),
-                format!("bus=pvscsi{}.{}", controller_index, index),
+                format!("bus=pvscsi{}.{}", controller_index, 0),
             ];
             device_args.extend(drive.get_device_options());
 
@@ -95,7 +95,7 @@ mod tests {
             "-device scsi-cd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0"
                 .to_string(),
             "-drive id=drive-pvscsi1,file=drive1.img,if=none,format=raw,cache=none,detect-zeroes=unmap".to_string(),
-            "-device scsi-hd,id=scsi1,scsi-id=1,drive=drive-pvscsi1,bus=pvscsi0.1"
+            "-device scsi-hd,id=scsi1,scsi-id=1,drive=drive-pvscsi1,bus=pvscsi0.0"
                 .to_string(),
         ];
         assert_eq!(storage.get_qemu_args(0), args);
