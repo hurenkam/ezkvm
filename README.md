@@ -11,8 +11,9 @@ Packages for debian/ubuntu can be built from source, see the debian directory.
 Pre-built packages for arch and debian can be found for released versions in the releases section
 
 More documentation can be found in the doc directory:
-https://github.com/hurenkam/ezkvm/blob/stable/doc/BUILDING.md
-https://github.com/hurenkam/ezkvm/blob/stable/doc/CONTRIBUTING.md
-https://github.com/hurenkam/ezkvm/blob/stable/doc/ROADMAP.md
-https://github.com/hurenkam/ezkvm/blob/stable/doc/STATUS.md
-https://github.com/hurenkam/ezkvm/blob/stable/doc/USER_MANUAL.md
+
+- [BUILDING](doc/BUILDING.md)
+- [CONTRIBUTING](doc/CONTRIBUTING.md)
+- [ROADMAP](doc/ROADMAP.md)
+- [STATUS](doc/STATUS.md)
+- [USER_MANUAL](doc/USER_MANUAL.md)
