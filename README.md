@@ -12,8 +12,14 @@ Pre-built packages for arch and debian can be found for released versions in the
 
 ## More documentation
 
+- [STATUS](doc/STATUS.md)
+- [ROADMAP](doc/ROADMAP.md)
+
+### For users
+
+- [USER_MANUAL](doc/USER_MANUAL.md)
+
+### For developers
+
 - [BUILDING](doc/BUILDING.md)
 - [CONTRIBUTING](doc/CONTRIBUTING.md)
-- [ROADMAP](doc/ROADMAP.md)
-- [STATUS](doc/STATUS.md)
-- [USER_MANUAL](doc/USER_MANUAL.md)
