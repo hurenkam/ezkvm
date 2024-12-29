@@ -404,7 +404,7 @@ mod tests {
             "-drive id=drive-pvscsi0,file=/dev/vm1/vm-108-boot,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap",
             "-device scsi-hd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0,boot_index=0",
             "-drive id=drive-pvscsi1,file=/dev/vm1/vm-108-tmp,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap",
-            "-device scsi-hd,id=scsi1,scsi-id=1,drive=drive-pvscsi1,bus=pvscsi0.1",
+            "-device scsi-hd,id=scsi1,scsi-id=1,drive=drive-pvscsi1,bus=pvscsi0.0",
             "-netdev type=bridge,br=vmbr0,id=netdev0",
             "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:B7"
         ];
