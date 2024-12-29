@@ -14,7 +14,9 @@ display:
   type: "gtk"
 
 storage:
-  - { type: "scsi-hd", file: "/dev/vm1/ubuntu-oriole-desktop-boot", discard: "on", boot_index: 0 }
+  - controller: pvscsi
+    drives:
+      - { type: hd, file: "/dev/vm1/ubuntu-oriole-desktop-boot", discard: "on", boot_index: 0 }
 
 network:
   - { type: "bridge", mac: "BC:24:11:FF:76:89" }

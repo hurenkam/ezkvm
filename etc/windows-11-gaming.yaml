@@ -25,8 +25,10 @@ display:
   window: { size: 1707x1067, full_screen: true }
 
 storage:
-  - { type: "scsi-hd", file: "/dev/vm1/windows-11-gaming-boot", discard: "on", boot_index: 0 }
-  - { type: "scsi-hd", file: "/dev/vm1/windows-11-gaming-tmp", discard: "on" }
+  - controller: pvscsi
+    drives:
+      - { type: hd, file: "/dev/vm1/windows-11-gaming-boot", discard: "on", boot_index: 0 }
+      - { type: hd,  file: "/dev/vm1/windows-11-gaming-tmp", discard: "on" }
 
 network:
   - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }

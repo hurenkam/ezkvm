@@ -348,13 +348,8 @@ mod tests {
         storage:
           - controller: pvscsi
             drives:
-              - type: hd
-                file: "/dev/vm1/vm-108-boot"
-                discard: "on"
-                boot_index: 0
-              - type: hd
-                file: "/dev/vm1/vm-108-tmp"
-                discard: "on"
+              - { type: hd, file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
+              - { type: hd, file: "/dev/vm1/vm-108-tmp", discard: "on" }
 
         network:
         - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }
@@ -444,10 +439,7 @@ mod tests {
         storage:
           - controller: pvscsi
             drives:
-              - type: hd
-                file: "/dev/vm1/vm-111-boot"
-                discard: "on"
-                boot_index: 0
+              - { type: hd, file: "/dev/vm1/vm-111-boot", discard: "on", boot_index: 0 }
 
         network:
           - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:7B" }
@@ -520,13 +512,11 @@ mod tests {
         storage:
           - controller: pvscsi
             drives:
-              - type: hd
-                file: "/dev/vm1/vm-950-disk-1"
-                boot_index: 1
+              - { type: hd, file: "/dev/vm1/vm-950-disk-1", boot_index: 1 }
+              
           - controller: ide
             drives:
-              - type: cd
-                file: "ubuntu.iso"
+              - { type: cd, file: "ubuntu.iso" }
 
         network:
         - { type: "bridge", mac: "BC:24:11:FF:76:89" }
@@ -610,13 +600,8 @@ mod tests {
         storage:
           - controller: pvscsi
             drives:
-              - type: hd
-                file: "/dev/vm1/vm-108-boot"
-                discard: "on"
-                boot_index: 0
-              - type: hd
-                file: "/dev/vm1/vm-108-tmp"
-                discard: "on"
+              - { type: hd, file: "/dev/vm1/vm-108-boot", discard: "on", boot_index: 0 }
+              - { type: hd, file: "/dev/vm1/vm-108-tmp", discard: "on" }
 
         network:
         - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:B7" }

@@ -22,7 +22,9 @@ display:
   type: "remote-viewer"
 
 storage:
-  - { type: "scsi-hd", file: "/dev/vm1/windows-11-desktop-boot", discard: "on", boot_index: 0 }
+  - controller: pvscsi
+    drives:
+      - { type: hd, file: "/dev/vm1/windows-11-desktop-boot", discard: "on", boot_index: 0 }
 
 network:
   - { type: "bridge", bridge: "vmbr0", driver: "virtio-net-pci", mac: "BC:24:11:3A:21:7B" }
