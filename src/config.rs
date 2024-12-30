@@ -160,7 +160,7 @@ impl Config {
         let name = format!("{}.yaml", name.as_ref());
         let candidates = Osal::find_files(name, vec![".", "~/.ezkvm", "/etc/ezkvm"]);
 
-        if let Some(candidate) = candidates.get(0) {
+        if let Some(candidate) = candidates.first() {
             if let Ok(config) = Osal::read_yaml_file(candidate.clone()) {
                 return Some(config);
             }
@@ -180,16 +180,14 @@ impl Config {
         let display = self.display();
 
         // make sure display contains an &Box<Gtk> instance
-        if (*display).type_id() == TypeId::of::<Box<dyn Display>>()
-            && (*display.deref()).type_id() == TypeId::of::<Gtk>()
-        {
-            // since we now know display is an &Box<Gtk>, we can do a cast to it
+        if (*(*display)).type_id() == TypeId::of::<Gtk>() {
+            // since we now know display is a &Box<Gtk>, we can do a cast to it
             let t = unsafe { &*(display as *const dyn Any as *const Box<Gtk>) };
 
             // and return a clone wrapped in an Option<>
             Some(t.deref().clone())
         } else {
-            // display is not an &Box<Gtk>, so return None
+            // display is not a &Box<Gtk>, so return None
             None
         }
     }
@@ -455,38 +453,38 @@ mod tests {
             "-accel kvm",
             "-nodefaults",
             "-monitor unix:/var/ezkvm/windows_desktop_config.monitor,server,nowait",
-            "-chardev socket,id=qmp,path=/var/ezkvm/windows_desktop_config.qmp,server=on,wait=off", 
-            "-mon chardev=qmp,mode=control", 
-            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5", 
-            "-mon chardev=qmp-event,mode=control", 
-            "-machine hpet=off,type=pc-q35-8.1", 
-            "-rtc driftfix=slew,base=localtime", 
-            "-global kvm-pit.lost_tick_policy=discard", 
-            "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg", 
-            "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b", 
-            "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b", 
+            "-chardev socket,id=qmp,path=/var/ezkvm/windows_desktop_config.qmp,server=on,wait=off",
+            "-mon chardev=qmp,mode=control",
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon chardev=qmp-event,mode=control",
+            "-machine hpet=off,type=pc-q35-8.1",
+            "-rtc driftfix=slew,base=localtime",
+            "-global kvm-pit.lost_tick_policy=discard",
+            "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
+            "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
             "-boot menu=on,strict=on,reboot-timeout=1000",
-            "-smbios type=1,uuid=181f1a56-e0e2-42d1-a916-bc16dd415a59", 
+            "-smbios type=1,uuid=181f1a56-e0e2-42d1-a916-bc16dd415a59",
             "-drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ezkvm/OVMF_CODE_4M.secboot.fd",
-            "-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-111-efidisk,size=540672", 
-            "-m 16384", 
-            "-smp 8,sockets=1,cores=8,maxcpus=8", 
-            "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce", 
-            "-chardev socket,id=chrtpm0,path=/var/ezkvm/windows_desktop_config-tpm.socket", 
-            "-tpmdev emulator,id=tpm0,chardev=chrtpm0", 
-            "-device tpm-tis,tpmdev=tpm0", 
-            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2", 
-            "-spice unix=on,addr=/var/ezkvm/windows_desktop_config-spice.socket,disable-ticketing=on", 
-            "-device virtio-serial-pci", 
-            "-chardev spicevmc,id=vdagent,name=vdagent", 
-            "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0", 
-            "-audiodev spice,id=spice-backend0", 
-            "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc", 
+            "-drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-111-efidisk,size=540672",
+            "-m 16384",
+            "-smp 8,sockets=1,cores=8,maxcpus=8",
+            "-cpu qemu64,+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce",
+            "-chardev socket,id=chrtpm0,path=/var/ezkvm/windows_desktop_config-tpm.socket",
+            "-tpmdev emulator,id=tpm0,chardev=chrtpm0",
+            "-device tpm-tis,tpmdev=tpm0",
+            "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2",
+            "-spice unix=on,addr=/var/ezkvm/windows_desktop_config-spice.socket,disable-ticketing=on",
+            "-device virtio-serial-pci",
+            "-chardev spicevmc,id=vdagent,name=vdagent",
+            "-device virtserialport,chardev=vdagent,name=com.redhat.spice.0",
+            "-audiodev spice,id=spice-backend0",
+            "-device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc",
             "-device hda-duplex,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0",
             "-device pvscsi,id=pvscsi0,bus=pci.0,addr=0",
-            "-drive id=drive-pvscsi0,file=/dev/vm1/vm-111-boot,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap", 
-            "-device scsi-hd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0,boot_index=0", 
-            "-netdev type=bridge,br=vmbr0,id=netdev0", 
+            "-drive id=drive-pvscsi0,file=/dev/vm1/vm-111-boot,if=none,discard=on,format=raw,cache=none,detect-zeroes=unmap",
+            "-device scsi-hd,id=scsi0,scsi-id=0,drive=drive-pvscsi0,bus=pvscsi0.0,boot_index=0",
+            "-netdev type=bridge,br=vmbr0,id=netdev0",
             "-device virtio-net-pci,id=net0,bus=pci.1,addr=0x0,netdev=netdev0,mac=BC:24:11:3A:21:7B"
         ];
 
@@ -667,8 +665,9 @@ mod tests {
 
     #[test]
     fn test_has_no_gtk_display_configured() {
+        let expected = false;
         let config: Config = serde_yaml::from_str(WINDOWS_GAMING_CONFIG).unwrap();
-        assert_eq!(config.has_gtk_display_configured(), false)
+        assert_eq!(config.has_gtk_display_configured(), expected)
     }
 
     #[test]
@@ -746,57 +745,60 @@ mod tests {
 
         let _config = Config::read("wakiza").unwrap();
     }
-}
 
-/// helper function to compare argument lists independent of order
-#[allow(unused)]
-pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<&str>) {
-    assert_eq!(actual.len(), expected.len());
-    actual.sort();
-    expected.sort();
-    let mut count = 0;
-    while count < actual.len() {
-        assert_eq!(actual[count], expected[count]);
-        count += 1;
+    /// helper function to compare argument lists independent of order
+    #[allow(unused)]
+    pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<&str>) {
+        assert_eq!(actual.len(), expected.len());
+        actual.sort();
+        expected.sort();
+        let mut count = 0;
+        while count < actual.len() {
+            assert_eq!(actual[count], expected[count]);
+            count += 1;
+        }
     }
-}
 
-/// helper function to compare argument options independent of order
-#[allow(unused)]
-pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
-    // arguments take the form '-<argument> [option,...]'
-    // so split them further
-    let actual_split: Vec<String> = actual.split_whitespace().map(str::to_string).collect();
-    let expected_split: Vec<String> = expected.split_whitespace().map(str::to_string).collect();
-    assert_eq!(actual_split.len(), expected_split.len());
-
-    // there should be at most one space, so length after splitting must be 1 or 2
-    assert!(actual_split.len() == 1 || actual_split.len() == 2);
-
-    // the argument itself must match
-    let actual_left = actual_split.get(0).unwrap().clone();
-    let expected_left = expected_split.get(0).unwrap().clone();
-    assert_eq!(actual_left, expected_left);
-
-    // if there are options, then split them
-    if actual_split.len() == 2 {
-        let mut actual_split: Vec<String> = actual_split
-            .get(1)
-            .unwrap()
-            .split(",")
-            .map(str::to_string)
-            .collect();
-        let mut expected_split: Vec<String> = expected_split
-            .get(1)
-            .unwrap()
-            .split(",")
-            .map(str::to_string)
-            .collect();
-
-        // for the first option in the arguments, order may still be relevant, so compare those first, and the rest after sorting
-        assert_eq!(actual_split.get(0).unwrap(), expected_split.get(0).unwrap());
-        actual_split.sort();
-        expected_split.sort();
+    /// helper function to compare argument options independent of order
+    #[allow(unused)]
+    pub fn assert_arguments_are_equal(actual: &str, expected: &str) {
+        // arguments take the form '-<argument> [option,...]'
+        // so split them further
+        let actual_split: Vec<String> = actual.split_whitespace().map(str::to_string).collect();
+        let expected_split: Vec<String> = expected.split_whitespace().map(str::to_string).collect();
         assert_eq!(actual_split.len(), expected_split.len());
+
+        // there should be at most one space, so length after splitting must be 1 or 2
+        assert!(actual_split.len() == 1 || actual_split.len() == 2);
+
+        // the argument itself must match
+        let actual_left = actual_split.first().unwrap().clone();
+        let expected_left = expected_split.first().unwrap().clone();
+        assert_eq!(actual_left, expected_left);
+
+        // if there are options, then split them
+        if actual_split.len() == 2 {
+            let mut actual_split: Vec<String> = actual_split
+                .get(1)
+                .unwrap()
+                .split(",")
+                .map(str::to_string)
+                .collect();
+            let mut expected_split: Vec<String> = expected_split
+                .get(1)
+                .unwrap()
+                .split(",")
+                .map(str::to_string)
+                .collect();
+
+            // for the first option in the arguments, order may still be relevant, so compare those first, and the rest after sorting
+            assert_eq!(
+                actual_split.first().unwrap(),
+                expected_split.first().unwrap()
+            );
+            actual_split.sort();
+            expected_split.sort();
+            assert_eq!(actual_split.len(), expected_split.len());
+        }
     }
 }
