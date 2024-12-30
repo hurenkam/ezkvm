@@ -35,14 +35,3 @@ chmod +s /usr/lib/qemu/qemu-bridge-helper
 ln -s /usr/share/OVMF/OVMF_CODE.fd /usr/share/ezkvm/OVMF_CODE.fd
 ln -s /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/ezkvm/OVMF_CODE_4M.fd
 ln -s /usr/share/OVMF/OVMF_CODE_4M.secboot.fd /usr/share/ezkvm/OVMF_CODE_4M.secboot.fd
-
-# Create the vmbr0 bridge using NetworkManager
-# Both EndeavorOS gemini as well as ubuntu 24.04 use
-# this by default, and so this should work for these
-# distro's. Other distro's may require manual intervention
-nmcli connection add type bridge ifname vmbr0 stp no
-nmcli connection up bridge-vmbr0
-nmcli connection modify bridge-vmbr0 ipv4.address 192.168.92.1
-nmcli connection modify bridge-vmbr0 ipv4.method manual
-nmcli connection up bridge-vmbr0
-

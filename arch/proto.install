@@ -38,16 +38,6 @@ post_install() {
     ln -s /usr/share/edk2/x64/OVMF_CODE.4m.fd /usr/share/ezkvm/OVMF_CODE_4M.fd
     ln -s /usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd /usr/share/ezkvm/OVMF_CODE_4M.secboot.fd
 
-    # Create the vmbr0 bridge using NetworkManager
-    # Both EndeavorOS gemini as well as ubuntu 24.04 use
-    # this by default, and so this should work for these
-    # distro's. Other distro's may require manual intervention
-    nmcli connection add type bridge ifname vmbr0 stp no
-    nmcli connection up bridge-vmbr0
-    nmcli connection modify bridge-vmbr0 ipv4.address 192.168.92.1
-    nmcli connection modify bridge-vmbr0 ipv4.method manual
-    nmcli connection up bridge-vmbr0
-
     # Since ezkvm is aimed at using proxmox vm's on other
     # distro's, the following rules will give read/write
     # access for the proxmxox vm drives to members of the
@@ -75,7 +65,6 @@ post_remove() {
     rm  -f /etc/qemu/bridge.conf
     rm -f /etc/udev/rules.d/92_ezkvm.rules
     rm -f /etc/security/limits.d/92_ezkvm.conf
-    nmcli connection delete bridge-vmbr0
     chmod -s /usr/lib/qemu/qemu-bridge-helper
 }
 

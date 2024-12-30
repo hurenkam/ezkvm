@@ -10,7 +10,6 @@ case $# in
 		rm -f /etc/security/limits.d/92-ezkvm.conf
 		rm -rf /var/ezkvm
 		rm -rf /usr/share/ezkvm
-		nmcli connection delete bridge-vmbr0
 		chmod -s /usr/lib/qemu/qemu-bridge-helper
 		;;
 
