@@ -104,7 +104,7 @@ There are currently 10 sections defined in the config file.
     raw qemu arguments can be listed that are to be appended at the end.
 
 Example configuration file:
-(more examples can be found [here](etc))
+(more examples can be found [here](/etc))
 
 ```
 general:
