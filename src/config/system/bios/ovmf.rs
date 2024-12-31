@@ -3,8 +3,6 @@ use crate::config::types::QemuDevice;
 use crate::{optional_value_getter, required_value_getter};
 use paste::paste;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::LazyLock;
 
 const OVMF64_2M_BOOT_ROM: &str = "/usr/share/ezkvm/OVMF_CODE.fd";
 const OVMF64_2M_SECURE_BOOT_ROM: &str = "/usr/share/ezkvm/OVMF_CODE.secboot.fd";
@@ -21,20 +19,16 @@ pub enum OVMFArch {
     Arch32,
 }
 #[derive(Deserialize, Serialize, Default, Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[repr(usize)]
 pub enum OVMFSize {
+    #[serde(rename = "2M")]
+    Size2M = 0,
     #[default]
     #[serde(rename = "4M")]
-    Size4M,
-    #[serde(rename = "2M")]
-    Size2M,
+    Size4M = 1,
 }
-static OVMF_SIZE: LazyLock<HashMap<OVMFSize, (u64, u64)>> = LazyLock::new(|| {
-    HashMap::from([
-        // type                 rom  settings
-        (OVMFSize::Size2M, (1966080, 131072)),
-        (OVMFSize::Size4M, (3653632, 540672)),
-    ])
-});
+const OVMF_ROM_SIZE: [usize; 2] = [1966080, 3653632];
+const OVMF_VAR_SIZE: [usize; 2] = [131072, 540672];
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone, PartialEq)]
 #[serde(default)]
@@ -90,12 +84,10 @@ impl OVMF {
                     } else {
                         OVMF64_4M_BOOT_ROM
                     }
+                } else if secure_boot {
+                    OVMF64_2M_SECURE_BOOT_ROM
                 } else {
-                    if secure_boot {
-                        OVMF64_2M_SECURE_BOOT_ROM
-                    } else {
-                        OVMF64_2M_BOOT_ROM
-                    }
+                    OVMF64_2M_BOOT_ROM
                 }
             }
         };
@@ -107,8 +99,11 @@ impl OVMF {
     }
     fn settings_size(&self) -> String {
         match &self.size {
-            None => format!(",size={}", OVMF_SIZE.get(&OVMFSize::Size4M).unwrap().1),
-            Some(value) => format!(",size={}", OVMF_SIZE.get(value).unwrap().1),
+            None => format!(
+                ",size={}",
+                OVMF_VAR_SIZE.get(OVMFSize::Size4M as usize).unwrap()
+            ),
+            Some(value) => format!(",size={}", OVMF_VAR_SIZE.get(*value as usize).unwrap()),
         }
     }
 }
