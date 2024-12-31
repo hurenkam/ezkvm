@@ -12,14 +12,15 @@ Pre-built packages for arch and debian can be found for released versions in the
 
 ## Documentation
 
-- [STATUS](doc/STATUS.md)
-- [ROADMAP](doc/ROADMAP.md)
+- [Status](doc/STATUS.md)
+- [Roadmap](doc/ROADMAP.md)
 
 ### For users
 
-- [USER_MANUAL](doc/USER_MANUAL.md)
+- [User Manual](doc/USER_MANUAL.md)
+- [Network Bridge](doc/NETWORK_BRIDGE.md)
 
 ### For developers
 
-- [BUILDING](doc/BUILDING.md)
-- [CONTRIBUTING](doc/CONTRIBUTING.md)
+- [Building](doc/BUILDING.md)
+- [Contributing](doc/CONTRIBUTING.md)

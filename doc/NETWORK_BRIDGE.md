@@ -52,6 +52,7 @@ iptables -t nat -A EZKVM_PRT -s ${NET} ! -d ${NET} -p tcp -j MASQUERADE --to-por
 iptables -t nat -A EZKVM_PRT -s ${NET} ! -d ${NET} -p udp -j MASQUERADE --to-ports ${PORTS}
 iptables -t nat -A EZKVM_PRT -s ${NET} ! -d ${NET} -j MASQUERADE
 
+# Start the dhcp server
 touch /var/ezkvm/dhcpd.vmbr0.lease
 dhcpd -cf /etc/ezkvm/dhcpd.vmbr0.conf -pf /var/ezkvm/dhcpd.vmbr0.pid -lf /var/ezkvm/dhcpd.vmbr0.lease
 ```
