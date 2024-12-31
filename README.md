@@ -17,8 +17,10 @@ Pre-built packages for arch and debian can be found for released versions in the
 
 ### For users
 
-- [User Manual](doc/USER_MANUAL.md)
+- [Installation](doc/INSTALLATION.md)
 - [Network Bridge](doc/NETWORK_BRIDGE.md)
+- [Configuration](doc/CONFIGURATION.md)
+- [User Manual](doc/USER_MANUAL.md)
 
 ### For developers
 
