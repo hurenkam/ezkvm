@@ -51,18 +51,14 @@ impl Spice {
     ) -> Self {
         Self {
             socket: SpiceSocket::TcpPort { addr, port },
-            display: SpiceDisplay::Enabled {
-                render_node: render_node,
-            },
+            display: SpiceDisplay::Enabled { render_node },
         }
     }
 
     pub fn new_with_socket_and_render_node(path: String, render_node: Option<String>) -> Self {
         Self {
             socket: SpiceSocket::UnixSocket { path },
-            display: SpiceDisplay::Enabled {
-                render_node: render_node,
-            },
+            display: SpiceDisplay::Enabled { render_node },
         }
     }
 }

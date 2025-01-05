@@ -1,10 +1,10 @@
+use crate::osal::OsalError;
 use crate::resource::resource::Resource;
 use log::debug;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use crate::osal::OsalError;
 
 #[derive(Debug, Deserialize)]
 pub struct ResourcePool {
@@ -24,8 +24,8 @@ impl ResourcePool {
         file.read_to_string(&mut contents)
             .expect("Unable to read file");
 
-        let resource_pool: ResourcePool =
-            serde_yaml::from_str(contents.as_str()).map_err(|_| OsalError::ParseError(Some(name.to_string())))?;
+        let resource_pool: ResourcePool = serde_yaml::from_str(contents.as_str())
+            .map_err(|_| OsalError::ParseError(Some(name.to_string())))?;
         Ok(resource_pool)
     }
 
@@ -52,12 +52,8 @@ impl ResourcePool {
     }
 
     pub fn get_resource(&self, id: &String) -> Option<&Resource> {
-        for resource in &self.devices {
-            if resource.get_id() == *id {
-                return Some(resource);
-            }
-        }
-
-        None
+        self.devices
+            .iter()
+            .find(|resource| resource.get_id() == *id)
     }
 }

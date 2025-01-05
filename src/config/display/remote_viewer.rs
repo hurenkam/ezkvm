@@ -1,7 +1,7 @@
 use crate::config::display::Display;
 use crate::config::spice::SpiceSocket;
 use crate::config::types::QemuDevice;
-use crate::config::vnc::VNCSocket;
+use crate::config::vnc::VncSocket;
 use crate::config::Config;
 use crate::osal::{Osal, OsalError};
 use derive_getters::Getters;
@@ -43,10 +43,10 @@ impl RemoteViewer {
         match config.vnc() {
             None => {}
             Some(vnc) => match vnc.socket() {
-                VNCSocket::TcpPort { addr, port } => {
+                VncSocket::TcpPort { addr, port } => {
                     result.extend(vec![format!("vnc://{}:{}", addr, port)])
                 }
-                VNCSocket::UnixSocket { path, .. } => {
+                VncSocket::UnixSocket { path, .. } => {
                     result.extend(vec![format!("vnc+unix://{}", path)])
                 }
             },
@@ -82,7 +82,7 @@ impl QemuDevice for RemoteViewer {
     }
 
     fn post_start(&self, config: &Config) {
-        match self.start(&config) {
+        match self.start(config) {
             Ok(_child) => debug!("RemoteViewer::post_start() succeeded"),
             Err(_error) => warn!("RemoteViewer::post_start() failed"),
         }

@@ -1,11 +1,11 @@
 mod ovmf;
 mod seabios;
 
+use crate::config::types::QemuDevice;
 #[allow(unused)]
-pub use ovmf::{OVMF, OVMFArch, OVMFSize};
+pub use ovmf::{Ovmf, OvmfArch, OvmfSize};
 #[allow(unused)]
 pub use seabios::SeaBios;
-use crate::config::types::QemuDevice;
 
 #[typetag::deserialize(tag = "type")]
 pub trait Bios: QemuDevice {}

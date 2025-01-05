@@ -4,13 +4,13 @@ use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Deserialize)]
 #[serde(untagged)]
-pub enum VNCSocket {
+pub enum VncSocket {
     TcpPort { addr: String, port: u16 },
     UnixSocket { path: String },
 }
-impl Default for VNCSocket {
+impl Default for VncSocket {
     fn default() -> Self {
-        VNCSocket::TcpPort {
+        VncSocket::TcpPort {
             addr: "127.0.0.1".to_string(),
             port: 5900,
         }
@@ -19,37 +19,37 @@ impl Default for VNCSocket {
 
 #[derive(Debug, PartialEq, Default, Deserialize, Getters)]
 #[serde(default)]
-pub struct VNC {
+pub struct Vnc {
     #[serde(default, flatten, deserialize_with = "default_when_missing")]
-    socket: VNCSocket,
+    socket: VncSocket,
 }
 
-impl VNC {
+impl Vnc {
     pub fn new_with_address_and_port(addr: String, port: u16) -> Self {
         Self {
-            socket: VNCSocket::TcpPort { addr, port },
+            socket: VncSocket::TcpPort { addr, port },
         }
     }
 
     pub fn new_with_socket(path: String) -> Self {
         Self {
-            socket: VNCSocket::UnixSocket { path },
+            socket: VncSocket::UnixSocket { path },
         }
     }
 }
 
-impl QemuDevice for VNC {
+impl QemuDevice for Vnc {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
         match self.socket {
-            VNCSocket::TcpPort { ref addr, ref port } => {
+            VncSocket::TcpPort { ref addr, ref port } => {
                 result.extend(vec![
                     format!("-vnc {}:{}", addr, port),
                     "-display vnc=:0".to_string(),
                 ]);
             }
 
-            VNCSocket::UnixSocket { ref path } => {
+            VncSocket::UnixSocket { ref path } => {
                 result.extend(vec![format!("-vnc unix:{}", path)]);
             }
         }
@@ -61,12 +61,12 @@ impl QemuDevice for VNC {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::VNC;
+    use crate::config::Vnc;
     #[test]
     fn test_defaults() {
         let input = r#""#;
 
-        let data = VNC {
+        let data = Vnc {
             socket: Default::default(),
         };
 
@@ -75,7 +75,7 @@ mod tests {
             "-display vnc=:0".to_string(),
         ];
 
-        assert_eq!(serde_yaml::from_str::<VNC>(input).unwrap(), data);
+        assert_eq!(serde_yaml::from_str::<Vnc>(input).unwrap(), data);
         assert_eq!(data.get_qemu_args(0), output);
     }
 
@@ -85,15 +85,15 @@ mod tests {
             path: /var/ezkvm/unix.socket
         "#;
 
-        let data = VNC {
-            socket: VNCSocket::UnixSocket {
+        let data = Vnc {
+            socket: VncSocket::UnixSocket {
                 path: "/var/ezkvm/unix.socket".to_string(),
             },
         };
 
         let output: Vec<String> = vec!["-vnc unix:/var/ezkvm/unix.socket".to_string()];
 
-        assert_eq!(serde_yaml::from_str::<VNC>(input).unwrap(), data);
+        assert_eq!(serde_yaml::from_str::<Vnc>(input).unwrap(), data);
         assert_eq!(data.get_qemu_args(0), output);
     }
 }

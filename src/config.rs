@@ -30,7 +30,7 @@ pub use system::System;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
-pub use vnc::VNC;
+pub use vnc::Vnc;
 
 #[macro_export]
 macro_rules! optional_value_getter {
@@ -105,7 +105,7 @@ pub struct Config {
     #[serde(default, deserialize_with = "default_when_missing")]
     spice: Option<Spice>,
     #[serde(default, deserialize_with = "default_when_missing")]
-    vnc: Option<VNC>,
+    vnc: Option<Vnc>,
     #[serde(default, deserialize_with = "default_when_missing")]
     host: Option<Host>,
     #[serde(default)]

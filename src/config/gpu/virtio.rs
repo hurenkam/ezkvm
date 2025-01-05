@@ -18,12 +18,12 @@ impl Default for PciAddress {
 #[serde(rename_all = "snake_case")]
 pub enum HardwareAddress {
     #[serde(rename = "pci")]
-    PCI {
+    Pci {
         #[serde(default, deserialize_with = "default_when_missing", flatten)]
         address: PciAddress,
     },
     #[serde(rename = "pcie")]
-    PCIE {
+    Pcie {
         #[serde(default, deserialize_with = "default_when_missing", flatten)]
         address: PciAddress,
     },
@@ -53,10 +53,10 @@ fn no() -> Boolean {
 impl HardwareAddress {
     pub fn get_options(&self) -> String {
         match self {
-            HardwareAddress::PCI { address } => {
+            HardwareAddress::Pci { address } => {
                 format!(",bus=pci.{},addr={}", address.bus, address.address)
             }
-            HardwareAddress::PCIE { address } => {
+            HardwareAddress::Pcie { address } => {
                 format!(",bus=pcie.{},addr={}", address.bus, address.address)
             }
         }
@@ -116,7 +116,7 @@ mod tests {
         )
         .unwrap();
         let gpu = Virtio {
-            address: Some(HardwareAddress::PCI {
+            address: Some(HardwareAddress::Pci {
                 address: PciAddress { bus: 1, address: 0 },
             }),
             vga: Boolean::Yes,
@@ -138,7 +138,7 @@ mod tests {
         )
         .unwrap();
         let gpu = Virtio {
-            address: Some(HardwareAddress::PCIE {
+            address: Some(HardwareAddress::Pcie {
                 address: PciAddress { bus: 0, address: 2 },
             }),
             vga: Boolean::Yes,
@@ -160,7 +160,7 @@ mod tests {
         )
         .unwrap();
         let gpu = Virtio {
-            address: Some(HardwareAddress::PCIE {
+            address: Some(HardwareAddress::Pcie {
                 address: PciAddress { bus: 0, address: 2 },
             }),
             vga: Boolean::Yes,

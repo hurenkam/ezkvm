@@ -18,22 +18,22 @@ pub struct NetworkItem {
 
 impl QemuDevice for NetworkItem {
     fn pre_start(&self, config: &Config) {
-        self.payload.pre_start(&self, config);
+        self.payload.pre_start(self, config);
     }
     fn post_start(&self, config: &Config) {
-        self.payload.post_start(&self, config);
+        self.payload.post_start(self, config);
     }
     fn pre_stop(&self, config: &Config) {
-        self.payload.pre_stop(&self, config);
+        self.payload.pre_stop(self, config);
     }
     fn post_stop(&self, config: &Config) {
-        self.payload.post_stop(&self, config);
+        self.payload.post_stop(self, config);
     }
     fn pre_hibernate(&self, config: &Config) {
-        self.payload.pre_hibernate(&self, config);
+        self.payload.pre_hibernate(self, config);
     }
     fn post_hibernate(&self, config: &Config) {
-        self.payload.post_hibernate(&self, config);
+        self.payload.post_hibernate(self, config);
     }
 
     fn get_qemu_args(&self, index: usize) -> Vec<String> {
@@ -48,10 +48,10 @@ impl QemuDevice for NetworkItem {
         device_args.extend(self.footer().get_device_options(index));
 
         let mut result = vec![];
-        if netdev_args.len() > 0 {
+        if !netdev_args.is_empty() {
             result.push(format!("-netdev {}", netdev_args.join(",")));
         }
-        if device_args.len() > 0 {
+        if !device_args.is_empty() {
             result.push(format!("-device {}", device_args.join(",")));
         }
 

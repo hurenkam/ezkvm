@@ -1,4 +1,5 @@
-use crate::resource::lock::{Lock};
+use crate::osal::OsalError;
+use crate::resource::lock::Lock;
 use crate::resource::resource::Resource;
 use crate::resource::resource_pool::ResourcePool;
 use log::{debug, info};
@@ -6,7 +7,6 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::{Arc, Mutex};
-use crate::osal::OsalError;
 
 static RESOURCE_MANAGER: Lazy<Arc<Mutex<DataManager>>> =
     Lazy::new(|| Arc::new(Mutex::new(DataManager::new("/etc/ezkvm/resource"))));
@@ -87,15 +87,13 @@ fn load_resource_pools() -> Result<HashMap<String, ResourcePool>, OsalError> {
     debug!("read_locks()");
     let mut resource_pools = HashMap::from([]);
 
-    let files = fs::read_dir("/etc/ezkvm/resources/").map_err(|_| OsalError::OpenError(None) )?;
-    for file in files {
-        if let Ok(entry) = file {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                if let Some(base_name) = file_name.strip_suffix(".yaml") {
-                    debug!("load_resource_pools(): {:?}", base_name);
-                    if let Ok(resource_pool) = ResourcePool::read(base_name) {
-                        resource_pools.insert(base_name.to_string(), resource_pool);
-                    }
+    let files = fs::read_dir("/etc/ezkvm/resources/").map_err(|_| OsalError::OpenError(None))?;
+    for entry in files.flatten() {
+        if let Ok(file_name) = entry.file_name().into_string() {
+            if let Some(base_name) = file_name.strip_suffix(".yaml") {
+                debug!("load_resource_pools(): {:?}", base_name);
+                if let Ok(resource_pool) = ResourcePool::read(base_name) {
+                    resource_pools.insert(base_name.to_string(), resource_pool);
                 }
             }
         }
@@ -109,14 +107,12 @@ fn load_machine_locks() -> Result<HashMap<String, Lock>, OsalError> {
     let mut locks = HashMap::from([]);
 
     let files = fs::read_dir("/var/ezkvm/lock/").map_err(|_| OsalError::OpenError(None))?;
-    for file in files {
-        if let Ok(entry) = file {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                if let Some(base_name) = file_name.strip_suffix(".yaml") {
-                    debug!("LockList::read(): {:?}", base_name);
-                    if let Ok(lock) = Lock::read(base_name) {
-                        locks.insert(base_name.to_string(), lock);
-                    }
+    for entry in files.flatten() {
+        if let Ok(file_name) = entry.file_name().into_string() {
+            if let Some(base_name) = file_name.strip_suffix(".yaml") {
+                debug!("LockList::read(): {:?}", base_name);
+                if let Ok(lock) = Lock::read(base_name) {
+                    locks.insert(base_name.to_string(), lock);
                 }
             }
         }
@@ -131,7 +127,7 @@ fn find_locked_resources(
 ) -> HashMap<String, String> {
     let mut result = HashMap::from([]);
 
-    for (_, lock) in locks {
+    for lock in locks.values() {
         for locked_resource in lock.resources() {
             result.insert(locked_resource.clone(), lock.name().clone());
         }

@@ -11,7 +11,7 @@ const OVMF64_4M_SECURE_BOOT_ROM: &str = "/usr/share/ezkvm/OVMF_CODE_4M.secboot.f
 const OVMF32_BOOT_ROM: &str = "/usr/share/ezkvm/OVMF32_CODE_4M.fd";
 
 #[derive(Deserialize, Serialize, Default, Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub enum OVMFArch {
+pub enum OvmfArch {
     #[default]
     #[serde(rename = "64bit")]
     Arch64,
@@ -20,32 +20,34 @@ pub enum OVMFArch {
 }
 #[derive(Deserialize, Serialize, Default, Debug, Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(usize)]
-pub enum OVMFSize {
+pub enum OvmfSize {
     #[serde(rename = "2M")]
     Size2M = 0,
     #[default]
     #[serde(rename = "4M")]
     Size4M = 1,
 }
+#[allow(dead_code)]
 const OVMF_ROM_SIZE: [usize; 2] = [1966080, 3653632];
+#[allow(dead_code)]
 const OVMF_VAR_SIZE: [usize; 2] = [131072, 540672];
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone, PartialEq)]
 #[serde(default)]
-pub struct OVMF {
-    #[serde(default = "OVMF::settings_file_default", rename = "file")]
+pub struct Ovmf {
+    #[serde(default = "Ovmf::settings_file_default", rename = "file")]
     settings_file: String,
     #[serde(default)]
     uuid: Option<String>,
     #[serde(default)]
-    arch: Option<OVMFArch>,
+    arch: Option<OvmfArch>,
     #[serde(default)]
-    size: Option<OVMFSize>,
-    #[serde(default = "OVMF::secure_boot_default")]
+    size: Option<OvmfSize>,
+    #[serde(default = "Ovmf::secure_boot_default")]
     secure_boot: Option<bool>,
 }
 
-impl OVMF {
+impl Ovmf {
     required_value_getter!(settings_file("file"): String = "NO_SETTINGS_FILE_PROVIDED".to_string());
     optional_value_getter!(uuid("uuid"): String);
 
@@ -57,8 +59,8 @@ impl OVMF {
     pub fn new(
         settings_file: String,
         uuid: Option<String>,
-        arch: Option<OVMFArch>,
-        size: Option<OVMFSize>,
+        arch: Option<OvmfArch>,
+        size: Option<OvmfSize>,
         secure_boot: Option<bool>,
     ) -> Self {
         Self {
@@ -73,12 +75,12 @@ impl OVMF {
     fn boot_rom_file(&self) -> String {
         let arch = self.arch.unwrap_or_default();
         let result = match arch {
-            OVMFArch::Arch32 => OVMF32_BOOT_ROM,
-            OVMFArch::Arch64 => {
+            OvmfArch::Arch32 => OVMF32_BOOT_ROM,
+            OvmfArch::Arch64 => {
                 let size = self.size.unwrap_or_default();
                 let secure_boot = self.secure_boot.unwrap_or_default();
 
-                if size == OVMFSize::Size4M {
+                if size == OvmfSize::Size4M {
                     if secure_boot {
                         OVMF64_4M_SECURE_BOOT_ROM
                     } else {
@@ -101,13 +103,13 @@ impl OVMF {
         match &self.size {
             None => format!(
                 ",size={}",
-                OVMF_VAR_SIZE.get(OVMFSize::Size4M as usize).unwrap()
+                OVMF_VAR_SIZE.get(OvmfSize::Size4M as usize).unwrap()
             ),
             Some(value) => format!(",size={}", OVMF_VAR_SIZE.get(*value as usize).unwrap()),
         }
     }
 }
-impl QemuDevice for OVMF {
+impl QemuDevice for Ovmf {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
             "-boot menu=on,strict=on,reboot-timeout=1000".to_string(),
@@ -126,7 +128,7 @@ impl QemuDevice for OVMF {
     }
 }
 #[typetag::deserialize(name = "ovmf")]
-impl Bios for OVMF {}
+impl Bios for Ovmf {}
 
 #[cfg(test)]
 mod tests {
@@ -134,19 +136,19 @@ mod tests {
 
     #[test]
     fn test_defaults() {
-        let actual: OVMF = serde_yaml::from_str(
+        let actual: Ovmf = serde_yaml::from_str(
             r#"
             "#,
         )
         .unwrap();
         let converted = serde_yaml::to_string(&actual).unwrap();
         println!("{}", converted);
-        let ovmf = OVMF {
-            settings_file: OVMF::settings_file_default(),
+        let ovmf = Ovmf {
+            settings_file: Ovmf::settings_file_default(),
             uuid: None,
             arch: None,
             size: None,
-            secure_boot: OVMF::secure_boot_default(),
+            secure_boot: Ovmf::secure_boot_default(),
         };
         assert_eq!(actual, ovmf);
 
@@ -159,7 +161,7 @@ mod tests {
     }
     #[test]
     fn test_valid() {
-        let actual: OVMF = serde_yaml::from_str(
+        let actual: Ovmf = serde_yaml::from_str(
             r#"
                     file: "the_file"
                     uuid: "the_uuid"
@@ -169,11 +171,11 @@ mod tests {
                 "#,
         )
         .unwrap();
-        let ovmf = OVMF {
+        let ovmf = Ovmf {
             settings_file: "the_file".to_string(),
             uuid: Some("the_uuid".to_string()),
-            arch: Some(OVMFArch::Arch64),
-            size: Some(OVMFSize::Size2M),
+            arch: Some(OvmfArch::Arch64),
+            size: Some(OvmfSize::Size2M),
             secure_boot: Some(false),
         };
         assert_eq!(actual, ovmf);

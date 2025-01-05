@@ -1,4 +1,5 @@
 use crate::config::display::Display;
+use crate::config::spice::SpiceSocket;
 use crate::config::types::QemuDevice;
 use crate::config::{default_when_missing, Config};
 use crate::osal::{Osal, OsalError};
@@ -7,7 +8,6 @@ use log::{debug, warn};
 use serde::Deserialize;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Child, Command};
-use crate::config::spice::SpiceSocket;
 
 #[derive(Deserialize, Debug, Getters)]
 pub struct LookingGlass {
@@ -36,23 +36,17 @@ impl LookingGlass {
             ]),
         }
         match config.spice() {
-            None => {},
-            Some(spice) => {
-                match spice.socket() {
-                    SpiceSocket::TcpPort { addr, port } => {
-                        result.extend(vec![
-                            format!("spice:host={}", addr),
-                            format!("spice:port={}", port),
-                        ])
-                    },
-                    SpiceSocket::UnixSocket { path, .. } => {
-                        result.extend(vec![
-                            format!("spice:host={}", path),
-                            format!("spice:port={}", 0),
-                        ])
-                    }
-                }
-            }
+            None => {}
+            Some(spice) => match spice.socket() {
+                SpiceSocket::TcpPort { addr, port } => result.extend(vec![
+                    format!("spice:host={}", addr),
+                    format!("spice:port={}", port),
+                ]),
+                SpiceSocket::UnixSocket { path, .. } => result.extend(vec![
+                    format!("spice:host={}", path),
+                    format!("spice:port={}", 0),
+                ]),
+            },
         }
 
         result
@@ -87,7 +81,7 @@ impl QemuDevice for LookingGlass {
     }
 
     fn post_start(&self, config: &Config) {
-        match self.start_lg_client(&config) {
+        match self.start_lg_client(config) {
             Ok(_child) => debug!("LookingGlass::post_start() succeeded"),
             Err(_error) => warn!("LookingGlass::post_start() failed"),
         }

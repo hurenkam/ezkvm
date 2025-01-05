@@ -76,7 +76,7 @@ fn load_pool(file: &str) -> ResourcePool {
     serde_yaml::from_str(contents.as_str()).unwrap()
 }
 
-fn start_vm(name: &String, config: &Config) -> Result<Lock, OsalError> {
+fn start_vm(name: &str, config: &Config) -> Result<Lock, OsalError> {
     debug!("start_vm()");
 
     let (uid, gid) = config.get_escalated_uid_and_gid();
@@ -96,7 +96,7 @@ fn start_vm(name: &String, config: &Config) -> Result<Lock, OsalError> {
         Command::new("/usr/bin/env").args(args).uid(uid).gid(gid),
         Some("qemu".to_string()),
     ) {
-        Ok(child) => Ok(Lock::new(name.clone(), child.id(), resources)),
+        Ok(child) => Ok(Lock::new(name.to_string(), child.id(), resources)),
         Err(error) => Err(error),
     }
 }
@@ -124,9 +124,7 @@ fn init_logger(log_level: LevelFilter) {
                 Level::Info => {
                     format!("{}", line.bold())
                 }
-                Level::Debug => {
-                    format!("{}", line)
-                }
+                Level::Debug => line.to_string(),
                 Level::Trace => {
                     format!("{}", line.dimmed())
                 }
