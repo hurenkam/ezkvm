@@ -1,6 +1,6 @@
 use crate::config::default_when_missing;
 use crate::config::gpu::Gpu;
-use crate::config::types::QemuDevice;
+use crate::config::types::{Boolean, QemuDevice};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -27,14 +27,6 @@ pub enum HardwareAddress {
         #[serde(default, deserialize_with = "default_when_missing", flatten)]
         address: PciAddress,
     },
-}
-
-#[derive(Deserialize, Serialize, Default, Debug, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Boolean {
-    #[default]
-    Yes,
-    No,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]

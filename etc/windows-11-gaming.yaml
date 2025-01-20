@@ -1,5 +1,7 @@
 general:
   name: windows-11-gaming
+  agent: no
+  monitor: no
 
 system:
   chipset: { type: "q35", version: "8.1" }
