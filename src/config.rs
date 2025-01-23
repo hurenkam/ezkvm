@@ -215,8 +215,8 @@ impl Config {
 impl QemuDevice for Config {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let mut result = vec![];
-        result.extend(self.general.get_qemu_args(0));
         result.extend(self.system.get_qemu_args(0));
+        result.extend(self.general.get_qemu_args(0));
         result.extend(self.display.get_qemu_args(0));
         result.extend(self.gpu.get_qemu_args(0));
 
@@ -292,15 +292,18 @@ mod tests {
         let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
-            "-monitor unix:/var/ezkvm/anonymous.monitor,server,nowait",
-            "-chardev socket,id=qmp,path=/var/ezkvm/anonymous.qmp,server=on,wait=off",
-            "-mon chardev=qmp,mode=control",
-            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
-            "-mon chardev=qmp-event,mode=control",
             "-machine hpet=off,type=pc-q35-8.1",
             "-rtc driftfix=slew,base=localtime",
             "-global kvm-pit.lost_tick_policy=discard",
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-monitor unix:/var/ezkvm/anonymous.monitor,server=on,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/anonymous.qmp,server=on,wait=off",
+            "-mon chardev=qmp,mode=control",
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon chardev=qmp-event,mode=control",
+            "-chardev socket,id=qga0,path=/var/ezkvm/anonymous.qga,server=on,wait=off",
+            "-device virtio-serial,id=qga0,bus=pci.0,addr=0x8",
+            "-device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
             "-boot menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/ezkvm/bootsplash.jpg",
@@ -316,6 +319,8 @@ mod tests {
     const WINDOWS_GAMING_CONFIG: &str = r#"
         general:
             name: windows_gaming_config
+            agent: no
+            monitor: no
 
         system:
             bios: { type: "ovmf", uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", file: "/dev/vm1/vm-108-efidisk" }
@@ -362,11 +367,6 @@ mod tests {
         let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
-            "-monitor unix:/var/ezkvm/windows_gaming_config.monitor,server,nowait",
-            "-chardev socket,id=qmp,path=/var/ezkvm/windows_gaming_config.qmp,server=on,wait=off",
-            "-mon chardev=qmp,mode=control",
-            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
-            "-mon chardev=qmp-event,mode=control",
             "-machine hpet=off,type=pc-q35-8.1",
             "-rtc driftfix=slew,base=localtime",
             "-global kvm-pit.lost_tick_policy=discard",
@@ -452,15 +452,18 @@ mod tests {
         let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
-            "-monitor unix:/var/ezkvm/windows_desktop_config.monitor,server,nowait",
-            "-chardev socket,id=qmp,path=/var/ezkvm/windows_desktop_config.qmp,server=on,wait=off",
-            "-mon chardev=qmp,mode=control",
-            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
-            "-mon chardev=qmp-event,mode=control",
             "-machine hpet=off,type=pc-q35-8.1",
             "-rtc driftfix=slew,base=localtime",
             "-global kvm-pit.lost_tick_policy=discard",
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
+            "-monitor unix:/var/ezkvm/windows_desktop_config.monitor,server=on,nowait",
+            "-chardev socket,id=qmp,path=/var/ezkvm/windows_desktop_config.qmp,server=on,wait=off",
+            "-mon chardev=qmp,mode=control",
+            "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
+            "-mon chardev=qmp-event,mode=control",
+            "-chardev socket,id=qga0,path=/var/ezkvm/windows_desktop_config.qga,server=on,wait=off",
+            "-device virtio-serial,id=qga0,bus=pci.0,addr=0x8",
+            "-device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
             "-device qemu-xhci,p2=15,p3=15,id=xhci,bus=pci.1,addr=0x1b",
             "-iscsi initiator-name=iqn.1993-08.org.debian:01:39407ad058b",
             "-boot menu=on,strict=on,reboot-timeout=1000",
@@ -528,12 +531,15 @@ mod tests {
         let expected: Vec<&str> = vec![
             "-accel kvm",
             "-nodefaults",
-            "-monitor unix:/var/ezkvm/ubuntu_desktop.monitor,server,nowait",
+            "-machine hpet=off,type=pc-q35-8.1",
+            "-monitor unix:/var/ezkvm/ubuntu_desktop.monitor,server=on,nowait",
             "-chardev socket,id=qmp,path=/var/ezkvm/ubuntu_desktop.qmp,server=on,wait=off",
             "-mon chardev=qmp,mode=control",
             "-chardev socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect=5",
             "-mon chardev=qmp-event,mode=control",
-            "-machine hpet=off,type=pc-q35-8.1",
+            "-chardev socket,id=qga0,path=/var/ezkvm/ubuntu_desktop.qga,server=on,wait=off",
+            "-device virtio-serial,id=qga0,bus=pci.0,addr=0x8",
+            "-device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
             "-rtc driftfix=slew,base=localtime",
             "-global kvm-pit.lost_tick_policy=discard",
             "-readconfig /usr/share/ezkvm/pve-q35-4.0.cfg",
