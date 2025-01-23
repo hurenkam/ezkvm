@@ -8,8 +8,15 @@ use log::LevelFilter;
 pub enum EzkvmCommand {
     Help,
     Start { name: String },
-    Stop { name: String },
-    Hibernate { name: String },
+
+    Qga { name: String, cmd: String },
+    QgaShutdown { name: String },
+    QgaHibernate { name: String },
+
+    Qmp { name: String, cmd: String },
+    QmpSystemReset { name: String },
+    QmpSystemPowerDown { name: String },
+    QmpSystemWakeUp { name: String },
 }
 
 pub struct EzkvmArguments {
@@ -19,16 +26,33 @@ pub struct EzkvmArguments {
     pub log_level: LevelFilter,
 }
 
+// Usage:
+// ezkvm --help                                                 -h
+// ezkvm --vm <name> --start                                    -n <name> -r
+// ezkvm --vm <name> --qga-shutdown                             -n <name> -q
+// ezkvm --vm <name> --qga-hibernate                            -n <name> -p
+// ezkvm --vm <name> --qga '{"execute": "guest-info"}'
+// ezkvm --vm <name> --qmp-system-reset
+// ezkvm --vm <name> --qmp-system-powerdown
+// ezkvm --vm <name> --qmp-system-wakeup
+// ezkvm --vm <name> --qmp-stop
+// ezkvm --vm <name> --qmp '{"execute": "query-status"}'
 impl EzkvmArguments {
     pub fn new(args: Vec<String>) -> Self {
         let mut command = EzkvmCommand::Help;
         let program = args[0].to_string();
 
         let mut opts = Options::new();
-        opts.optopt("", "help", "print usage message", "");
-        opts.optopt("", "start", "start a virtual machine by name", "");
-        opts.optopt("", "shutdown", "shutdown a virtual machine by name", "");
-        opts.optopt("", "hibernate", "hibernate a virtual machine by name", "");
+        opts.reqopt("n","name","specify the vm","");
+        opts.optflag("r", "start", "start a virtual machine");
+        opts.optflag("q", "qga-shutdown", "shutdown a virtual machine through the guest-agent service");
+        opts.optflag("p", "qga-hibernate", "hibernate a virtual machine through the guest-agent service");
+        opts.optopt("", "qga", "send a command to the guest-agent service", "guest agent command");
+        opts.optflag("", "qmp-system-reset", "send a reset command to the vm monitor service");
+        opts.optflag("", "qmp-system-powerdown", "send a powerdown command to the vm monitor service");
+        opts.optflag("", "qmp-system-wakeup", "send a wakeup command to the vm monitor service");
+        opts.optopt("", "qmp", "send a command to the vm monitor service", "monitor command");
+        opts.optflag("h", "help", "print usage message");
 
         let matches = match opts.parse(&args[1..]) {
             Ok(m) => m,
@@ -37,24 +61,35 @@ impl EzkvmArguments {
             }
         };
 
-        if matches.opt_present("start") {
-            match matches.opt_str("start") {
-                None => {}
-                Some(name) => command = EzkvmCommand::Start { name },
-            }
-        }
-
-        if matches.opt_present("shutdown") {
-            match matches.opt_str("shutdown") {
-                None => {}
-                Some(name) => command = EzkvmCommand::Stop { name },
-            }
-        }
-
-        if matches.opt_present("hibernate") {
-            match matches.opt_str("hibernate") {
-                None => {}
-                Some(name) => command = EzkvmCommand::Hibernate { name },
+        if matches.opt_present("name") {
+            if let Some(name) = matches.opt_str("name") {
+                if matches.opt_present("start") {
+                    command = EzkvmCommand::Start { name }
+                } else if matches.opt_present("qga-shutdown") {
+                    command = EzkvmCommand::QgaShutdown { name }
+                } else if matches.opt_present("qga-hibernate") {
+                    command = EzkvmCommand::QgaHibernate { name }
+                } else if matches.opt_present("qmp-system-reset") {
+                    command = EzkvmCommand::QmpSystemReset { name }
+                } else if matches.opt_present("qmp-system-powerdown") {
+                    command = EzkvmCommand::QmpSystemPowerDown { name }
+                } else if matches.opt_present("qmp-system-wakeup") {
+                    command = EzkvmCommand::QmpSystemWakeUp { name }
+                } else if matches.opt_present("qga") {
+                    match matches.opt_str("qga") {
+                        None => {}
+                        Some(cmd) => {
+                            command = EzkvmCommand::Qga { name, cmd }
+                        }
+                    }
+                } else if matches.opt_present("qmp") {
+                    match matches.opt_str("qmp") {
+                        None => {}
+                        Some(cmd) => {
+                            command = EzkvmCommand::Qmp { name, cmd }
+                        }
+                    }
+                }
             }
         }
 

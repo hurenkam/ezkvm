@@ -33,8 +33,6 @@ fn main() {
 
     match args.command {
         EzkvmCommand::Start { name } => handle_start_command(name),
-        EzkvmCommand::Stop { .. } => todo!(),
-        EzkvmCommand::Hibernate { .. } => todo!(),
         _ => args.print_usage(),
     }
 }
