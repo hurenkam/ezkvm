@@ -698,7 +698,7 @@ mod tests {
 
         get_uid_and_gid_context.expect().returning(|| (1000, 1000));
 
-        let actual = config.get_escalated_uid_and_gid();
+    let actual = config.get_escalated_uid_and_gid();
         let expected: (u32, u32) = (0, 0);
         assert_eq!(actual, expected)
     }
