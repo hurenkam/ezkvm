@@ -3,6 +3,8 @@ mod args;
 mod config;
 mod osal;
 mod resource;
+mod rpc;
+mod types;
 
 use crate::args::{EzkvmArguments, EzkvmCommand};
 use std::env;
