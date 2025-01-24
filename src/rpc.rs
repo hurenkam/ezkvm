@@ -4,5 +4,6 @@ mod error;
 mod monitor;
 
 pub use agent::*;
-pub use monitor::*;
+pub use connection::ConnectionApi;
 pub use connection::SocketConnection;
+pub use monitor::*;

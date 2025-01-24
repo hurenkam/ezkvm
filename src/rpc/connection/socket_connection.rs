@@ -1,8 +1,6 @@
 use crate::rpc::connection::interface::ConnectionApi;
 use crate::rpc::error::RpcError;
 use log::info;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::sync::Mutex;
@@ -20,9 +18,8 @@ impl SocketConnection {
 }
 
 impl ConnectionApi for SocketConnection {
-    fn write<C: Serialize>(&self, c: C) -> Result<(), RpcError> {
-        let data = serde_json::to_string(&c).map_err(|_| RpcError::SerializeError)?;
-        info!("SocketConnection::write({})", data.clone());
+    fn write_raw(&self, data: String) -> Result<(), RpcError> {
+        info!("SocketConnection::write_raw({})", data.clone());
         self.stream
             .lock()
             .unwrap()
@@ -30,8 +27,8 @@ impl ConnectionApi for SocketConnection {
             .map_err(|_| RpcError::WriteError)
     }
 
-    fn read<D: DeserializeOwned>(&self) -> Result<D, RpcError> {
-        let mut buffer = vec![0; 10240];
+    fn read_raw(&self) -> Result<String, RpcError> {
+        let mut buffer = vec![0; 65536];
         let count = self
             .stream
             .lock()
@@ -48,7 +45,8 @@ impl ConnectionApi for SocketConnection {
             data.truncate(data.len() - 1)
         };
         info!("SocketConnection::read({})", data.clone());
-        serde_json::from_str(data.as_str()).map_err(|_| RpcError::DeserializeError)
+
+        Ok(data)
     }
 }
 

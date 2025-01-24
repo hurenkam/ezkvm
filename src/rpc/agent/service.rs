@@ -1,4 +1,7 @@
-use crate::rpc::agent::commands::{GuestHibernateRequest, GuestInfoRequest, GuestInfoResponse, GuestShutdownRequest, GuestSyncRequest, GuestSyncResponse};
+use crate::rpc::agent::commands::{
+    GuestHibernateRequest, GuestInfoRequest, GuestInfoResponse, GuestShutdownRequest,
+    GuestSyncRequest, GuestSyncResponse,
+};
 use crate::rpc::agent::{GuestAgentInfo, GuestAgentServiceApi};
 use crate::rpc::connection::ConnectionApi;
 use crate::rpc::error::RpcError;
@@ -43,13 +46,12 @@ impl<C: ConnectionApi> GuestAgentServiceApi<C> for GuestAgentService<C> {
     }
 
     fn hibernate(&self) -> Result<(), RpcError> {
-        self.connection
-            .write(GuestHibernateRequest::new())
+        self.connection.write(GuestHibernateRequest::new())
     }
 
-    fn raw(&self, cmd: String)-> Result<String, RpcError> {
-        self.connection.write(cmd)?;
-        self.connection.read::<String>()
+    fn raw(&self, cmd: String) -> Result<String, RpcError> {
+        self.connection.write_raw(cmd)?;
+        self.connection.read_raw()
     }
 }
 /*
