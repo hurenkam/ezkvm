@@ -1,5 +1,5 @@
 #[derive(Clone, Debug)]
-#[allow(unused)]
+#[allow(unused, clippy::enum_variant_names)]
 pub enum RpcError {
     ConnectionError,
     SerializeError,

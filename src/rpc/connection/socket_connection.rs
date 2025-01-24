@@ -42,7 +42,7 @@ impl ConnectionApi for SocketConnection {
             String::new()
         } else {
             let data = &buffer[..count];
-            String::from_utf8_lossy(&data).to_string()
+            String::from_utf8_lossy(data).to_string()
         };
         if data.ends_with('\n') {
             data.truncate(data.len() - 1)
