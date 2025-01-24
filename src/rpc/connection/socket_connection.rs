@@ -13,7 +13,7 @@ pub struct SocketConnection {
 
 #[allow(unused)]
 impl SocketConnection {
-    pub fn connect(path: &str) -> Result<Self, RpcError> {
+    pub fn connect(path: String) -> Result<Self, RpcError> {
         let stream = Mutex::new(UnixStream::connect(path).map_err(|_| RpcError::ConnectionError)?);
         Ok(Self { stream })
     }

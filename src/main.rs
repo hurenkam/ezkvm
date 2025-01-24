@@ -5,24 +5,21 @@ mod osal;
 mod resource;
 mod rpc;
 mod types;
+mod vm;
 
 use crate::args::{EzkvmArguments, EzkvmCommand};
 use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::process::Command;
 
 use crate::colored::Colorize;
-use crate::config::{Config, QemuDevice};
-use crate::osal::{Osal, OsalError};
 use crate::resource::data_manager::DataManager;
-use crate::resource::lock::Lock;
 use crate::resource::resource_pool::ResourcePool;
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, info, Level, LevelFilter};
+use log::{debug, Level, LevelFilter};
 use std::io::Write;
-use std::os::unix::prelude::CommandExt;
+use crate::vm::VirtualMachine;
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
@@ -32,35 +29,36 @@ fn main() {
     let _resource_manager = DataManager::instance();
 
     match args.command {
-        EzkvmCommand::Start { name } => handle_start_command(name),
+        EzkvmCommand::Start { name } => {
+            VirtualMachine::load(name).start().expect("unable to start vm");
+        }
+        EzkvmCommand::QgaShutdown { name } => {
+            VirtualMachine::load(name).qga_shutdown().expect("unable to shutdown vm");
+        }
+        EzkvmCommand::QgaHibernate { name } => {
+            VirtualMachine::load(name).qga_hibernate().expect("unable to hibernate vm");
+        }
+        EzkvmCommand::Qga { name, cmd } => {
+            VirtualMachine::load(name).qga(cmd).expect("unable to execute guest-agent command");
+        }
+        EzkvmCommand::QmpQuit { name } => {
+            VirtualMachine::load(name).qmp_quit().expect("unable to quit the vm");
+        }
+        EzkvmCommand::QmpSystemReset { name } => {
+            VirtualMachine::load(name).qmp_system_reset().expect("unable to reset the vm");
+        }
+        EzkvmCommand::QmpSystemPowerDown { name } => {
+            VirtualMachine::load(name).qmp_system_power_down().expect("unable to power down the vm");
+        }
+        EzkvmCommand::QmpSystemWakeUp { name } => {
+            VirtualMachine::load(name).qmp_system_wake_up().expect("unable to wake up the vm");
+        }
+
+        EzkvmCommand::Qmp { name, cmd } => {
+            VirtualMachine::load(name).qmp(cmd).expect("unable to execute monitor command");
+        }
         _ => args.print_usage(),
     }
-}
-
-fn handle_start_command(name: String) {
-    let config = load_vm(format!("/etc/ezkvm/{}.yaml", name).as_str());
-
-    config.pre_start(&config);
-
-    if let Ok(_lock) = start_vm(&name, &config) {
-        // use lock
-    } else {
-        debug!("Unable to start the vm");
-    }
-
-    config.post_start(&config);
-}
-
-fn load_vm(file: &str) -> Config {
-    debug!("load_vm({})", file);
-
-    let mut file = File::open(file).expect("Unable to open file");
-    let mut contents = String::new();
-
-    file.read_to_string(&mut contents)
-        .expect("Unable to read file");
-
-    serde_yaml::from_str(contents.as_str()).unwrap()
 }
 
 #[allow(dead_code)]
@@ -74,31 +72,6 @@ fn load_pool(file: &str) -> ResourcePool {
         .expect("Unable to read file");
 
     serde_yaml::from_str(contents.as_str()).unwrap()
-}
-
-fn start_vm(name: &str, config: &Config) -> Result<Lock, OsalError> {
-    debug!("start_vm()");
-
-    let (uid, gid) = config.get_escalated_uid_and_gid();
-
-    let config_qemu_args = config.get_qemu_args(0);
-    let mut args = "qemu-system-x86_64".to_string();
-    for arg in config_qemu_args {
-        //info!("{}", arg);
-        args = format!("{} {}", args, arg).to_string();
-    }
-    info!("{}", args);
-    let args: Vec<String> = args.split_whitespace().map(str::to_string).collect();
-
-    let resources: Vec<String> = config.allocate_resources()?;
-
-    match Osal::execute_command(
-        Command::new("/usr/bin/env").args(args).uid(uid).gid(gid),
-        Some("qemu".to_string()),
-    ) {
-        Ok(child) => Ok(Lock::new(name.to_string(), child.id(), resources)),
-        Err(error) => Err(error),
-    }
 }
 
 fn init_logger(log_level: LevelFilter) {

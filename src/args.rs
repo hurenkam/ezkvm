@@ -4,7 +4,7 @@ use getopts::Options;
 use log::LevelFilter;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum EzkvmCommand {
     Help,
     Start { name: String },
@@ -14,6 +14,7 @@ pub enum EzkvmCommand {
     QgaHibernate { name: String },
 
     Qmp { name: String, cmd: String },
+    QmpQuit { name: String },
     QmpSystemReset { name: String },
     QmpSystemPowerDown { name: String },
     QmpSystemWakeUp { name: String },
@@ -43,15 +44,15 @@ impl EzkvmArguments {
         let program = args[0].to_string();
 
         let mut opts = Options::new();
-        opts.reqopt("n","name","specify the vm","");
+        opts.optopt("n","name","specify the vm","");
         opts.optflag("r", "start", "start a virtual machine");
-        opts.optflag("q", "qga-shutdown", "shutdown a virtual machine through the guest-agent service");
-        opts.optflag("p", "qga-hibernate", "hibernate a virtual machine through the guest-agent service");
-        opts.optopt("", "qga", "send a command to the guest-agent service", "guest agent command");
-        opts.optflag("", "qmp-system-reset", "send a reset command to the vm monitor service");
-        opts.optflag("", "qmp-system-powerdown", "send a powerdown command to the vm monitor service");
-        opts.optflag("", "qmp-system-wakeup", "send a wakeup command to the vm monitor service");
-        opts.optopt("", "qmp", "send a command to the vm monitor service", "monitor command");
+        opts.optflag("q", "qga-shutdown", "shutdown a virtual machine through the guest-agent service of a vm");
+        opts.optflag("p", "qga-hibernate", "hibernate a virtual machine through the guest-agent service of a vm");
+        opts.optopt("", "qga", "send a command to the guest-agent service of a vm", "guest agent command");
+        opts.optflag("", "qmp-system-reset", "send a reset command to the vm monitor service of a vm");
+        opts.optflag("", "qmp-system-powerdown", "send a powerdown command to the vm monitor service of a vm");
+        opts.optflag("", "qmp-system-wakeup", "send a wakeup command to the vm monitor service of a vm");
+        opts.optopt("", "qmp", "send a command to the vm monitor service of a vm", "monitor command");
         opts.optflag("h", "help", "print usage message");
 
         let matches = match opts.parse(&args[1..]) {

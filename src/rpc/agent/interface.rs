@@ -23,4 +23,8 @@ pub trait GuestAgentServiceApi<C: ConnectionApi> {
     fn sync(&self) -> Result<(), RpcError>;
     fn info(&self) -> Result<GuestAgentInfo, RpcError>;
     fn shutdown(&self) -> Result<(), RpcError>;
+    fn hibernate(&self) -> Result<(), RpcError>;
+    fn raw(&self, cmd: String)-> Result<String, RpcError>;
 }
+
+pub use crate::rpc::agent::service::GuestAgentService;

@@ -31,6 +31,7 @@ pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
 pub use vnc::Vnc;
+pub use types::Boolean;
 
 #[macro_export]
 macro_rules! optional_value_getter {
