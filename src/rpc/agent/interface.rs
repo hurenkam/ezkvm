@@ -19,12 +19,12 @@ pub struct GuestAgentSupportedCommand {
 
 #[allow(unused)]
 pub trait GuestAgentServiceApi<C: ConnectionApi> {
-    fn new(connection: C) -> Arc<Self>;
+    fn new(connection: C) -> Result<Arc<Self>, RpcError>;
     fn sync(&self) -> Result<(), RpcError>;
     fn info(&self) -> Result<GuestAgentInfo, RpcError>;
     fn shutdown(&self) -> Result<(), RpcError>;
     fn hibernate(&self) -> Result<(), RpcError>;
-    fn raw(&self, cmd: String)-> Result<String, RpcError>;
+    fn raw(&self, cmd: String) -> Result<String, RpcError>;
 }
 
 pub use crate::rpc::agent::service::GuestAgentService;

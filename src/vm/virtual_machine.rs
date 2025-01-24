@@ -3,10 +3,9 @@ use crate::config::{Config, QemuDevice};
 use crate::osal::{Osal, OsalError};
 use crate::resource::lock::Lock;
 use crate::rpc::{
-    ConnectionApi, GuestAgentService, GuestAgentServiceApi, MonitorService, MonitorServiceApi,
-    SocketConnection,
+    GuestAgentService, GuestAgentServiceApi, MonitorService, MonitorServiceApi, SocketConnection,
 };
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;
@@ -27,7 +26,7 @@ pub struct VirtualMachine {
 
 impl VirtualMachine {
     pub fn load(name: String) -> Self {
-        debug!("VirtualMachine::load({})", name);
+        trace!("VirtualMachine::load({})", name);
 
         let mut file =
             File::open(format!("/etc/ezkvm/{}.yaml", name)).expect("Unable to open file");
@@ -44,7 +43,7 @@ impl VirtualMachine {
     }
 
     pub fn start(&self) -> Result<Lock, OsalError> {
-        debug!("VirtualMachine[{}].Start()", self.name.clone());
+        trace!("VirtualMachine[{}].start()", self.name.clone());
 
         self.config.pre_start(&self.config);
 
@@ -56,7 +55,9 @@ impl VirtualMachine {
             //info!("{}", arg);
             args = format!("{} {}", args, arg).to_string();
         }
+
         info!("{}", args);
+
         let args: Vec<String> = args.split_whitespace().map(str::to_string).collect();
 
         let resources: Vec<String> = self.config.allocate_resources()?;
@@ -77,6 +78,11 @@ impl VirtualMachine {
     fn connect_guest_agent(
         &self,
     ) -> Result<Arc<GuestAgentService<SocketConnection>>, VirtualMachineError> {
+        trace!(
+            "VirtualMachine[{}].connect_guest_agent()",
+            self.name.clone()
+        );
+
         if self.config.general().agent().clone() == Boolean::No {
             error!("guest agent is not configured for this vm");
             return Err(VirtualMachineError::NotConnected);
@@ -84,16 +90,15 @@ impl VirtualMachine {
 
         let connection = SocketConnection::connect(format!("/var/ezkvm/{}.qga", self.name.clone()))
             .map_err(|_| VirtualMachineError::NotConnected)?;
-        let agent = GuestAgentService::new(connection);
-        agent
-            .sync()
-            .map_err(|_| VirtualMachineError::NotConnected)?;
-        Ok(agent)
+
+        GuestAgentService::new(connection).map_err(|_| VirtualMachineError::NotConnected)
     }
 
     fn connect_monitor(
         &self,
     ) -> Result<Arc<MonitorService<SocketConnection>>, VirtualMachineError> {
+        trace!("VirtualMachine[{}].connect_monitor()", self.name.clone());
+
         if self.config.general().monitor().clone() == Boolean::No {
             error!("monitor is not configured for this vm");
             return Err(VirtualMachineError::NotConnected);
@@ -101,23 +106,12 @@ impl VirtualMachine {
 
         let connection = SocketConnection::connect(format!("/var/ezkvm/{}.qmp", self.name.clone()))
             .map_err(|_| VirtualMachineError::NotConnected)?;
-        let data = connection
-            .read_raw()
-            .map_err(|_| VirtualMachineError::NotConnected)?;
-        trace!("{}", data);
-        connection
-            .write_raw("{\"execute\":\"qmp_capabilities\"}".to_string())
-            .map_err(|_| VirtualMachineError::NotConnected)?;
-        let data = connection
-            .read_raw()
-            .map_err(|_| VirtualMachineError::NotConnected)?;
-        trace!("{}", data);
 
-        let monitor = MonitorService::new(connection);
-        Ok(monitor)
+        MonitorService::new(connection).map_err(|_| VirtualMachineError::NotConnected)
     }
 
     pub fn qga_shutdown(&self) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qga_shutdown()", self.name.clone());
         let agent = self.connect_guest_agent()?;
         agent
             .shutdown()
@@ -126,6 +120,7 @@ impl VirtualMachine {
     }
 
     pub fn qga_hibernate(&self) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qga_hibernate()", self.name.clone());
         let agent = self.connect_guest_agent()?;
         agent
             .hibernate()
@@ -134,6 +129,7 @@ impl VirtualMachine {
     }
 
     pub fn qga(&self, cmd: String) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qga()", self.name.clone());
         let agent = self.connect_guest_agent()?;
         let result = agent
             .raw(cmd)
@@ -143,22 +139,30 @@ impl VirtualMachine {
     }
 
     pub fn qmp_quit(&self) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qmp_quit()", self.name.clone());
         Err(VirtualMachineError::CommandNotSupported)
     }
 
     pub fn qmp_system_reset(&self) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qmp_system_reset()", self.name.clone());
         Err(VirtualMachineError::CommandNotSupported)
     }
 
     pub fn qmp_system_power_down(&self) -> Result<(), VirtualMachineError> {
+        trace!(
+            "VirtualMachine[{}].qmp_system_power_down()",
+            self.name.clone()
+        );
         Err(VirtualMachineError::CommandNotSupported)
     }
 
     pub fn qmp_system_wake_up(&self) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qmp_system_wake_up()", self.name.clone());
         Err(VirtualMachineError::CommandNotSupported)
     }
 
     pub fn qmp(&self, cmd: String) -> Result<(), VirtualMachineError> {
+        trace!("VirtualMachine[{}].qmp()", self.name.clone());
         let monitor = self.connect_monitor()?;
         let result = monitor
             .raw(cmd)

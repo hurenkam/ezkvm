@@ -35,16 +35,17 @@ impl ConnectionApi for SocketConnection {
             .unwrap()
             .read(&mut buffer)
             .map_err(|_| RpcError::ReadError)?;
-        let mut data = if count == 0 {
-            String::new()
-        } else {
-            let data = &buffer[..count];
-            String::from_utf8_lossy(data).to_string()
-        };
+        if count == 0 {
+            return Err(RpcError::ConnectionError);
+        }
+
+        let buf = &buffer[..count];
+        let mut data = String::from_utf8_lossy(buf).to_string();
+
         if data.ends_with('\n') {
             data.truncate(data.len() - 1)
         };
-        info!("SocketConnection::read({})", data.clone());
+        info!("SocketConnection::read_raw({})", data.clone());
 
         Ok(data)
     }

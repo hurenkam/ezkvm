@@ -15,11 +15,14 @@ pub struct GuestAgentService<C: ConnectionApi> {
 }
 
 impl<C: ConnectionApi> GuestAgentServiceApi<C> for GuestAgentService<C> {
-    fn new(connection: C) -> Arc<Self> {
-        Arc::new(GuestAgentService {
+    fn new(connection: C) -> Result<Arc<Self>, RpcError> {
+        let agent = Arc::new(GuestAgentService {
             connection,
             id: AtomicU32::new(0),
-        })
+        });
+        agent.sync()?;
+
+        Ok(agent)
     }
 
     fn sync(&self) -> Result<(), RpcError> {
