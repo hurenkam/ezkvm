@@ -6,20 +6,29 @@ use std::os::unix::net::UnixStream;
 use std::sync::Mutex;
 
 pub struct SocketConnection {
+    id: String,
     stream: Mutex<UnixStream>,
 }
 
 #[allow(unused)]
 impl SocketConnection {
     pub fn connect(path: String) -> Result<Self, RpcError> {
-        let stream = Mutex::new(UnixStream::connect(path).map_err(|_| RpcError::ConnectionError)?);
-        Ok(Self { stream })
+        let stream =
+            Mutex::new(UnixStream::connect(path.clone()).map_err(|_| RpcError::ConnectionError)?);
+        Ok(Self { id: path, stream })
     }
 }
 
 impl ConnectionApi for SocketConnection {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
     fn write_raw(&self, data: String) -> Result<(), RpcError> {
-        info!("SocketConnection::write_raw({})", data.clone());
+        info!(
+            "SocketConnection[{}]::write_raw({})",
+            self.id(),
+            data.clone()
+        );
         self.stream
             .lock()
             .unwrap()
@@ -45,7 +54,11 @@ impl ConnectionApi for SocketConnection {
         if data.ends_with('\n') {
             data.truncate(data.len() - 1)
         };
-        info!("SocketConnection::read_raw({})", data.clone());
+        info!(
+            "SocketConnection[{}]::read_raw({})",
+            self.id(),
+            data.clone()
+        );
 
         Ok(data)
     }
