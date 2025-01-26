@@ -1,5 +1,5 @@
 //use crate::yaml::QemuDevice;
-use crate::config::QemuDevice;
+use crate::vm::config::QemuDevice;
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;

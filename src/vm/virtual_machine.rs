@@ -1,5 +1,4 @@
-use crate::config::Boolean;
-use crate::config::{Config, QemuDevice};
+use super::config::{Boolean, Config, QemuDevice};
 use crate::osal::{Osal, OsalError};
 use crate::resource::lock::Lock;
 use crate::rpc::{

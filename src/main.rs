@@ -1,10 +1,8 @@
 extern crate colored;
 mod args;
-mod config;
 mod osal;
 mod resource;
 mod rpc;
-mod types;
 mod vm;
 
 use crate::args::{EzkvmArguments, EzkvmCommand};
@@ -15,11 +13,11 @@ use std::io::Read;
 use crate::colored::Colorize;
 use crate::resource::data_manager::DataManager;
 use crate::resource::resource_pool::ResourcePool;
+use crate::vm::VirtualMachine;
 use chrono::Local;
 use env_logger::Builder;
 use log::{debug, Level, LevelFilter};
 use std::io::Write;
-use crate::vm::VirtualMachine;
 
 fn main() {
     let args = EzkvmArguments::new(env::args().collect());
@@ -30,32 +28,50 @@ fn main() {
 
     match args.command {
         EzkvmCommand::Start { name } => {
-            VirtualMachine::load(name).start().expect("unable to start vm");
+            VirtualMachine::load(name)
+                .start()
+                .expect("unable to start vm");
         }
         EzkvmCommand::QgaShutdown { name } => {
-            VirtualMachine::load(name).qga_shutdown().expect("unable to shutdown vm");
+            VirtualMachine::load(name)
+                .qga_shutdown()
+                .expect("unable to shutdown vm");
         }
         EzkvmCommand::QgaHibernate { name } => {
-            VirtualMachine::load(name).qga_hibernate().expect("unable to hibernate vm");
+            VirtualMachine::load(name)
+                .qga_hibernate()
+                .expect("unable to hibernate vm");
         }
         EzkvmCommand::Qga { name, cmd } => {
-            VirtualMachine::load(name).qga(cmd).expect("unable to execute guest-agent command");
+            VirtualMachine::load(name)
+                .qga(cmd)
+                .expect("unable to execute guest-agent command");
         }
         EzkvmCommand::QmpQuit { name } => {
-            VirtualMachine::load(name).qmp_quit().expect("unable to quit the vm");
+            VirtualMachine::load(name)
+                .qmp_quit()
+                .expect("unable to quit the vm");
         }
         EzkvmCommand::QmpSystemReset { name } => {
-            VirtualMachine::load(name).qmp_system_reset().expect("unable to reset the vm");
+            VirtualMachine::load(name)
+                .qmp_system_reset()
+                .expect("unable to reset the vm");
         }
         EzkvmCommand::QmpSystemPowerDown { name } => {
-            VirtualMachine::load(name).qmp_system_power_down().expect("unable to power down the vm");
+            VirtualMachine::load(name)
+                .qmp_system_power_down()
+                .expect("unable to power down the vm");
         }
         EzkvmCommand::QmpSystemWakeUp { name } => {
-            VirtualMachine::load(name).qmp_system_wake_up().expect("unable to wake up the vm");
+            VirtualMachine::load(name)
+                .qmp_system_wake_up()
+                .expect("unable to wake up the vm");
         }
 
         EzkvmCommand::Qmp { name, cmd } => {
-            VirtualMachine::load(name).qmp(cmd).expect("unable to execute monitor command");
+            VirtualMachine::load(name)
+                .qmp(cmd)
+                .expect("unable to execute monitor command");
         }
         _ => args.print_usage(),
     }
