@@ -73,3 +73,11 @@ subnet 192.168.191.0 netmask 255.255.255.0 {
   option routers 192.168.191.1;
 }
 ```
+
+## Note
+
+When qemu is started as a normal user with bridge networking, you may run into permission issues with the bridge helper.
+To fix this, I used the command below to set the SUID bit of the helper (this may be a security risk, so beware).
+```
+sudo chmod u+s /usr/lib/qemu/qemu-bridge-helper
+```
