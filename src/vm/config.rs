@@ -9,29 +9,29 @@ mod system;
 mod types;
 mod vnc;
 
-use derive_getters::Getters;
-use display::Display;
-use gpu::Gpu;
-use log::debug;
-use serde::{Deserialize, Deserializer};
-use std::any::{Any, TypeId};
-use std::ops::Deref;
-
-#[mockall_double::double]
-use crate::osal::Osal;
-use crate::osal::OsalError;
+pub use display::Display;
 pub use display::Gtk;
 pub use general::General;
+pub use gpu::Gpu;
 pub use host::Host;
-use network::NetworkItem;
+pub use network::NetworkItem;
 pub use spice::Spice;
-use storage::Controller;
+pub use storage::Controller;
 pub use system::System;
 pub use types::Boolean;
 pub use types::Pci;
 pub use types::QemuDevice;
 pub use types::Usb;
 pub use vnc::Vnc;
+
+#[mockall_double::double]
+use crate::osal::Osal;
+use crate::osal::OsalError;
+use derive_getters::Getters;
+use log::debug;
+use serde::{Deserialize, Deserializer};
+use std::any::{Any, TypeId};
+use std::ops::Deref;
 
 #[macro_export]
 macro_rules! optional_value_getter {

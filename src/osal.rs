@@ -92,20 +92,25 @@ impl Osal {
             .map_err(|_| OsalError::ExecError(Some(format!("{:?}", command))))
         {
             Ok(child) => {
+                let mut cmd = format!("");
+                for arg in command.get_args() {
+                    cmd = cmd + &format!(" {}", arg.to_str().expect(""))
+                }
                 debug!(
-                    "Osal::execute_command(): Spawned '{:?} {:?}' with pid {}",
-                    command.get_program(),
-                    command.get_args(),
+                    "Osal::execute_command(): Spawned '{:?}' with pid {}",
+                    cmd,
                     child.id()
                 );
                 Ok(child)
             }
             Err(error) => {
+                let mut cmd = format!("");
+                for arg in command.get_args() {
+                    cmd = cmd + &format!(" {}", arg.to_str().expect(""))
+                }
                 error!(
-                    "Osal::execute_command(): Unable to spawn '{:?} {:?}' due to error {:?}",
-                    command.get_program(),
-                    command.get_args(),
-                    error
+                    "Osal::execute_command(): Unable to spawn '{:?}' due to error {:?}",
+                    cmd, error
                 );
                 Err(error)
             }
