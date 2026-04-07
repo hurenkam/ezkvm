@@ -1,0 +1,40 @@
+name: "basic-ubuntu"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048          # 2 GiB
+  vcpus: 2
+  cpu_model: "host"
+
+boot:
+  firmware: "uefi"
+  boot_order: ["disk", "cdrom"]
+
+devices:
+  drives:
+    - id: "root"
+      path: "/var/lib/ezkvm/ubuntu-22.04.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+      readonly: false
+
+  networks:
+    - id: "net0"
+      model: "virtio-net"
+      mode: "user"
+      mac: "52:54:00:12:34:56"
+
+  displays:
+    - type: "virtio-gpu"
+      vram: 256
+
+  serials:
+    - type: "pty"
+      port: 0
+
+options:
+  enable_kvm: true
+  daemonize: false
