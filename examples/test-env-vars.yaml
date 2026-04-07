@@ -1,0 +1,32 @@
+name: "test-env-vars"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: ${TEST_MEMORY}
+  vcpus: 2
+  cpu_model: "host"
+
+boot:
+  firmware: "uefi"
+  boot_order: ["disk", "cdrom"]
+
+devices:
+  drives:
+    - id: "root"
+      path: "${HOME}/test.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+      readonly: false
+
+  networks:
+    - id: "net0"
+      model: "virtio-net"
+      mode: "user"
+      mac: "52:54:00:12:34:56"
+
+options:
+  enable_kvm: true
+  daemonize: false
