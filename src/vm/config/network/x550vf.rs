@@ -1,5 +1,5 @@
 use super::super::Config;
-use super::network_payload::NetworkPayload;
+use super::network_payload::{network_pci_addr, NetworkPayload};
 use super::NetworkItem;
 use crate::required_value_getter;
 use paste::paste;
@@ -29,53 +29,44 @@ impl NetworkPayload for X550vf {
 
     fn get_device_options(&self, index: usize) -> Vec<String> {
         vec![format!(
-            "vfio-pci,id=net{},host={},bus=pci.1,addr=0x0,rombar=0",
-            index, self.pci
+            "vfio-pci,id=net{},host={},bus=pci.1,addr={},rombar=0",
+            index,
+            self.pci,
+            network_pci_addr(index)
         )]
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_defaults() {
-        let network = Tap {
-            ifname: Tap::ifname_default(),
-            upscript: Tap::upscript_default(),
-            downscript: Tap::downscript_default(),
-            vhost: Tap::vhost_default(),
-            driver: Tap::driver_default(),
+        let network = X550vf {
+            parent: X550vf::parent_default(),
+            vf: X550vf::vf_default(),
+            pci: X550vf::pci_default(),
         };
 
-        let expected_netdev_options = vec![
-            "type=tap,script=/var/lib/qemu/bridge-up,downscript=/var/lib/qemu/bridge-down,vhost=on"
-                .to_string(),
-        ];
-        assert_eq!(expected_netdev_options, network.get_netdev_options(0));
-
-        let expected_device_options = vec!["virtio-net-pci,id=net0,bus=pci.1,addr=0x0".to_string()];
+        let expected_device_options = vec![format!(
+            "vfio-pci,id=net0,host={},bus=pci.1,addr=0x0,rombar=0",
+            X550vf::pci_default()
+        )];
         assert_eq!(expected_device_options, network.get_device_options(0));
     }
 
     #[test]
     fn test_valid() {
-        let network = Tap {
-            ifname: "tap_401i0".to_string(),
-            upscript: "~/.ezkvm/upscript".to_string(),
-            downscript: "~/.ezkvm/downscript".to_string(),
-            vhost: "off".to_string(),
-            driver: "ne2000".to_string(),
+        let network = X550vf {
+            parent: "enp3s0f0".to_string(),
+            vf: "4".to_string(),
+            pci: "0000:03:10.4".to_string(),
         };
 
-        let expected_netdev_options = vec![
-            "type=tap,script=~/.ezkvm/upscript,downscript=~/.ezkvm/downscript,vhost=off"
-                .to_string(),
+        let expected_device_options = vec![
+            "vfio-pci,id=net3,host=0000:03:10.4,bus=pci.1,addr=0x3,rombar=0".to_string(),
         ];
-        assert_eq!(expected_netdev_options, network.get_netdev_options(3));
-
-        let expected_device_options = vec!["ne2000,id=net3,bus=pci.1,addr=0x0".to_string()];
         assert_eq!(expected_device_options, network.get_device_options(3));
     }
 }
-*/

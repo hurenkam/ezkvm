@@ -18,7 +18,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: Any config with applesmc set.
 	- Action: Append applesmc args in System::get_qemu_args and add a test asserting presence.
 
-- [ ] Network device PCI address collisions across multiple NICs.
+- [x] Network device PCI address collisions across multiple NICs.
 	- Location: src/vm/config/network/bridge.rs:24, src/vm/config/network/tap.rs:36, src/vm/config/network/x550vf.rs:30, src/vm/config.rs:249
 	- Impact: Duplicate PCI addresses can fail or miswire devices.
 	- Trigger: Multi-NIC configs.

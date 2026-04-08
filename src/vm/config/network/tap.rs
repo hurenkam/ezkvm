@@ -1,4 +1,4 @@
-use super::network_payload::NetworkPayload;
+use super::network_payload::{network_pci_addr, NetworkPayload};
 use crate::required_value_getter;
 use paste::paste;
 use serde::{Deserialize, Serialize};
@@ -36,8 +36,10 @@ impl NetworkPayload for Tap {
 
     fn get_device_options(&self, index: usize) -> Vec<String> {
         vec![format!(
-            "{},id=net{},bus=pci.1,addr=0x0",
-            self.driver, index
+            "{},id=net{},bus=pci.1,addr={}",
+            self.driver,
+            index,
+            network_pci_addr(index)
         )]
     }
 }
@@ -81,7 +83,7 @@ mod tests {
         ];
         assert_eq!(expected_netdev_options, network.get_netdev_options(3));
 
-        let expected_device_options = vec!["ne2000,id=net3,bus=pci.1,addr=0x0".to_string()];
+        let expected_device_options = vec!["ne2000,id=net3,bus=pci.1,addr=0x3".to_string()];
         assert_eq!(expected_device_options, network.get_device_options(3));
     }
 }
