@@ -38,7 +38,7 @@ Validation: cargo test (66 passed, 0 failed)
 
 ## Next (Medium / Medium-High)
 
-- [ ] VM startup rebuilds argv via whitespace split.
+- [x] VM startup rebuilds argv via whitespace split.
 	- Location: src/vm/virtual_machine.rs:50
 	- Impact: Args containing spaces are corrupted before spawn.
 	- Trigger: Any arg value with whitespace.

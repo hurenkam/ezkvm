@@ -48,16 +48,10 @@ impl VirtualMachine {
 
         let (uid, gid) = self.config.get_escalated_uid_and_gid();
 
-        let config_qemu_args = self.config.get_qemu_args(0);
-        let mut args = "qemu-system-x86_64".to_string();
-        for arg in config_qemu_args {
-            //info!("{}", arg);
-            args = format!("{} {}", args, arg).to_string();
-        }
+        let mut args: Vec<String> = vec!["qemu-system-x86_64".to_string()];
+        args.extend(self.config.get_qemu_args(0));
 
-        info!("{}", args);
-
-        let args: Vec<String> = args.split_whitespace().map(str::to_string).collect();
+        info!("{}", args.join(" "));
 
         let resources: Vec<String> = self.config.allocate_resources()?;
 
