@@ -6,7 +6,7 @@ Validation: cargo test (66 passed, 0 failed)
 
 ## Fix Now (High)
 
-- [ ] Passthrough TPM panics at runtime.
+- [x] Passthrough TPM panics at runtime.
 	- Location: src/vm/config/system/tpm/pass_through_tpm.rs:7, src/vm/config/system.rs:56
 	- Impact: VM aborts instead of returning a clean validation error.
 	- Trigger: system.tpm.type = passthrough.
