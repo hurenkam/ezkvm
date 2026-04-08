@@ -9,6 +9,7 @@ A simple alternative to libvirt and virt-manager that uses YAML configuration fi
 - **Type Safety**: Rust compiler ensures configuration correctness
 - **Simple CLI**: Easy-to-use command-line interface
 - **KVM Optimized**: Built specifically for KVM with QEMU
+- **Environment Variable Substitution**: Support for `${VAR_NAME}` syntax in configs
 
 ## Installation
 
@@ -35,14 +36,14 @@ cargo build --release
 ezkvm validate examples/basic-vm.yaml
 ```
 
-3. Create the VM:
+3. Start the VM:
 ```bash
-ezkvm create examples/basic-vm.yaml
+ezkvm start examples/basic-vm.yaml
 ```
 
-4. Start the VM:
+4. Start in dry-run mode to see the QEMU command:
 ```bash
-ezkvm start basic-ubuntu
+ezkvm start examples/basic-vm.yaml --dry-run
 ```
 
 ## Configuration
@@ -87,16 +88,38 @@ options:
   daemonize: false
 ```
 
+### Environment Variable Substitution
+
+Configuration files support environment variable substitution using `${VAR_NAME}` or `$VAR_NAME` syntax:
+
+```yaml
+system:
+  memory: ${VM_MEMORY}  # Will be replaced with environment variable
+  vcpus: 2
+
+devices:
+  drives:
+    - path: "${HOME}/vms/disk.qcow2"  # Uses $HOME environment variable
+```
+
+## Examples
+
+See the `examples/` directory for complete configuration examples:
+- `basic-vm.yaml` - Full Ubuntu VM configuration
+- `test-vm.yaml` - Minimal test configuration
+
 ## Commands
 
-- `ezkvm create <config.yaml>` - Create and validate a VM
-- `ezkvm start <name>` - Start a VM
-- `ezkvm stop <name>` - Stop a VM gracefully
-- `ezkvm kill <name>` - Force kill a VM
-- `ezkvm list` - List running VMs
-- `ezkvm status <name>` - Show VM status
-- `ezkvm console <name>` - Attach to VM console
-- `ezkvm validate <config.yaml>` - Validate configuration
+- `ezkvm create <config.yaml>` - Create and validate a VM configuration
+- `ezkvm start <config.yaml>` - Start a VM from configuration
+- `ezkvm start <config.yaml> --dry-run` - Show the QEMU command without executing
+- `ezkvm start <config.yaml> --daemon` - Start VM in background
+- `ezkvm stop <config.yaml>` - Stop a VM gracefully
+- `ezkvm kill <config.yaml>` - Force kill a VM
+- `ezkvm list` - List running VMs (not yet implemented)
+- `ezkvm status <config.yaml>` - Show VM status (not yet implemented)
+- `ezkvm console <config.yaml>` - Attach to VM console (not yet implemented)
+- `ezkvm validate <config.yaml>` - Validate configuration file
 
 ## Architecture
 

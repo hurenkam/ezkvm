@@ -79,6 +79,12 @@ impl<'a> IntoIterator for &'a QemuArgs {
     }
 }
 
+impl AsRef<[String]> for QemuArgs {
+    fn as_ref(&self) -> &[String] {
+        &self.0
+    }
+}
+
 impl From<Vec<String>> for QemuArgs {
     fn from(args: Vec<String>) -> Self {
         Self(args)
@@ -88,12 +94,6 @@ impl From<Vec<String>> for QemuArgs {
 impl From<QemuArgs> for Vec<String> {
     fn from(args: QemuArgs) -> Vec<String> {
         args.0
-    }
-}
-
-impl AsRef<[String]> for QemuArgs {
-    fn as_ref(&self) -> &[String] {
-        &self.0
     }
 }
 

@@ -22,6 +22,11 @@ impl QemuManager {
         Self { config }
     }
     
+    /// Get a reference to the VM configuration
+    pub fn config(&self) -> &VmConfig {
+        &self.config
+    }
+    
     /// Generate the complete QEMU command line
     pub fn build_command(&self) -> Result<QemuArgs> {
         let mut args = QemuArgs::new();

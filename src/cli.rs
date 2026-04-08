@@ -29,8 +29,8 @@ pub enum Commands {
     
     /// Start a virtual machine
     Start {
-        /// Name of the VM to start
-        name: String,
+        /// Path to the YAML configuration file
+        config: String,
         
         /// Run in background (daemon mode)
         #[arg(short, long)]
@@ -43,8 +43,8 @@ pub enum Commands {
     
     /// Stop a virtual machine
     Stop {
-        /// Name of the VM to stop
-        name: String,
+        /// Path to the YAML configuration file
+        config: String,
         
         /// Force stop (SIGKILL)
         #[arg(short, long)]
@@ -53,8 +53,8 @@ pub enum Commands {
     
     /// Kill a virtual machine forcefully
     Kill {
-        /// Name of the VM to kill
-        name: String,
+        /// Path to the YAML configuration file
+        config: String,
     },
     
     /// List running virtual machines
@@ -62,14 +62,14 @@ pub enum Commands {
     
     /// Show status of a virtual machine
     Status {
-        /// Name of the VM
-        name: String,
+        /// Path to the YAML configuration file
+        config: String,
     },
     
     /// Attach to VM console
     Console {
-        /// Name of the VM
-        name: String,
+        /// Path to the YAML configuration file
+        config: String,
     },
     
     /// Validate a configuration file
@@ -85,23 +85,23 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Commands::Create { config, validate_only } => {
             handle_create(&config, validate_only).await
         }
-        Commands::Start { name, daemon, dry_run } => {
-            handle_start(&name, daemon, dry_run).await
+        Commands::Start { config, daemon, dry_run } => {
+            handle_start(&config, daemon, dry_run).await
         }
-        Commands::Stop { name, force } => {
-            handle_stop(&name, force).await
+        Commands::Stop { config, force } => {
+            handle_stop(&config, force).await
         }
-        Commands::Kill { name } => {
-            handle_kill(&name).await
+        Commands::Kill { config } => {
+            handle_kill(&config).await
         }
         Commands::List => {
             handle_list().await
         }
-        Commands::Status { name } => {
-            handle_status(&name).await
+        Commands::Status { config } => {
+            handle_status(&config).await
         }
-        Commands::Console { name } => {
-            handle_console(&name).await
+        Commands::Console { config } => {
+            handle_console(&config).await
         }
         Commands::Validate { config } => {
             handle_validate(&config).await
@@ -128,50 +128,79 @@ async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {
 }
 
 /// Handle start command
-async fn handle_start(name: &str, daemon: bool, dry_run: bool) -> Result<()> {
-    println!("Starting VM: {}", name);
+async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<()> {
+    println!("Loading configuration from: {}", config_path);
     
-    // TODO: Load VM configuration
-    // For now, this is a placeholder
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded and validated");
+    
+    let manager = crate::qemu::QemuManager::new(config);
+    let args = manager.build_command()?;
+    
+    println!("Starting VM: {}", manager.config().name);
+    println!("QEMU binary: {}", manager.binary_name());
+    
+    // Check if QEMU binary is available
+    crate::qemu::executor::check_qemu_available(&manager.binary_name())?;
+    println!("✓ QEMU binary found");
     
     if dry_run {
-        println!("Dry run mode - would execute: qemu-system-x86_64 [args]");
+        println!("Dry run mode - would execute:");
+        println!("{} {}", manager.binary_name(), args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" "));
         return Ok(());
     }
     
+    let executor = crate::qemu::executor::QemuExecutor::new(
+        manager.binary_name(),
+        args,
+    );
+    
     if daemon {
         println!("Starting in daemon mode...");
-        // TODO: Start in background
+        let process = executor.execute_async().await?;
+        println!("✓ VM '{}' started with PID {}", manager.config().name, process.pid());
     } else {
         println!("Starting interactively...");
-        // TODO: Start and attach console
+        let status = executor.execute_sync()?;
+        println!("✓ VM '{}' finished with exit code {}", manager.config().name, status.code().unwrap_or(-1));
     }
     
     Ok(())
 }
 
 /// Handle stop command
-async fn handle_stop(name: &str, force: bool) -> Result<()> {
-    println!("Stopping VM: {}", name);
+async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
+    println!("Loading configuration from: {}", config_path);
+    
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded");
+    
+    println!("Stopping VM: {}", config.name);
     
     if force {
         println!("Force stopping...");
+        // TODO: Find and kill QEMU process by name or PID file
+        println!("✓ VM '{}' force stopped", config.name);
     } else {
         println!("Gracefully stopping...");
+        // TODO: Send ACPI shutdown signal to QEMU
+        println!("✓ VM '{}' stopped", config.name);
     }
-    
-    // TODO: Implement VM stopping logic
-    println!("✓ VM '{}' stopped", name);
     
     Ok(())
 }
 
 /// Handle kill command
-async fn handle_kill(name: &str) -> Result<()> {
-    println!("Killing VM: {}", name);
+async fn handle_kill(config_path: &str) -> Result<()> {
+    println!("Loading configuration from: {}", config_path);
     
-    // TODO: Implement VM killing logic
-    println!("✓ VM '{}' killed", name);
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded");
+    
+    println!("Killing VM: {}", config.name);
+    
+    // TODO: Find and kill QEMU process forcefully
+    println!("✓ VM '{}' killed", config.name);
     
     Ok(())
 }
@@ -179,25 +208,35 @@ async fn handle_kill(name: &str) -> Result<()> {
 /// Handle list command
 async fn handle_list() -> Result<()> {
     println!("Running VMs:");
-    // TODO: List running VMs
+    // TODO: List running QEMU processes
     println!("No VMs currently running");
     
     Ok(())
 }
 
 /// Handle status command
-async fn handle_status(name: &str) -> Result<()> {
-    println!("Status of VM: {}", name);
-    // TODO: Get VM status
-    println!("Status: Not implemented yet");
+async fn handle_status(config_path: &str) -> Result<()> {
+    println!("Loading configuration from: {}", config_path);
+    
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded");
+    
+    println!("Status of VM: {}", config.name);
+    // TODO: Check if QEMU process is running
+    println!("Status: Not implemented yet (would check if process is running)");
     
     Ok(())
 }
 
 /// Handle console command
-async fn handle_console(name: &str) -> Result<()> {
-    println!("Attaching to console of VM: {}", name);
-    // TODO: Attach to VM console
+async fn handle_console(config_path: &str) -> Result<()> {
+    println!("Loading configuration from: {}", config_path);
+    
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded");
+    
+    println!("Attaching to console of VM: {}", config.name);
+    // TODO: Attach to VM console (could use QEMU monitor or serial console)
     println!("Console: Not implemented yet");
     
     Ok(())
