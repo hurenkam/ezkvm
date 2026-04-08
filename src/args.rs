@@ -8,6 +8,13 @@ use log::LevelFilter;
 pub enum EzkvmCommand {
     Help,
     Start { name: String },
+    ImportProxmoxConfig {
+        input: String,
+        output: Option<String>,
+        import_name: Option<String>,
+        strict: bool,
+        dry_run: bool,
+    },
 
     Qga { name: String, cmd: String },
     QgaShutdown { name: String },
@@ -54,6 +61,11 @@ impl EzkvmArguments {
         opts.optflag("", "qmp-system-wakeup", "send a wakeup command to the vm monitor service of a vm");
         opts.optflag("", "qmp-quit", "send a quit command to the vm monitor service of a vm");
         opts.optopt("", "qmp", "send a command to the vm monitor service of a vm", "monitor command");
+        opts.optopt("", "import-proxmox", "import a proxmox vm config file into ezkvm yaml", "proxmox config file");
+        opts.optopt("", "output", "write imported yaml to this file", "yaml output file");
+        opts.optopt("", "import-name", "override imported vm name", "imported vm name");
+        opts.optflag("", "strict", "fail import when warnings are present");
+        opts.optflag("", "dry-run", "print generated yaml without writing output file");
         opts.optflag("h", "help", "print usage message");
 
         let matches = match opts.parse(&args[1..]) {
@@ -63,7 +75,15 @@ impl EzkvmArguments {
             }
         };
 
-        if matches.opt_present("name") {
+        if let Some(input) = matches.opt_str("import-proxmox") {
+            command = EzkvmCommand::ImportProxmoxConfig {
+                input,
+                output: matches.opt_str("output"),
+                import_name: matches.opt_str("import-name"),
+                strict: matches.opt_present("strict"),
+                dry_run: matches.opt_present("dry-run"),
+            }
+        } else if matches.opt_present("name") {
             if let Some(name) = matches.opt_str("name") {
                 if matches.opt_present("start") {
                     command = EzkvmCommand::Start { name }

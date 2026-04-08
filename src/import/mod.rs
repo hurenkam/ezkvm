@@ -10,4 +10,5 @@ pub use report::EzkvmImportResult;
 pub enum ImportError {
     ParseError(String),
     ValidationError(String),
+    IoError(String),
 }

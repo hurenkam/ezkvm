@@ -1,6 +1,5 @@
 extern crate colored;
 mod args;
-#[allow(dead_code)]
 mod import;
 mod osal;
 mod resource;
@@ -74,6 +73,23 @@ fn main() {
             VirtualMachine::load(name)
                 .qmp(cmd)
                 .expect("unable to execute monitor command");
+        }
+        EzkvmCommand::ImportProxmoxConfig {
+            input,
+            output,
+            import_name,
+            strict,
+            dry_run,
+        } => {
+            let summary = import::io::import_from_file(
+                &input,
+                output.as_deref(),
+                import_name.as_deref(),
+                strict,
+                dry_run,
+            )
+            .expect("unable to import proxmox configuration");
+            println!("{}", summary);
         }
         _ => args.print_usage(),
     }
