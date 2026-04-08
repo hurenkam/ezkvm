@@ -6,6 +6,7 @@
 mod cli;
 mod config;
 mod qemu;
+mod state;
 
 use anyhow::Result;
 use clap::Parser;

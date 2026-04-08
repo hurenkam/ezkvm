@@ -115,14 +115,27 @@ async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {
     
     let config = crate::config::VmConfig::from_file(config_path)?;
     println!("✓ Configuration loaded and validated");
+    println!("\nVM Details:");
+    println!("  Name: {}", config.name);
+    println!("  Architecture: {}", config.system.architecture);
+    println!("  Machine: {}", config.system.machine);
+    println!("  Memory: {} MiB", config.system.memory);
+    println!("  vCPUs: {}", config.system.vcpus);
+    println!("  Devices:");
+    println!("    Drives: {}", config.devices.drives.len());
+    println!("    Networks: {}", config.devices.networks.len());
+    println!("    Displays: {}", config.devices.displays.len());
     
     if validate_only {
-        println!("✓ Validation successful");
+        println!("\n✓ Validation successful");
         return Ok(());
     }
     
-    // TODO: Save VM configuration for later use
-    println!("✓ VM '{}' created successfully", config.name);
+    // Cache the VM configuration for later use
+    crate::state::cache_config(&config.name, &config)?;
+    println!("\n✓ VM '{}' configuration cached", config.name);
+    let state_dir = crate::state::get_state_dir()?;
+    println!("Configuration saved to: {}", state_dir.display());
     
     Ok(())
 }
@@ -136,6 +149,12 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     
     // Override daemonize option based on CLI flag
     config.options.daemonize = daemon;
+    
+    // Cache the configuration for quick restarts
+    crate::state::cache_config(&config.name, &config)?;
+    
+    // Cache the configuration for quick restarts
+    crate::state::cache_config(&config.name, &config)?;
     
     let manager = crate::qemu::QemuManager::new(config);
     let args = manager.build_command()?;
@@ -161,11 +180,25 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     if daemon {
         println!("Starting in daemon mode...");
         // With -daemonize, QEMU detaches so this should return quickly
-        let status = executor.execute_sync()?;
-        println!("✓ VM '{}' started (daemonized)", manager.config().name);
+        let _status = executor.execute_sync()?;
+        
+        // Try to find the PID of the started VM
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        if let Ok(pids) = crate::qemu::process::find_qemu_processes(&manager.config().name) {
+            if let Some(pid) = pids.first() {
+                crate::state::save_pid(&manager.config().name, *pid)?;
+                println!("✓ VM '{}' started (daemonized) - PID {}", manager.config().name, pid);
+            } else {
+                println!("✓ VM '{}' started (daemonized)", manager.config().name);
+            }
+        } else {
+            println!("✓ VM '{}' started (daemonized)", manager.config().name);
+        }
     } else {
         println!("Starting interactively...");
         let status = executor.execute_sync()?;
+        // Clean up PID file for interactive mode
+        let _ = crate::state::delete_pid(&manager.config().name);
         println!("✓ VM '{}' finished with exit code {}", manager.config().name, status.code().unwrap_or(-1));
     }
     
@@ -191,6 +224,9 @@ async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
         println!("✓ VM '{}' stopped", config.name);
     }
     
+    // Clean up PID file
+    let _ = crate::state::delete_pid(&config.name);
+    
     Ok(())
 }
 
@@ -205,6 +241,9 @@ async fn handle_kill(config_path: &str) -> Result<()> {
     
     crate::qemu::process::kill_vm(&config.name)?;
     println!("✓ VM '{}' killed", config.name);
+    
+    // Clean up PID file
+    let _ = crate::state::delete_pid(&config.name);
     
     Ok(())
 }
@@ -239,13 +278,39 @@ async fn handle_status(config_path: &str) -> Result<()> {
     let config = crate::config::VmConfig::from_file(config_path)?;
     println!("✓ Configuration loaded");
     
-    println!("Status of VM: {}", config.name);
+    let vm_name = &config.name;
+    println!("Status of VM: {}", vm_name);
     
-    match crate::qemu::process::is_vm_running(&config.name) {
-        Ok(true) => println!("Status: Running"),
-        Ok(false) => println!("Status: Not running"),
+    // First check if we have a PID file
+    if let Ok(Some(pid)) = crate::state::read_pid(vm_name) {
+        // Verify the process still exists
+        match crate::qemu::process::find_qemu_processes(vm_name) {
+            Ok(pids) if pids.contains(&pid) => {
+                println!("Status: Running (PID: {})", pid);
+                println!("Memory: {} MiB", config.system.memory);
+                println!("vCPUs: {}", config.system.vcpus);
+                return Ok(());
+            }
+            _ => {
+                // Process not found, clean up stale PID file
+                let _ = crate::state::delete_pid(vm_name);
+            }
+        }
+    }
+    
+    // Check if process is running (even if no PID file)
+    match crate::qemu::process::is_vm_running(vm_name) {
+        Ok(is_running) => {
+            if is_running {
+                println!("Status: Running");
+                println!("Memory: {} MiB", config.system.memory);
+                println!("vCPUs: {}", config.system.vcpus);
+            } else {
+                println!("Status: Not running");
+            }
+        }
         Err(e) => {
-            eprintln!("Error checking status: {}", e);
+            eprintln!("Error checking VM status: {}", e);
             return Err(e);
         }
     }
@@ -261,8 +326,38 @@ async fn handle_console(config_path: &str) -> Result<()> {
     println!("✓ Configuration loaded");
     
     println!("Attaching to console of VM: {}", config.name);
-    // TODO: Attach to VM console (could use QEMU monitor or serial console)
-    println!("Console: Not implemented yet");
+    
+    // Check if VM is running
+    match crate::qemu::process::is_vm_running(&config.name) {
+        Ok(is_running) if is_running => {
+            // Try to connect via VNC (default QEMU VNC port)
+            // QEMU provides VNC on port 5900 + display number
+            println!("\nVM is running. Attempting VNC connection...");
+            println!("VNC Server: localhost:5900");
+            println!("\nYou can connect using:");
+            println!("  vncviewer localhost:5900");
+            println!("  or any other VNC client\n");
+            
+            // Try to open VNC client if available
+            if let Ok(_) = std::process::Command::new("which")
+                .arg("vncviewer")
+                .output() {
+                println!("Attempting to launch vncviewer...");
+                let _ = std::process::Command::new("vncviewer")
+                    .arg("localhost:5900")
+                    .spawn();
+            }
+        }
+        Ok(_) => {
+            println!("\nError: VM '{}' is not running", config.name);
+            println!("Start the VM first with: ezkvm start {}", config_path);
+            return Err(anyhow::anyhow!("VM is not running"));
+        }
+        Err(e) => {
+            eprintln!("Error checking VM status: {}", e);
+            return Err(e);
+        }
+    }
     
     Ok(())
 }
