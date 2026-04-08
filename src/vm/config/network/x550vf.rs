@@ -16,9 +16,9 @@ pub struct X550vf {
 }
 
 impl X550vf {
-    required_value_getter!(parent("parent"): String = "tap0".to_string());
-    required_value_getter!(vf("vf"): String = "/var/lib/qemu/bridge-up".to_string());
-    required_value_getter!(pci("pci"): String = "/var/lib/qemu/bridge-down".to_string());
+    required_value_getter!(parent("parent"): String = "".to_string());
+    required_value_getter!(vf("vf"): String = "".to_string());
+    required_value_getter!(pci("pci"): String = "".to_string());
 }
 
 #[typetag::deserialize(name = "x550vf")]

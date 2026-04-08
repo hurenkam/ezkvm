@@ -1,87 +1,51 @@
-# Review Checklist
+# Review Status
 
 Date: 2026-04-08  
 Scope: Entire Rust source under src/  
-Validation: cargo test (66 passed, 0 failed)
+Validation: cargo test (77 passed, 0 failed)
 
-## Fix Now (High)
+## Completed
 
-- [x] Passthrough TPM panics at runtime.
-	- Location: src/vm/config/system/tpm/pass_through_tpm.rs:7, src/vm/config/system.rs:56
-	- Impact: VM aborts instead of returning a clean validation error.
-	- Trigger: system.tpm.type = passthrough.
-	- Action: Implement passthrough TPM args or reject this variant during validation/deserialization and add a regression test.
+- All checklist items 1-11 were implemented and validated.
+- VNC handling is now explicit: configured `vnc.port` is treated as TCP port and converted to QEMU display number (`5900 -> :0`).
+- Passthrough TPM support is implemented with QEMU args in `src/vm/config/system/tpm/pass_through_tpm.rs`.
 
-- [x] Apple SMC is configured but never emitted into QEMU args.
-	- Location: src/vm/config/system.rs:33, src/vm/config/system.rs:56, src/vm/config/system/applesmc.rs:17
-	- Impact: macOS-oriented configs can fail due to missing device arg.
-	- Trigger: Any config with applesmc set.
-	- Action: Append applesmc args in System::get_qemu_args and add a test asserting presence.
+## Remaining Decision
 
-- [x] Network device PCI address collisions across multiple NICs.
-	- Location: src/vm/config/network/bridge.rs:24, src/vm/config/network/tap.rs:36, src/vm/config/network/x550vf.rs:30, src/vm/config.rs:249
-	- Impact: Duplicate PCI addresses can fail or miswire devices.
-	- Trigger: Multi-NIC configs.
-	- Action: Derive unique addresses by index or allow explicit slot assignment; add a two-NIC test.
+- [ ] Decide whether to require live integration validation (QEMU/QMP/QGA) in addition to unit tests.
 
-- [x] VNC TCP mapping likely inconsistent with QEMU syntax and may double-select display backend.
-	- Location: src/vm/config/vnc.rs:42
-	- Impact: Port/display mismatch and potential backend conflict.
-	- Trigger: VNC TCP config.
-	- Action: Normalize field semantics (display number vs TCP port), map consistently, remove conflicting duplicate display emission, add CLI-shape test.
+## Overall Assessment
 
-- [x] Unix socket RPC is not stream-message safe.
-	- Location: src/rpc/connection/socket_connection.rs:23, src/rpc/connection/socket_connection.rs:37
-	- Impact: Partial/coalesced frames can break JSON handling and cause flaky RPC behavior.
-	- Trigger: Fragmented or merged reads.
-	- Action: Add framing-aware buffered parsing and tests for split/combined frames.
+- Remaining uncertainty is integration-level behavior on real QEMU/QMP/QGA endpoints and host-specific environments.
 
-## Next (Medium / Medium-High)
+## Config Syntax Gap Assessment
 
-- [x] VM startup rebuilds argv via whitespace split.
-	- Location: src/vm/virtual_machine.rs:50
-	- Impact: Args containing spaces are corrupted before spawn.
-	- Trigger: Any arg value with whitespace.
-	- Action: Pass original vector directly to Command::args; add path-with-space test.
+Date: 2026-04-08  
+Scope: YAML config syntax coverage vs popular QEMU features
 
-- [x] post_start hooks execute even when spawn fails.
-	- Location: src/vm/virtual_machine.rs:64
-	- Impact: Side processes may start after failed VM launch.
-	- Trigger: Spawn errors (missing binary, invalid args, permission issues).
-	- Action: Run post_start only after successful spawn; add negative-path test.
+### Prioritized Implementation Checklist
 
-- [x] extras are modeled but never appended to final QEMU args.
-	- Location: src/vm/config.rs:117, src/vm/config.rs:153, src/vm/config.rs:217
-	- Impact: User-supplied raw extras are silently ignored.
-	- Trigger: Configs relying on extras.
-	- Action: Append extras in Config::get_qemu_args at documented order point; add direct test.
+P1 (High impact)
 
-- [x] Config search locations are not honored by Osal.
-	- Location: src/vm/config.rs:162, src/osal.rs:36
-	- Impact: Lookup depends on current working directory.
-	- Trigger: Config file not in cwd.
-	- Action: Resolve and search all requested locations (including home expansion where intended); add filesystem-backed tests.
+- [ ] Add typed CPU topology fields: threads, dies, clusters; add NUMA node mapping and distance controls.
+- [ ] Add typed memory backend options: hugepages, prealloc, mem-path, backend kind, NUMA placement.
+- [ ] Implement typed virtio balloon and virtio-rng support; wire `memory.balloon` to emitted QEMU args.
+- [ ] Add typed storage performance/reliability options: aio (including io_uring/native), iothreads, throttling, serial/wwn, snapshot mode, error policy.
+- [ ] Add additional typed network backends: user/slirp, socket/vhost-user, macvtap/macvlan, multiqueue options.
 
-- [x] CLI exposes QMP lifecycle commands that always return unsupported.
-	- Location: src/args.rs:52, src/args.rs:73, src/vm/virtual_machine.rs:140
-	- Impact: User-visible commands parse but fail at runtime.
-	- Trigger: qmp-system-reset, qmp-system-powerdown, qmp-system-wakeup, qmp-quit.
-	- Action: Implement via monitor path or hide/remove until supported.
+P2 (Medium impact)
 
-## Hardening (Medium-Low)
+- [ ] Add typed SPICE/VNC security and transport options: auth, TLS, websocket/password controls.
+- [ ] Add typed boot policy controls: boot order, boot once, legacy/firmware policy toggles.
+- [ ] Add typed PCIe topology controls: root ports, switch/slot planning, deterministic placement.
+- [ ] Add typed QMP/monitor endpoint customization instead of fixed paths/options.
 
-- [x] Top-level config tests sort args, masking ordering regressions.
-	- Location: src/vm/config.rs:758
-	- Impact: Ordering-sensitive regressions can pass tests.
-	- Trigger: Refactors that reorder argument assembly.
-	- Action: Keep order-sensitive assertions for critical arg sequences.
+P3 (Documentation alignment)
 
-## Open Questions / Assumptions
+- [ ] Update [doc/CONFIGURATION.md](doc/CONFIGURATION.md) to reflect implemented TPM passthrough support.
+- [ ] Reconcile storage controller docs in [doc/CONFIGURATION.md](doc/CONFIGURATION.md) with current implementation (ide/sata/pvscsi vs documented virtio controller).
 
-- [ ] Confirm whether vnc.port is intended as TCP port or display number.
-- [ ] Confirm passthrough TPM is meant to be supported now vs explicitly unsupported.
-- [ ] Decide whether live integration validation (QEMU/QMP) is required beyond unit tests.
+### Note
 
-## Overall Status
+- Raw `extras` can still express many advanced QEMU flags until typed schema support is added.
 
-- [ ] Runtime risk remains moderate despite green unit tests, concentrated in startup/argument composition, RPC stream handling, and partially exposed features.
