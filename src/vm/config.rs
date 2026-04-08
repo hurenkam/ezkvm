@@ -250,6 +250,8 @@ impl QemuDevice for Config {
             result.extend(network.get_qemu_args(i));
         }
 
+        result.extend(self.extras.clone());
+
         result
     }
 
@@ -315,6 +317,23 @@ mod tests {
         ];
 
         assert_argument_lists_are_equal(actual, expected);
+    }
+
+    #[test]
+    fn test_extras_are_appended() {
+        let config: Config = serde_yaml::from_str(
+            r#"
+            extras:
+              - "-S"
+              - "-name my-extra-name"
+            "#,
+        )
+        .unwrap();
+
+        let actual = config.get_qemu_args(0);
+        assert!(actual.len() >= 2);
+        assert_eq!(actual[actual.len() - 2], "-S");
+        assert_eq!(actual[actual.len() - 1], "-name my-extra-name");
     }
 
     const WINDOWS_GAMING_CONFIG: &str = r#"

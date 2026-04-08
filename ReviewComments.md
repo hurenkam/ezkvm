@@ -50,7 +50,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: Spawn errors (missing binary, invalid args, permission issues).
 	- Action: Run post_start only after successful spawn; add negative-path test.
 
-- [ ] extras are modeled but never appended to final QEMU args.
+- [x] extras are modeled but never appended to final QEMU args.
 	- Location: src/vm/config.rs:117, src/vm/config.rs:153, src/vm/config.rs:217
 	- Impact: User-supplied raw extras are silently ignored.
 	- Trigger: Configs relying on extras.
