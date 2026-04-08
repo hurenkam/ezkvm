@@ -36,7 +36,7 @@ pub struct EzkvmArguments {
 // ezkvm --vm <name> --qmp-system-reset
 // ezkvm --vm <name> --qmp-system-powerdown
 // ezkvm --vm <name> --qmp-system-wakeup
-// ezkvm --vm <name> --qmp-stop
+// ezkvm --vm <name> --qmp-quit
 // ezkvm --vm <name> --qmp '{"execute": "query-status"}'
 impl EzkvmArguments {
     pub fn new(args: Vec<String>) -> Self {
@@ -52,6 +52,7 @@ impl EzkvmArguments {
         opts.optflag("", "qmp-system-reset", "send a reset command to the vm monitor service of a vm");
         opts.optflag("", "qmp-system-powerdown", "send a powerdown command to the vm monitor service of a vm");
         opts.optflag("", "qmp-system-wakeup", "send a wakeup command to the vm monitor service of a vm");
+        opts.optflag("", "qmp-quit", "send a quit command to the vm monitor service of a vm");
         opts.optopt("", "qmp", "send a command to the vm monitor service of a vm", "monitor command");
         opts.optflag("h", "help", "print usage message");
 
@@ -76,6 +77,8 @@ impl EzkvmArguments {
                     command = EzkvmCommand::QmpSystemPowerDown { name }
                 } else if matches.opt_present("qmp-system-wakeup") {
                     command = EzkvmCommand::QmpSystemWakeUp { name }
+                } else if matches.opt_present("qmp-quit") {
+                    command = EzkvmCommand::QmpQuit { name }
                 } else if matches.opt_present("qga") {
                     match matches.opt_str("qga") {
                         None => {}

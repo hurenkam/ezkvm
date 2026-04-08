@@ -14,7 +14,6 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq)]
 pub enum VirtualMachineError {
     NotConnected,
-    CommandNotSupported,
     CommandFailed,
 }
 
@@ -132,12 +131,19 @@ impl VirtualMachine {
 
     pub fn qmp_quit(&self) -> Result<(), VirtualMachineError> {
         trace!("VirtualMachine[{}].qmp_quit()", self.name.clone());
-        Err(VirtualMachineError::CommandNotSupported)
+        let monitor = self.connect_monitor()?;
+        // QEMU may close the monitor socket immediately after quit.
+        let _ = monitor.raw("{\"execute\":\"quit\"}".to_string());
+        Ok(())
     }
 
     pub fn qmp_system_reset(&self) -> Result<(), VirtualMachineError> {
         trace!("VirtualMachine[{}].qmp_system_reset()", self.name.clone());
-        Err(VirtualMachineError::CommandNotSupported)
+        let monitor = self.connect_monitor()?;
+        monitor
+            .raw("{\"execute\":\"system_reset\"}".to_string())
+            .map_err(|_| VirtualMachineError::CommandFailed)?;
+        Ok(())
     }
 
     pub fn qmp_system_power_down(&self) -> Result<(), VirtualMachineError> {
@@ -145,12 +151,20 @@ impl VirtualMachine {
             "VirtualMachine[{}].qmp_system_power_down()",
             self.name.clone()
         );
-        Err(VirtualMachineError::CommandNotSupported)
+        let monitor = self.connect_monitor()?;
+        monitor
+            .raw("{\"execute\":\"system_powerdown\"}".to_string())
+            .map_err(|_| VirtualMachineError::CommandFailed)?;
+        Ok(())
     }
 
     pub fn qmp_system_wake_up(&self) -> Result<(), VirtualMachineError> {
         trace!("VirtualMachine[{}].qmp_system_wake_up()", self.name.clone());
-        Err(VirtualMachineError::CommandNotSupported)
+        let monitor = self.connect_monitor()?;
+        monitor
+            .raw("{\"execute\":\"system_wakeup\"}".to_string())
+            .map_err(|_| VirtualMachineError::CommandFailed)?;
+        Ok(())
     }
 
     pub fn qmp(&self, cmd: String) -> Result<(), VirtualMachineError> {

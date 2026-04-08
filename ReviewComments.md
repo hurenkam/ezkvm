@@ -62,7 +62,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: Config file not in cwd.
 	- Action: Resolve and search all requested locations (including home expansion where intended); add filesystem-backed tests.
 
-- [ ] CLI exposes QMP lifecycle commands that always return unsupported.
+- [x] CLI exposes QMP lifecycle commands that always return unsupported.
 	- Location: src/args.rs:52, src/args.rs:73, src/vm/virtual_machine.rs:140
 	- Impact: User-visible commands parse but fail at runtime.
 	- Trigger: qmp-system-reset, qmp-system-powerdown, qmp-system-wakeup, qmp-quit.
