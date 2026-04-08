@@ -1,5 +1,6 @@
 use log::{debug, error};
 use serde::Deserialize;
+use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,16 @@ pub struct Osal {}
 #[cfg_attr(test, mockall::automock)]
 #[allow(unused)]
 impl Osal {
+    fn resolve_search_location(location: &str) -> PathBuf {
+        if let Some(stripped) = location.strip_prefix("~/") {
+            if let Some(home) = std::env::var_os("HOME") {
+                return PathBuf::from(home).join(stripped);
+            }
+        }
+
+        PathBuf::from(location)
+    }
+
     pub fn get_uid_and_gid() -> (u32, u32) {
         (
             u32::from(nix::unistd::getuid()),
@@ -38,16 +49,21 @@ impl Osal {
         S: 'static + AsRef<str>,
         T: 'static + AsRef<str>,
     {
-        let mut result = vec![];
-
+        let mut results = BTreeSet::new();
         let pattern = pattern.as_ref();
-        if let Ok(matches) = glob::glob(pattern) {
-            for path in matches.flatten() {
-                result.push(path.to_owned());
+
+        for location in locations {
+            let location = Self::resolve_search_location(location.as_ref());
+            let search_pattern = location.join(pattern);
+
+            if let Ok(matches) = glob::glob(search_pattern.to_string_lossy().as_ref()) {
+                for path in matches.flatten() {
+                    results.insert(path);
+                }
             }
         }
 
-        result
+        results.into_iter().collect()
     }
     pub fn read_file<P: 'static + AsRef<Path>>(path: P) -> Result<String, OsalError> {
         let file = format!("{:?}", path.as_ref());
@@ -115,5 +131,49 @@ impl Osal {
                 Err(error)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Osal;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_find_files_searches_all_locations() {
+        let tmp = tempfile::tempdir().unwrap();
+        let loc1 = tmp.path().join("a");
+        let loc2 = tmp.path().join("b");
+        std::fs::create_dir_all(&loc1).unwrap();
+        std::fs::create_dir_all(&loc2).unwrap();
+
+        let file_name = "vm-test.yaml";
+        let file1 = loc1.join(file_name);
+        let file2 = loc2.join(file_name);
+        std::fs::write(&file1, "one").unwrap();
+        std::fs::write(&file2, "two").unwrap();
+
+        let mut actual = Osal::find_files(
+            file_name,
+            vec![
+                loc1.to_string_lossy().to_string(),
+                loc2.to_string_lossy().to_string(),
+            ],
+        );
+        actual.sort();
+
+        let mut expected = vec![file1, file2];
+        expected.sort();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_resolve_search_location_expands_tilde() {
+        let home = std::env::var("HOME").unwrap();
+        let actual = Osal::resolve_search_location("~/.ezkvm");
+        let expected = PathBuf::from(home).join(".ezkvm");
+
+        assert_eq!(actual, expected);
     }
 }

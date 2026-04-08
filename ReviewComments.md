@@ -56,7 +56,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: Configs relying on extras.
 	- Action: Append extras in Config::get_qemu_args at documented order point; add direct test.
 
-- [ ] Config search locations are not honored by Osal.
+- [x] Config search locations are not honored by Osal.
 	- Location: src/vm/config.rs:162, src/osal.rs:36
 	- Impact: Lookup depends on current working directory.
 	- Trigger: Config file not in cwd.
