@@ -6,6 +6,7 @@ pub mod builder;
 pub mod executor;
 pub mod args;
 pub mod types;
+pub mod process;
 
 use crate::config::VmConfig;
 use crate::qemu::types::QemuArgs;
@@ -30,6 +31,9 @@ impl QemuManager {
     /// Generate the complete QEMU command line
     pub fn build_command(&self) -> Result<QemuArgs> {
         let mut args = QemuArgs::new();
+        
+        // Add VM name first
+        args.add_name(&self.config.name);
         
         // Add system arguments
         args.extend(QemuArgs::from(self.config.system.clone()));
@@ -63,8 +67,17 @@ impl QemuManager {
         // Boot order
         if !self.config.boot.boot_order.is_empty() {
             args.push_str("-boot");
-            let order = self.config.boot.boot_order.join(",");
-            args.push(format!("order={}", order));
+            let order: Vec<String> = self.config.boot.boot_order.iter()
+                .map(|device| match device.as_str() {
+                    "disk" | "hd" => "c".to_string(),
+                    "cdrom" | "cd" => "d".to_string(),
+                    "floppy" => "a".to_string(),
+                    "network" => "n".to_string(),
+                    _ => device.clone(),
+                })
+                .collect();
+            let order_str = order.join("");
+            args.push(format!("order={}", order_str));
         }
         
         // Kernel boot (if specified)

@@ -131,8 +131,11 @@ async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {
 async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
     
-    let config = crate::config::VmConfig::from_file(config_path)?;
+    let mut config = crate::config::VmConfig::from_file(config_path)?;
     println!("✓ Configuration loaded and validated");
+    
+    // Override daemonize option based on CLI flag
+    config.options.daemonize = daemon;
     
     let manager = crate::qemu::QemuManager::new(config);
     let args = manager.build_command()?;
@@ -157,8 +160,9 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     
     if daemon {
         println!("Starting in daemon mode...");
-        let process = executor.execute_async().await?;
-        println!("✓ VM '{}' started with PID {}", manager.config().name, process.pid());
+        // With -daemonize, QEMU detaches so this should return quickly
+        let status = executor.execute_sync()?;
+        println!("✓ VM '{}' started (daemonized)", manager.config().name);
     } else {
         println!("Starting interactively...");
         let status = executor.execute_sync()?;
@@ -179,11 +183,11 @@ async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
     
     if force {
         println!("Force stopping...");
-        // TODO: Find and kill QEMU process by name or PID file
+        crate::qemu::process::kill_vm(&config.name)?;
         println!("✓ VM '{}' force stopped", config.name);
     } else {
         println!("Gracefully stopping...");
-        // TODO: Send ACPI shutdown signal to QEMU
+        crate::qemu::process::stop_vm(&config.name)?;
         println!("✓ VM '{}' stopped", config.name);
     }
     
@@ -199,7 +203,7 @@ async fn handle_kill(config_path: &str) -> Result<()> {
     
     println!("Killing VM: {}", config.name);
     
-    // TODO: Find and kill QEMU process forcefully
+    crate::qemu::process::kill_vm(&config.name)?;
     println!("✓ VM '{}' killed", config.name);
     
     Ok(())
@@ -208,8 +212,22 @@ async fn handle_kill(config_path: &str) -> Result<()> {
 /// Handle list command
 async fn handle_list() -> Result<()> {
     println!("Running VMs:");
-    // TODO: List running QEMU processes
-    println!("No VMs currently running");
+    
+    match crate::qemu::process::list_running_vms() {
+        Ok(vms) => {
+            if vms.is_empty() {
+                println!("No VMs currently running");
+            } else {
+                for (name, pid) in vms {
+                    println!("  {} (PID: {})", name, pid);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Error listing VMs: {}", e);
+            return Err(e);
+        }
+    }
     
     Ok(())
 }
@@ -222,8 +240,15 @@ async fn handle_status(config_path: &str) -> Result<()> {
     println!("✓ Configuration loaded");
     
     println!("Status of VM: {}", config.name);
-    // TODO: Check if QEMU process is running
-    println!("Status: Not implemented yet (would check if process is running)");
+    
+    match crate::qemu::process::is_vm_running(&config.name) {
+        Ok(true) => println!("Status: Running"),
+        Ok(false) => println!("Status: Not running"),
+        Err(e) => {
+            eprintln!("Error checking status: {}", e);
+            return Err(e);
+        }
+    }
     
     Ok(())
 }

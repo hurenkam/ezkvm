@@ -11,6 +11,12 @@ impl QemuArgs {
         self.push(format!("type={}", machine));
     }
 
+    /// Add VM name argument
+    pub fn add_name(&mut self, name: &str) {
+        self.push_str("-name");
+        self.push(name.to_string());
+    }
+
     /// Add a CPU argument
     pub fn add_cpu(&mut self, cpu: &str) {
         self.push_str("-cpu");

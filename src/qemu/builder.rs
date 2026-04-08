@@ -18,9 +18,18 @@ impl QemuCommandBuilder {
         }
     }
     
+    /// Set VM name
+    pub fn name(mut self, name: &str) -> Self {
+        self.args.add_name(name);
+        self
+    }
+    
     /// Build from a VM configuration
     pub fn from_config(config: &VmConfig) -> Self {
         let mut builder = Self::new();
+        
+        // Add VM name first
+        builder = builder.name(&config.name);
         
         // Add system configuration
         builder = builder

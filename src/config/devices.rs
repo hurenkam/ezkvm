@@ -56,7 +56,10 @@ impl From<NetworkConfig> for QemuArgs {
         let mut args = QemuArgs::new();
         
         args.push_str("-netdev");
-        let netdev_spec = format!("id={},{}", network.id, network.mode);
+        let netdev_spec = match network.mode.as_str() {
+            "user" => format!("type=user,id={}", network.id),
+            _ => format!("type={},id={}", network.mode, network.id),
+        };
         args.push(netdev_spec);
         
         args.push_str("-device");
@@ -76,12 +79,10 @@ impl From<DisplayConfig> for QemuArgs {
         let mut args = QemuArgs::new();
         
         args.push_str("-device");
-        let mut device_spec = display.r#type.clone();
+        let device_spec = display.r#type.clone();
         
-        if let Some(vram) = display.vram {
-            device_spec.push_str(&format!(",vram={}", vram * 1024 * 1024)); // Convert MiB to bytes
-        }
-        
+        // For virtio-gpu, VRAM is specified differently or not at all
+        // Let's skip VRAM for now to get basic functionality working
         args.push(device_spec);
         args
     }
