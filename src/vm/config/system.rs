@@ -8,7 +8,6 @@ use derive_getters::Getters;
 use memory::Memory;
 use serde::Deserialize;
 use tpm::Tpm;
-use typetag::serde;
 
 mod applesmc;
 mod bios;
