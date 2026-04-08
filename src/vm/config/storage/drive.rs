@@ -52,7 +52,19 @@ impl Drive {
     pub fn get_drive_type(&self) -> &str {
         &self.drive_type
     }
+
+    fn is_empty_cd_tray(&self) -> bool {
+        self.drive_type.eq_ignore_ascii_case("cd")
+            && (self.file.trim().is_empty() || self.file.eq_ignore_ascii_case("none"))
+    }
+
     pub(crate) fn get_drive_options(&self) -> Vec<String> {
+        if self.is_empty_cd_tray() {
+            let mut result = vec!["if=none".to_string(), "media=cdrom".to_string()];
+            result.extend(self.extra_drive_options.clone());
+            return result;
+        }
+
         let mut result = vec![format!("file={}", self.file), "if=none".to_string()];
         if let Some(value) = self.discard() {
             result.push(value);
@@ -174,5 +186,13 @@ mod tests {
             "option_3".to_string(),
         ];
         assert_eq!(storage.get_device_options(), device_args);
+    }
+
+    #[test]
+    fn test_empty_cd_tray_is_rendered_without_backing_file() {
+        let storage = Drive::new("cd".to_string(), "none".to_string());
+
+        let drive_args: Vec<String> = vec!["if=none".to_string(), "media=cdrom".to_string()];
+        assert_eq!(storage.get_drive_options(), drive_args);
     }
 }

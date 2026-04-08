@@ -183,7 +183,14 @@ pub fn map_to_ezkvm_yaml(
         root.insert(s("storage"), Value::Sequence(storage));
     }
 
-    let network = map_network(proxmox, &mut mapped_keys, &mut skipped_keys, &mut warnings);
+    let proxmox_vmid = infer_vmid(proxmox);
+    let network = map_network(
+        proxmox,
+        proxmox_vmid.as_deref(),
+        &mut mapped_keys,
+        &mut skipped_keys,
+        &mut warnings,
+    );
     if !network.is_empty() {
         root.insert(s("network"), Value::Sequence(network));
     }
@@ -282,6 +289,7 @@ fn map_storage(
 
 fn map_network(
     proxmox: &ProxmoxVmConfig,
+    proxmox_vmid: Option<&str>,
     mapped_keys: &mut Vec<String>,
     skipped_keys: &mut Vec<String>,
     warnings: &mut Vec<String>,
@@ -299,8 +307,18 @@ fn map_network(
         };
 
         let mut item = Mapping::new();
-        item.insert(s("type"), s("bridge"));
-        item.insert(s("bridge"), s(bridge));
+        if let Some(vmid) = proxmox_vmid {
+            item.insert(s("type"), s("proxmox_tap"));
+            item.insert(s("bridge"), s(bridge));
+            item.insert(s("vmid"), s(vmid));
+        } else {
+            warnings.push(format!(
+                "network '{}' could not infer vmid; using bridge backend",
+                net.key
+            ));
+            item.insert(s("type"), s("bridge"));
+            item.insert(s("bridge"), s(bridge));
+        }
 
         let driver = normalize_net_driver(&net.model, warnings);
         item.insert(s("driver"), s(&driver));
@@ -806,6 +824,48 @@ fn extract_uuid(proxmox: &ProxmoxVmConfig) -> Option<String> {
     })
 }
 
+fn infer_vmid(proxmox: &ProxmoxVmConfig) -> Option<String> {
+    if let Some(vmid) = proxmox.scalars.get("vmid") {
+        if !vmid.is_empty() && vmid.chars().all(|c| c.is_ascii_digit()) {
+            return Some(vmid.clone());
+        }
+    }
+
+    for value in proxmox.scalars.values() {
+        if let Some(vmid) = extract_vmid_from_text(value) {
+            return Some(vmid);
+        }
+    }
+
+    for disk in &proxmox.disks {
+        if let Some(vmid) = extract_vmid_from_text(&disk.source) {
+            return Some(vmid);
+        }
+    }
+
+    None
+}
+
+fn extract_vmid_from_text(value: &str) -> Option<String> {
+    let mut remaining = value;
+
+    while let Some(pos) = remaining.find("vm-") {
+        let candidate = &remaining[pos + 3..];
+        let digits: String = candidate
+            .chars()
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect();
+
+        if !digits.is_empty() {
+            return Some(digits);
+        }
+
+        remaining = &candidate[0..];
+    }
+
+    None
+}
+
 fn pci_group_key(host: &str) -> String {
     ensure_pci_function(host)
         .rsplit_once('.')
@@ -854,6 +914,8 @@ mod tests {
 
         let parsed: Config = serde_yaml::from_str(&result.yaml).unwrap();
         assert_eq!(parsed.general().name(), "imported-ubuntu");
+        assert!(result.yaml.contains("type: proxmox_tap"));
+        assert!(result.yaml.contains("vmid: '100'") || result.yaml.contains("vmid: \"100\"") || result.yaml.contains("vmid: 100"));
         assert!(!result.mapped_keys.is_empty());
     }
 

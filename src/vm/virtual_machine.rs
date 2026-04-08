@@ -23,6 +23,24 @@ pub struct VirtualMachine {
 }
 
 impl VirtualMachine {
+    fn expand_qemu_args(args: Vec<String>) -> Vec<String> {
+        let mut expanded: Vec<String> = Vec::new();
+
+        for arg in args {
+            match shell_words::split(arg.as_str()) {
+                Ok(tokens) => {
+                    if tokens.is_empty() {
+                        continue;
+                    }
+                    expanded.extend(tokens);
+                }
+                Err(_) => expanded.push(arg),
+            }
+        }
+
+        expanded
+    }
+
     pub fn load(name: String) -> Self {
         trace!("VirtualMachine::load({})", name);
 
@@ -48,7 +66,7 @@ impl VirtualMachine {
         let (uid, gid) = self.config.get_escalated_uid_and_gid();
 
         let mut args: Vec<String> = vec!["qemu-system-x86_64".to_string()];
-        args.extend(self.config.get_qemu_args(0));
+        args.extend(Self::expand_qemu_args(self.config.get_qemu_args(0)));
 
         info!("{}", args.join(" "));
 
@@ -175,5 +193,40 @@ impl VirtualMachine {
             .map_err(|_| VirtualMachineError::CommandFailed)?;
         println!("{}", result);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VirtualMachine;
+
+    #[test]
+    fn expand_qemu_args_splits_compound_options() {
+        let input = vec![
+            "-machine q35".to_string(),
+            "-cpu host".to_string(),
+            "-device virtio-vga-gl,id=vga".to_string(),
+        ];
+
+        let actual = VirtualMachine::expand_qemu_args(input);
+        let expected = vec![
+            "-machine".to_string(),
+            "q35".to_string(),
+            "-cpu".to_string(),
+            "host".to_string(),
+            "-device".to_string(),
+            "virtio-vga-gl,id=vga".to_string(),
+        ];
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn expand_qemu_args_keeps_existing_single_tokens() {
+        let input = vec!["-machine".to_string(), "q35".to_string()];
+
+        let actual = VirtualMachine::expand_qemu_args(input);
+
+        assert_eq!(actual, vec!["-machine".to_string(), "q35".to_string()]);
     }
 }

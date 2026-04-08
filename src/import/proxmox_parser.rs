@@ -6,10 +6,20 @@ use std::collections::HashMap;
 
 pub fn parse_proxmox_config(input: &str) -> Result<ProxmoxVmConfig, ImportError> {
     let mut result = ProxmoxVmConfig::default();
+    let mut in_non_root_section = false;
 
     for (line_no, raw_line) in input.lines().enumerate() {
         let line = raw_line.trim();
         if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        if is_section_header(line) {
+            in_non_root_section = true;
+            continue;
+        }
+
+        if in_non_root_section {
             continue;
         }
 
@@ -66,6 +76,10 @@ fn parse_bus_key(key: &str) -> Option<(String, usize)> {
     }
 
     None
+}
+
+fn is_section_header(line: &str) -> bool {
+    line.starts_with('[') && line.ends_with(']') && line.len() > 2
 }
 
 fn parse_disk_entry(key: &str, bus: &str, index: usize, value: &str) -> ProxmoxDiskEntry {
@@ -214,5 +228,30 @@ mod tests {
         let err = parse_proxmox_config("invalid line").unwrap_err();
         let msg = format!("{:?}", err);
         assert!(msg.contains("invalid line"));
+    }
+
+    #[test]
+    fn test_parse_ignores_snapshot_sections() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-200
+            memory: 4096
+            cores: 2
+            net0: virtio=BC:24:11:AA:BB:CC,bridge=vmbr0
+
+            [intermediate_20240524]
+            snaptime: 1716500000
+            vmstate: local-lvm:vm-200-state-intermediate_20240524
+            memory: 2048
+            [older_snapshot]
+            memory: 1024
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.scalars.get("name").map(String::as_str), Some("vm-200"));
+        assert_eq!(parsed.scalars.get("memory").map(String::as_str), Some("4096"));
+        assert_eq!(parsed.networks.len(), 1);
+        assert_eq!(parsed.networks[0].options.get("bridge").map(String::as_str), Some("vmbr0"));
     }
 }
