@@ -43,10 +43,9 @@ impl QemuDevice for Vnc {
         let mut result = vec![];
         match self.socket {
             VncSocket::TcpPort { ref addr, ref port } => {
-                result.extend(vec![
-                    format!("-vnc {}:{}", addr, port),
-                    "-display vnc=:0".to_string(),
-                ]);
+                // QEMU expects a VNC display number, where TCP port 5900 maps to display 0.
+                let display = if *port >= 5900 { port - 5900 } else { *port };
+                result.push(format!("-vnc {}:{}", addr, display));
             }
 
             VncSocket::UnixSocket { ref path } => {
@@ -70,10 +69,7 @@ mod tests {
             socket: Default::default(),
         };
 
-        let output: Vec<String> = vec![
-            "-vnc 127.0.0.1:5900".to_string(),
-            "-display vnc=:0".to_string(),
-        ];
+        let output: Vec<String> = vec!["-vnc 127.0.0.1:0".to_string()];
 
         assert_eq!(serde_yaml::from_str::<Vnc>(input).unwrap(), data);
         assert_eq!(data.get_qemu_args(0), output);
@@ -94,6 +90,14 @@ mod tests {
         let output: Vec<String> = vec!["-vnc unix:/var/ezkvm/unix.socket".to_string()];
 
         assert_eq!(serde_yaml::from_str::<Vnc>(input).unwrap(), data);
+        assert_eq!(data.get_qemu_args(0), output);
+    }
+
+    #[test]
+    fn test_tcp_port_conversion() {
+        let data = Vnc::new_with_address_and_port("0.0.0.0".to_string(), 5903);
+        let output: Vec<String> = vec!["-vnc 0.0.0.0:3".to_string()];
+
         assert_eq!(data.get_qemu_args(0), output);
     }
 }

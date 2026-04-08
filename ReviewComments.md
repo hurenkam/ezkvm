@@ -24,7 +24,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: Multi-NIC configs.
 	- Action: Derive unique addresses by index or allow explicit slot assignment; add a two-NIC test.
 
-- [ ] VNC TCP mapping likely inconsistent with QEMU syntax and may double-select display backend.
+- [x] VNC TCP mapping likely inconsistent with QEMU syntax and may double-select display backend.
 	- Location: src/vm/config/vnc.rs:42
 	- Impact: Port/display mismatch and potential backend conflict.
 	- Trigger: VNC TCP config.
