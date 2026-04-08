@@ -44,7 +44,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: Any arg value with whitespace.
 	- Action: Pass original vector directly to Command::args; add path-with-space test.
 
-- [ ] post_start hooks execute even when spawn fails.
+- [x] post_start hooks execute even when spawn fails.
 	- Location: src/vm/virtual_machine.rs:64
 	- Impact: Side processes may start after failed VM launch.
 	- Trigger: Spawn errors (missing binary, invalid args, permission issues).

@@ -55,17 +55,16 @@ impl VirtualMachine {
 
         let resources: Vec<String> = self.config.allocate_resources()?;
 
-        let result = match Osal::execute_command(
+        match Osal::execute_command(
             Command::new("/usr/bin/env").args(args).uid(uid).gid(gid),
             Some("qemu".to_string()),
         ) {
-            Ok(child) => Ok(Lock::new(self.name.clone(), child.id(), resources)),
+            Ok(child) => {
+                self.config.post_start(&self.config);
+                Ok(Lock::new(self.name.clone(), child.id(), resources))
+            }
             Err(error) => Err(error),
-        };
-
-        self.config.post_start(&self.config);
-
-        result
+        }
     }
 
     fn connect_guest_agent(
