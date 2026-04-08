@@ -70,7 +70,7 @@ Validation: cargo test (66 passed, 0 failed)
 
 ## Hardening (Medium-Low)
 
-- [ ] Top-level config tests sort args, masking ordering regressions.
+- [x] Top-level config tests sort args, masking ordering regressions.
 	- Location: src/vm/config.rs:758
 	- Impact: Ordering-sensitive regressions can pass tests.
 	- Trigger: Refactors that reorder argument assembly.

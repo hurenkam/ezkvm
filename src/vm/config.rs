@@ -772,16 +772,59 @@ mod tests {
         let _config = Config::read("wakiza").unwrap();
     }
 
-    /// helper function to compare argument lists independent of order
+    /// helper function to compare argument lists independent of overall order
+    /// while asserting critical ordering constraints that affect QEMU behavior
     #[allow(unused)]
     pub fn assert_argument_lists_are_equal(mut actual: Vec<&str>, mut expected: Vec<&str>) {
+        let actual_in_order = actual.clone();
+
         assert_eq!(actual.len(), expected.len());
+
         actual.sort();
         expected.sort();
-        let mut count = 0;
-        while count < actual.len() {
-            assert_eq!(actual[count], expected[count]);
-            count += 1;
+
+        for (actual_arg, expected_arg) in actual.iter().zip(expected.iter()) {
+            assert_arguments_are_equal(actual_arg, expected_arg);
+        }
+
+        assert_critical_argument_order(&actual_in_order);
+    }
+
+    fn assert_critical_argument_order(args: &[&str]) {
+        let index_of = |prefix: &str| args.iter().position(|arg| arg.starts_with(prefix));
+
+        if let (Some(machine), Some(accel)) = (index_of("-machine"), index_of("-accel")) {
+            assert!(
+                machine < accel,
+                "expected -machine before -accel in generated args"
+            );
+        }
+
+        if let (Some(memory), Some(smp)) = (index_of("-m"), index_of("-smp")) {
+            assert!(memory < smp, "expected -m before -smp in generated args");
+        }
+
+        if let (Some(smp), Some(cpu)) = (index_of("-smp"), index_of("-cpu")) {
+            assert!(smp < cpu, "expected -smp before -cpu in generated args");
+        }
+
+        let network_positions: Vec<usize> = args
+            .iter()
+            .enumerate()
+            .filter_map(|(i, arg)| {
+                if arg.starts_with("-netdev") || arg.starts_with("-device ") {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for window in network_positions.windows(2) {
+            assert!(
+                window[0] < window[1],
+                "expected network-related args to preserve emission order"
+            );
         }
     }
 
