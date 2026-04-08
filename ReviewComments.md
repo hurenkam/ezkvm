@@ -30,7 +30,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: VNC TCP config.
 	- Action: Normalize field semantics (display number vs TCP port), map consistently, remove conflicting duplicate display emission, add CLI-shape test.
 
-- [ ] Unix socket RPC is not stream-message safe.
+- [x] Unix socket RPC is not stream-message safe.
 	- Location: src/rpc/connection/socket_connection.rs:23, src/rpc/connection/socket_connection.rs:37
 	- Impact: Partial/coalesced frames can break JSON handling and cause flaky RPC behavior.
 	- Trigger: Fragmented or merged reads.
