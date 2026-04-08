@@ -12,7 +12,7 @@ Validation: cargo test (66 passed, 0 failed)
 	- Trigger: system.tpm.type = passthrough.
 	- Action: Implement passthrough TPM args or reject this variant during validation/deserialization and add a regression test.
 
-- [ ] Apple SMC is configured but never emitted into QEMU args.
+- [x] Apple SMC is configured but never emitted into QEMU args.
 	- Location: src/vm/config/system.rs:33, src/vm/config/system.rs:56, src/vm/config/system/applesmc.rs:17
 	- Impact: macOS-oriented configs can fail due to missing device arg.
 	- Trigger: Any config with applesmc set.

@@ -60,6 +60,9 @@ impl QemuDevice for System {
         result.extend(self.memory.get_qemu_args(0));
         result.extend(self.cpu.get_qemu_args(0));
         result.extend(self.tpm.get_qemu_args(0));
+        if let Some(applesmc) = &self.applesmc {
+            result.extend(applesmc.get_qemu_args(0));
+        }
         result
     }
 
@@ -160,5 +163,21 @@ mod tests {
         );
 
         assert_eq!(actual.get_qemu_args(0), expected.get_qemu_args(0));
+    }
+
+    #[test]
+    fn test_applesmc_is_emitted_when_configured() {
+        let actual: System = serde_yaml::from_str(
+            r#"
+                  applesmc: { osk: "my-osk-key" }
+              "#,
+        )
+        .unwrap();
+
+        assert!(
+            actual
+                .get_qemu_args(0)
+                .contains(&"-device isa-applesmc,osk=my-osk-key".to_string())
+        );
     }
 }
