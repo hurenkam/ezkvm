@@ -54,12 +54,18 @@ impl Cpu {
 impl QemuDevice for Cpu {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         let total = self.sockets * self.cores;
+        let cpu = if self.flags.trim().is_empty() {
+            format!("-cpu {}", self.model)
+        } else {
+            format!("-cpu {},{}", self.model, self.flags)
+        };
+
         vec![
             format!(
                 "-smp {},sockets={},cores={},maxcpus={}",
                 total, self.sockets, self.cores, total
             ),
-            format!("-cpu {},{}", self.model, self.flags),
+            cpu,
         ]
     }
 }
@@ -107,6 +113,23 @@ mod tests {
             "-smp 12,sockets=2,cores=6,maxcpus=12".to_string(),
             "-cpu my_model,my_flags".to_string(),
         ];
+        assert_eq!(cpu.get_qemu_args(0), expected);
+    }
+
+    #[test]
+    fn test_get_qemu_args_without_flags() {
+        let cpu = Cpu {
+            model: "host".to_string(),
+            sockets: 1,
+            cores: 8,
+            flags: "".to_string(),
+        };
+
+        let expected: Vec<String> = vec![
+            "-smp 8,sockets=1,cores=8,maxcpus=8".to_string(),
+            "-cpu host".to_string(),
+        ];
+
         assert_eq!(cpu.get_qemu_args(0), expected);
     }
 }
