@@ -6,15 +6,19 @@ use chipset::Chipset;
 use cpu::Cpu;
 use derive_getters::Getters;
 use memory::Memory;
+use numa::{NumaDistance, NumaNode};
 use serde::Deserialize;
 use tpm::Tpm;
+use virtio_rng::VirtioRng;
 
 mod applesmc;
 mod bios;
 mod chipset;
 mod cpu;
 mod memory;
+mod numa;
 mod tpm;
+mod virtio_rng;
 
 #[allow(dead_code)]
 #[derive(Deserialize, Default, Debug, Getters)]
@@ -31,6 +35,12 @@ pub struct System {
     tpm: Box<dyn Tpm>,
     #[serde(default)]
     applesmc: Option<AppleSmc>,
+    #[serde(default)]
+    numa_nodes: Vec<NumaNode>,
+    #[serde(default)]
+    numa_distances: Vec<NumaDistance>,
+    #[serde(default)]
+    virtio_rng: Option<VirtioRng>,
 }
 
 impl System {
@@ -48,6 +58,9 @@ impl System {
             cpu,
             tpm,
             applesmc: None,
+            numa_nodes: vec![],
+            numa_distances: vec![],
+            virtio_rng: None,
         }
     }
 }
@@ -62,6 +75,15 @@ impl QemuDevice for System {
         result.extend(self.tpm.get_qemu_args(0));
         if let Some(applesmc) = &self.applesmc {
             result.extend(applesmc.get_qemu_args(0));
+        }
+        if let Some(rng) = &self.virtio_rng {
+            result.extend(rng.get_qemu_args(0));
+        }
+        for node in &self.numa_nodes {
+            result.extend(node.get_qemu_args(0));
+        }
+        for dist in &self.numa_distances {
+            result.extend(dist.get_qemu_args(0));
         }
         result
     }

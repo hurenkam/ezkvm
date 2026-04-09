@@ -27,11 +27,11 @@ Scope: YAML config syntax coverage vs popular QEMU features
 
 P1 (High impact)
 
-- [ ] Add typed CPU topology fields: threads, dies, clusters; add NUMA node mapping and distance controls.
-- [ ] Add typed memory backend options: hugepages, prealloc, mem-path, backend kind, NUMA placement.
-- [ ] Implement typed virtio balloon and virtio-rng support; wire `memory.balloon` to emitted QEMU args.
-- [ ] Add typed storage performance/reliability options: aio (including io_uring/native), iothreads, throttling, serial/wwn, snapshot mode, error policy.
-- [ ] Add additional typed network backends: user/slirp, socket/vhost-user, macvtap/macvlan, multiqueue options.
+- [x] Add typed CPU topology fields: threads, dies, clusters; add NUMA node mapping and distance controls.
+- [x] Add typed memory backend options: hugepages, prealloc, mem-path, backend kind, NUMA placement.
+- [x] Implement typed virtio balloon and virtio-rng support; wire `memory.balloon` to emitted QEMU args.
+- [x] Add typed storage performance/reliability options: aio (including io_uring/native), iothreads, throttling, serial/wwn, snapshot mode, error policy.
+- [x] Add additional typed network backends: user/slirp, socket/vhost-user, macvtap/macvlan, multiqueue options.
 
 P2 (Medium impact)
 
