@@ -96,6 +96,30 @@ pub fn map_to_ezkvm_yaml(
         if let Ok(parsed) = memory.parse::<u64>() {
             let mut memory_map = Mapping::new();
             memory_map.insert(s("max"), Value::Number(parsed.into()));
+
+            if let Some(balloon) = proxmox.scalars.get("balloon").and_then(|value| parse_boolish(value)) {
+                memory_map.insert(s("balloon"), Value::Bool(balloon));
+                mapped_keys.push("balloon".to_string());
+            }
+
+            if let Some(hugepages_raw) = proxmox.scalars.get("hugepages") {
+                // Proxmox often stores hugepages as 0/2/1024 where non-zero means enabled.
+                let hugepages_enabled = parse_boolish(hugepages_raw)
+                    .or_else(|| hugepages_raw.parse::<u64>().ok().map(|value| value > 0));
+
+                if let Some(enabled) = hugepages_enabled {
+                    memory_map.insert(s("hugepages"), Value::Bool(enabled));
+                    mapped_keys.push("hugepages".to_string());
+
+                    if enabled {
+                        memory_map.insert(s("prealloc"), Value::Bool(true));
+                    }
+                } else {
+                    warnings.push(format!("unable to parse hugepages '{}'", hugepages_raw));
+                    skipped_keys.push("hugepages".to_string());
+                }
+            }
+
             system.insert(s("memory"), Value::Mapping(memory_map));
             mapped_keys.push("memory".to_string());
         } else {
@@ -132,6 +156,10 @@ pub fn map_to_ezkvm_yaml(
     if let Some(tpm_map) = map_tpm(proxmox, &name, &mut mapped_keys, &mut skipped_keys, &mut warnings)
     {
         system.insert(s("tpm"), Value::Mapping(tpm_map));
+    }
+
+    if let Some(rng_map) = map_rng(proxmox, &mut mapped_keys, &mut skipped_keys, &mut warnings) {
+        system.insert(s("virtio_rng"), Value::Mapping(rng_map));
     }
 
     if !system.is_empty() {
@@ -263,6 +291,18 @@ fn map_storage(
             if let Some(cache) = drive.options.get("cache") {
                 drive_map.insert(s("cache"), s(cache));
             }
+            if let Some(aio) = drive.options.get("aio") {
+                drive_map.insert(s("aio"), s(aio));
+            }
+            if let Some(serial) = drive.options.get("serial") {
+                drive_map.insert(s("serial"), s(serial));
+            }
+            if let Some(werror) = drive.options.get("werror") {
+                drive_map.insert(s("werror"), s(werror));
+            }
+            if let Some(rerror) = drive.options.get("rerror") {
+                drive_map.insert(s("rerror"), s(rerror));
+            }
             if let Some(boot) = drive.options.get("bootindex") {
                 if let Ok(parsed) = boot.parse::<u64>() {
                     drive_map.insert(s("boot_index"), Value::Number(parsed.into()));
@@ -325,6 +365,19 @@ fn map_network(
 
         if let Some(mac) = &net.mac {
             item.insert(s("mac"), s(mac));
+        }
+
+        if let Some(queues) = net.options.get("queues") {
+            if let Ok(parsed) = queues.parse::<u64>() {
+                item.insert(s("queues"), Value::Number(parsed.into()));
+                mapped_keys.push(format!("{}.queues", net.key));
+            } else {
+                warnings.push(format!(
+                    "network '{}' queues '{}' is not numeric; skipping",
+                    net.key, queues
+                ));
+                skipped_keys.push(format!("{}.queues", net.key));
+            }
         }
 
         mapped_keys.push(net.key.clone());
@@ -560,6 +613,47 @@ fn map_tpm(
 
     mapped_keys.push("tpmstate0".to_string());
     Some(tpm)
+}
+
+fn map_rng(
+    proxmox: &ProxmoxVmConfig,
+    mapped_keys: &mut Vec<String>,
+    skipped_keys: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) -> Option<Mapping> {
+    let raw = proxmox.scalars.get("rng0")?;
+    let mut rng = Mapping::new();
+
+    // Proxmox uses rng0 as comma-separated key=value pairs.
+    let options: HashMap<String, String> = raw
+        .split(',')
+        .filter_map(|token| token.trim().split_once('='))
+        .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+        .collect();
+
+    if let Some(source) = options.get("source") {
+        rng.insert(s("filename"), s(source));
+    } else {
+        warnings.push("rng0 present without source option; using ezkvm default /dev/urandom".to_string());
+    }
+
+    if let Some(max_bytes) = options.get("max_bytes") {
+        warnings.push(format!(
+            "rng0 max_bytes={} is not yet represented in typed ezkvm config",
+            max_bytes
+        ));
+        skipped_keys.push("rng0.max_bytes".to_string());
+    }
+    if let Some(period) = options.get("period") {
+        warnings.push(format!(
+            "rng0 period={} is not yet represented in typed ezkvm config",
+            period
+        ));
+        skipped_keys.push("rng0.period".to_string());
+    }
+
+    mapped_keys.push("rng0".to_string());
+    Some(rng)
 }
 
 fn split_gpu_passthrough_devices<'a>(
@@ -898,13 +992,15 @@ mod tests {
             r#"
             name: imported-ubuntu
             memory: 8192
+            balloon: 1
+            hugepages: 1024
             sockets: 1
             cores: 4
             cpu: host
             bios: ovmf
             machine: q35
-            scsi0: /dev/vm1/vm-100-disk-0,discard=on,cache=none
-            net0: virtio=BC:24:11:FF:76:89,bridge=vmbr0
+            scsi0: /dev/vm1/vm-100-disk-0,discard=on,cache=none,aio=io_uring,serial=DISK100,werror=enospc
+            net0: virtio=BC:24:11:FF:76:89,bridge=vmbr0,queues=4
             hostpci0: 0000:03:10.4,multifunction=on
             "#,
         )
@@ -916,6 +1012,13 @@ mod tests {
         assert_eq!(parsed.general().name(), "imported-ubuntu");
         assert!(result.yaml.contains("type: proxmox_tap"));
         assert!(result.yaml.contains("vmid: '100'") || result.yaml.contains("vmid: \"100\"") || result.yaml.contains("vmid: 100"));
+        assert!(result.yaml.contains("balloon: true"));
+        assert!(result.yaml.contains("hugepages: true"));
+        assert!(result.yaml.contains("prealloc: true"));
+        assert!(result.yaml.contains("aio: io_uring"));
+        assert!(result.yaml.contains("serial: DISK100"));
+        assert!(result.yaml.contains("werror: enospc"));
+        assert!(result.yaml.contains("queues: 4"));
         assert!(!result.mapped_keys.is_empty());
     }
 
@@ -930,6 +1033,7 @@ mod tests {
             bios: ovmf
             efidisk0: /dev/vm1/desktop-efidisk,efitype=4m,pre-enrolled-keys=1
             tpmstate0: /dev/vm1/desktop-tpmstate,version=v2.0
+            rng0: source=/dev/random,max_bytes=1024,period=1000
             vga: virtio-gl
             args: -S -name "desktop vm"
             "#,
@@ -943,6 +1047,10 @@ mod tests {
         assert!(result.yaml.contains("type: virtio"));
         assert!(result.yaml.contains("type: remote-viewer"));
         assert!(result.yaml.contains("secure_boot: true"));
+        assert!(result.yaml.contains("virtio_rng:"));
+        assert!(result.yaml.contains("filename: /dev/random"));
+        assert!(result.skipped_keys.contains(&"rng0.max_bytes".to_string()));
+        assert!(result.skipped_keys.contains(&"rng0.period".to_string()));
         assert!(result.yaml.contains("- -name"));
         assert!(result.yaml.contains("- desktop vm"));
     }
