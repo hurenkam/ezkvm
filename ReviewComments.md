@@ -35,9 +35,9 @@ P1 (High impact)
 
 P2 (Medium impact)
 
-- [ ] Add typed SPICE/VNC security and transport options: auth, TLS, websocket/password controls.
-- [ ] Add typed boot policy controls: boot order, boot once, legacy/firmware policy toggles.
-- [ ] Add typed PCIe topology controls: root ports, switch/slot planning, deterministic placement.
+- [x] Add typed SPICE/VNC security and transport options: auth, TLS, websocket/password controls.
+- [x] Add typed boot policy controls: boot order, boot once, legacy/firmware policy toggles.
+- [x] Add typed PCIe topology controls: root ports, switch/slot planning, deterministic placement.
 - [ ] Add typed QMP/monitor endpoint customization instead of fixed paths/options.
 
 P3 (Documentation alignment)

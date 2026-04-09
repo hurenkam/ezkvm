@@ -138,6 +138,11 @@ mod tests {
                 None,
                 None,
                 Ovmf::secure_boot_default(),
+                Ovmf::boot_menu_default(),
+                Ovmf::boot_strict_default(),
+                Ovmf::reboot_timeout_default(),
+                None,
+                None,
             )),
             Memory::new(16384, Some(false)),
             Cpu::new(
@@ -172,6 +177,11 @@ mod tests {
                 None,
                 None,
                 Ovmf::secure_boot_default(),
+                Ovmf::boot_menu_default(),
+                Ovmf::boot_strict_default(),
+                Ovmf::reboot_timeout_default(),
+                None,
+                None,
             )),
             Memory::new(16384, Some(false)),
             Cpu::new(

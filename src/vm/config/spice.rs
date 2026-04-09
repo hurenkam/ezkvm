@@ -34,13 +34,32 @@ pub struct Spice {
     socket: SpiceSocket,
     #[serde(default, flatten, deserialize_with = "default_when_missing")]
     display: SpiceDisplay,
+    #[serde(default = "Spice::disable_ticketing_default")]
+    disable_ticketing: bool,
+    #[serde(default)]
+    password: Option<String>,
+    #[serde(default)]
+    tls_port: Option<u16>,
+    #[serde(default)]
+    x509_dir: Option<String>,
+    #[serde(default)]
+    websocket_port: Option<u16>,
 }
 
 impl Spice {
+    fn disable_ticketing_default() -> bool {
+        true
+    }
+
     pub fn new_with_address_and_port(addr: String, port: u16) -> Self {
         Self {
             socket: SpiceSocket::TcpPort { addr, port },
             display: SpiceDisplay::Disabled,
+            disable_ticketing: Self::disable_ticketing_default(),
+            password: None,
+            tls_port: None,
+            x509_dir: None,
+            websocket_port: None,
         }
     }
 
@@ -52,6 +71,11 @@ impl Spice {
         Self {
             socket: SpiceSocket::TcpPort { addr, port },
             display: SpiceDisplay::Enabled { render_node },
+            disable_ticketing: Self::disable_ticketing_default(),
+            password: None,
+            tls_port: None,
+            x509_dir: None,
+            websocket_port: None,
         }
     }
 
@@ -59,6 +83,41 @@ impl Spice {
         Self {
             socket: SpiceSocket::UnixSocket { path },
             display: SpiceDisplay::Enabled { render_node },
+            disable_ticketing: Self::disable_ticketing_default(),
+            password: None,
+            tls_port: None,
+            x509_dir: None,
+            websocket_port: None,
+        }
+    }
+
+    fn get_security_options(&self) -> String {
+        let mut options: Vec<String> = vec![];
+
+        if self.disable_ticketing {
+            options.push("disable-ticketing=on".to_string());
+        }
+
+        if let Some(ref password) = self.password {
+            options.push(format!("password={}", password));
+        }
+
+        if let Some(tls_port) = self.tls_port {
+            options.push(format!("tls-port={}", tls_port));
+        }
+
+        if let Some(ref x509_dir) = self.x509_dir {
+            options.push(format!("x509-dir={}", x509_dir));
+        }
+
+        if let Some(websocket_port) = self.websocket_port {
+            options.push(format!("websocket={}", websocket_port));
+        }
+
+        if options.is_empty() {
+            "".to_string()
+        } else {
+            format!(",{}", options.join(","))
         }
     }
 }
@@ -68,9 +127,10 @@ impl QemuDevice for Spice {
         let mut result = vec![];
         match self.socket {
             SpiceSocket::TcpPort { ref addr, ref port } => {
+                let security = self.get_security_options();
                 result.extend(vec![format!(
-                    "-spice port={},addr={},disable-ticketing=on",
-                    port, addr
+                    "-spice port={},addr={}{}",
+                    port, addr, security
                 )]);
                 match &self.display {
                     SpiceDisplay::Disabled => {}
@@ -96,9 +156,11 @@ impl QemuDevice for Spice {
                     }
                 };
 
+                let security = self.get_security_options();
+
                 result.extend(vec![format!(
-                    "-spice unix=on,addr={}{},disable-ticketing=on",
-                    path, gl_options
+                    "-spice unix=on,addr={}{}{}",
+                    path, gl_options, security
                 )]);
             }
         }
@@ -128,6 +190,11 @@ mod tests {
         let data = Spice {
             socket: Default::default(),
             display: Default::default(),
+            disable_ticketing: true,
+            password: None,
+            tls_port: None,
+            x509_dir: None,
+            websocket_port: None,
         };
 
         let output: Vec<String> = vec![
@@ -162,6 +229,11 @@ mod tests {
             display: SpiceDisplay::Enabled {
                 render_node: Some("/dev/dri/renderD128".to_string()),
             },
+            disable_ticketing: true,
+            password: None,
+            tls_port: None,
+            x509_dir: None,
+            websocket_port: None,
         };
 
         let output: Vec<String> = vec![
@@ -195,6 +267,11 @@ mod tests {
             display: SpiceDisplay::Enabled {
                 render_node: Some("/dev/dri/renderD128".to_string()),
             },
+            disable_ticketing: true,
+            password: None,
+            tls_port: None,
+            x509_dir: None,
+            websocket_port: None,
         };
 
         let output: Vec<String> = vec![
@@ -209,5 +286,25 @@ mod tests {
 
         assert_eq!(serde_yaml::from_str::<Spice>(input).unwrap(), data);
         assert_eq!(data.get_qemu_args(0), output);
+    }
+
+    #[test]
+    fn test_security_and_transport_options() {
+        let input = r#"
+            addr: 0.0.0.0
+            port: 5901
+            disable_ticketing: false
+            password: secret
+            tls_port: 5902
+            x509_dir: /etc/pki/qemu
+            websocket_port: 6100
+        "#;
+
+        let spice: Spice = serde_yaml::from_str(input).unwrap();
+        let args = spice.get_qemu_args(0);
+        assert_eq!(
+            args[0],
+            "-spice port=5901,addr=0.0.0.0,password=secret,tls-port=5902,x509-dir=/etc/pki/qemu,websocket=6100"
+        );
     }
 }

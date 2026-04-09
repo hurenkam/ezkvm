@@ -45,6 +45,16 @@ pub struct Ovmf {
     size: Option<OvmfSize>,
     #[serde(default = "Ovmf::secure_boot_default")]
     secure_boot: Option<bool>,
+    #[serde(default = "Ovmf::boot_menu_default")]
+    boot_menu: Option<bool>,
+    #[serde(default = "Ovmf::boot_strict_default")]
+    boot_strict: Option<bool>,
+    #[serde(default = "Ovmf::reboot_timeout_default")]
+    reboot_timeout: Option<u32>,
+    #[serde(default)]
+    boot_order: Option<String>,
+    #[serde(default)]
+    boot_once: Option<String>,
 }
 
 impl Ovmf {
@@ -55,6 +65,18 @@ impl Ovmf {
         Some(true)
     }
 
+    pub fn boot_menu_default() -> Option<bool> {
+        Some(true)
+    }
+
+    pub fn boot_strict_default() -> Option<bool> {
+        Some(true)
+    }
+
+    pub fn reboot_timeout_default() -> Option<u32> {
+        Some(1000)
+    }
+
     #[cfg(test)]
     pub fn new(
         settings_file: String,
@@ -62,6 +84,11 @@ impl Ovmf {
         arch: Option<OvmfArch>,
         size: Option<OvmfSize>,
         secure_boot: Option<bool>,
+        boot_menu: Option<bool>,
+        boot_strict: Option<bool>,
+        reboot_timeout: Option<u32>,
+        boot_order: Option<String>,
+        boot_once: Option<String>,
     ) -> Self {
         Self {
             settings_file,
@@ -69,7 +96,40 @@ impl Ovmf {
             arch,
             size,
             secure_boot,
+            boot_menu,
+            boot_strict,
+            reboot_timeout,
+            boot_order,
+            boot_once,
         }
+    }
+
+    fn boot_arg(&self) -> String {
+        let menu = if self.boot_menu.unwrap_or(true) {
+            "on"
+        } else {
+            "off"
+        };
+        let strict = if self.boot_strict.unwrap_or(true) {
+            "on"
+        } else {
+            "off"
+        };
+        let reboot_timeout = self.reboot_timeout.unwrap_or(1000);
+
+        let mut boot = format!(
+            "-boot menu={},strict={},reboot-timeout={}",
+            menu, strict, reboot_timeout
+        );
+
+        if let Some(ref order) = self.boot_order {
+            boot.push_str(format!(",order={}", order).as_str());
+        }
+        if let Some(ref once) = self.boot_once {
+            boot.push_str(format!(",once={}", once).as_str());
+        }
+
+        boot
     }
 
     fn boot_rom_file(&self) -> String {
@@ -112,7 +172,7 @@ impl Ovmf {
 impl QemuDevice for Ovmf {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
         vec![
-            "-boot menu=on,strict=on,reboot-timeout=1000".to_string(),
+            self.boot_arg(),
             format!("-smbios type=1{}", self.uuid()),
             format!(
                 "-drive if=pflash,unit=0,format=raw,readonly=on{}{}",
@@ -149,6 +209,11 @@ mod tests {
             arch: None,
             size: None,
             secure_boot: Ovmf::secure_boot_default(),
+            boot_menu: Ovmf::boot_menu_default(),
+            boot_strict: Ovmf::boot_strict_default(),
+            reboot_timeout: Ovmf::reboot_timeout_default(),
+            boot_order: None,
+            boot_once: None,
         };
         assert_eq!(actual, ovmf);
 
@@ -177,6 +242,11 @@ mod tests {
             arch: Some(OvmfArch::Arch64),
             size: Some(OvmfSize::Size2M),
             secure_boot: Some(false),
+            boot_menu: Ovmf::boot_menu_default(),
+            boot_strict: Ovmf::boot_strict_default(),
+            reboot_timeout: Ovmf::reboot_timeout_default(),
+            boot_order: None,
+            boot_once: None,
         };
         assert_eq!(actual, ovmf);
 
@@ -191,5 +261,27 @@ mod tests {
                     .to_string()
             ]
         );
+    }
+
+    #[test]
+    fn test_boot_policy_customization() {
+        let ovmf: Ovmf = serde_yaml::from_str(
+            r#"
+                file: the_file
+                secure_boot: true
+                boot_menu: false
+                boot_strict: false
+                reboot_timeout: 2000
+                boot_order: cd
+                boot_once: c
+            "#,
+        )
+        .unwrap();
+
+        assert!(ovmf.get_qemu_args(0)[0].contains("menu=off"));
+        assert!(ovmf.get_qemu_args(0)[0].contains("strict=off"));
+        assert!(ovmf.get_qemu_args(0)[0].contains("reboot-timeout=2000"));
+        assert!(ovmf.get_qemu_args(0)[0].contains("order=cd"));
+        assert!(ovmf.get_qemu_args(0)[0].contains("once=c"));
     }
 }
