@@ -42,8 +42,8 @@ P2 (Medium impact)
 
 P3 (Documentation alignment)
 
-- [ ] Update [doc/CONFIGURATION.md](doc/CONFIGURATION.md) to reflect implemented TPM passthrough support.
-- [ ] Reconcile storage controller docs in [doc/CONFIGURATION.md](doc/CONFIGURATION.md) with current implementation (ide/sata/pvscsi vs documented virtio controller).
+- [x] Update [doc/CONFIGURATION.md](doc/CONFIGURATION.md) to reflect implemented TPM passthrough support.
+- [x] Reconcile storage controller docs in [doc/CONFIGURATION.md](doc/CONFIGURATION.md) with current implementation (ide/sata/pvscsi vs documented virtio controller).
 
 ### Note
 

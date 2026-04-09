@@ -23,7 +23,10 @@ There are currently 10 sections defined in the config file.
     - `bios`: Can be SeaBios or OVMF (UEFI)
     - `memory`: Amount of memory assigned (in Mib)
     - `cpu`: Cpu type and amount of sockets/cores/threads
-    - `tpm`: Can be None or Swtpm. Passthrough is planned.
+    - `tpm`: Supported types are `no_tpm`, `swtpm`, and `passthrough`.
+      - `no_tpm`: No TPM device is exposed to the guest.
+      - `swtpm`: Software TPM emulator with state disk and Unix socket.
+      - `passthrough`: Host TPM passthrough using `/dev/tpm0`.
     - `applesmc`: Here you can provide the osk key for macOS.
 
 3) `gpu`
@@ -90,8 +93,9 @@ There are currently 10 sections defined in the config file.
       install the ezkvm_ovmf package, a proxmos_ovmf package, or built your own.
     - `sata`: This enables a simulated sata bus on the host.
     - `ide`: This uses a simulated ide bus.
-    - `virtio`: This does not really simulate a bus, but instantiates a `virtio-pci-blk`
-      instance for each listed device.
+
+   Note: The currently implemented storage controllers are `pvscsi`, `sata`, and `ide`.
+   A typed `virtio` storage controller is not currently implemented in the schema.
 
 9) `network`
 
