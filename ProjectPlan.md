@@ -6,8 +6,10 @@
 - **Configuration**: YAML files translated to direct QEMU commands
 - **Scope**: QEMU/KVM only, no libvirt abstraction layer
 - **Architecture**: CLI tool with modular design for future expansion
+- **Status**: ✅ Completed as of April 10, 2026
 
 ## **Phase 1: Project Setup & Core Infrastructure (1-2 weeks)**
+**Status**: ✅ COMPLETED
 
 ### 1.1 Initialize Rust Project
 ```bash
@@ -45,6 +47,7 @@ ezkvm/
 ```
 
 ## **Phase 2: YAML Configuration Schema & Parsing (2-3 weeks)**
+**Status**: ✅ COMPLETED
 
 ### 2.1 Define YAML Schema
 Create a simplified, human-readable schema covering essential VM components:
@@ -96,8 +99,33 @@ options:
 - File path resolution (absolute/relative)
 - Environment variable substitution
 - Schema validation before VM creation
+- Global tool configuration loaded from `/etc/ezkvm.yaml`
+
+### 2.4 Central Tool Configuration
+- Store external tool paths and runtime directories in a central config file so they do not need to appear in every VM YAML
+- Default location: `/etc/ezkvm.yaml`
+- Support override via `EZKVM_CONFIG` or CLI flags
+- Example central config:
+
+```yaml
+tools:
+  swtpm: "/usr/bin/swtpm"
+  remote_viewer: "/usr/bin/remote-viewer"
+  looking_glass: "/usr/bin/looking-glass-client"
+
+locations:
+  run_dir: "/var/run/ezkvm"
+  ovmf_dir: "/usr/share/OVMF"
+  vm_dir: "/etc/ezkvm/vms"
+  template_dir: "/etc/ezkvm/templates"
+```
+
+- VM YAML can reference these central tool settings implicitly, with optional per-VM overrides for special cases
+- Support automation hooks that use central tool paths for TPM and viewer clients, so VM configs only need feature toggles
 
 ## **Phase 3: QEMU Command Generation (2-3 weeks)**
+
+**Status**: ✅ COMPLETED
 
 ### 3.1 Argument Builder Pattern
 - Type-safe QEMU argument construction
@@ -115,6 +143,7 @@ options:
 - Graceful cleanup on failures
 
 ## **Phase 4: CLI Interface & VM Management (2 weeks)**
+**Status**: ✅ COMPLETED
 
 ### 4.1 Core Commands
 ```bash
@@ -133,11 +162,13 @@ ezkvm console <vm-name>       # Attach to VM console
 - Log rotation for VM output
 
 ## **Phase 5: Advanced Features (3-4 weeks)**
+**Status**: ✅ COMPLETED
 
 ### 5.1 Device Management
 - Hot-plug support for drives/networks
 - USB device passthrough
 - SPICE/VNC remote access
+- Automatic service startup for configured features (pre-start TPM emulator, post-start remote-viewer or Looking Glass client)
 
 ### 5.2 Networking
 - Bridge mode configuration
@@ -150,6 +181,7 @@ ezkvm console <vm-name>       # Attach to VM console
 - Live migration preparation
 
 ## **Phase 6: Testing & Documentation (2 weeks)**
+**Status**: ✅ COMPLETED
 
 ### 6.1 Testing Strategy
 - Unit tests for configuration parsing
@@ -163,6 +195,9 @@ ezkvm console <vm-name>       # Attach to VM console
 - Migration guide from virt-manager
 
 ## **Technical Decisions**
+
+> The original project plan has been fully implemented. The repository now supports the advanced ezkvm feature set described in the roadmap, including TPM, guest agent, ballooning, UEFI, VFIO passthrough, SPICE, Looking Glass, SCSI/iSCSI, QMP, SMBIOS, NUMA, and Hyper-V enlightenments.
+
 
 ### **QEMU Integration Approach**
 - **Phase 1-2**: Generate command-line arguments (simple, reliable)
@@ -201,6 +236,44 @@ ezkvm console <vm-name>       # Attach to VM console
 - ✅ Faster startup than libvirt (target: <500ms overhead)
 
 ## **Timeline & Milestones**
-- **Month 1**: Project setup, YAML parsing, basic QEMU execution
-- **Month 2**: CLI interface, VM lifecycle management, testing
-- **Month 3**: Advanced features, documentation, performance optimization
+- **Month 1**: Project setup, YAML parsing, basic QEMU execution ✅
+- **Month 2**: CLI interface, VM lifecycle management, testing ✅
+- **Month 3**: Advanced features, documentation, performance optimization ✅
+
+## **Phase 7: Proxmox Config Importer (Optional)**
+**Status**: Planned
+
+### 7.1 Importer CLI
+- Add a new command such as `ezkvm import-proxmox <proxmox-config>`
+- Support direct file import and optional Proxmox API source
+- Emit validated `ezkvm` YAML configuration files
+
+### 7.2 Proxmox Config Mapping
+- Parse Proxmox VM definition syntax and key/value pairs
+- Map `memory`, `cores`, `cpu`, `machine`, `bios`, `efitype`, `boot`
+- Convert `virtioX`, `scsiX`, `ideX`, `sataX`, `netX`, `hostpciX`, `usbX`
+- Translate `scsihw`, `tpmstate0`, `vmgenid`, `smbios1`, `agent`, `spice`, `args`
+- Preserve unsupported fields as fallback raw configuration
+
+### 7.3 Validation and Output
+- Validate the generated YAML against existing `ezkvm` schema
+- Warn on unmapped or partially supported config items
+- Allow import as a draft YAML for manual review
+
+### 7.4 Implementation Structure
+- `src/importer/proxmox.rs` for parsing and mapping logic
+- `src/importer/mod.rs` for importer CLI integration
+- `src/cli.rs` add new import commands
+- `src/config/proxmox_mapping.rs` or helper modules for conversion tables
+
+### 7.5 Benefits
+- Provides a migration path from Proxmox to ezkvm
+- Makes ezkvm useful to existing Proxmox users immediately
+- Preserves advanced VM configuration in YAML-first format
+
+## **Future Work**
+- Optional storage pool metadata integration
+- Extended host device discovery and validation
+- Additional KVM paravirtualization enhancements
+- Production-focused operation and migration documentation
+- Proxmox configuration import and conversion support
