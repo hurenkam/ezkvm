@@ -2,6 +2,7 @@ mod drive;
 mod ide;
 mod pvscsi;
 mod sata;
+mod virtio_scsi_single;
 
 #[typetag::deserialize(tag = "controller")]
 pub trait Controller: 'static + Any + QemuDevice {}

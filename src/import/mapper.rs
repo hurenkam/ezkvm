@@ -6,6 +6,7 @@ use super::ImportError;
 use serde_yaml::{Mapping, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+#[allow(dead_code)]
 pub fn map_to_ezkvm_yaml(
     proxmox: &ProxmoxVmConfig,
     name_override: Option<&str>,
@@ -231,9 +232,14 @@ pub fn map_to_ezkvm_yaml_with_storage(
         root.insert(s("display"), Value::Mapping(display));
     }
 
+    let boot_order = parse_boot_order(proxmox, &mut mapped_keys, &mut skipped_keys, &mut warnings);
+    let scsihw = parse_scsihw(proxmox, &mut mapped_keys);
+
     let storage = map_storage(
         &proxmox.disks,
         storage_config,
+        &boot_order,
+        &scsihw,
         &mut mapped_keys,
         &mut skipped_keys,
         &mut warnings,
@@ -283,9 +289,53 @@ pub fn map_to_ezkvm_yaml_with_storage(
     })
 }
 
+fn parse_boot_order(
+    proxmox: &ProxmoxVmConfig,
+    mapped_keys: &mut Vec<String>,
+    skipped_keys: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) -> Vec<String> {
+    let Some(raw) = proxmox.scalars.get("boot") else {
+        return vec![];
+    };
+
+    // Expected format: "order=scsi2" or "order=scsi2;net0;ide0"
+    for token in raw.split(',').map(str::trim) {
+        if let Some(order_value) = token.strip_prefix("order=") {
+            let devices: Vec<String> = order_value
+                .split(';')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect();
+            if devices.is_empty() {
+                warnings.push(format!("boot order '{}' has no devices; skipping", raw));
+                skipped_keys.push("boot".to_string());
+            } else {
+                mapped_keys.push("boot".to_string());
+            }
+            return devices;
+        }
+    }
+    warnings.push(format!(
+        "boot '{}' has no recognized 'order=' clause; skipping",
+        raw
+    ));
+    skipped_keys.push("boot".to_string());
+    vec![]
+}
+
+fn parse_scsihw(proxmox: &ProxmoxVmConfig, mapped_keys: &mut Vec<String>) -> Option<String> {
+    let raw = proxmox.scalars.get("scsihw")?;
+    mapped_keys.push("scsihw".to_string());
+    Some(raw.to_ascii_lowercase())
+}
+
 fn map_storage(
     disks: &[ProxmoxDiskEntry],
     storage_config: Option<&ProxmoxStorageConfig>,
+    boot_order: &[String],
+    scsihw: &Option<String>,
     mapped_keys: &mut Vec<String>,
     skipped_keys: &mut Vec<String>,
     warnings: &mut Vec<String>,
@@ -303,7 +353,15 @@ fn map_storage(
             continue;
         }
 
-        let controller_name = if bus == "scsi" { "pvscsi" } else { &bus };
+        let use_virtio_scsi_single = bus == "scsi"
+            && scsihw.as_deref() == Some("virtio-scsi-single");
+        let controller_name = if use_virtio_scsi_single {
+            "virtio-scsi-single"
+        } else if bus == "scsi" {
+            "pvscsi"
+        } else {
+            &bus
+        };
 
         let mut controller = Mapping::new();
         controller.insert(s("controller"), s(controller_name));
@@ -337,10 +395,14 @@ fn map_storage(
             if let Some(rerror) = drive.options.get("rerror") {
                 drive_map.insert(s("rerror"), s(rerror));
             }
+            // Explicit per-drive bootindex option takes precedence
             if let Some(boot) = drive.options.get("bootindex") {
                 if let Ok(parsed) = boot.parse::<u64>() {
                     drive_map.insert(s("boot_index"), Value::Number(parsed.into()));
                 }
+            } else if let Some(pos) = boot_order.iter().position(|k| k == &drive.key) {
+                // 1-based position in the Proxmox boot order sequence
+                drive_map.insert(s("boot_index"), Value::Number(((pos + 1) as u64).into()));
             }
 
             if !resolved_source.starts_with('/') {
@@ -523,7 +585,7 @@ fn map_cpu(
 ) {
     let mut tokens = value.split(',').map(|token| token.trim()).filter(|token| !token.is_empty());
     let mut model = tokens.next().unwrap_or("qemu64").to_string();
-    let mut flags = Some(String::new());
+    let mut explicit_flags: Option<String> = None;
 
     if let Some((key, parsed_model)) = model.split_once('=') {
         if key == "cputype" || key == "model" {
@@ -535,7 +597,8 @@ fn map_cpu(
         if let Some((key, raw_value)) = token.split_once('=') {
             match key.trim() {
                 "flags" => {
-                    flags = Some(raw_value.trim().to_string());
+                    // Proxmox uses semicolons to separate flags; ezkvm expects commas
+                    explicit_flags = Some(raw_value.trim().replace(';', ","));
                 }
                 "hidden" | "hv-vendor-id" | "reported-model" => warnings.push(format!(
                     "cpu option '{}' is not represented in typed ezkvm config; consider preserving it in extras manually",
@@ -549,8 +612,30 @@ fn map_cpu(
         }
     }
 
+    // KVM passthrough models: Proxmox automatically adds paravirt flags that are not
+    // explicit in the VM config. Inject them here so guest behaviour matches.
+    let is_kvm_passthrough = matches!(model.as_str(), "host" | "host-passthrough" | "host-model");
+    let flags = if is_kvm_passthrough {
+        let mut f = explicit_flags.unwrap_or_default();
+        if !f.contains("kvm_pv_eoi") {
+            let paravirt = "+kvm_pv_eoi,+kvm_pv_unhalt";
+            f = if f.is_empty() {
+                paravirt.to_string()
+            } else {
+                format!("{},{}", paravirt, f)
+            };
+            warnings.push(format!(
+                "paravirt flags +kvm_pv_eoi,+kvm_pv_unhalt injected for cpu model '{}' (Proxmox implicit default)",
+                model
+            ));
+        }
+        f
+    } else {
+        explicit_flags.unwrap_or_default()
+    };
+
     cpu.insert(s("model"), s(&model));
-    cpu.insert(s("flags"), s(flags.as_deref().unwrap_or("")));
+    cpu.insert(s("flags"), s(&flags));
     mapped_keys.push("cpu".to_string());
 }
 
@@ -1263,6 +1348,146 @@ mod tests {
         assert!(result.yaml.contains("port: '2'") || result.yaml.contains("port: \"2\"") || result.yaml.contains("port: 2"));
         assert!(!result.yaml.contains("vm_id: '1'"));
         assert!(!result.yaml.contains("vm_id: '2'"));
+    }
+
+    #[test]
+    fn test_map_scsihw_virtio_scsi_single_uses_correct_controller() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: scsi-single-vm
+            scsihw: virtio-scsi-single
+            scsi0: /dev/vg/disk0,discard=on
+            scsi1: /dev/vg/disk1,cache=writeback
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        assert!(result.yaml.contains("controller: virtio-scsi-single"));
+        assert!(!result.yaml.contains("controller: pvscsi"));
+        assert!(result.mapped_keys.contains(&"scsihw".to_string()));
+    }
+
+    #[test]
+    fn test_map_scsihw_default_uses_pvscsi() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: pvscsi-vm
+            scsi0: /dev/vg/disk0,discard=on
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        assert!(result.yaml.contains("controller: pvscsi"));
+        assert!(!result.yaml.contains("controller: virtio-scsi-single"));
+    }
+
+    #[test]
+    fn test_map_boot_order_sets_boot_index() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: boot-order-vm
+            boot: order=scsi2;net0;ide0
+            scsi0: /dev/vg/disk0,discard=on
+            scsi2: /dev/vg/disk2,discard=on
+            ide0: local:iso/debian.iso,media=cdrom
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        // scsi2 is position 0 → boot_index: 1
+        assert!(result.yaml.contains("boot_index: 1"));
+        // scsi0 has no boot entry → no boot_index
+        // Verify boot key is mapped, not skipped
+        assert!(result.mapped_keys.contains(&"boot".to_string()));
+        assert!(!result.skipped_keys.contains(&"boot".to_string()));
+    }
+
+    #[test]
+    fn test_map_boot_order_single_drive() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: single-boot-vm
+            boot: order=scsi0
+            scsi0: /dev/vg/disk0
+            scsi1: /dev/vg/disk1
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        // scsi0 is position 0 → boot_index: 1
+        assert!(result.yaml.contains("boot_index: 1"));
+        // only one boot_index entry
+        assert_eq!(result.yaml.matches("boot_index:").count(), 1);
+        assert!(result.mapped_keys.contains(&"boot".to_string()));
+    }
+
+    #[test]
+    fn test_map_cpu_host_injects_paravirt_flags() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: paravirt-vm
+            cpu: host
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        assert!(result.yaml.contains("+kvm_pv_eoi"));
+        assert!(result.yaml.contains("+kvm_pv_unhalt"));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.contains("paravirt flags") && w.contains("kvm_pv_eoi")));
+    }
+
+    #[test]
+    fn test_map_cpu_host_preserves_explicit_flags_and_adds_paravirt() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: paravirt-vm
+            cpu: host,flags=+pdpe1gb;+md-clear
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        // Paravirt flags injected
+        assert!(result.yaml.contains("+kvm_pv_eoi"));
+        assert!(result.yaml.contains("+kvm_pv_unhalt"));
+        // Explicit Proxmox flags preserved (semicolons converted to commas)
+        assert!(result.yaml.contains("+pdpe1gb"));
+        assert!(result.yaml.contains("+md-clear"));
+        // No semicolons in the output
+        assert!(!result.yaml.contains(';'));
+    }
+
+    #[test]
+    fn test_map_cpu_non_host_no_paravirt_injection() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: standard-vm
+            cpu: qemu64
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        assert!(!result.yaml.contains("kvm_pv_eoi"));
+        assert!(!result
+            .warnings
+            .iter()
+            .any(|w| w.contains("paravirt flags")));
     }
 
     #[test]

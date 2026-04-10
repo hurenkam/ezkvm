@@ -6,6 +6,7 @@ use crate::vm::config::Config;
 use std::fs;
 use std::path::Path;
 
+#[allow(dead_code)]
 pub fn import_from_text(input: &str, name_override: Option<&str>) -> Result<EzkvmImportResult, ImportError> {
     import_from_text_with_storage(input, None, name_override)
 }
@@ -28,6 +29,7 @@ pub fn import_from_text_with_storage(
     Ok(result)
 }
 
+#[allow(dead_code)]
 pub fn import_from_file(
     input_path: &str,
     output_path: Option<&str>,
