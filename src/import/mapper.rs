@@ -996,19 +996,28 @@ fn map_spice(
     match vga_model(vga).as_str() {
         "virtio" | "virtio-vga" | "virtio-gl" | "vmware" | "vmware-svga" | "qxl" | "qxl2"
         | "qxl3" | "qxl4" => {
+            let mut spice = Mapping::new();
+            spice.insert(s("addr"), s("127.0.0.1"));
+            // Proxmox-style TLS-only SPICE endpoint: plain TCP disabled, TLS listener enabled.
+            spice.insert(s("port"), Value::Number(0_u64.into()));
+            spice.insert(s("tls_port"), Value::Number(61000_u64.into()));
+            spice.insert(s("tls_ciphers"), s("HIGH"));
+            spice.insert(s("seamless_migration"), Value::Bool(true));
+            spice.insert(s("disable_ticketing"), Value::Bool(true));
+
             if matches!(display_type.as_deref(), Some("remote-viewer")) {
                 warnings.push(format!(
-                    "spice endpoint inferred from Proxmox vga '{}' (matched with remote-viewer display; SPICE is the importer default)",
+                    "spice endpoint inferred from Proxmox vga '{}' (remote-viewer path; using Proxmox-like TCP+TLS defaults)",
                     vga_model(vga)
                 ));
             } else {
                 warnings.push(format!(
-                    "spice endpoint inferred with ezkvm defaults from Proxmox vga '{}'",
+                    "spice endpoint inferred from Proxmox vga '{}' with TCP+TLS defaults",
                     vga_model(vga)
                 ));
             }
             mapped_keys.push("spice".to_string());
-            Some(Mapping::new())
+            Some(spice)
         }
         _ => None,
     }
@@ -1026,8 +1035,20 @@ fn map_vnc(
         return None;
     };
 
+    let vnc_path = infer_vmid(proxmox)
+        .map(|vmid| format!("/var/run/qemu-server/{}.vnc", vmid))
+        .unwrap_or_else(|| format!("/var/ezkvm/{}.vnc", vm_name));
+
     if matches!(display_type.as_deref(), Some("remote-viewer")) {
-        return None;
+        let mut vnc = Mapping::new();
+        vnc.insert(s("path"), s(&vnc_path));
+        vnc.insert(s("password"), Value::Bool(true));
+        warnings.push(format!(
+            "vnc unix socket inferred from Proxmox vga '{}' on remote-viewer path for management compatibility",
+            vga_model(vga)
+        ));
+        mapped_keys.push("vnc".to_string());
+        return Some(vnc);
     }
 
     // Legacy non-remote-viewer path: generate VNC for std and cirrus (usually local displays)
@@ -1038,7 +1059,8 @@ fn map_vnc(
     match vga_model(vga).as_str() {
         "std" | "cirrus" => {
             let mut vnc = Mapping::new();
-            vnc.insert(s("path"), s(&format!("/var/ezkvm/{}.vnc", vm_name)));
+            vnc.insert(s("path"), s(&vnc_path));
+            vnc.insert(s("password"), Value::Bool(true));
             warnings.push(format!(
                 "vnc unix socket inferred from Proxmox vga '{}'",
                 vga_model(vga)
@@ -1491,7 +1513,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_viewer_generates_spice_not_vnc() {
+    fn test_remote_viewer_generates_spice_tls_and_vnc() {
         let proxmox = parse_proxmox_config(
             r#"
             name: remote-viewer-vm
@@ -1506,11 +1528,18 @@ mod tests {
         assert!(result.yaml.contains("display:"));
         assert!(result.yaml.contains("type: remote-viewer"));
         
-        // Verify SPICE is generated for remote-viewer
+        // Verify SPICE is generated for remote-viewer with TLS defaults.
         assert!(result.yaml.contains("spice:"));
-        
-        // Verify VNC is NOT generated for remote-viewer
-        assert!(!result.yaml.contains("vnc:"));
+        assert!(result.yaml.contains("addr: 127.0.0.1"));
+        assert!(result.yaml.contains("port: 0"));
+        assert!(result.yaml.contains("tls_port: 61000"));
+        assert!(result.yaml.contains("tls_ciphers: HIGH"));
+        assert!(result.yaml.contains("seamless_migration: true"));
+        assert!(result.yaml.contains("disable_ticketing: true"));
+
+        // Verify VNC is also generated for management compatibility.
+        assert!(result.yaml.contains("vnc:"));
+        assert!(result.yaml.contains("password: true"));
     }
 
     #[test]

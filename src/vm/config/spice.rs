@@ -41,7 +41,11 @@ pub struct Spice {
     #[serde(default)]
     tls_port: Option<u16>,
     #[serde(default)]
+    tls_ciphers: Option<String>,
+    #[serde(default)]
     x509_dir: Option<String>,
+    #[serde(default)]
+    seamless_migration: Option<bool>,
     #[serde(default)]
     websocket_port: Option<u16>,
 }
@@ -58,7 +62,9 @@ impl Spice {
             disable_ticketing: Self::disable_ticketing_default(),
             password: None,
             tls_port: None,
+            tls_ciphers: None,
             x509_dir: None,
+            seamless_migration: None,
             websocket_port: None,
         }
     }
@@ -74,7 +80,9 @@ impl Spice {
             disable_ticketing: Self::disable_ticketing_default(),
             password: None,
             tls_port: None,
+            tls_ciphers: None,
             x509_dir: None,
+            seamless_migration: None,
             websocket_port: None,
         }
     }
@@ -86,7 +94,9 @@ impl Spice {
             disable_ticketing: Self::disable_ticketing_default(),
             password: None,
             tls_port: None,
+            tls_ciphers: None,
             x509_dir: None,
+            seamless_migration: None,
             websocket_port: None,
         }
     }
@@ -106,8 +116,19 @@ impl Spice {
             options.push(format!("tls-port={}", tls_port));
         }
 
+        if let Some(ref tls_ciphers) = self.tls_ciphers {
+            options.push(format!("tls-ciphers={}", tls_ciphers));
+        }
+
         if let Some(ref x509_dir) = self.x509_dir {
             options.push(format!("x509-dir={}", x509_dir));
+        }
+
+        if let Some(seamless_migration) = self.seamless_migration {
+            options.push(format!(
+                "seamless-migration={}",
+                if seamless_migration { "on" } else { "off" }
+            ));
         }
 
         if let Some(websocket_port) = self.websocket_port {
@@ -193,7 +214,9 @@ mod tests {
             disable_ticketing: true,
             password: None,
             tls_port: None,
+            tls_ciphers: None,
             x509_dir: None,
+            seamless_migration: None,
             websocket_port: None,
         };
 
@@ -232,7 +255,9 @@ mod tests {
             disable_ticketing: true,
             password: None,
             tls_port: None,
+            tls_ciphers: None,
             x509_dir: None,
+            seamless_migration: None,
             websocket_port: None,
         };
 
@@ -270,7 +295,9 @@ mod tests {
             disable_ticketing: true,
             password: None,
             tls_port: None,
+            tls_ciphers: None,
             x509_dir: None,
+            seamless_migration: None,
             websocket_port: None,
         };
 
@@ -296,7 +323,9 @@ mod tests {
             disable_ticketing: false
             password: secret
             tls_port: 5902
+            tls_ciphers: HIGH
             x509_dir: /etc/pki/qemu
+            seamless_migration: true
             websocket_port: 6100
         "#;
 
@@ -304,7 +333,7 @@ mod tests {
         let args = spice.get_qemu_args(0);
         assert_eq!(
             args[0],
-            "-spice port=5901,addr=0.0.0.0,password=secret,tls-port=5902,x509-dir=/etc/pki/qemu,websocket=6100"
+            "-spice port=5901,addr=0.0.0.0,password=secret,tls-port=5902,tls-ciphers=HIGH,x509-dir=/etc/pki/qemu,seamless-migration=on,websocket=6100"
         );
     }
 }

@@ -29,25 +29,25 @@ impl RemoteViewer {
     fn get_args(&self, config: &Config) -> Vec<String> {
         let mut result = vec![];
         match config.spice() {
-            None => {}
+            None => {
+                match config.vnc() {
+                    None => {}
+                    Some(vnc) => match vnc.socket() {
+                        VncSocket::TcpPort { addr, port } => {
+                            result.extend(vec![format!("vnc://{}:{}", addr, port)])
+                        }
+                        VncSocket::UnixSocket { path, .. } => {
+                            result.extend(vec![format!("vnc+unix://{}", path)])
+                        }
+                    },
+                }
+            }
             Some(spice) => match spice.socket() {
                 SpiceSocket::TcpPort { addr, port } => {
                     result.extend(vec![format!("spice://{}:{}", addr, port)])
                 }
                 SpiceSocket::UnixSocket { path, .. } => {
                     result.extend(vec![format!("spice+unix://{}", path)])
-                }
-            },
-        }
-
-        match config.vnc() {
-            None => {}
-            Some(vnc) => match vnc.socket() {
-                VncSocket::TcpPort { addr, port } => {
-                    result.extend(vec![format!("vnc://{}:{}", addr, port)])
-                }
-                VncSocket::UnixSocket { path, .. } => {
-                    result.extend(vec![format!("vnc+unix://{}", path)])
                 }
             },
         }
