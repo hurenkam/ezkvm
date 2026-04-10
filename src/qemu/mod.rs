@@ -44,6 +44,105 @@ impl QemuManager {
         // Add boot arguments
         args.extend(self.build_boot_args());
         
+        // Add TPM arguments
+        if let Some(tpm) = &self.config.tpm {
+            args.add_tpm(&tpm.version, &tpm.backend, tpm.state_path.as_deref(), &tpm.model);
+        }
+        
+        // Add guest agent arguments
+        if let Some(guest_agent) = &self.config.guest_agent {
+            if guest_agent.enabled {
+                args.add_guest_agent(guest_agent.socket_path.as_deref(), guest_agent.freeze_cpu);
+            }
+        }
+        
+        // Add ballooning arguments
+        if let Some(ballooning) = &self.config.ballooning {
+            if ballooning.enabled {
+                args.add_balloon(&ballooning.model, ballooning.free_page_reporting);
+            }
+        }
+        
+        // Add VFIO-PCI device arguments
+        for hostpci in &self.config.hostpci {
+            args.add_vfio_pci(&hostpci.device, &hostpci.id, hostpci.pcie, hostpci.x_vga, hostpci.romfile.as_deref());
+        }
+        
+        // Add USB device arguments
+        if !self.config.usb_devices.is_empty() {
+            // Add XHCI controller if we have USB devices
+            args.add_xhci_controller("xhci");
+        }
+        for usb_device in &self.config.usb_devices {
+            args.add_usb_host(&usb_device.host, &usb_device.id, usb_device.bus.as_deref(), usb_device.port.as_deref());
+        }
+        
+        // Add SPICE arguments
+        if let Some(spice) = &self.config.spice {
+            if spice.enabled {
+                args.add_spice(spice.port, &spice.addr, spice.disable_ticketing, spice.audio, spice.vdagent);
+            }
+        }
+        
+        // Add ivshmem arguments
+        if let Some(ivshmem) = &self.config.ivshmem {
+            if ivshmem.enabled {
+                args.add_ivshmem(ivshmem.size, ivshmem.vectors, &ivshmem.id);
+            }
+        }
+        
+        // Add SCSI controller arguments
+        for scsi_controller in &self.config.scsi_controllers {
+            args.add_scsi_controller(&scsi_controller.id, &scsi_controller.r#type, 
+                                   scsi_controller.iothread.as_deref(), scsi_controller.max_targets);
+        }
+        
+        // Add iSCSI disk arguments
+        for iscsi_disk in &self.config.iscsi_disks {
+            args.add_iscsi_disk(&iscsi_disk.id, &iscsi_disk.portal, &iscsi_disk.target, iscsi_disk.lun,
+                              iscsi_disk.initiator.as_deref(), iscsi_disk.username.as_deref(), 
+                              iscsi_disk.password.as_deref(), iscsi_disk.controller.as_deref());
+        }
+        
+        // Add QMP monitoring
+        if let Some(qmp) = &self.config.qmp {
+            if qmp.enabled {
+                let socket_type = match qmp.socket_type {
+                    super::config::QmpSocketType::Tcp => "tcp",
+                    super::config::QmpSocketType::Unix => "unix",
+                };
+                args.add_qmp(qmp.socket_path.as_deref(), socket_type);
+            }
+        }
+        
+        // Add SMBIOS system information
+        if let Some(smbios) = &self.config.smbios {
+            args.add_smbios(smbios.manufacturer.as_deref(), smbios.product.as_deref(),
+                          smbios.version.as_deref(), smbios.serial.as_deref(),
+                          smbios.uuid.as_deref(), smbios.sku.as_deref(),
+                          smbios.family.as_deref());
+            
+            // Add VM generation ID if specified
+            if let Some(vm_gen_id) = &smbios.vm_generation_id {
+                args.add_vm_generation_id(vm_gen_id);
+            }
+        }
+        
+        // Add NUMA topology
+        for numa in &self.config.numa {
+            args.add_numa_node(numa.id, numa.memory, &numa.cpus, numa.host_node);
+        }
+        
+        // Add Hyper-V enlightenments
+        if let Some(hyperv) = &self.config.hyperv {
+            if hyperv.enabled {
+                args.add_hyperv(hyperv.relaxed, hyperv.vapic, hyperv.time, hyperv.crash,
+                              hyperv.reset, hyperv.vendor_id.as_deref(), hyperv.frequencies,
+                              hyperv.reenlightenment, hyperv.tlbflush, hyperv.ipi,
+                              hyperv.spinlock_retry);
+            }
+        }
+        
         // Add option arguments
         args.extend(self.build_option_args());
         
@@ -96,6 +195,17 @@ impl QemuManager {
             args.push(cmdline.clone());
         }
         
+        // UEFI firmware (enhanced support)
+        if let Some(firmware) = &self.config.boot.firmware {
+            if firmware == "uefi" || firmware == "ovmf" {
+                args.add_uefi(
+                    self.config.boot.uefi_code.as_deref(),
+                    self.config.boot.uefi_vars.as_deref(),
+                    self.config.boot.secure_boot
+                );
+            }
+        }
+        
         args
     }
     
@@ -103,20 +213,7 @@ impl QemuManager {
     fn build_option_args(&self) -> QemuArgs {
         let mut args = QemuArgs::new();
         
-        // UEFI firmware
-        if let Some(firmware) = &self.config.boot.firmware {
-            if firmware == "uefi" {
-                // Use OVMF for UEFI
-                args.push_str("-bios");
-                args.push("/usr/share/ovmf/OVMF.fd".to_string());
-                
-                // UEFI variables
-                if let Some(vars) = &self.config.options.uefi_vars {
-                    args.push_str("-drive");
-                    args.push(format!("if=pflash,format=raw,file={},readonly=on", vars));
-                }
-            }
-        }
+        // Additional options can be added here in the future
         
         args
     }

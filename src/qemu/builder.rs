@@ -45,7 +45,8 @@ impl QemuCommandBuilder {
         
         // Add devices
         for drive in &config.devices.drives {
-            builder = builder.drive(&drive.path, &drive.interface, &drive.format, drive.readonly);
+            builder = builder.drive_enhanced(&drive.path, &drive.interface, &drive.format, drive.readonly,
+                                           drive.discard, drive.ssd, drive.controller.as_deref());
         }
         
         for network in &config.devices.networks {
@@ -118,6 +119,13 @@ impl QemuCommandBuilder {
     /// Add a drive
     pub fn drive(mut self, path: &str, interface: &str, format: &str, readonly: bool) -> Self {
         self.args.add_drive(path, interface, format, readonly);
+        self
+    }
+    
+    /// Add an enhanced drive with advanced options
+    pub fn drive_enhanced(mut self, path: &str, interface: &str, format: &str, readonly: bool,
+                         discard: bool, ssd: bool, controller: Option<&str>) -> Self {
+        self.args.add_drive_enhanced(path, interface, format, readonly, discard, ssd, controller);
         self
     }
     

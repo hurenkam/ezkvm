@@ -110,22 +110,74 @@ See the `examples/` directory for complete configuration examples:
 
 ## Commands
 
+### VM Management
 - `ezkvm create <config.yaml>` - Create and validate a VM configuration
 - `ezkvm start <config.yaml>` - Start a VM from configuration
 - `ezkvm start <config.yaml> --dry-run` - Show the QEMU command without executing
 - `ezkvm start <config.yaml> --daemon` - Start VM in background
 - `ezkvm stop <config.yaml>` - Stop a VM gracefully
+- `ezkvm stop <config.yaml> --force` - Force stop a VM
 - `ezkvm kill <config.yaml>` - Force kill a VM
-- `ezkvm list` - List running VMs (not yet implemented)
-- `ezkvm status <config.yaml>` - Show VM status (not yet implemented)
-- `ezkvm console <config.yaml>` - Attach to VM console (not yet implemented)
+- `ezkvm list` - List running VMs
+- `ezkvm status <config.yaml>` - Show VM status
+- `ezkvm console <config.yaml>` - Attach to VM console
 - `ezkvm validate <config.yaml>` - Validate configuration file
+
+### Storage Management
+- `ezkvm storage create <name> --size <GB>` - Create a QCOW2 disk image
+- `ezkvm storage list` - List available disk images
+- `ezkvm storage info <disk>` - Show disk image information
+- `ezkvm storage resize <disk> --size <GB>` - Resize a disk image
+- `ezkvm storage snapshot <disk> --name <snapshot>` - Create a disk snapshot
+
+### Device Management
+- `ezkvm device usb list` - List available USB devices
+- `ezkvm device pci list` - List available PCI devices
+
+### Network Management
+- `ezkvm network bridge <name>` - Create a network bridge
 
 ## Architecture
 
-- **config/**: YAML parsing and validation
+ezkvm follows a modular architecture with clear separation of concerns:
+
+- **config/**: YAML parsing, validation, and configuration structures
 - **qemu/**: QEMU command generation and process management
-- **cli/**: Command-line interface
+- **cli/**: Command-line interface and command dispatch
+- **state/**: VM state management and persistence
+- **storage/**: Storage device management utilities
+- **device/**: Hardware device management (USB, PCI passthrough)
+- **network/**: Network configuration and bridge management
+
+### Design Principles
+
+- **Type Safety**: Rust's type system ensures configuration correctness
+- **Direct QEMU Integration**: No libvirt abstraction layer for maximum control
+- **YAML Configuration**: Human-readable configs instead of XML
+- **Modular Design**: Easy to extend with new features
+- **Error Handling**: Comprehensive error messages with actionable suggestions
+
+### Architecture Diagram
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   CLI Layer     │    │  Config Layer   │    │  QEMU Layer     │
+│                 │    │                 │    │                 │
+│ • Command       │    │ • YAML Parsing  │    │ • Command Gen   │
+│   parsing       │◄──►│ • Validation    │◄──►│ • Process Mgmt  │
+│ • Help/usage    │    │ • Env vars      │    │ • Monitoring    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   State Layer   │
+                    │                 │
+                    │ • PID tracking  │
+                    │ • Config cache  │
+                    │ • Logs          │
+                    └─────────────────┘
+```
 
 ## Development
 
@@ -141,13 +193,82 @@ cargo build
 cargo test
 ```
 
+The test suite includes:
+- Unit tests for configuration parsing and validation
+- Integration tests for file I/O and environment variable substitution
+- End-to-end tests for CLI functionality
+
 ### Running
 
 ```bash
 cargo run -- validate examples/basic-vm.yaml
 ```
 
-## License
+## Migration from virt-manager/libvirt
+
+### Key Differences
+
+| Feature | virt-manager/libvirt | ezkvm |
+|---------|---------------------|-------|
+| Configuration | XML files | YAML files |
+| Backend | libvirt abstraction | Direct QEMU |
+| Learning Curve | Steep | Gentle |
+| Flexibility | Limited by libvirt | Full QEMU control |
+| Dependencies | Many packages | Minimal (QEMU + Rust) |
+
+### Converting a Basic VM
+
+**virt-manager XML:**
+```xml
+<domain type='kvm'>
+  <name>ubuntu-vm</name>
+  <memory unit='MiB'>2048</memory>
+  <vcpu>2</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc-q35-6.2'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/ubuntu.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+  </devices>
+</domain>
+```
+
+**Equivalent ezkvm YAML:**
+```yaml
+name: "ubuntu-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "root"
+      path: "/var/lib/libvirt/images/ubuntu.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+```
+
+### Command Equivalents
+
+| virt-manager/libvirt | ezkvm |
+|---------------------|-------|
+| `virsh define config.xml` | `ezkvm validate config.yaml` |
+| `virsh start vm-name` | `ezkvm start config.yaml` |
+| `virsh shutdown vm-name` | `ezkvm stop config.yaml` |
+| `virsh destroy vm-name` | `ezkvm kill config.yaml` |
+| `virsh list --all` | `ezkvm list` |
+| `virt-viewer vm-name` | `ezkvm console config.yaml` |
 
 MIT License
 

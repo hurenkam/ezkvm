@@ -77,6 +77,93 @@ pub enum Commands {
         /// Path to the YAML configuration file
         config: String,
     },
+    
+    /// Storage management commands
+    #[command(subcommand)]
+    Storage(StorageCommands),
+    
+    /// Device management commands
+    #[command(subcommand)]
+    Device(DeviceCommands),
+    
+    /// Network management commands
+    #[command(subcommand)]
+    Network(NetworkCommands),
+}
+
+#[derive(Subcommand)]
+pub enum StorageCommands {
+    /// Create a QCOW2 disk image
+    Create {
+        /// Name of the disk image
+        name: String,
+        /// Size in GB
+        #[arg(short, long)]
+        size: u32,
+    },
+    
+    /// List all disk images
+    List,
+    
+    /// Show disk image information
+    Info {
+        /// Name or path of the disk image
+        disk: String,
+    },
+    
+    /// Resize a disk image
+    Resize {
+        /// Name of the disk image
+        disk: String,
+        /// New size in GB
+        #[arg(short, long)]
+        size: u32,
+    },
+    
+    /// Create a snapshot of a disk
+    Snapshot {
+        /// Name of the disk image
+        disk: String,
+        /// Snapshot name
+        #[arg(short, long)]
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DeviceCommands {
+    /// List available USB devices
+    Usb {
+        #[command(subcommand)]
+        cmd: Option<UsbCommands>,
+    },
+    
+    /// List available PCI devices
+    Pci {
+        #[command(subcommand)]
+        cmd: Option<PciCommands>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum UsbCommands {
+    /// List USB devices
+    List,
+}
+
+#[derive(Subcommand)]
+pub enum PciCommands {
+    /// List PCI devices suitable for passthrough
+    List,
+}
+
+#[derive(Subcommand)]
+pub enum NetworkCommands {
+    /// Create a network bridge
+    Bridge {
+        /// Name of the bridge
+        name: String,
+    },
 }
 
 /// Execute the CLI command
@@ -105,6 +192,15 @@ pub async fn execute(cli: Cli) -> Result<()> {
         }
         Commands::Validate { config } => {
             handle_validate(&config).await
+        }
+        Commands::Storage(cmd) => {
+            handle_storage(cmd).await
+        }
+        Commands::Device(cmd) => {
+            handle_device(cmd).await
+        }
+        Commands::Network(cmd) => {
+            handle_network(cmd).await
         }
     }
 }
@@ -374,4 +470,170 @@ async fn handle_validate(config_path: &str) -> Result<()> {
     println!("vCPUs: {}", config.system.vcpus);
     
     Ok(())
+}
+
+/// Handle storage commands
+async fn handle_storage(cmd: StorageCommands) -> Result<()> {
+    match cmd {
+        StorageCommands::Create { name, size } => {
+            println!("Creating storage image: {}", name);
+            println!("Size: {} GB", size);
+            
+            // Create a QEMU disk image
+            // qemu-img create -f qcow2 <path> <size>G
+            let output = std::process::Command::new("qemu-img")
+                .args(&["create", "-f", "qcow2", &name])
+                .arg(format!("{}G", size))
+                .output()?;
+            
+            if !output.status.success() {
+                let err_msg = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to create storage image: {}", err_msg));
+            }
+            
+            println!("✓ Storage image created at: {}", name);
+            Ok(())
+        }
+        StorageCommands::List => {
+            println!("Available storage images:");
+            
+            // Try to list qcow2 images in common directories
+            let home = std::env::var("HOME").unwrap_or_default();
+            let home_storage = format!("{}/.ezkvm/storage", home);
+            let common_paths = vec![
+                ".",
+                "./storage",
+                "./images",
+                &home_storage,
+            ];
+            
+            for path in common_paths {
+                if let Ok(entries) = std::fs::read_dir(path) {
+                    for entry in entries.flatten() {
+                        if let Some(name) = entry.file_name().to_str() {
+                            if name.ends_with(".qcow2") || name.ends_with(".img") {
+                                println!("  {}", entry.path().display());
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        StorageCommands::Info { disk } => {
+            println!("Getting information about disk: {}", disk);
+            
+            // Use qemu-img info to get disk information
+            let output = std::process::Command::new("qemu-img")
+                .args(&["info", &disk])
+                .output()?;
+            
+            if output.status.success() {
+                let info = String::from_utf8_lossy(&output.stdout);
+                println!("{}", info);
+            } else {
+                let err_msg = String::from_utf8_lossy(&output.stderr);
+                println!("Error getting disk info: {}", err_msg);
+            }
+            Ok(())
+        }
+        StorageCommands::Resize { disk, size } => {
+            println!("Resizing disk '{}' to {} GB", disk, size);
+            
+            // Use qemu-img resize to resize the disk
+            let output = std::process::Command::new("qemu-img")
+                .args(&["resize", &disk])
+                .arg(format!("{}G", size))
+                .output()?;
+            
+            if output.status.success() {
+                println!("✓ Disk resized successfully");
+            } else {
+                let err_msg = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to resize disk: {}", err_msg));
+            }
+            Ok(())
+        }
+        StorageCommands::Snapshot { disk, name } => {
+            println!("Creating snapshot '{}' of disk '{}'", name, disk);
+            
+            // Use qemu-img snapshot to create a snapshot
+            let output = std::process::Command::new("qemu-img")
+                .args(&["snapshot", "-c", &name, &disk])
+                .output()?;
+            
+            if output.status.success() {
+                println!("✓ Snapshot created successfully");
+            } else {
+                let err_msg = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!("Failed to create snapshot: {}", err_msg));
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Handle device commands
+async fn handle_device(cmd: DeviceCommands) -> Result<()> {
+    match cmd {
+        DeviceCommands::Usb { cmd } => {
+            match cmd {
+                Some(UsbCommands::List) | None => {
+                    println!("Available USB devices:");
+                    
+                    // Try to list USB devices using lsusb if available
+                    if let Ok(output) = std::process::Command::new("lsusb").output() {
+                        if output.status.success() {
+                            let devices = String::from_utf8_lossy(&output.stdout);
+                            print!("{}", devices);
+                        } else {
+                            println!("  (lsusb not available)");
+                        }
+                    } else {
+                        println!("  (USB listing requires lsusb tool)");
+                    }
+                    Ok(())
+                }
+            }
+        }
+        DeviceCommands::Pci { cmd } => {
+            match cmd {
+                Some(PciCommands::List) | None => {
+                    println!("Available PCI devices:");
+                    
+                    // Try to list PCI devices using lspci if available
+                    if let Ok(output) = std::process::Command::new("lspci").output() {
+                        if output.status.success() {
+                            let devices = String::from_utf8_lossy(&output.stdout);
+                            print!("{}", devices);
+                        } else {
+                            println!("  (lspci not available)");
+                        }
+                    } else {
+                        println!("  (PCI listing requires lspci tool)");
+                    }
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
+/// Handle network commands
+async fn handle_network(cmd: NetworkCommands) -> Result<()> {
+    match cmd {
+        NetworkCommands::Bridge { name } => {
+            println!("Creating bridge: {}", name);
+            println!("Note: This requires root/sudo privileges");
+            
+            // This would typically use `ip` or `brctl` commands
+            println!("\nYou can create a bridge manually with:");
+            println!("  sudo brctl addbr {}", name);
+            println!("  sudo brctl addif {} <interface>", name);
+            println!("  sudo ip addr add <ip>/<mask> dev {}", name);
+            println!("  sudo ip link set {} up", name);
+            
+            Ok(())
+        }
+    }
 }

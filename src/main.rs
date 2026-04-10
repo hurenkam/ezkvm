@@ -7,6 +7,9 @@ mod cli;
 mod config;
 mod qemu;
 mod state;
+mod storage;
+mod device;
+mod network;
 
 use anyhow::Result;
 use clap::Parser;
