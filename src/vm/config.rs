@@ -496,7 +496,6 @@ mod tests {
             "-chardev socket,id=chrtpm0,path=/var/ezkvm/windows_desktop_config-tpm.socket",
             "-tpmdev emulator,id=tpm0,chardev=chrtpm0",
             "-device tpm-tis,tpmdev=tpm0",
-            "-display egl-headless,gl=on",
             "-device virtio-vga-gl,id=vga,bus=pcie.0,addr=2",
             "-spice unix=on,addr=/var/ezkvm/windows_desktop_config-spice.socket,disable-ticketing=on",
             "-device virtio-serial-pci",
