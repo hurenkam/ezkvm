@@ -278,7 +278,7 @@ pub fn map_to_ezkvm_yaml_with_storage(
         );
     }
 
-    let yaml = serde_yaml::to_string(&Value::Mapping(root))
+    let yaml = render_import_yaml(&root)
         .map_err(|e| ImportError::ValidationError(format!("yaml serialization failed: {}", e)))?;
 
     Ok(EzkvmImportResult {
@@ -287,6 +287,240 @@ pub fn map_to_ezkvm_yaml_with_storage(
         skipped_keys,
         warnings,
     })
+}
+
+fn render_import_yaml(root: &Mapping) -> Result<String, serde_yaml::Error> {
+    let mut rendered = String::new();
+
+    for (index, (key, value)) in root.iter().enumerate() {
+        if index > 0 {
+            rendered.push('\n');
+        }
+
+        let key = key.as_str().expect("yaml keys must be strings");
+        match value {
+            Value::Mapping(mapping) => {
+                rendered.push_str(key);
+                rendered.push_str(":\n");
+                rendered.push_str(&render_mapping_entries(mapping, 1, &[key.to_string()])?);
+            }
+            Value::Sequence(sequence) => {
+                rendered.push_str(key);
+                rendered.push_str(":\n");
+                rendered.push_str(&render_sequence(sequence, 1, &[key.to_string()])?);
+            }
+            _ => {
+                rendered.push_str(key);
+                rendered.push_str(": ");
+                rendered.push_str(&render_scalar(value)?);
+                rendered.push('\n');
+            }
+        }
+    }
+
+    Ok(rendered)
+}
+
+fn render_mapping_entries(
+    mapping: &Mapping,
+    indent: usize,
+    path: &[String],
+) -> Result<String, serde_yaml::Error> {
+    let mut rendered = String::new();
+
+    for (key, value) in mapping {
+        let key = key.as_str().expect("yaml keys must be strings");
+        let child_path = append_path(path, key);
+        rendered.push_str(&"  ".repeat(indent));
+        rendered.push_str(key);
+
+        match value {
+            Value::Mapping(child) if should_inline_mapping(&child_path, child) => {
+                rendered.push_str(": ");
+                rendered.push_str(&render_inline_mapping(child)?);
+                rendered.push('\n');
+            }
+            Value::Mapping(child) => {
+                rendered.push_str(":\n");
+                rendered.push_str(&render_mapping_entries(child, indent + 1, &child_path)?);
+            }
+            Value::Sequence(sequence) => {
+                rendered.push_str(":\n");
+                rendered.push_str(&render_sequence(sequence, indent + 1, &child_path)?);
+            }
+            _ => {
+                rendered.push_str(": ");
+                rendered.push_str(&render_scalar(value)?);
+                rendered.push('\n');
+            }
+        }
+    }
+
+    Ok(rendered)
+}
+
+fn render_sequence(
+    sequence: &[Value],
+    indent: usize,
+    path: &[String],
+) -> Result<String, serde_yaml::Error> {
+    let mut rendered = String::new();
+
+    for item in sequence {
+        rendered.push_str(&"  ".repeat(indent));
+        rendered.push_str("- ");
+
+        match item {
+            Value::Mapping(mapping) if should_inline_sequence_item(path, mapping) => {
+                rendered.push_str(&render_inline_mapping(mapping)?);
+                rendered.push('\n');
+            }
+            Value::Mapping(mapping) => {
+                rendered.push_str(&render_block_sequence_mapping(mapping, indent, path)?);
+            }
+            Value::Sequence(child_sequence) => {
+                rendered.push('\n');
+                rendered.push_str(&render_sequence(child_sequence, indent + 1, path)?);
+            }
+            _ => {
+                rendered.push_str(&render_scalar(item)?);
+                rendered.push('\n');
+            }
+        }
+    }
+
+    Ok(rendered)
+}
+
+fn render_block_sequence_mapping(
+    mapping: &Mapping,
+    indent: usize,
+    path: &[String],
+) -> Result<String, serde_yaml::Error> {
+    let mut rendered = String::new();
+    let mut entries = mapping.iter();
+
+    if let Some((first_key, first_value)) = entries.next() {
+        let first_key = first_key.as_str().expect("yaml keys must be strings");
+        let first_path = append_path(path, first_key);
+        rendered.push_str(first_key);
+
+        match first_value {
+            Value::Mapping(child) if should_inline_mapping(&first_path, child) => {
+                rendered.push_str(": ");
+                rendered.push_str(&render_inline_mapping(child)?);
+                rendered.push('\n');
+            }
+            Value::Mapping(child) => {
+                rendered.push_str(":\n");
+                rendered.push_str(&render_mapping_entries(child, indent + 1, &first_path)?);
+            }
+            Value::Sequence(sequence) => {
+                rendered.push_str(":\n");
+                rendered.push_str(&render_sequence(sequence, indent + 1, &first_path)?);
+            }
+            _ => {
+                rendered.push_str(": ");
+                rendered.push_str(&render_scalar(first_value)?);
+                rendered.push('\n');
+            }
+        }
+    }
+
+    for (key, value) in entries {
+        let key = key.as_str().expect("yaml keys must be strings");
+        let child_path = append_path(path, key);
+        rendered.push_str(&"  ".repeat(indent + 1));
+        rendered.push_str(key);
+
+        match value {
+            Value::Mapping(child) if should_inline_mapping(&child_path, child) => {
+                rendered.push_str(": ");
+                rendered.push_str(&render_inline_mapping(child)?);
+                rendered.push('\n');
+            }
+            Value::Mapping(child) => {
+                rendered.push_str(":\n");
+                rendered.push_str(&render_mapping_entries(child, indent + 2, &child_path)?);
+            }
+            Value::Sequence(sequence) => {
+                rendered.push_str(":\n");
+                rendered.push_str(&render_sequence(sequence, indent + 2, &child_path)?);
+            }
+            _ => {
+                rendered.push_str(": ");
+                rendered.push_str(&render_scalar(value)?);
+                rendered.push('\n');
+            }
+        }
+    }
+
+    Ok(rendered)
+}
+
+fn should_inline_mapping(path: &[String], mapping: &Mapping) -> bool {
+    if !mapping.keys().all(|key| key.as_str().is_some()) {
+        return false;
+    }
+
+    if !mapping.values().all(value_is_inline_simple) {
+        return false;
+    }
+
+    match path {
+        [section] if matches!(section.as_str(), "general" | "gpu" | "display" | "spice" | "vnc" | "host") => false,
+        [section, _] if section == "system" => true,
+        [section, subsection, _] if section == "host" && matches!(subsection.as_str(), "pci" | "usb") => true,
+        _ => mapping.is_empty(),
+    }
+}
+
+fn should_inline_sequence_item(path: &[String], mapping: &Mapping) -> bool {
+    if !mapping.keys().all(|key| key.as_str().is_some()) {
+        return false;
+    }
+
+    if !mapping.values().all(value_is_inline_simple) {
+        return false;
+    }
+
+    matches!(path, [section] if section == "network")
+        || matches!(path, [section, subsection] if section == "storage" && subsection == "drives")
+        || matches!(path, [section, subsection] if section == "host" && matches!(subsection.as_str(), "pci" | "usb"))
+}
+
+fn value_is_inline_simple(value: &Value) -> bool {
+    matches!(value, Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_))
+        || matches!(value, Value::Mapping(mapping) if mapping.is_empty())
+        || matches!(value, Value::Sequence(sequence) if sequence.is_empty())
+}
+
+fn render_inline_mapping(mapping: &Mapping) -> Result<String, serde_yaml::Error> {
+    let mut parts = vec![];
+    for (key, value) in mapping {
+        let key = key.as_str().expect("yaml keys must be strings");
+        parts.push(format!("{}: {}", key, render_inline_value(value)?));
+    }
+    Ok(format!("{{ {} }}", parts.join(", ")))
+}
+
+fn render_inline_value(value: &Value) -> Result<String, serde_yaml::Error> {
+    match value {
+        Value::Mapping(mapping) if mapping.is_empty() => Ok("{ }".to_string()),
+        Value::Sequence(sequence) if sequence.is_empty() => Ok("[]".to_string()),
+        _ => render_scalar(value),
+    }
+}
+
+fn render_scalar(value: &Value) -> Result<String, serde_yaml::Error> {
+    let rendered = serde_yaml::to_string(value)?;
+    Ok(rendered.trim_end().to_string())
+}
+
+fn append_path(path: &[String], segment: &str) -> Vec<String> {
+    let mut child = path.to_vec();
+    child.push(segment.to_string());
+    child
 }
 
 fn parse_boot_order(
@@ -1285,6 +1519,10 @@ mod tests {
         assert!(result.yaml.contains("werror: enospc"));
         assert!(result.yaml.contains("queues: 4"));
         assert!(!result.mapped_keys.is_empty());
+        assert!(result.yaml.contains("cpu: { cores: 4, sockets: 1, model: host"));
+        assert!(result.yaml.contains("bios: { type: ovmf"));
+        assert!(result.yaml.contains("- { type: hd, file: /dev/vm1/vm-100-disk-0"));
+        assert!(result.yaml.contains("- { type: proxmox_tap, bridge: vmbr0"));
     }
 
     #[test]
