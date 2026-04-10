@@ -9,6 +9,18 @@ pub struct ProxmoxVmConfig {
     pub usb: Vec<ProxmoxUsbEntry>,
 }
 
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ProxmoxStorageConfig {
+    pub storages: BTreeMap<String, ProxmoxStorageEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProxmoxStorageEntry {
+    pub storage_type: String,
+    pub store_id: String,
+    pub options: BTreeMap<String, String>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProxmoxDiskEntry {
     pub key: String,

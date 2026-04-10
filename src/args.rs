@@ -3,6 +3,8 @@ extern crate getopts;
 use getopts::Options;
 use log::LevelFilter;
 
+const DEFAULT_PROXMOX_STORAGE_PATH: &str = "/etc/pve/storage.cfg";
+
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum EzkvmCommand {
@@ -10,6 +12,7 @@ pub enum EzkvmCommand {
     Start { name: String },
     ImportProxmoxConfig {
         input: String,
+        storage: Option<String>,
         output: Option<String>,
         import_name: Option<String>,
         strict: bool,
@@ -62,6 +65,7 @@ impl EzkvmArguments {
         opts.optflag("", "qmp-quit", "send a quit command to the vm monitor service of a vm");
         opts.optopt("", "qmp", "send a command to the vm monitor service of a vm", "monitor command");
         opts.optopt("", "import-proxmox", "import a proxmox vm config file into ezkvm yaml", "proxmox config file");
+        opts.optopt("", "proxmox-storage", "optional proxmox storage.cfg file used to resolve volume IDs (defaults to /etc/pve/storage.cfg)", "storage.cfg file");
         opts.optopt("", "output", "write imported yaml to this file", "yaml output file");
         opts.optopt("", "import-name", "override imported vm name", "imported vm name");
         opts.optflag("", "strict", "fail import when warnings are present");
@@ -78,6 +82,11 @@ impl EzkvmArguments {
         if let Some(input) = matches.opt_str("import-proxmox") {
             command = EzkvmCommand::ImportProxmoxConfig {
                 input,
+                storage: Some(
+                    matches
+                        .opt_str("proxmox-storage")
+                        .unwrap_or_else(|| DEFAULT_PROXMOX_STORAGE_PATH.to_string()),
+                ),
                 output: matches.opt_str("output"),
                 import_name: matches.opt_str("import-name"),
                 strict: matches.opt_present("strict"),
@@ -136,5 +145,54 @@ impl EzkvmArguments {
     pub fn print_usage(&self) {
         let brief = format!("Usage: {} [options]", self.program);
         print!("{}", self.opts.usage(&brief));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EzkvmArguments, EzkvmCommand};
+
+    #[test]
+    fn test_import_proxmox_defaults_storage_cfg_path() {
+        let args = EzkvmArguments::new(vec![
+            "ezkvm".to_string(),
+            "--import-proxmox".to_string(),
+            "100.conf".to_string(),
+        ]);
+
+        assert_eq!(
+            args.command,
+            EzkvmCommand::ImportProxmoxConfig {
+                input: "100.conf".to_string(),
+                storage: Some("/etc/pve/storage.cfg".to_string()),
+                output: None,
+                import_name: None,
+                strict: false,
+                dry_run: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_import_proxmox_preserves_explicit_storage_cfg_path() {
+        let args = EzkvmArguments::new(vec![
+            "ezkvm".to_string(),
+            "--import-proxmox".to_string(),
+            "100.conf".to_string(),
+            "--proxmox-storage".to_string(),
+            "/tmp/storage.cfg".to_string(),
+        ]);
+
+        assert_eq!(
+            args.command,
+            EzkvmCommand::ImportProxmoxConfig {
+                input: "100.conf".to_string(),
+                storage: Some("/tmp/storage.cfg".to_string()),
+                output: None,
+                import_name: None,
+                strict: false,
+                dry_run: false,
+            }
+        );
     }
 }

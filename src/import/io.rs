@@ -1,13 +1,26 @@
-use super::mapper::map_to_ezkvm_yaml;
+use super::mapper::map_to_ezkvm_yaml_with_storage;
 use super::proxmox_parser::parse_proxmox_config;
+use super::proxmox_storage_parser::parse_proxmox_storage_config;
 use super::{EzkvmImportResult, ImportError};
 use crate::vm::config::Config;
 use std::fs;
 use std::path::Path;
 
 pub fn import_from_text(input: &str, name_override: Option<&str>) -> Result<EzkvmImportResult, ImportError> {
+    import_from_text_with_storage(input, None, name_override)
+}
+
+pub fn import_from_text_with_storage(
+    input: &str,
+    storage_input: Option<&str>,
+    name_override: Option<&str>,
+) -> Result<EzkvmImportResult, ImportError> {
     let proxmox = parse_proxmox_config(input)?;
-    let result = map_to_ezkvm_yaml(&proxmox, name_override)?;
+    let storage_config = match storage_input {
+        Some(storage_input) => Some(parse_proxmox_storage_config(storage_input)?),
+        None => None,
+    };
+    let result = map_to_ezkvm_yaml_with_storage(&proxmox, storage_config.as_ref(), name_override)?;
 
     serde_yaml::from_str::<Config>(&result.yaml)
         .map_err(|e| ImportError::ValidationError(format!("generated yaml is not valid ezkvm config: {}", e)))?;
@@ -22,10 +35,28 @@ pub fn import_from_file(
     strict: bool,
     dry_run: bool,
 ) -> Result<String, ImportError> {
+    import_from_file_with_storage(input_path, None, output_path, name_override, strict, dry_run)
+}
+
+pub fn import_from_file_with_storage(
+    input_path: &str,
+    storage_path: Option<&str>,
+    output_path: Option<&str>,
+    name_override: Option<&str>,
+    strict: bool,
+    dry_run: bool,
+) -> Result<String, ImportError> {
     let content = fs::read_to_string(input_path)
         .map_err(|e| ImportError::IoError(format!("unable to read '{}': {}", input_path, e)))?;
+    let storage_content = match storage_path {
+        Some(path) => Some(
+            fs::read_to_string(path)
+                .map_err(|e| ImportError::IoError(format!("unable to read '{}': {}", path, e)))?,
+        ),
+        None => None,
+    };
 
-    let result = import_from_text(&content, name_override)?;
+    let result = import_from_text_with_storage(&content, storage_content.as_deref(), name_override)?;
 
     if strict && !result.warnings.is_empty() {
         return Err(ImportError::ValidationError(format!(
@@ -100,7 +131,7 @@ fn build_summary(
 
 #[cfg(test)]
 mod tests {
-    use super::{import_from_file, import_from_text};
+    use super::{import_from_file, import_from_file_with_storage, import_from_text};
     use std::fs;
     use tempfile::tempdir;
 
@@ -175,5 +206,50 @@ mod tests {
 
         let err = import_from_file(input_path.to_str().unwrap(), None, None, true, true).unwrap_err();
         assert!(format!("{:?}", err).contains("strict import failed"));
+    }
+
+    #[test]
+    fn test_import_from_file_with_storage_resolves_paths() {
+        let temp = tempdir().unwrap();
+        let input_path = temp.path().join("vm102.conf");
+        let storage_path = temp.path().join("storage.cfg");
+
+        fs::write(
+            &input_path,
+            r#"
+            name: vm-102
+            bios: ovmf
+            scsi0: vm0:vm-102-disk-0
+            efidisk0: boot:vm-102-efi,efitype=4m
+            "#,
+        )
+        .unwrap();
+        fs::write(
+            &storage_path,
+            r#"
+            lvm: boot
+                vgname boot
+                content images,rootdir
+
+            lvmthin: vm0
+                thinpool pool
+                vgname vm0
+                content images,rootdir
+            "#,
+        )
+        .unwrap();
+
+        let summary = import_from_file_with_storage(
+            input_path.to_str().unwrap(),
+            Some(storage_path.to_str().unwrap()),
+            None,
+            None,
+            false,
+            true,
+        )
+        .unwrap();
+
+        assert!(summary.contains("/dev/vm0/vm-102-disk-0"));
+        assert!(summary.contains("/dev/boot/vm-102-efi"));
     }
 }

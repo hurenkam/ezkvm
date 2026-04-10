@@ -76,13 +76,15 @@ fn main() {
         }
         EzkvmCommand::ImportProxmoxConfig {
             input,
+            storage,
             output,
             import_name,
             strict,
             dry_run,
         } => {
-            let summary = import::io::import_from_file(
+            let summary = import::io::import_from_file_with_storage(
                 &input,
+                storage.as_deref(),
                 output.as_deref(),
                 import_name.as_deref(),
                 strict,

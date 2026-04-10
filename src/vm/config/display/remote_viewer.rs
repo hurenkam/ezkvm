@@ -78,7 +78,7 @@ impl RemoteViewer {
 
 impl QemuDevice for RemoteViewer {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
-        vec![]
+        vec!["--display egl-headless,gl=core".to_string()]
     }
 
     fn post_start(&self, config: &Config) {
@@ -103,7 +103,7 @@ mod tests {
             full_screen: true,
             render_node: None,
         };
-        let expected: Vec<String> = vec![];
+        let expected: Vec<String> = vec!["--display egl-headless,gl=core".to_string()];
         assert_eq!(display.get_qemu_args(0), expected);
 
         let expected: Vec<String> = vec!["--full-screen".to_string()];
@@ -116,7 +116,7 @@ mod tests {
             full_screen: false,
             render_node: Some("/dev/dri/renderD128".to_string()),
         };
-        let expected: Vec<String> = vec![];
+        let expected: Vec<String> = vec!["--display egl-headless,gl=core".to_string()];
         assert_eq!(display.get_qemu_args(0), expected);
 
         let expected: Vec<String> = vec![

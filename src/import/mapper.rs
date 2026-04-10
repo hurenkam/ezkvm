@@ -1,4 +1,6 @@
-use super::proxmox_model::{ProxmoxDiskEntry, ProxmoxHostPciEntry, ProxmoxVmConfig};
+use super::proxmox_model::{
+    ProxmoxDiskEntry, ProxmoxHostPciEntry, ProxmoxStorageConfig, ProxmoxVmConfig,
+};
 use super::report::EzkvmImportResult;
 use super::ImportError;
 use serde_yaml::{Mapping, Value};
@@ -6,6 +8,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub fn map_to_ezkvm_yaml(
     proxmox: &ProxmoxVmConfig,
+    name_override: Option<&str>,
+) -> Result<EzkvmImportResult, ImportError> {
+    map_to_ezkvm_yaml_with_storage(proxmox, None, name_override)
+}
+
+pub fn map_to_ezkvm_yaml_with_storage(
+    proxmox: &ProxmoxVmConfig,
+    storage_config: Option<&ProxmoxStorageConfig>,
     name_override: Option<&str>,
 ) -> Result<EzkvmImportResult, ImportError> {
     let mut mapped_keys = vec![];
@@ -112,6 +122,7 @@ pub fn map_to_ezkvm_yaml(
                     mapped_keys.push("hugepages".to_string());
 
                     if enabled {
+                        memory_map.insert(s("mem_path"), s("/run/hugepages/kvm/1048576kB"));
                         memory_map.insert(s("prealloc"), Value::Bool(true));
                     }
                 } else {
@@ -145,6 +156,7 @@ pub fn map_to_ezkvm_yaml(
 
     if let Some(bios_map) = map_bios(
         proxmox,
+        storage_config,
         guest_uuid.as_deref(),
         &mut mapped_keys,
         &mut skipped_keys,
@@ -153,7 +165,14 @@ pub fn map_to_ezkvm_yaml(
         system.insert(s("bios"), Value::Mapping(bios_map));
     }
 
-    if let Some(tpm_map) = map_tpm(proxmox, &name, &mut mapped_keys, &mut skipped_keys, &mut warnings)
+    if let Some(tpm_map) = map_tpm(
+        proxmox,
+        storage_config,
+        &name,
+        &mut mapped_keys,
+        &mut skipped_keys,
+        &mut warnings,
+    )
     {
         system.insert(s("tpm"), Value::Mapping(tpm_map));
     }
@@ -168,9 +187,13 @@ pub fn map_to_ezkvm_yaml(
 
     let (gpu_passthrough, host_passthrough) = split_gpu_passthrough_devices(&proxmox.host_pci);
 
+    // Determine display type first so we can conditionally generate SPICE or VNC
+    let display_type = infer_display_type(proxmox, &gpu_passthrough);
+
     if let Some(spice) = map_spice(
         proxmox,
         &gpu_passthrough,
+        &display_type,
         &mut mapped_keys,
         &mut warnings,
     ) {
@@ -179,7 +202,9 @@ pub fn map_to_ezkvm_yaml(
 
     if let Some(vnc) = map_vnc(
         proxmox,
+        &name,
         &gpu_passthrough,
+        &display_type,
         &mut mapped_keys,
         &mut warnings,
     ) {
@@ -206,7 +231,13 @@ pub fn map_to_ezkvm_yaml(
         root.insert(s("display"), Value::Mapping(display));
     }
 
-    let storage = map_storage(&proxmox.disks, &mut mapped_keys, &mut skipped_keys, &mut warnings);
+    let storage = map_storage(
+        &proxmox.disks,
+        storage_config,
+        &mut mapped_keys,
+        &mut skipped_keys,
+        &mut warnings,
+    );
     if !storage.is_empty() {
         root.insert(s("storage"), Value::Sequence(storage));
     }
@@ -254,6 +285,7 @@ pub fn map_to_ezkvm_yaml(
 
 fn map_storage(
     disks: &[ProxmoxDiskEntry],
+    storage_config: Option<&ProxmoxStorageConfig>,
     mapped_keys: &mut Vec<String>,
     skipped_keys: &mut Vec<String>,
     warnings: &mut Vec<String>,
@@ -281,9 +313,11 @@ fn map_storage(
             let mut drive_map = Mapping::new();
             let media = drive.options.get("media").cloned().unwrap_or_default();
             let drive_type = if media == "cdrom" { "cd" } else { "hd" };
+            let resolved_source = resolve_volume_reference(&drive.source, storage_config)
+                .unwrap_or_else(|| drive.source.clone());
 
             drive_map.insert(s("type"), s(drive_type));
-            drive_map.insert(s("file"), s(&drive.source));
+            drive_map.insert(s("file"), s(&resolved_source));
 
             if let Some(discard) = drive.options.get("discard") {
                 drive_map.insert(s("discard"), s(discard));
@@ -309,7 +343,7 @@ fn map_storage(
                 }
             }
 
-            if !drive.source.starts_with('/') {
+            if !resolved_source.starts_with('/') {
                 warnings.push(format!(
                     "disk '{}' source '{}' may require manual path translation",
                     drive.key, drive.source
@@ -522,6 +556,7 @@ fn map_cpu(
 
 fn map_bios(
     proxmox: &ProxmoxVmConfig,
+    storage_config: Option<&ProxmoxStorageConfig>,
     guest_uuid: Option<&str>,
     mapped_keys: &mut Vec<String>,
     skipped_keys: &mut Vec<String>,
@@ -552,10 +587,12 @@ fn map_bios(
     if bios_type == "ovmf" {
         if let Some(efidisk) = proxmox.scalars.get("efidisk0") {
             let (source, options) = parse_inline_options(efidisk);
-            bios.insert(s("file"), s(&source));
+            let resolved_source =
+                resolve_volume_reference(&source, storage_config).unwrap_or_else(|| source.clone());
+            bios.insert(s("file"), s(&resolved_source));
             mapped_keys.push("efidisk0".to_string());
 
-            if !source.starts_with('/') {
+            if !resolved_source.starts_with('/') {
                 warnings.push(format!(
                     "efidisk0 source '{}' may require manual path translation",
                     source
@@ -585,6 +622,7 @@ fn map_bios(
 
 fn map_tpm(
     proxmox: &ProxmoxVmConfig,
+    storage_config: Option<&ProxmoxStorageConfig>,
     name: &str,
     mapped_keys: &mut Vec<String>,
     skipped_keys: &mut Vec<String>,
@@ -592,8 +630,10 @@ fn map_tpm(
 ) -> Option<Mapping> {
     let raw = proxmox.scalars.get("tpmstate0")?;
     let (source, options) = parse_inline_options(raw);
+    let resolved_source =
+        resolve_volume_reference(&source, storage_config).unwrap_or_else(|| source.clone());
 
-    if !source.starts_with('/') {
+    if !resolved_source.starts_with('/') {
         warnings.push(format!(
             "tpmstate0 source '{}' is not an absolute path; skipping typed tpm mapping",
             source
@@ -604,7 +644,7 @@ fn map_tpm(
 
     let mut tpm = Mapping::new();
     tpm.insert(s("type"), s("swtpm"));
-    tpm.insert(s("disk"), s(&source));
+    tpm.insert(s("disk"), s(&resolved_source));
     tpm.insert(s("socket"), s(&format!("/var/ezkvm/{}-tpm.socket", name)));
 
     if let Some(version) = options.get("version") {
@@ -695,8 +735,19 @@ fn map_pci_entries(items: &[&ProxmoxHostPciEntry], mapped_keys: &mut Vec<String>
 
     for item in items {
         let mut map = Mapping::new();
-        map.insert(s("vm_id"), s(&format!("{:x}", item.index + 1)));
-        map.insert(s("host_id"), s(&ensure_pci_function(&item.host)));
+        let normalized_host = ensure_pci_function(&item.host);
+        let function = pci_function(&normalized_host).unwrap_or(0);
+
+        // q35 ich9 downstream ports accept slot 0. Map each hostpciN to port N+1 and keep slot 0.
+        let vm_id = if function == 0 {
+            "0".to_string()
+        } else {
+            format!("0.{:x}", function)
+        };
+
+        map.insert(s("vm_id"), s(&vm_id));
+        map.insert(s("port"), s(&(item.index + 1).to_string()));
+        map.insert(s("host_id"), s(&normalized_host));
 
         if let Some(mf) = item.options.get("multifunction").and_then(|value| parse_boolish(value)) {
             map.insert(s("multi_function"), Value::Bool(mf));
@@ -707,6 +758,11 @@ fn map_pci_entries(items: &[&ProxmoxHostPciEntry], mapped_keys: &mut Vec<String>
     }
 
     pci_items
+}
+
+fn pci_function(host: &str) -> Option<u8> {
+    host.rsplit_once('.')
+        .and_then(|(_, function)| u8::from_str_radix(function, 16).ok())
 }
 
 fn map_gpu(
@@ -765,6 +821,33 @@ fn map_gpu(
     }
 }
 
+fn infer_display_type(
+    proxmox: &ProxmoxVmConfig,
+    gpu_passthrough: &[&ProxmoxHostPciEntry],
+) -> Option<String> {
+    if !gpu_passthrough.is_empty() {
+        if proxmox
+            .scalars
+            .get("vga")
+            .map(|value| vga_model(value) == "none")
+            .unwrap_or(true)
+        {
+            return Some("no_display".to_string());
+        }
+    }
+
+    let Some(vga) = proxmox.scalars.get("vga") else {
+        return None;
+    };
+
+    match vga_model(vga).as_str() {
+        "virtio" | "virtio-vga" | "virtio-gl" | "vmware" | "vmware-svga" | "qxl" | "qxl2"
+        | "qxl3" | "qxl4" | "std" | "cirrus" => Some("remote-viewer".to_string()),
+        "none" | "serial0" => Some("no_display".to_string()),
+        _ => None,
+    }
+}
+
 fn map_display(
     proxmox: &ProxmoxVmConfig,
     gpu_passthrough: &[&ProxmoxHostPciEntry],
@@ -795,7 +878,7 @@ fn map_display(
         | "qxl3" | "qxl4" | "std" | "cirrus" => {
             display.insert(s("type"), s("remote-viewer"));
             warnings.push(format!(
-                "display inferred as remote-viewer from Proxmox vga '{}'",
+                "display inferred as remote-viewer from Proxmox vga '{}'; importer defaults this path to SPICE",
                 vga_model(vga)
             ));
             mapped_keys.push("display".to_string());
@@ -813,6 +896,7 @@ fn map_display(
 fn map_spice(
     proxmox: &ProxmoxVmConfig,
     gpu_passthrough: &[&ProxmoxHostPciEntry],
+    display_type: &Option<String>,
     mapped_keys: &mut Vec<String>,
     warnings: &mut Vec<String>,
 ) -> Option<Mapping> {
@@ -827,10 +911,17 @@ fn map_spice(
     match vga_model(vga).as_str() {
         "virtio" | "virtio-vga" | "virtio-gl" | "vmware" | "vmware-svga" | "qxl" | "qxl2"
         | "qxl3" | "qxl4" => {
-            warnings.push(format!(
-                "spice endpoint inferred with ezkvm defaults from Proxmox vga '{}'",
-                vga_model(vga)
-            ));
+            if matches!(display_type.as_deref(), Some("remote-viewer")) {
+                warnings.push(format!(
+                    "spice endpoint inferred from Proxmox vga '{}' (matched with remote-viewer display; SPICE is the importer default)",
+                    vga_model(vga)
+                ));
+            } else {
+                warnings.push(format!(
+                    "spice endpoint inferred with ezkvm defaults from Proxmox vga '{}'",
+                    vga_model(vga)
+                ));
+            }
             mapped_keys.push("spice".to_string());
             Some(Mapping::new())
         }
@@ -840,7 +931,9 @@ fn map_spice(
 
 fn map_vnc(
     proxmox: &ProxmoxVmConfig,
+    vm_name: &str,
     gpu_passthrough: &[&ProxmoxHostPciEntry],
+    display_type: &Option<String>,
     mapped_keys: &mut Vec<String>,
     warnings: &mut Vec<String>,
 ) -> Option<Mapping> {
@@ -848,18 +941,25 @@ fn map_vnc(
         return None;
     };
 
+    if matches!(display_type.as_deref(), Some("remote-viewer")) {
+        return None;
+    }
+
+    // Legacy non-remote-viewer path: generate VNC for std and cirrus (usually local displays)
     if !gpu_passthrough.is_empty() && vga_model(vga) == "none" {
         return None;
     }
 
     match vga_model(vga).as_str() {
         "std" | "cirrus" => {
+            let mut vnc = Mapping::new();
+            vnc.insert(s("path"), s(&format!("/var/ezkvm/{}.vnc", vm_name)));
             warnings.push(format!(
-                "vnc endpoint inferred with ezkvm defaults from Proxmox vga '{}'",
+                "vnc unix socket inferred from Proxmox vga '{}'",
                 vga_model(vga)
             ));
             mapped_keys.push("vnc".to_string());
-            Some(Mapping::new())
+            Some(vnc)
         }
         _ => None,
     }
@@ -899,6 +999,60 @@ fn parse_inline_options(value: &str) -> (String, HashMap<String, String>) {
     }
 
     (source, options)
+}
+
+fn resolve_volume_reference(
+    source: &str,
+    storage_config: Option<&ProxmoxStorageConfig>,
+) -> Option<String> {
+    if source.starts_with('/') {
+        return Some(source.to_string());
+    }
+
+    let (store_id, volume) = source.split_once(':')?;
+    let storage = storage_config?.storages.get(store_id)?;
+
+    match storage.storage_type.as_str() {
+        "dir" => storage
+            .options
+            .get("path")
+            .map(|base_path| resolve_dir_volume(base_path, volume)),
+        "lvm" | "lvmthin" => storage.options.get("vgname").and_then(|vgname| {
+            if volume.contains('/') {
+                None
+            } else {
+                Some(format!("/dev/{}/{}", vgname, volume))
+            }
+        }),
+        _ => None,
+    }
+}
+
+fn resolve_dir_volume(base_path: &str, volume: &str) -> String {
+    let trimmed_base = base_path.trim_end_matches('/');
+
+    if volume.starts_with('/') {
+        return volume.to_string();
+    }
+
+    if volume.starts_with("images/")
+        || volume.starts_with("iso/")
+        || volume.starts_with("vztmpl/")
+        || volume.starts_with("backup/")
+        || volume.starts_with("snippets/")
+        || volume.starts_with("template/")
+        || volume.starts_with("rootdir/")
+    {
+        return format!("{}/{}", trimmed_base, volume);
+    }
+
+    if let Some((prefix, _)) = volume.split_once('/') {
+        if prefix.chars().all(|ch| ch.is_ascii_digit()) {
+            return format!("{}/images/{}", trimmed_base, volume);
+        }
+    }
+
+    format!("{}/{}", trimmed_base, volume)
 }
 
 fn parse_boolish(value: &str) -> Option<bool> {
@@ -982,8 +1136,9 @@ fn s(input: &str) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::map_to_ezkvm_yaml;
+    use super::{map_to_ezkvm_yaml, map_to_ezkvm_yaml_with_storage};
     use crate::import::proxmox_parser::parse_proxmox_config;
+    use crate::import::proxmox_storage_parser::parse_proxmox_storage_config;
     use crate::vm::config::Config;
 
     #[test]
@@ -1014,6 +1169,9 @@ mod tests {
         assert!(result.yaml.contains("vmid: '100'") || result.yaml.contains("vmid: \"100\"") || result.yaml.contains("vmid: 100"));
         assert!(result.yaml.contains("balloon: true"));
         assert!(result.yaml.contains("hugepages: true"));
+        assert!(result
+            .yaml
+            .contains("mem_path: /run/hugepages/kvm/1048576kB"));
         assert!(result.yaml.contains("prealloc: true"));
         assert!(result.yaml.contains("aio: io_uring"));
         assert!(result.yaml.contains("serial: DISK100"));
@@ -1074,7 +1232,130 @@ mod tests {
         assert_eq!(parsed.general().name(), "gaming-vm");
         assert!(result.yaml.contains("type: passthrough"));
         assert!(result.yaml.contains("type: no_display"));
+        assert!(result.yaml.contains("vm_id: '0'") || result.yaml.contains("vm_id: \"0\"") || result.yaml.contains("vm_id: 0"));
+        assert!(result.yaml.contains("vm_id: '0.1'") || result.yaml.contains("vm_id: \"0.1\"") || result.yaml.contains("vm_id: 0.1"));
+        assert!(result.yaml.contains("port: '1'") || result.yaml.contains("port: \"1\"") || result.yaml.contains("port: 1"));
+        assert!(result.yaml.contains("port: '2'") || result.yaml.contains("port: \"2\"") || result.yaml.contains("port: 2"));
         assert!(result.yaml.contains("usb:"));
         assert!(!result.yaml.contains("host:\n  pci:"));
+    }
+
+    #[test]
+    fn test_map_host_pci_uses_slot_zero_and_port_per_index() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: host-pci-vm
+            hostpci0: 0000:6e:00.0
+            hostpci1: 0000:6e:00.1
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        let parsed: Config = serde_yaml::from_str(&result.yaml).unwrap();
+
+        assert_eq!(parsed.general().name(), "host-pci-vm");
+        assert!(result.yaml.contains("host:"));
+        assert!(result.yaml.contains("pci:"));
+        assert!(result.yaml.contains("vm_id: '0'") || result.yaml.contains("vm_id: \"0\"") || result.yaml.contains("vm_id: 0"));
+        assert!(result.yaml.contains("vm_id: '0.1'") || result.yaml.contains("vm_id: \"0.1\"") || result.yaml.contains("vm_id: 0.1"));
+        assert!(result.yaml.contains("port: '1'") || result.yaml.contains("port: \"1\"") || result.yaml.contains("port: 1"));
+        assert!(result.yaml.contains("port: '2'") || result.yaml.contains("port: \"2\"") || result.yaml.contains("port: 2"));
+        assert!(!result.yaml.contains("vm_id: '1'"));
+        assert!(!result.yaml.contains("vm_id: '2'"));
+    }
+
+    #[test]
+    fn test_remote_viewer_generates_spice_not_vnc() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: remote-viewer-vm
+            vga: virtio-gl
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        
+        // Verify remote-viewer display type is inferred
+        assert!(result.yaml.contains("display:"));
+        assert!(result.yaml.contains("type: remote-viewer"));
+        
+        // Verify SPICE is generated for remote-viewer
+        assert!(result.yaml.contains("spice:"));
+        
+        // Verify VNC is NOT generated for remote-viewer
+        assert!(!result.yaml.contains("vnc:"));
+    }
+
+    #[test]
+    fn test_map_resolves_lvmthin_sources_with_storage_cfg() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: imported-ubuntu
+            bios: ovmf
+            scsi0: vm0:vm-100-disk-0,discard=on
+            efidisk0: boot:vm-100-efi,efitype=4m
+            tpmstate0: ws0:vm-100-tpm,version=v2.0
+            "#,
+        )
+        .unwrap();
+        let storage = parse_proxmox_storage_config(
+            r#"
+            lvm: boot
+                vgname boot
+                content images,rootdir
+
+            lvmthin: ws0
+                thinpool pool
+                vgname ws0
+                content rootdir,images
+
+            lvmthin: vm0
+                thinpool pool
+                vgname vm0
+                content images,rootdir
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml_with_storage(&proxmox, Some(&storage), None).unwrap();
+        let parsed: Config = serde_yaml::from_str(&result.yaml).unwrap();
+
+        assert_eq!(parsed.general().name(), "imported-ubuntu");
+        assert!(result.yaml.contains("file: /dev/vm0/vm-100-disk-0"));
+        assert!(result.yaml.contains("file: /dev/boot/vm-100-efi"));
+        assert!(result.yaml.contains("disk: /dev/ws0/vm-100-tpm"));
+        assert!(!result
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("manual path translation")));
+    }
+
+    #[test]
+    fn test_map_resolves_dir_storage_image_paths() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: iso-vm
+            ide2: local:iso/debian.iso,media=cdrom
+            scsi0: local:100/vm-100-disk-0.qcow2
+            "#,
+        )
+        .unwrap();
+        let storage = parse_proxmox_storage_config(
+            r#"
+            dir: local
+                path /var/lib/vz
+                content iso,vztmpl,images
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml_with_storage(&proxmox, Some(&storage), None).unwrap();
+
+        assert!(result.yaml.contains("file: /var/lib/vz/iso/debian.iso"));
+        assert!(result
+            .yaml
+            .contains("file: /var/lib/vz/images/100/vm-100-disk-0.qcow2"));
     }
 }

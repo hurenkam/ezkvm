@@ -76,7 +76,11 @@ impl QemuDevice for Virtio {
 }
 
 #[typetag::deserialize(name = "virtio")]
-impl Gpu for Virtio {}
+impl Gpu for Virtio {
+    fn use_gl(&self) -> bool {
+        self.gl == Boolean::Yes
+    }
+}
 
 #[cfg(test)]
 mod tests {

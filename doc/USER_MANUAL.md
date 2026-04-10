@@ -34,3 +34,14 @@ Some examples can be found in etc directory:
   the basics should be in place for this to work.
 
 To start the qemu VM, it should suffice to run `ezkvm --start <configfile>`.
+
+# Proxmox import ##
+
+The Proxmox importer assumes `/etc/pve/storage.cfg` when `--proxmox-storage` is omitted.
+For imported guests that map to `remote-viewer`, the importer emits a SPICE endpoint by default rather than VNC.
+
+Example:
+
+```bash
+ezkvm --import-proxmox /etc/pve/qemu-server/100.conf --dry-run
+```

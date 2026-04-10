@@ -11,7 +11,11 @@ mod virtio;
 mod vmware_svga;
 
 #[typetag::deserialize(tag = "type")]
-pub trait Gpu: QemuDevice {}
+pub trait Gpu: QemuDevice {
+    fn use_gl(&self) -> bool {
+        false
+    }
+}
 impl Default for Box<dyn Gpu> {
     fn default() -> Self {
         NoGpu::boxed_default()
