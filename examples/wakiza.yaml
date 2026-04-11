@@ -121,10 +121,18 @@ hostpci:
     pcie: true
 
 
-# Add XHCI controller and USB host device
+# XHCI controller and USB host device
+xhci_controllers:
+  - id: "xhci"
+    p2: 15
+    p3: 15
+    bus: "pci.1"
+    addr: "0x1b"
+
 usb_devices:
   - id: "usb0"
-    host: "1-2.2"
+    hostbus: "1"
+    hostport: "2.2"
     bus: "xhci.0"
     port: "1"
 

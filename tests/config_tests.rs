@@ -506,4 +506,64 @@ ivshmem:
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("ivshmem mem_path must be an absolute path"));
     }
+
+    #[test]
+    fn test_config_with_xhci_controller_and_usb_hostport() {
+        let yaml = r#"
+name: "usb-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+xhci_controllers:
+  - id: "xhci"
+    p2: 15
+    p3: 15
+    bus: "pci.1"
+    addr: "0x1b"
+
+usb_devices:
+  - id: "usb0"
+    hostbus: "1"
+    hostport: "2.2"
+    bus: "xhci.0"
+    port: "1"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.xhci_controllers.len(), 1);
+        assert_eq!(config.xhci_controllers[0].p2, Some(15));
+        assert_eq!(config.xhci_controllers[0].p3, Some(15));
+        assert_eq!(config.xhci_controllers[0].bus.as_deref(), Some("pci.1"));
+        assert_eq!(config.xhci_controllers[0].addr.as_deref(), Some("0x1b"));
+        assert_eq!(config.usb_devices[0].hostbus.as_deref(), Some("1"));
+        assert_eq!(config.usb_devices[0].hostport.as_deref(), Some("2.2"));
+    }
+
+    #[test]
+    fn test_usb_device_accepts_proxmox_host_form() {
+        let yaml = r#"
+name: "usb-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+usb_devices:
+  - id: "usb0"
+    host: "1-2.2"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.usb_devices[0].host, "1-2.2");
+    }
 }

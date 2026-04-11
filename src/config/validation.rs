@@ -45,6 +45,11 @@ pub fn validate_config(config: &VmConfig) -> Result<()> {
     for usb_device in &config.usb_devices {
         validate_usb_device_config(usb_device)?;
     }
+
+    // Validate XHCI controller configuration
+    for xhci_controller in &config.xhci_controllers {
+        validate_xhci_controller_config(xhci_controller)?;
+    }
     
     // Validate SPICE configuration
     if let Some(spice) = &config.spice {
@@ -457,12 +462,59 @@ fn validate_hostpci_config(hostpci: &super::HostPciConfig) -> Result<()> {
 
 /// Validate USB device configuration
 fn validate_usb_device_config(usb_device: &super::UsbDeviceConfig) -> Result<()> {
-    // Validate USB host specification format
-    // Should be in format "bus.port" or "vendor:product"
-    if !is_valid_usb_spec(&usb_device.host) {
-        return Err(anyhow!("Invalid USB device specification: {}. Expected format: 'bus.port' or 'vendor:product'", usb_device.host));
+    let has_host_spec = !usb_device.host.trim().is_empty();
+    let has_hostbus = usb_device.hostbus.as_deref().map(|value| !value.trim().is_empty()).unwrap_or(false);
+    let has_hostport = usb_device.hostport.as_deref().map(|value| !value.trim().is_empty()).unwrap_or(false);
+
+    if has_host_spec {
+        if !is_valid_usb_spec(&usb_device.host) {
+            return Err(anyhow!("Invalid USB device specification: {}. Expected format: 'bus-port.path', 'vendor:product', or use hostbus/hostport fields", usb_device.host));
+        }
+    } else if !(has_hostbus && has_hostport) {
+        return Err(anyhow!("USB device '{}' requires either host or both hostbus and hostport", usb_device.id));
+    }
+
+    if has_hostbus && !usb_device.hostbus.as_ref().unwrap().chars().all(|c| c.is_ascii_digit()) {
+        return Err(anyhow!("USB hostbus must be numeric: {}", usb_device.hostbus.as_ref().unwrap()));
+    }
+
+    if has_hostport && !is_valid_usb_hostport(usb_device.hostport.as_ref().unwrap()) {
+        return Err(anyhow!("Invalid USB hostport format: {}", usb_device.hostport.as_ref().unwrap()));
     }
     
+    Ok(())
+}
+
+/// Validate XHCI controller configuration
+fn validate_xhci_controller_config(xhci_controller: &super::XhciControllerConfig) -> Result<()> {
+    if xhci_controller.id.trim().is_empty() {
+        return Err(anyhow!("XHCI controller id cannot be empty"));
+    }
+
+    if let Some(p2) = xhci_controller.p2 {
+        if p2 == 0 {
+            return Err(anyhow!("XHCI controller p2 must be greater than 0 when specified"));
+        }
+    }
+
+    if let Some(p3) = xhci_controller.p3 {
+        if p3 == 0 {
+            return Err(anyhow!("XHCI controller p3 must be greater than 0 when specified"));
+        }
+    }
+
+    if let Some(bus) = &xhci_controller.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("XHCI controller bus cannot be empty"));
+        }
+    }
+
+    if let Some(addr) = &xhci_controller.addr {
+        if addr.trim().is_empty() {
+            return Err(anyhow!("XHCI controller addr cannot be empty"));
+        }
+    }
+
     Ok(())
 }
 
@@ -807,4 +859,11 @@ fn is_valid_usb_spec(spec: &str) -> bool {
     }
     
     false
+}
+
+fn is_valid_usb_hostport(hostport: &str) -> bool {
+    !hostport.is_empty()
+        && hostport
+            .split('.')
+            .all(|segment| !segment.is_empty() && segment.chars().all(|c| c.is_ascii_digit()))
 }

@@ -211,9 +211,19 @@ impl QemuArgs {
     }
 
     /// Add USB host device passthrough
-    pub fn add_usb_host(&mut self, host_spec: &str, id: &str, bus: Option<&str>, port: Option<&str>) {
+    pub fn add_usb_host(&mut self, host_spec: &str, hostbus: Option<&str>, hostport: Option<&str>, id: &str, bus: Option<&str>, port: Option<&str>) {
         self.push_str("-device");
-        let mut usb_spec = format!("usb-host,host={},id={}", host_spec, id);
+        let mut usb_spec = String::from("usb-host");
+
+        if let (Some(hostbus), Some(hostport)) = (hostbus, hostport) {
+            usb_spec.push_str(&format!(",hostbus={},hostport={}", hostbus, hostport));
+        } else if let Some((normalized_bus, normalized_port)) = normalize_usb_host_spec(host_spec) {
+            usb_spec.push_str(&format!(",hostbus={},hostport={}", normalized_bus, normalized_port));
+        } else if !host_spec.trim().is_empty() {
+            usb_spec.push_str(&format!(",host={}", host_spec));
+        }
+
+        usb_spec.push_str(&format!(",id={}", id));
         if let Some(bus) = bus {
             usb_spec.push_str(&format!(",bus={}", bus));
         }
@@ -224,9 +234,22 @@ impl QemuArgs {
     }
 
     /// Add XHCI USB controller
-    pub fn add_xhci_controller(&mut self, id: &str) {
+    pub fn add_xhci_controller(&mut self, id: &str, p2: Option<u8>, p3: Option<u8>, bus: Option<&str>, addr: Option<&str>) {
         self.push_str("-device");
-        self.push(format!("qemu-xhci,id={}", id));
+        let mut controller_spec = format!("qemu-xhci,id={}", id);
+        if let Some(p2) = p2 {
+            controller_spec.push_str(&format!(",p2={}", p2));
+        }
+        if let Some(p3) = p3 {
+            controller_spec.push_str(&format!(",p3={}", p3));
+        }
+        if let Some(bus) = bus {
+            controller_spec.push_str(&format!(",bus={}", bus));
+        }
+        if let Some(addr) = addr {
+            controller_spec.push_str(&format!(",addr={}", addr));
+        }
+        self.push(controller_spec);
     }
 
     /// Add SPICE display server
@@ -570,6 +593,23 @@ impl QemuArgs {
     }
 }
 
+fn normalize_usb_host_spec(host_spec: &str) -> Option<(&str, &str)> {
+    let (hostbus, hostport) = host_spec.split_once('-')?;
+    if hostbus.is_empty() || hostport.is_empty() {
+        return None;
+    }
+    if !hostbus.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    if !hostport
+        .split('.')
+        .all(|segment| !segment.is_empty() && segment.chars().all(|c| c.is_ascii_digit()))
+    {
+        return None;
+    }
+    Some((hostbus, hostport))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -668,5 +708,32 @@ mod tests {
         let built = args.build();
         assert!(built.iter().any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0"));
         assert!(built.iter().any(|arg| arg == "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M"));
+    }
+
+    #[test]
+    fn test_xhci_controller_with_placement() {
+        let mut args = QemuArgs::new();
+        args.add_xhci_controller("xhci", Some(15), Some(15), Some("pci.1"), Some("0x1b"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b"));
+    }
+
+    #[test]
+    fn test_usb_host_normalizes_proxmox_form() {
+        let mut args = QemuArgs::new();
+        args.add_usb_host("1-2.2", None, None, "usb0", Some("xhci.0"), Some("1"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1"));
+    }
+
+    #[test]
+    fn test_usb_host_explicit_hostbus_hostport() {
+        let mut args = QemuArgs::new();
+        args.add_usb_host("", Some("1"), Some("2.2"), "usb0", Some("xhci.0"), Some("1"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1"));
     }
 }

@@ -47,10 +47,10 @@
 - [x] Add tests for parsed input devices and emitted QEMU arguments
 
 ### 3. XHCI And USB Parity
-- [ ] Extend the XHCI controller model to support `p2`, `p3`, `bus`, and `addr`
-- [ ] Add a dedicated XHCI controller config section instead of relying on implicit controller creation
-- [ ] Support Proxmox-style USB host emission using `hostbus` and `hostport` in addition to the current host spec
-- [ ] Keep existing USB validation, but add normalization/tests for the Proxmox `1-2.2` form
+- [x] Extend the XHCI controller model to support `p2`, `p3`, `bus`, and `addr`
+- [x] Add a dedicated XHCI controller config section instead of relying on implicit controller creation
+- [x] Support Proxmox-style USB host emission using `hostbus` and `hostport` in addition to the current host spec
+- [x] Keep existing USB validation, but add normalization/tests for the Proxmox `1-2.2` form
 
 ### 4. ivshmem And Looking Glass Parity
 - [x] Extend `ivshmem` config to support `bus` placement and custom `mem_path`

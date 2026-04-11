@@ -95,12 +95,29 @@ impl QemuManager {
         }
         
         // Add USB device arguments
-        if !self.config.usb_devices.is_empty() {
-            // Add XHCI controller if we have USB devices
-            args.add_xhci_controller("xhci");
+        if !self.config.xhci_controllers.is_empty() {
+            for xhci_controller in &self.config.xhci_controllers {
+                args.add_xhci_controller(
+                    &xhci_controller.id,
+                    xhci_controller.p2,
+                    xhci_controller.p3,
+                    xhci_controller.bus.as_deref(),
+                    xhci_controller.addr.as_deref(),
+                );
+            }
+        } else if !self.config.usb_devices.is_empty() {
+            // Backward-compatible implicit XHCI controller if USB devices are present.
+            args.add_xhci_controller("xhci", None, None, None, None);
         }
         for usb_device in &self.config.usb_devices {
-            args.add_usb_host(&usb_device.host, &usb_device.id, usb_device.bus.as_deref(), usb_device.port.as_deref());
+            args.add_usb_host(
+                &usb_device.host,
+                usb_device.hostbus.as_deref(),
+                usb_device.hostport.as_deref(),
+                &usb_device.id,
+                usb_device.bus.as_deref(),
+                usb_device.port.as_deref(),
+            );
         }
         
         // Add SPICE arguments
