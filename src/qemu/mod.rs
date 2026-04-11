@@ -170,7 +170,7 @@ impl QemuManager {
         }
         
         // Add option arguments
-        args.extend(self.build_option_args());
+        args.extend(self.build_option_args()?);
         
         // Add KVM acceleration if enabled
         if self.config.options.enable_kvm {
@@ -189,20 +189,46 @@ impl QemuManager {
     fn build_boot_args(&self) -> QemuArgs {
         let mut args = QemuArgs::new();
         
-        // Boot order
-        if !self.config.boot.boot_order.is_empty() {
+        // Boot order and related boot UI options
+        if !self.config.boot.boot_order.is_empty()
+            || self.config.boot.menu
+            || self.config.boot.strict
+            || self.config.boot.reboot_timeout.is_some()
+            || self.config.boot.splash.is_some()
+        {
             args.push_str("-boot");
-            let order: Vec<String> = self.config.boot.boot_order.iter()
-                .map(|device| match device.as_str() {
-                    "disk" | "hd" => "c".to_string(),
-                    "cdrom" | "cd" => "d".to_string(),
-                    "floppy" => "a".to_string(),
-                    "network" => "n".to_string(),
-                    _ => device.clone(),
-                })
-                .collect();
-            let order_str = order.join("");
-            args.push(format!("order={}", order_str));
+            let mut parts = Vec::new();
+
+            if !self.config.boot.boot_order.is_empty() {
+                let order: Vec<String> = self.config.boot.boot_order.iter()
+                    .map(|device| match device.as_str() {
+                        "disk" | "hd" => "c".to_string(),
+                        "cdrom" | "cd" => "d".to_string(),
+                        "floppy" => "a".to_string(),
+                        "network" => "n".to_string(),
+                        _ => device.clone(),
+                    })
+                    .collect();
+                parts.push(format!("order={}", order.join("")));
+            }
+
+            if self.config.boot.menu {
+                parts.push("menu=on".to_string());
+            }
+
+            if self.config.boot.strict {
+                parts.push("strict=on".to_string());
+            }
+
+            if let Some(timeout) = self.config.boot.reboot_timeout {
+                parts.push(format!("reboot-timeout={}", timeout));
+            }
+
+            if let Some(splash) = &self.config.boot.splash {
+                parts.push(format!("splash={}", splash));
+            }
+
+            args.push(parts.join(","));
         }
         
         // Kernel boot (if specified)
@@ -243,12 +269,28 @@ impl QemuManager {
     }
     
     /// Build option-related arguments
-    fn build_option_args(&self) -> QemuArgs {
+    fn build_option_args(&self) -> Result<QemuArgs> {
         let mut args = QemuArgs::new();
+
+        let pid_file = crate::state::get_pid_file_at(
+            &self.config.name,
+            self.config.options.pid_file.as_deref(),
+        )?;
+        args.add_pidfile(&pid_file.to_string_lossy());
+
+        if self.config.options.nodefaults {
+            args.add_nodefaults();
+        }
+
+        for global in &self.config.options.global_options {
+            args.add_global(global);
+        }
+
+        if let Some(rtc) = &self.config.options.rtc {
+            args.add_rtc(rtc.base.as_deref(), rtc.driftfix.as_deref());
+        }
         
-        // Additional options can be added here in the future
-        
-        args
+        Ok(args)
     }
     
     /// Get the QEMU binary name

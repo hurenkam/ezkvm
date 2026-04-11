@@ -85,6 +85,8 @@ pub fn validate_config(config: &VmConfig) -> Result<()> {
     if let Some(hyperv) = &config.hyperv {
         validate_hyperv_config(hyperv)?;
     }
+
+    validate_vm_options(&config.options)?;
     
     Ok(())
 }
@@ -118,6 +120,15 @@ fn validate_system_config(system: &super::SystemConfig) -> Result<()> {
     for feature in &system.cpu_features {
         if !feature.name.starts_with('+') && !feature.name.starts_with('-') {
             return Err(anyhow!("CPU feature '{}' must start with '+' or '-'", feature.name));
+        }
+    }
+
+    for option in &system.machine_options {
+        if option.trim().is_empty() {
+            return Err(anyhow!("Machine options cannot be empty"));
+        }
+        if !option.contains('=') {
+            return Err(anyhow!("Machine option '{}' must use key=value format", option));
         }
     }
     
@@ -157,6 +168,12 @@ fn validate_boot_config(boot: &super::BootConfig) -> Result<()> {
                     eprintln!("Warning: UEFI vars path '{}' does not exist", vars_path);
                 }
             }
+        }
+    }
+
+    if let Some(splash) = &boot.splash {
+        if splash.trim().is_empty() {
+            return Err(anyhow!("Boot splash path cannot be empty"));
         }
     }
     
@@ -205,6 +222,27 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
         return Err(anyhow!("Unsupported drive format: {}. Supported: {:?}", 
                           drive.format, valid_formats));
     }
+
+    if let Some(cache) = &drive.cache {
+        let valid_cache = ["none", "writeback", "writethrough", "unsafe", "directsync"];
+        if !valid_cache.contains(&cache.as_str()) {
+            return Err(anyhow!("Unsupported drive cache mode: {}. Supported: {:?}", cache, valid_cache));
+        }
+    }
+
+    if let Some(aio) = &drive.aio {
+        let valid_aio = ["threads", "native", "io_uring"];
+        if !valid_aio.contains(&aio.as_str()) {
+            return Err(anyhow!("Unsupported drive aio mode: {}. Supported: {:?}", aio, valid_aio));
+        }
+    }
+
+    if let Some(detect_zeroes) = &drive.detect_zeroes {
+        let valid_detect_zeroes = ["off", "on", "unmap"];
+        if !valid_detect_zeroes.contains(&detect_zeroes.as_str()) {
+            return Err(anyhow!("Unsupported detect-zeroes mode: {}. Supported: {:?}", detect_zeroes, valid_detect_zeroes));
+        }
+    }
     
     // Check if path exists (optional, but warn if not)
     if !std::path::Path::new(&drive.path).exists() {
@@ -217,7 +255,7 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
 /// Validate network configuration
 fn validate_network_config(network: &super::NetworkConfig) -> Result<()> {
     // Validate model
-    let valid_models = ["virtio-net", "e1000", "e1000e", "rtl8139"];
+    let valid_models = ["virtio-net", "virtio-net-pci", "e1000", "e1000e", "rtl8139"];
     if !valid_models.contains(&network.model.as_str()) {
         return Err(anyhow!("Unsupported network model: {}. Supported: {:?}", 
                           network.model, valid_models));
@@ -236,6 +274,30 @@ fn validate_network_config(network: &super::NetworkConfig) -> Result<()> {
     if let Some(mac) = &network.mac {
         if !is_valid_mac_address(mac) {
             return Err(anyhow!("Invalid MAC address format: {}", mac));
+        }
+    }
+
+    if let Some(rx_queue_size) = network.rx_queue_size {
+        if rx_queue_size == 0 {
+            return Err(anyhow!("RX queue size must be greater than 0"));
+        }
+    }
+
+    if let Some(tx_queue_size) = network.tx_queue_size {
+        if tx_queue_size == 0 {
+            return Err(anyhow!("TX queue size must be greater than 0"));
+        }
+    }
+
+    if let Some(bus) = &network.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("Network bus cannot be empty"));
+        }
+    }
+
+    if let Some(addr) = &network.addr {
+        if addr.trim().is_empty() {
+            return Err(anyhow!("Network device address cannot be empty"));
         }
     }
     
@@ -311,6 +373,50 @@ fn validate_tpm_config(tpm: &super::TpmConfig) -> Result<()> {
 fn validate_guest_agent_config(guest_agent: &super::GuestAgentConfig) -> Result<()> {
     // Basic validation - guest agent config is mostly boolean flags
     // Could add socket path validation if needed
+    Ok(())
+}
+
+fn validate_vm_options(options: &super::VmOptions) -> Result<()> {
+    for global in &options.global_options {
+        if global.trim().is_empty() {
+            return Err(anyhow!("Global QEMU options cannot be empty"));
+        }
+    }
+
+    if let Some(rtc) = &options.rtc {
+        if let Some(base) = &rtc.base {
+            let valid = ["utc", "localtime"];
+            if !valid.contains(&base.as_str()) {
+                return Err(anyhow!("Unsupported RTC base: {}. Supported: {:?}", base, valid));
+            }
+        }
+
+        if let Some(driftfix) = &rtc.driftfix {
+            let valid = ["none", "slew"];
+            if !valid.contains(&driftfix.as_str()) {
+                return Err(anyhow!("Unsupported RTC driftfix: {}. Supported: {:?}", driftfix, valid));
+            }
+        }
+    }
+
+    if let Some(pid_file) = &options.pid_file {
+        if pid_file.trim().is_empty() {
+            return Err(anyhow!("PID file path cannot be empty"));
+        }
+    }
+
+    if let Some(log_dir) = &options.log_dir {
+        if log_dir.trim().is_empty() {
+            return Err(anyhow!("Log directory cannot be empty"));
+        }
+    }
+
+    if let Some(log_keep) = options.log_keep {
+        if log_keep == 0 {
+            return Err(anyhow!("log_keep must be greater than 0"));
+        }
+    }
+
     Ok(())
 }
 
@@ -429,6 +535,21 @@ fn validate_iscsi_disk_config(iscsi_disk: &super::IscsiDiskConfig) -> Result<()>
         if !initiator.starts_with("iqn.") {
             return Err(anyhow!("iSCSI initiator must be a valid IQN starting with 'iqn.'"));
         }
+    }
+
+    match (&iscsi_disk.username, &iscsi_disk.password) {
+        (Some(username), Some(password)) => {
+            if username.trim().is_empty() {
+                return Err(anyhow!("iSCSI username cannot be empty"));
+            }
+            if password.trim().is_empty() {
+                return Err(anyhow!("iSCSI password cannot be empty"));
+            }
+        }
+        (Some(_), None) | (None, Some(_)) => {
+            return Err(anyhow!("iSCSI authentication requires both username and password"));
+        }
+        (None, None) => {}
     }
     
     Ok(())

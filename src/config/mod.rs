@@ -136,6 +136,10 @@ pub struct SystemConfig {
     
     /// Machine type (q35, pc, virt, etc.)
     pub machine: String,
+
+    /// Additional machine-specific options appended to `-machine`
+    #[serde(default)]
+    pub machine_options: Vec<String>,
     
     /// Memory in MiB
     pub memory: u32,
@@ -168,6 +172,20 @@ pub struct BootConfig {
     /// Boot order (disk, cdrom, network)
     #[serde(default)]
     pub boot_order: Vec<String>,
+
+    /// Show the boot menu
+    #[serde(default)]
+    pub menu: bool,
+
+    /// Enforce strict boot ordering
+    #[serde(default)]
+    pub strict: bool,
+
+    /// Reboot timeout in milliseconds
+    pub reboot_timeout: Option<u32>,
+
+    /// Splash screen image path
+    pub splash: Option<String>,
     
     /// Kernel path (optional)
     pub kernel: Option<String>,
@@ -238,6 +256,15 @@ pub struct DriveConfig {
     /// Enable SSD emulation
     #[serde(default)]
     pub ssd: bool,
+
+    /// QEMU cache mode
+    pub cache: Option<String>,
+
+    /// QEMU async I/O backend
+    pub aio: Option<String>,
+
+    /// Detect-zeroes behavior
+    pub detect_zeroes: Option<String>,
     
     /// SCSI controller to attach to (for SCSI drives)
     pub controller: Option<String>,
@@ -257,6 +284,21 @@ pub struct NetworkConfig {
     
     /// MAC address
     pub mac: Option<String>,
+
+    /// RX queue size
+    pub rx_queue_size: Option<u32>,
+
+    /// TX queue size
+    pub tx_queue_size: Option<u32>,
+
+    /// Boot index for firmware boot ordering
+    pub boot_index: Option<u32>,
+
+    /// PCI/PCIe bus placement for the network device
+    pub bus: Option<String>,
+
+    /// Slot or function address on the selected bus
+    pub addr: Option<String>,
 }
 
 /// Display configuration
@@ -289,6 +331,27 @@ pub struct VmOptions {
     
     /// Run in daemon mode
     pub daemonize: bool,
+
+    /// Disable QEMU default devices
+    #[serde(default)]
+    pub nodefaults: bool,
+
+    /// Raw `-global` options
+    #[serde(default)]
+    pub global_options: Vec<String>,
+
+    /// RTC configuration
+    #[serde(default)]
+    pub rtc: Option<RtcConfig>,
+
+    /// Custom PID file location
+    pub pid_file: Option<String>,
+
+    /// Custom log directory for VM-specific logs
+    pub log_dir: Option<String>,
+
+    /// Number of log files to retain during rotation
+    pub log_keep: Option<usize>,
     
     /// Path to UEFI variables file
     pub uefi_vars: Option<String>,
@@ -299,9 +362,25 @@ impl Default for VmOptions {
         Self {
             enable_kvm: true,
             daemonize: false,
+            nodefaults: false,
+            global_options: Vec::new(),
+            rtc: None,
+            pid_file: None,
+            log_dir: None,
+            log_keep: None,
             uefi_vars: None,
         }
     }
+}
+
+/// RTC configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RtcConfig {
+    /// RTC base, usually `utc` or `localtime`
+    pub base: Option<String>,
+
+    /// RTC drift fix policy, usually `slew` or `none`
+    pub driftfix: Option<String>,
 }
 
 /// TPM configuration

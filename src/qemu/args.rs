@@ -488,6 +488,38 @@ impl QemuArgs {
         self.push_str("-daemonize");
     }
 
+    /// Add nodefaults argument
+    pub fn add_nodefaults(&mut self) {
+        self.push_str("-nodefaults");
+    }
+
+    /// Add a raw global option
+    pub fn add_global(&mut self, spec: &str) {
+        self.push_str("-global");
+        self.push(spec.to_string());
+    }
+
+    /// Add RTC configuration
+    pub fn add_rtc(&mut self, base: Option<&str>, driftfix: Option<&str>) {
+        let mut parts = Vec::new();
+        if let Some(base) = base {
+            parts.push(format!("base={}", base));
+        }
+        if let Some(driftfix) = driftfix {
+            parts.push(format!("driftfix={}", driftfix));
+        }
+        if !parts.is_empty() {
+            self.push_str("-rtc");
+            self.push(parts.join(","));
+        }
+    }
+
+    /// Add pidfile argument
+    pub fn add_pidfile(&mut self, path: &str) {
+        self.push_str("-pidfile");
+        self.push(path.to_string());
+    }
+
     /// Add a custom argument
     pub fn add_arg(&mut self, arg: &str) {
         self.push(arg.to_string());
@@ -535,5 +567,29 @@ mod tests {
         
         let built = args.build();
         assert_eq!(built, vec!["-drive", "file=/path/to/cd.iso,if=ide,format=raw,readonly=on"]);
+    }
+
+    #[test]
+    fn test_iscsi_disk_with_initiator_and_auth() {
+        let mut args = QemuArgs::new();
+        args.add_iscsi_disk(
+            "iscsi0",
+            "10.0.0.1:3260",
+            "iqn.2024-01.example:storage.vm0",
+            1,
+            Some("iqn.1993-08.org.debian:01:622fd71731a1"),
+            Some("chap-user"),
+            Some("chap-pass"),
+            Some("scsihw0"),
+        );
+
+        let built = args.build();
+        assert_eq!(built[0], "-blockdev");
+        assert!(built[1].contains("driver=iscsi,portal=10.0.0.1:3260,target=iqn.2024-01.example:storage.vm0,lun=1,node-name=iscsi0"));
+        assert!(built[1].contains(",initiator-name=iqn.1993-08.org.debian:01:622fd71731a1"));
+        assert!(built[1].contains(",user=chap-user"));
+        assert!(built[1].contains(",password=chap-pass"));
+        assert_eq!(built[2], "-device");
+        assert!(built[3].contains("scsi-hd,drive=iscsi0,id=iscsi0,bus=scsihw0.0"));
     }
 }

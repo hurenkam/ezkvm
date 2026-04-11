@@ -4,8 +4,11 @@
 
 use anyhow::{anyhow, Result};
 use std::fs;
-use std::path::{PathBuf};
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::config::VmConfig;
+
+const DEFAULT_LOG_KEEP: usize = 10;
 
 /// Default directory for storing VM state (PID files, configs, logs)
 pub fn get_state_dir() -> Result<PathBuf> {
@@ -23,6 +26,15 @@ pub fn get_state_dir() -> Result<PathBuf> {
 
 /// Get the PID file path for a VM
 pub fn get_pid_file(vm_name: &str) -> Result<PathBuf> {
+    get_pid_file_at(vm_name, None)
+}
+
+/// Get the PID file path for a VM, allowing a custom location.
+pub fn get_pid_file_at(vm_name: &str, custom_path: Option<&str>) -> Result<PathBuf> {
+    if let Some(custom_path) = custom_path {
+        return Ok(PathBuf::from(custom_path));
+    }
+
     let state_dir = get_state_dir()?;
     Ok(state_dir.join(format!("{}.pid", vm_name)))
 }
@@ -35,22 +47,45 @@ pub fn get_config_cache(vm_name: &str) -> Result<PathBuf> {
 
 /// Get the logs directory for a VM
 pub fn get_logs_dir(vm_name: &str) -> Result<PathBuf> {
-    let state_dir = get_state_dir()?;
-    let logs_dir = state_dir.join("logs").join(vm_name);
+    get_logs_dir_at(vm_name, None)
+}
+
+/// Get the logs directory for a VM, allowing a custom location.
+pub fn get_logs_dir_at(vm_name: &str, custom_dir: Option<&str>) -> Result<PathBuf> {
+    let logs_dir = if let Some(custom_dir) = custom_dir {
+        PathBuf::from(custom_dir).join(vm_name)
+    } else {
+        let state_dir = get_state_dir()?;
+        state_dir.join("logs").join(vm_name)
+    };
+
     fs::create_dir_all(&logs_dir)?;
     Ok(logs_dir)
 }
 
 /// Save VM PID to file
 pub fn save_pid(vm_name: &str, pid: i32) -> Result<()> {
-    let pid_file = get_pid_file(vm_name)?;
+    save_pid_at(vm_name, pid, None)
+}
+
+/// Save VM PID to file at an optional custom location.
+pub fn save_pid_at(vm_name: &str, pid: i32, custom_path: Option<&str>) -> Result<()> {
+    let pid_file = get_pid_file_at(vm_name, custom_path)?;
+    if let Some(parent) = pid_file.parent() {
+        fs::create_dir_all(parent)?;
+    }
     fs::write(&pid_file, pid.to_string())?;
     Ok(())
 }
 
 /// Read VM PID from file
 pub fn read_pid(vm_name: &str) -> Result<Option<i32>> {
-    let pid_file = get_pid_file(vm_name)?;
+    read_pid_at(vm_name, None)
+}
+
+/// Read VM PID from file at an optional custom location.
+pub fn read_pid_at(vm_name: &str, custom_path: Option<&str>) -> Result<Option<i32>> {
+    let pid_file = get_pid_file_at(vm_name, custom_path)?;
     
     if !pid_file.exists() {
         return Ok(None);
@@ -65,10 +100,72 @@ pub fn read_pid(vm_name: &str) -> Result<Option<i32>> {
 
 /// Delete VM PID file
 pub fn delete_pid(vm_name: &str) -> Result<()> {
-    let pid_file = get_pid_file(vm_name)?;
+    delete_pid_at(vm_name, None)
+}
+
+/// Delete VM PID file at an optional custom location.
+pub fn delete_pid_at(vm_name: &str, custom_path: Option<&str>) -> Result<()> {
+    let pid_file = get_pid_file_at(vm_name, custom_path)?;
     if pid_file.exists() {
         fs::remove_file(pid_file)?;
     }
+    Ok(())
+}
+
+/// Get the log file for a VM
+pub fn get_log_file(vm_name: &str, session: &str) -> Result<PathBuf> {
+    get_log_file_at(vm_name, session, None)
+}
+
+/// Get the log file for a VM, allowing a custom logs directory.
+pub fn get_log_file_at(vm_name: &str, session: &str, custom_dir: Option<&str>) -> Result<PathBuf> {
+    let logs_dir = get_logs_dir_at(vm_name, custom_dir)?;
+    Ok(logs_dir.join(format!("{}.log", session)))
+}
+
+/// Create a fresh session log file path using a timestamp-based session id.
+pub fn create_session_log_file(vm_name: &str, custom_dir: Option<&str>) -> Result<PathBuf> {
+    let session = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| anyhow!("Failed to get system time: {}", e))?
+        .as_secs()
+        .to_string();
+
+    get_log_file_at(vm_name, &session, custom_dir)
+}
+
+/// Clean up old log files (keep last N)
+pub fn cleanup_old_logs(vm_name: &str) -> Result<()> {
+    cleanup_old_logs_at(vm_name, None, None)
+}
+
+/// Clean up old log files in an optional custom logs directory.
+pub fn cleanup_old_logs_at(vm_name: &str, custom_dir: Option<&str>, keep: Option<usize>) -> Result<()> {
+    let logs_dir = get_logs_dir_at(vm_name, custom_dir)?;
+    let keep = keep.unwrap_or(DEFAULT_LOG_KEEP);
+    
+    let mut log_files: Vec<_> = fs::read_dir(&logs_dir)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_file() && path.extension().map(|e| e == "log").unwrap_or(false) {
+                let metadata = entry.metadata().ok()?;
+                let modified = metadata.modified().ok()?;
+                Some((path, modified))
+            } else {
+                None
+            }
+        })
+        .collect();
+    
+    if log_files.len() > keep {
+        log_files.sort_by_key(|(_, mtime)| *mtime);
+        while log_files.len() > keep {
+            let (path, _) = log_files.remove(0);
+            let _ = fs::remove_file(path);
+        }
+    }
+    
     Ok(())
 }
 
@@ -102,43 +199,6 @@ pub fn delete_cached_config(vm_name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Get the log file for a VM
-pub fn get_log_file(vm_name: &str, session: &str) -> Result<PathBuf> {
-    let logs_dir = get_logs_dir(vm_name)?;
-    Ok(logs_dir.join(format!("{}.log", session)))
-}
-
-/// Clean up old log files (keep last 10)
-pub fn cleanup_old_logs(vm_name: &str) -> Result<()> {
-    let logs_dir = get_logs_dir(vm_name)?;
-    
-    let mut log_files: Vec<_> = fs::read_dir(&logs_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.is_file() && path.extension().map(|e| e == "log").unwrap_or(false) {
-                let metadata = entry.metadata().ok()?;
-                let modified = metadata.modified().ok()?;
-                Some((path, modified))
-            } else {
-                None
-            }
-        })
-        .collect();
-    
-    if log_files.len() > 10 {
-        // Sort by modification time
-        log_files.sort_by_key(|(_, mtime)| *mtime);
-        
-        // Remove oldest files (keep 10)
-        while log_files.len() > 10 {
-            let (path, _) = log_files.remove(0);
-            let _ = fs::remove_file(path);
-        }
-    }
-    
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {
@@ -169,5 +229,42 @@ mod tests {
         // Verify deleted
         let pid = read_pid(test_vm).unwrap();
         assert_eq!(pid, None);
+    }
+
+    #[test]
+    fn test_custom_pid_file_operations() {
+        let custom_dir = std::env::temp_dir().join("ezkvm-state-tests");
+        let custom_path = custom_dir.join("custom.pid");
+        let custom_str = custom_path.to_string_lossy().to_string();
+
+        save_pid_at("custom-vm", 54321, Some(&custom_str)).unwrap();
+        let pid = read_pid_at("custom-vm", Some(&custom_str)).unwrap();
+        assert_eq!(pid, Some(54321));
+        delete_pid_at("custom-vm", Some(&custom_str)).unwrap();
+        let pid = read_pid_at("custom-vm", Some(&custom_str)).unwrap();
+        assert_eq!(pid, None);
+        let _ = fs::remove_dir_all(custom_dir);
+    }
+
+    #[test]
+    fn test_log_rotation_cleanup() {
+        let custom_dir = std::env::temp_dir().join("ezkvm-log-tests");
+        let custom_str = custom_dir.to_string_lossy().to_string();
+
+        for index in 0..3 {
+            let log_file = get_log_file_at("log-vm", &format!("session-{}", index), Some(&custom_str)).unwrap();
+            fs::write(log_file, format!("log {}", index)).unwrap();
+        }
+
+        cleanup_old_logs_at("log-vm", Some(&custom_str), Some(2)).unwrap();
+        let logs_dir = get_logs_dir_at("log-vm", Some(&custom_str)).unwrap();
+        let remaining = fs::read_dir(logs_dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().extension().map(|ext| ext == "log").unwrap_or(false))
+            .count();
+
+        assert_eq!(remaining, 2);
+        let _ = fs::remove_dir_all(custom_dir);
     }
 }

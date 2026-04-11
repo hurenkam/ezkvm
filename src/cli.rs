@@ -375,6 +375,14 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     
     // Cache the configuration for quick restarts
     crate::state::cache_config(&config.name, &config)?;
+
+    let pid_file = crate::state::get_pid_file_at(&config.name, config.options.pid_file.as_deref())?;
+    let log_file = if daemon || config.options.log_dir.is_some() {
+        crate::state::cleanup_old_logs_at(&config.name, config.options.log_dir.as_deref(), config.options.log_keep)?;
+        Some(crate::state::create_session_log_file(&config.name, config.options.log_dir.as_deref())?)
+    } else {
+        None
+    };
     
     let manager = crate::qemu::QemuManager::new(config, central_config);
     let args = manager.build_command()?;
@@ -389,6 +397,10 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     if dry_run {
         println!("Dry run mode - would execute:");
         println!("{} {}", manager.binary_name(), args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" "));
+        println!("PID file: {}", pid_file.display());
+        if let Some(log_file) = &log_file {
+            println!("Log file: {}", log_file.display());
+        }
         return Ok(());
     }
     
@@ -399,14 +411,19 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     
     if daemon {
         println!("Starting in daemon mode...");
-        // With -daemonize, QEMU detaches so this should return quickly
-        let _status = executor.execute_sync()?;
+        if let Some(log_file) = &log_file {
+            println!("Logging QEMU output to {}", log_file.display());
+            let _status = executor.execute_sync_logged(log_file, Stdio::null())?;
+        } else {
+            let _status = executor.execute_sync()?;
+        }
 
-        // Try to find the PID of the started VM
         std::thread::sleep(std::time::Duration::from_millis(100));
-        if let Ok(pids) = crate::qemu::process::find_qemu_processes(&manager.config().name) {
+        if let Ok(Some(pid)) = crate::state::read_pid_at(&manager.config().name, manager.config().options.pid_file.as_deref()) {
+            println!("✓ VM '{}' started (daemonized) - PID {}", manager.config().name, pid);
+        } else if let Ok(pids) = crate::qemu::process::find_qemu_processes(&manager.config().name) {
             if let Some(pid) = pids.first() {
-                crate::state::save_pid(&manager.config().name, *pid)?;
+                crate::state::save_pid_at(&manager.config().name, *pid, manager.config().options.pid_file.as_deref())?;
                 println!("✓ VM '{}' started (daemonized) - PID {}", manager.config().name, pid);
             } else {
                 println!("✓ VM '{}' started (daemonized)", manager.config().name);
@@ -425,9 +442,14 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
         let _ = spawn_remote_viewer(manager.config(), &central_config_clone);
         let _ = spawn_looking_glass(manager.config(), &central_config_clone);
 
-        let status = executor.execute_sync()?;
+        let status = if let Some(log_file) = &log_file {
+            println!("Logging QEMU output to {}", log_file.display());
+            executor.execute_sync_logged(log_file, Stdio::inherit())?
+        } else {
+            executor.execute_sync()?
+        };
         // Clean up PID file for interactive mode
-        let _ = crate::state::delete_pid(&manager.config().name);
+        let _ = crate::state::delete_pid_at(&manager.config().name, manager.config().options.pid_file.as_deref());
         println!("✓ VM '{}' finished with exit code {}", manager.config().name, status.code().unwrap_or(-1));
     }
     
@@ -454,7 +476,7 @@ async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
     }
     
     // Clean up PID file
-    let _ = crate::state::delete_pid(&config.name);
+    let _ = crate::state::delete_pid_at(&config.name, config.options.pid_file.as_deref());
     
     Ok(())
 }
@@ -472,7 +494,7 @@ async fn handle_kill(config_path: &str) -> Result<()> {
     println!("✓ VM '{}' killed", config.name);
     
     // Clean up PID file
-    let _ = crate::state::delete_pid(&config.name);
+    let _ = crate::state::delete_pid_at(&config.name, config.options.pid_file.as_deref());
     
     Ok(())
 }
@@ -511,7 +533,7 @@ async fn handle_status(config_path: &str) -> Result<()> {
     println!("Status of VM: {}", vm_name);
     
     // First check if we have a PID file
-    if let Ok(Some(pid)) = crate::state::read_pid(vm_name) {
+    if let Ok(Some(pid)) = crate::state::read_pid_at(vm_name, config.options.pid_file.as_deref()) {
         // Verify the process still exists
         match crate::qemu::process::find_qemu_processes(vm_name) {
             Ok(pids) if pids.contains(&pid) => {
@@ -522,7 +544,7 @@ async fn handle_status(config_path: &str) -> Result<()> {
             }
             _ => {
                 // Process not found, clean up stale PID file
-                let _ = crate::state::delete_pid(vm_name);
+                let _ = crate::state::delete_pid_at(vm_name, config.options.pid_file.as_deref());
             }
         }
     }

@@ -3,6 +3,8 @@
 //! Handles spawning and managing QEMU processes.
 
 use super::types::QemuArgs;
+use std::fs::File;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use tokio::process::Command as TokioCommand;
 use anyhow::{anyhow, Result};
@@ -34,6 +36,29 @@ impl QemuExecutor {
         let status = cmd.status()
             .map_err(|e| anyhow!("Failed to execute QEMU: {}", e))?;
         
+        Ok(status)
+    }
+
+    /// Execute QEMU synchronously while redirecting stdout/stderr to a log file.
+    pub fn execute_sync_logged(&self, log_file: &Path, stdin: Stdio) -> Result<std::process::ExitStatus> {
+        let stdout_file = File::options()
+            .create(true)
+            .append(true)
+            .open(log_file)
+            .map_err(|e| anyhow!("Failed to open log file '{}': {}", log_file.display(), e))?;
+        let stderr_file = stdout_file
+            .try_clone()
+            .map_err(|e| anyhow!("Failed to clone log file handle '{}': {}", log_file.display(), e))?;
+
+        let mut cmd = Command::new(&self.binary);
+        cmd.args(self.args.as_ref());
+        cmd.stdin(stdin)
+            .stdout(Stdio::from(stdout_file))
+            .stderr(Stdio::from(stderr_file));
+
+        let status = cmd.status()
+            .map_err(|e| anyhow!("Failed to execute QEMU: {}", e))?;
+
         Ok(status)
     }
     

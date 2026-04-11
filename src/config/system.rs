@@ -18,7 +18,12 @@ impl From<SystemConfig> for QemuArgs {
         
         // Machine type
         args.push_str("-machine");
-        args.push(format!("type={}", config.machine));
+        let mut machine_spec = format!("type={}", config.machine);
+        for option in config.machine_options {
+            machine_spec.push(',');
+            machine_spec.push_str(&option);
+        }
+        args.push(machine_spec);
         
         // CPU configuration
         args.push_str("-cpu");
