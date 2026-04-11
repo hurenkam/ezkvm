@@ -4,6 +4,7 @@
 
 use clap::{Parser, Subcommand};
 use anyhow::{anyhow, Result};
+use std::net::TcpStream;
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::path::PathBuf;
@@ -282,6 +283,47 @@ fn wait_for_unix_socket(socket_path: &str, timeout: Duration, label: &str) -> Re
     }
 }
 
+fn wait_for_tcp_endpoint(host: &str, port: u16, timeout: Duration, label: &str) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    let mut last_error = None;
+
+    while Instant::now() < deadline {
+        match TcpStream::connect((host, port)) {
+            Ok(stream) => {
+                drop(stream);
+                return Ok(());
+            }
+            Err(err) => {
+                last_error = Some(err);
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
+
+    match last_error {
+        Some(err) => Err(anyhow!(
+            "timed out waiting for {} {}:{} to become ready: {}",
+            label,
+            host,
+            port,
+            err
+        )),
+        None => Err(anyhow!(
+            "timed out waiting for {} {}:{} to become ready",
+            label,
+            host,
+            port
+        )),
+    }
+}
+
+fn resolve_client_host(addr: &str) -> String {
+    match addr.trim() {
+        "0.0.0.0" | "::" | "[::]" | "" => "127.0.0.1".to_string(),
+        other => other.to_string(),
+    }
+}
+
 fn ensure_runtime_socket_dirs(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
     if let Some(tpm) = &config.tpm {
         if tpm.backend == "emulator" {
@@ -315,6 +357,8 @@ struct AuxiliaryLaunch {
     label: &'static str,
     program: String,
     args: Vec<String>,
+    inherit_output: bool,
+    verify_running: bool,
 }
 
 fn format_auxiliary_launch(launch: &AuxiliaryLaunch) -> String {
@@ -327,16 +371,31 @@ fn format_auxiliary_launch(launch: &AuxiliaryLaunch) -> String {
 
 fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
     let mut cmd = Command::new(&launch.program);
-    cmd.args(&launch.args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+    cmd.args(&launch.args).stdin(Stdio::null());
 
-    cmd.spawn()
+    if launch.inherit_output {
+        cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    } else {
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+
+    let mut child = cmd
+        .spawn()
         .map_err(|err| anyhow!("failed to start {} at '{}': {}", launch.label, launch.program, err))?;
+
+    if launch.verify_running {
+        std::thread::sleep(Duration::from_millis(250));
+        if let Some(status) = child.try_wait()? {
+            return Err(anyhow!("{} exited immediately with status {}", launch.label, status));
+        }
+    }
 
     println!("✓ Started {}", launch.label);
     Ok(())
+}
+
+fn has_primary_passthrough_gpu(config: &crate::config::VmConfig) -> bool {
+    config.hostpci.iter().any(|device| device.x_vga)
 }
 
 fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> String {
@@ -354,18 +413,24 @@ fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &cr
 }
 
 fn build_remote_viewer_launch(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Option<AuxiliaryLaunch> {
+    if has_primary_passthrough_gpu(config) {
+        return None;
+    }
+
     let spice = match &config.spice {
         Some(spice) if spice.enabled => spice,
         _ => return None,
     };
 
     let remote_viewer_path = central_config.tools.remote_viewer.as_ref()?;
-    let uri = format!("spice://{}:{}", spice.addr, spice.port);
+    let uri = format!("spice://{}:{}", resolve_client_host(&spice.addr), spice.port);
 
     Some(AuxiliaryLaunch {
         label: "remote-viewer for SPICE session",
         program: remote_viewer_path.clone(),
         args: vec![uri],
+        inherit_output: false,
+        verify_running: false,
     })
 }
 
@@ -381,10 +446,41 @@ fn build_looking_glass_launch(config: &crate::config::VmConfig, central_config: 
         None => return Ok(None),
     };
 
+    let mut args = vec![format!("app:shmFile={}", ivshmem.mem_path)];
+
+    if let Some(full_screen) = central_config.looking_glass.full_screen {
+        args.push(format!("win:fullScreen={}", full_screen));
+    }
+
+    if let Some(size) = central_config.looking_glass.size.as_deref() {
+        if !size.trim().is_empty() {
+            args.push(format!("win:size={}", size));
+        }
+    }
+
+    if let Some(grab_keyboard) = central_config.looking_glass.grab_keyboard {
+        args.push(format!("input:grabKeyboard={}", grab_keyboard));
+    }
+
+    if let Some(escape_key) = central_config.looking_glass.escape_key.as_deref() {
+        if !escape_key.trim().is_empty() {
+            args.push(format!("input:escapeKey={}", escape_key));
+        }
+    }
+
+    if let Some(spice) = &config.spice {
+        if spice.enabled {
+            args.push(format!("spice:host={}", resolve_client_host(&spice.addr)));
+            args.push(format!("spice:port={}", spice.port));
+        }
+    }
+
     Ok(Some(AuxiliaryLaunch {
         label: "Looking Glass client for ivshmem session",
         program: looking_glass_path.clone(),
-        args: vec![format!("app:shmFile={}", ivshmem.mem_path)],
+        args,
+        inherit_output: true,
+        verify_running: true,
     }))
 }
 
@@ -449,6 +545,17 @@ fn spawn_looking_glass(config: &crate::config::VmConfig, central_config: &crate:
             "Looking Glass shared memory path '{}' does not exist",
             config.ivshmem.as_ref().unwrap().mem_path
         ));
+    }
+
+    if let Some(spice) = &config.spice {
+        if spice.enabled {
+            wait_for_tcp_endpoint(
+                &resolve_client_host(&spice.addr),
+                spice.port,
+                Duration::from_secs(5),
+                "SPICE server",
+            )?;
+        }
     }
 
     run_auxiliary_launch(&launch)?;
@@ -928,21 +1035,26 @@ async fn handle_network(cmd: NetworkCommands) -> Result<()> {
 
                 fn base_config() -> crate::config::VmConfig {
                     crate::config::VmConfig::from_str(r#"
-            name: "test-vm"
-            backend: "qemu"
+name: "test-vm"
+backend: "qemu"
 
-            system:
-              architecture: "x86_64"
-              machine: "q35"
-              memory: 1024
-              vcpus: 1
-              cpu_model: "host"
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory: 1024
+    vcpus: 1
+    cpu_model: "host"
 
-            ivshmem:
-              enabled: true
-              size: 128
-              id: "ivshmem0"
-              mem_path: "/dev/kvmfr0"
+ivshmem:
+    enabled: true
+    size: 128
+    id: "ivshmem0"
+    mem_path: "/dev/kvmfr0"
+
+spice:
+    enabled: true
+    port: 5903
+    addr: "0.0.0.0"
             "#).unwrap()
                 }
 
@@ -956,6 +1068,12 @@ async fn handle_network(cmd: NetworkCommands) -> Result<()> {
                             looking_glass: Some("looking-glass-client".to_string()),
                         },
                         locations: crate::config::LocationsConfig::default(),
+                        looking_glass: crate::config::LookingGlassOptions {
+                            full_screen: Some(true),
+                            size: Some("1707x1067".to_string()),
+                            grab_keyboard: Some(true),
+                            escape_key: Some("KEY_F12".to_string()),
+                        },
                     };
 
                     let launch = build_looking_glass_launch(&config, &central_config)
@@ -963,7 +1081,20 @@ async fn handle_network(cmd: NetworkCommands) -> Result<()> {
                         .unwrap();
 
                     assert_eq!(launch.program, "looking-glass-client");
-                    assert_eq!(launch.args, vec!["app:shmFile=/dev/kvmfr0"]);
+                    assert_eq!(
+                        launch.args,
+                        vec![
+                            "app:shmFile=/dev/kvmfr0",
+                            "win:fullScreen=true",
+                            "win:size=1707x1067",
+                            "input:grabKeyboard=true",
+                            "input:escapeKey=KEY_F12",
+                            "spice:host=127.0.0.1",
+                            "spice:port=5903",
+                        ]
+                    );
+                    assert!(launch.inherit_output);
+                    assert!(launch.verify_running);
                 }
 
                 #[test]
@@ -985,6 +1116,7 @@ async fn handle_network(cmd: NetworkCommands) -> Result<()> {
                             looking_glass: Some("   ".to_string()),
                         },
                         locations: crate::config::LocationsConfig::default(),
+                        looking_glass: crate::config::LookingGlassOptions::default(),
                     };
 
                     let err = build_looking_glass_launch(&config, &central_config).unwrap_err();
@@ -1019,12 +1151,66 @@ async fn handle_network(cmd: NetworkCommands) -> Result<()> {
                     let launch = AuxiliaryLaunch {
                         label: "Looking Glass client for ivshmem session",
                         program: "looking-glass-client".to_string(),
-                        args: vec!["app:shmFile=/dev/kvmfr0".to_string()],
+                        args: vec![
+                            "app:shmFile=/dev/kvmfr0".to_string(),
+                            "win:fullScreen=true".to_string(),
+                            "win:size=1707x1067".to_string(),
+                            "input:grabKeyboard=true".to_string(),
+                            "input:escapeKey=KEY_F12".to_string(),
+                            "spice:host=127.0.0.1".to_string(),
+                            "spice:port=5903".to_string(),
+                        ],
+                        inherit_output: true,
+                        verify_running: true,
                     };
 
                     assert_eq!(
                         format_auxiliary_launch(&launch),
-                        "looking-glass-client app:shmFile=/dev/kvmfr0"
+                        "looking-glass-client app:shmFile=/dev/kvmfr0 win:fullScreen=true win:size=1707x1067 input:grabKeyboard=true input:escapeKey=KEY_F12 spice:host=127.0.0.1 spice:port=5903"
                     );
+                }
+
+                #[test]
+                fn test_resolve_client_host_maps_wildcard_to_localhost() {
+                    assert_eq!(resolve_client_host("0.0.0.0"), "127.0.0.1");
+                    assert_eq!(resolve_client_host("::"), "127.0.0.1");
+                    assert_eq!(resolve_client_host("192.168.1.10"), "192.168.1.10");
+                }
+
+                #[test]
+                fn test_remote_viewer_is_suppressed_for_primary_passthrough_gpu() {
+                    let config = crate::config::VmConfig::from_str(r#"
+            name: "test-vm"
+            backend: "qemu"
+
+            system:
+              architecture: "x86_64"
+              machine: "q35"
+              memory: 1024
+              vcpus: 1
+              cpu_model: "host"
+
+            hostpci:
+              - device: "0000:03:00.0"
+                id: "hostpci0"
+                x_vga: true
+
+            spice:
+              enabled: true
+              port: 5903
+              addr: "0.0.0.0"
+            "#).unwrap();
+
+                    let central_config = crate::config::CentralConfig {
+                        tools: crate::config::ToolsConfig {
+                            swtpm: None,
+                            remote_viewer: Some("remote-viewer".to_string()),
+                            looking_glass: None,
+                        },
+                        locations: crate::config::LocationsConfig::default(),
+                        looking_glass: crate::config::LookingGlassOptions::default(),
+                    };
+
+                    assert!(build_remote_viewer_launch(&config, &central_config).is_none());
                 }
             }

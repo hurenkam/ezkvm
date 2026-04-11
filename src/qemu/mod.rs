@@ -26,6 +26,10 @@ impl QemuManager {
             && self.central_config.tools.swtpm.is_some()
     }
 
+    fn has_primary_passthrough_gpu(&self) -> bool {
+        self.config.hostpci.iter().any(|device| device.x_vga)
+    }
+
     fn resolve_tpm_socket_path(&self) -> String {
         if let Some(tpm) = &self.config.tpm {
             if let Some(state_path) = &tpm.state_path {
@@ -137,12 +141,14 @@ impl QemuManager {
                 let has_serial_controller = self.config.guest_agent.as_ref()
                     .map(|guest_agent| guest_agent.enabled)
                     .unwrap_or(false);
+                let attach_display_device = !self.has_primary_passthrough_gpu();
                 args.add_spice(
                     spice.port,
                     &spice.addr,
                     spice.disable_ticketing,
                     spice.vdagent,
                     has_serial_controller,
+                    attach_display_device,
                 );
 
                 if spice.audio {

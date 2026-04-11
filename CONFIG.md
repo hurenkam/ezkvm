@@ -29,6 +29,12 @@ locations:
   ovmf_dir: "/usr/share/OVMF"
   vm_dir: "/etc/ezkvm/vms"
   template_dir: "/etc/ezkvm/templates"
+
+looking_glass:
+  full_screen: true
+  size: "1707x1067"
+  grab_keyboard: true
+  escape_key: "KEY_F12"
 ```
 
 ### Central Configuration Fields
@@ -48,13 +54,21 @@ Directory paths for runtime and configuration files.
 - `locations.vm_dir` (optional): Default directory for VM configuration files
 - `locations.template_dir` (optional): Directory for VM templates
 
+#### `looking_glass`
+Optional Looking Glass client launch options.
+
+- `looking_glass.full_screen` (optional): Launch in fullscreen mode
+- `looking_glass.size` (optional): Initial window size in `WIDTHxHEIGHT` form
+- `looking_glass.grab_keyboard` (optional): Grab keyboard input when the window is focused
+- `looking_glass.escape_key` (optional): Key name used to release keyboard grab
+
 ### Runtime Automation
 
 When `tools.swtpm` is configured and the VM uses `tpm.backend: "emulator"`, ezkvm will start `swtpm` automatically before launching QEMU and will wire the configured socket path into the VM.
 
 When `tools.remote_viewer` is configured and SPICE is enabled, ezkvm will launch `remote-viewer spice://ADDR:PORT` to attach automatically.
 
-When `tools.looking_glass` is configured and `ivshmem.enabled` is true, ezkvm will launch `looking-glass-client` automatically after startup.
+When `tools.looking_glass` is configured and `ivshmem.enabled` is true, ezkvm will launch `looking-glass-client` automatically after startup. If SPICE is enabled, ezkvm also passes the SPICE host and port to the client.
 
 ### Usage in VM Configurations
 

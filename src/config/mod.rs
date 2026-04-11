@@ -25,6 +25,10 @@ pub struct CentralConfig {
     /// Directory locations
     #[serde(default)]
     pub locations: LocationsConfig,
+
+    /// Looking Glass client options
+    #[serde(default)]
+    pub looking_glass: LookingGlassOptions,
 }
 
 /// Tool paths configuration
@@ -54,6 +58,22 @@ pub struct LocationsConfig {
     
     /// Directory for VM templates
     pub template_dir: Option<String>,
+}
+
+/// Looking Glass client options
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LookingGlassOptions {
+    /// Launch the client in fullscreen mode.
+    pub full_screen: Option<bool>,
+
+    /// Initial window size in WIDTHxHEIGHT format.
+    pub size: Option<String>,
+
+    /// Grab the keyboard when focused.
+    pub grab_keyboard: Option<bool>,
+
+    /// Escape key name used to release keyboard grab.
+    pub escape_key: Option<String>,
 }
 
 /// Main configuration structure for a virtual machine
