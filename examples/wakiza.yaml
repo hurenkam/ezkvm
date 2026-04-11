@@ -127,9 +127,14 @@ hostpci:
     id: "hostpci0.0"
     pcie: true
     x_vga: true
+    bus: "ich9-pcie-port-1"
+    addr: "0x0.0"
+    multifunction: true
   - device: "0000:03:00.1"
     id: "hostpci0.1"
     pcie: true
+    bus: "ich9-pcie-port-1"
+    addr: "0x0.1"
 
 
 # XHCI controller and USB host device

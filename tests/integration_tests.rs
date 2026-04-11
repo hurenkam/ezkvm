@@ -122,7 +122,12 @@ system:
 
         let proxmox_cmd = include_str!("../input/wakiza/108.cmd");
         let expected_fragment_groups: &[&[&str]] = &[
+          &["if=pflash,unit=0", "readonly=on", "OVMF_CODE_4M.secboot.fd"],
+          &["if=pflash,unit=1", "id=drive-efidisk0", "file=/dev/vm1/vm-108-efidisk"],
+          &["-vga", "none", "-nographic"],
           &["qemu-xhci", "id=xhci", "p2=15", "p3=15", "bus=pci.1", "addr=0x1b"],
+          &["vfio-pci", "host=0000:03:00.0", "id=hostpci0.0", "bus=ich9-pcie-port-1", "addr=0x0.0", "multifunction=on"],
+          &["vfio-pci", "host=0000:03:00.1", "id=hostpci0.1", "bus=ich9-pcie-port-1", "addr=0x0.1"],
           &["usb-host", "hostbus=1", "hostport=2.2", "id=usb0", "bus=xhci.0", "port=1"],
           &["ich9-intel-hda", "id=audiodev0", "bus=pci.2", "addr=0xc"],
           &["hda-micro", "id=audiodev0-codec0", "bus=audiodev0.0", "cad=0", "audiodev=spice-backend0"],

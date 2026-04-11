@@ -106,7 +106,16 @@ impl QemuManager {
         
         // Add VFIO-PCI device arguments
         for hostpci in &self.config.hostpci {
-            args.add_vfio_pci(&hostpci.device, &hostpci.id, hostpci.pcie, hostpci.x_vga, hostpci.romfile.as_deref());
+            args.add_vfio_pci(
+                &hostpci.device,
+                &hostpci.id,
+                hostpci.pcie,
+                hostpci.x_vga,
+                hostpci.bus.as_deref(),
+                hostpci.addr.as_deref(),
+                hostpci.multifunction,
+                hostpci.romfile.as_deref(),
+            );
         }
         
         // Add USB device arguments
@@ -358,6 +367,11 @@ impl QemuManager {
 
         if self.config.options.nodefaults {
             args.add_nodefaults();
+        }
+
+        if self.has_primary_passthrough_gpu() {
+            args.add_vga_none();
+            args.add_nographic();
         }
 
         for global in &self.config.options.global_options {

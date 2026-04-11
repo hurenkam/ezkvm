@@ -540,6 +540,16 @@ pub struct HostPciConfig {
     /// VGA passthrough (for GPU devices)
     #[serde(default)]
     pub x_vga: bool,
+
+    /// Optional guest bus placement for the passthrough device
+    pub bus: Option<String>,
+
+    /// Optional guest slot/function address for the passthrough device
+    pub addr: Option<String>,
+
+    /// Enable multifunction on the guest slot when grouping related functions
+    #[serde(default)]
+    pub multifunction: bool,
     
     /// ROM file path (optional)
     pub romfile: Option<String>,

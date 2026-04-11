@@ -190,20 +190,20 @@ impl QemuArgs {
 
     /// Add UEFI firmware
     pub fn add_uefi(&mut self, code_path: Option<&str>, vars_path: Option<&str>, secure_boot: bool) {
-        // Set firmware to UEFI
-        self.push_str("-bios");
-        if let Some(code) = code_path {
-            // Custom OVMF firmware
-            self.push(code.to_string());
-        } else {
-            // Use system OVMF
-            self.push("/usr/share/ovmf/OVMF.fd".to_string());
-        }
+        let firmware_code = code_path.unwrap_or("/usr/share/ovmf/OVMF.fd");
 
-        // Add UEFI variables if specified
+        self.push_str("-drive");
+        self.push(format!(
+            "if=pflash,unit=0,format=raw,readonly=on,file={}",
+            firmware_code
+        ));
+
         if let Some(vars) = vars_path {
             self.push_str("-drive");
-            self.push(format!("if=pflash,format=raw,file={},readonly=on", vars));
+            self.push(format!(
+                "if=pflash,unit=1,id=drive-efidisk0,format=raw,file={}",
+                vars
+            ));
         }
 
         // Enable secure boot if requested
@@ -214,7 +214,7 @@ impl QemuArgs {
     }
 
     /// Add VFIO-PCI device passthrough
-    pub fn add_vfio_pci(&mut self, device: &str, id: &str, pcie: bool, x_vga: bool, romfile: Option<&str>) {
+    pub fn add_vfio_pci(&mut self, device: &str, id: &str, pcie: bool, x_vga: bool, bus: Option<&str>, addr: Option<&str>, multifunction: bool, romfile: Option<&str>) {
         self.push_str("-device");
         let mut vfio_spec = format!("vfio-pci,host={},id={}", device, id);
         if pcie {
@@ -222,6 +222,15 @@ impl QemuArgs {
         }
         if x_vga {
             vfio_spec.push_str(",x-vga=1");
+        }
+        if let Some(bus) = bus {
+            vfio_spec.push_str(&format!(",bus={}", bus));
+        }
+        if let Some(addr) = addr {
+            vfio_spec.push_str(&format!(",addr={}", addr));
+        }
+        if multifunction {
+            vfio_spec.push_str(",multifunction=on");
         }
         if let Some(rom) = romfile {
             vfio_spec.push_str(&format!(",romfile={}", rom));
@@ -582,6 +591,17 @@ impl QemuArgs {
         self.push_str("-nodefaults");
     }
 
+    /// Disable emulated VGA output.
+    pub fn add_vga_none(&mut self) {
+        self.push_str("-vga");
+        self.push_str("none");
+    }
+
+    /// Disable QEMU's default graphical console.
+    pub fn add_nographic(&mut self) {
+        self.push_str("-nographic");
+    }
+
     /// Add a raw global option
     pub fn add_global(&mut self, spec: &str) {
         self.push_str("-global");
@@ -673,6 +693,45 @@ mod tests {
         
         let built = args.build();
         assert_eq!(built, vec!["-drive", "file=/path/to/cd.iso,if=ide,format=raw,readonly=on"]);
+    }
+
+    #[test]
+    fn test_uefi_uses_pflash_drives() {
+        let mut args = QemuArgs::new();
+        args.add_uefi(Some("/usr/share/OVMF_CODE.fd"), Some("/var/lib/vm/vars.fd"), true);
+
+        let built = args.build();
+        assert_eq!(
+            built,
+            vec![
+                "-drive",
+                "if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/OVMF_CODE.fd",
+                "-drive",
+                "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/var/lib/vm/vars.fd",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_vfio_pci_with_guest_placement_and_multifunction() {
+        let mut args = QemuArgs::new();
+        args.add_vfio_pci(
+            "0000:03:00.0",
+            "hostpci0.0",
+            true,
+            true,
+            Some("ich9-pcie-port-1"),
+            Some("0x0.0"),
+            true,
+            None,
+        );
+
+        let built = args.build();
+        assert_eq!(built[0], "-device");
+        assert_eq!(
+            built[1],
+            "vfio-pci,host=0000:03:00.0,id=hostpci0.0,pcie=1,x-vga=1,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on"
+        );
     }
 
     #[test]

@@ -566,6 +566,18 @@ fn validate_hostpci_config(hostpci: &super::HostPciConfig) -> Result<()> {
     if !is_valid_pci_address(&hostpci.device) {
         return Err(anyhow!("Invalid PCI device address format: {}", hostpci.device));
     }
+
+    if let Some(bus) = &hostpci.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("Host PCI guest bus cannot be empty"));
+        }
+    }
+
+    if let Some(addr) = &hostpci.addr {
+        if addr.trim().is_empty() {
+            return Err(anyhow!("Host PCI guest address cannot be empty"));
+        }
+    }
     
     // Check if ROM file exists if specified
     if let Some(romfile) = &hostpci.romfile {

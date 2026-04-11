@@ -390,6 +390,41 @@ iscsi_disks:
     }
 
     #[test]
+    fn test_config_with_hostpci_guest_placement() {
+        let yaml = r#"
+name: "gpu-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 4
+  cpu_model: "host"
+
+hostpci:
+  - device: "0000:03:00.0"
+    id: "hostpci0.0"
+    pcie: true
+    x_vga: true
+    bus: "ich9-pcie-port-1"
+    addr: "0x0.0"
+    multifunction: true
+  - device: "0000:03:00.1"
+    id: "hostpci0.1"
+    pcie: true
+    bus: "ich9-pcie-port-1"
+    addr: "0x0.1"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.hostpci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(config.hostpci[0].addr.as_deref(), Some("0x0.0"));
+        assert!(config.hostpci[0].multifunction);
+        assert_eq!(config.hostpci[1].addr.as_deref(), Some("0x0.1"));
+    }
+
+    #[test]
     fn test_config_with_spice_audio_devices() {
         let yaml = r#"
 name: "audio-vm"
