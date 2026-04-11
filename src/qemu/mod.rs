@@ -134,7 +134,16 @@ impl QemuManager {
         // Add SPICE arguments
         if let Some(spice) = &self.config.spice {
             if spice.enabled {
-                args.add_spice(spice.port, &spice.addr, spice.disable_ticketing, spice.vdagent);
+                let has_serial_controller = self.config.guest_agent.as_ref()
+                    .map(|guest_agent| guest_agent.enabled)
+                    .unwrap_or(false);
+                args.add_spice(
+                    spice.port,
+                    &spice.addr,
+                    spice.disable_ticketing,
+                    spice.vdagent,
+                    has_serial_controller,
+                );
 
                 if spice.audio {
                     let mut emitted_backends: Vec<&str> = Vec::new();

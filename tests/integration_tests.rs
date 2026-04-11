@@ -146,5 +146,8 @@ system:
             assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
           }
         }
+
+        let virtio_serial_controller_count = generated.matches("virtio-serial-pci").count();
+        assert_eq!(virtio_serial_controller_count, 1, "Expected a single virtio-serial-pci controller in generated command\n{generated}");
       }
 }

@@ -269,7 +269,7 @@ impl QemuArgs {
     }
 
     /// Add SPICE display server
-    pub fn add_spice(&mut self, port: u16, addr: &str, disable_ticketing: bool, vdagent: bool) {
+    pub fn add_spice(&mut self, port: u16, addr: &str, disable_ticketing: bool, vdagent: bool, has_serial_controller: bool) {
         self.push_str("-spice");
         let mut spice_spec = format!("port={},addr={}", port, addr);
         if disable_ticketing {
@@ -283,8 +283,10 @@ impl QemuArgs {
 
         // Add vdagent channel for clipboard sharing
         if vdagent {
-            self.push_str("-device");
-            self.push("virtio-serial-pci,id=virtio-serial0".to_string());
+            if !has_serial_controller {
+                self.push_str("-device");
+                self.push("virtio-serial-pci,id=virtio-serial0".to_string());
+            }
             self.push_str("-chardev");
             self.push("spicevmc,id=vdagent,name=vdagent".to_string());
             self.push_str("-device");
@@ -693,7 +695,7 @@ mod tests {
     #[test]
     fn test_spice_audio_devices() {
         let mut args = QemuArgs::new();
-        args.add_spice(5903, "0.0.0.0", true, true);
+        args.add_spice(5903, "0.0.0.0", true, true, false);
         args.add_spice_audiodev("spice-backend0");
         args.add_audio_device("ich9-intel-hda", "audiodev0", Some("pci.2"), Some("0xc"), None, None);
         args.add_audio_device("hda-micro", "audiodev0-codec0", Some("audiodev0.0"), None, Some(0), Some("spice-backend0"));
@@ -710,7 +712,7 @@ mod tests {
     #[test]
     fn test_input_devices() {
         let mut args = QemuArgs::new();
-        args.add_spice(5903, "0.0.0.0", true, true);
+        args.add_spice(5903, "0.0.0.0", true, true, false);
         args.add_input_device("virtio-mouse");
         args.add_input_device("virtio-keyboard");
 
@@ -722,6 +724,23 @@ mod tests {
         assert_eq!(keyboard_count, 1);
         assert!(built.iter().any(|arg| arg == "virtio-serial-pci,id=virtio-serial0"));
         assert!(built.iter().any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0"));
+    }
+
+    #[test]
+    fn test_spice_vdagent_reuses_existing_serial_controller() {
+        let mut args = QemuArgs::new();
+        args.add_guest_agent(Some("/var/run/qemu-server/108.qga"), false, Some("pci.0"), Some("0x8"));
+        args.add_spice(5903, "0.0.0.0", true, true, true);
+
+        let built = args.build();
+        let serial_controller_count = built
+            .iter()
+            .filter(|arg| arg.starts_with("virtio-serial-pci"))
+            .count();
+
+        assert_eq!(serial_controller_count, 1);
+        assert!(built.iter().any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0"));
+        assert!(built.iter().any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"));
     }
 
     #[test]
