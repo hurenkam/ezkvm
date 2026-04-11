@@ -345,6 +345,23 @@ pub struct SerialConfig {
     /// Port number (for multi-port setups)
     #[serde(default)]
     pub port: Option<u32>,
+
+    /// Output file path for `file` serial backends
+    pub path: Option<String>,
+
+    /// Hostname or IP for `socket` serial backends
+    pub host: Option<String>,
+
+    /// TCP port for `socket` serial backends
+    pub socket_port: Option<u16>,
+
+    /// Whether the socket backend should listen in server mode
+    #[serde(default = "default_true")]
+    pub server: bool,
+
+    /// Whether QEMU should wait for a socket connection before continuing
+    #[serde(default)]
+    pub wait: bool,
 }
 
 /// Additional VM options

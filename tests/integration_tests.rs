@@ -40,7 +40,7 @@ devices:
       mode: "user"
 
   displays:
-    - type: "cirrus"
+    - type: "qxl"
       vram: 64
 
 options:

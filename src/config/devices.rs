@@ -172,10 +172,16 @@ impl From<DisplayConfig> for QemuArgs {
         let mut args = QemuArgs::new();
         
         args.push_str("-device");
-        let device_spec = display.r#type.clone();
-        
-        // For virtio-gpu, VRAM is specified differently or not at all
-        // Let's skip VRAM for now to get basic functionality working
+        let mut device_spec = display.r#type.clone();
+
+        if let Some(vram) = display.vram {
+            match display.r#type.as_str() {
+                "qxl" => device_spec.push_str(&format!(",vram_size_mb={}", vram)),
+                "vmware-svga" => device_spec.push_str(&format!(",vgamem_mb={}", vram)),
+                _ => device_spec.push_str(&format!(",vram={}", vram * 1024 * 1024)),
+            }
+        }
+
         args.push(device_spec);
         args
     }
@@ -195,13 +201,21 @@ impl From<SerialConfig> for QemuArgs {
                 args.push("stdio".to_string());
             }
             "file" => {
-                // Would need a path parameter, simplified for now
                 args.push_str("-serial");
-                args.push("file:/dev/null".to_string());
+                args.push(format!("file:{}", serial.path.unwrap_or_else(|| "/dev/null".to_string())));
             }
             "socket" => {
                 args.push_str("-serial");
-                args.push("tcp:127.0.0.1:4444,server,nowait".to_string());
+                let host = serial.host.unwrap_or_else(|| "127.0.0.1".to_string());
+                let port = serial.socket_port.unwrap_or(4444);
+                let mut spec = format!("tcp:{}:{}", host, port);
+                if serial.server {
+                    spec.push_str(",server");
+                }
+                if !serial.wait {
+                    spec.push_str(",nowait");
+                }
+                args.push(spec);
             }
             _ => {
                 // Default to pty
@@ -337,5 +351,49 @@ mod tests {
         assert!(args[3].contains(",rx_queue_size=1024"));
         assert!(args[3].contains(",tx_queue_size=256"));
         assert!(args[3].contains(",bootindex=102"));
+    }
+
+    #[test]
+    fn test_display_config_with_vram() {
+        let display = DisplayConfig {
+            r#type: "qxl".to_string(),
+            vram: Some(256),
+        };
+
+        let args = QemuArgs::from(display).into_inner();
+        assert_eq!(args[0], "-device");
+        assert_eq!(args[1], "qxl,vram_size_mb=256");
+    }
+
+    #[test]
+    fn test_serial_file_backend() {
+        let serial = SerialConfig {
+            r#type: "file".to_string(),
+            port: Some(0),
+            path: Some("/tmp/serial.log".to_string()),
+            host: None,
+            socket_port: None,
+            server: true,
+            wait: false,
+        };
+
+        let args = QemuArgs::from(serial).into_inner();
+        assert_eq!(args, vec!["-serial", "file:/tmp/serial.log"]);
+    }
+
+    #[test]
+    fn test_serial_socket_backend() {
+        let serial = SerialConfig {
+            r#type: "socket".to_string(),
+            port: Some(0),
+            path: None,
+            host: Some("127.0.0.1".to_string()),
+            socket_port: Some(4444),
+            server: true,
+            wait: false,
+        };
+
+        let args = QemuArgs::from(serial).into_inner();
+        assert_eq!(args, vec!["-serial", "tcp:127.0.0.1:4444,server,nowait"]);
     }
 }

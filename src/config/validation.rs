@@ -207,6 +207,11 @@ fn validate_device_config(devices: &super::DeviceConfig) -> Result<()> {
     for display in &devices.displays {
         validate_display_config(display)?;
     }
+
+    // Validate serial devices
+    for serial in &devices.serials {
+        validate_serial_config(serial)?;
+    }
     
     Ok(())
 }
@@ -356,11 +361,57 @@ fn validate_display_config(display: &super::DisplayConfig) -> Result<()> {
     
     // Validate VRAM
     if let Some(vram) = display.vram {
+        if vram == 0 {
+            return Err(anyhow!("VRAM must be greater than 0 when specified"));
+        }
         if vram > 1024 { // 1 GiB
             return Err(anyhow!("VRAM cannot exceed 1024 MiB"));
         }
+
+        let vram_supported_types = ["virtio-gpu", "qxl", "vmware-svga"];
+        if !vram_supported_types.contains(&display.r#type.as_str()) {
+            return Err(anyhow!(
+                "Display type '{}' does not support configurable VRAM. Supported: {:?}",
+                display.r#type,
+                vram_supported_types
+            ));
+        }
     }
     
+    Ok(())
+}
+
+/// Validate serial configuration
+fn validate_serial_config(serial: &super::SerialConfig) -> Result<()> {
+    let valid_types = ["pty", "stdio", "file", "socket"];
+    if !valid_types.contains(&serial.r#type.as_str()) {
+        return Err(anyhow!("Unsupported serial type: {}. Supported: {:?}", serial.r#type, valid_types));
+    }
+
+    match serial.r#type.as_str() {
+        "file" => {
+            let path = serial.path.as_deref().unwrap_or("").trim();
+            if path.is_empty() {
+                return Err(anyhow!("Serial file backend requires a non-empty path"));
+            }
+        }
+        "socket" => {
+            let host = serial.host.as_deref().unwrap_or("").trim();
+            if host.is_empty() {
+                return Err(anyhow!("Serial socket backend requires a non-empty host"));
+            }
+
+            match serial.socket_port {
+                Some(0) | None => {
+                    return Err(anyhow!("Serial socket backend requires a TCP port between 1 and 65535"));
+                }
+                Some(_) => {}
+            }
+        }
+        "pty" | "stdio" => {}
+        _ => unreachable!(),
+    }
+
     Ok(())
 }
 
