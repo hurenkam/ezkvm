@@ -29,7 +29,7 @@ system:
 
 boot:
   firmware: "uefi"
-  boot_order: ["disk", "cdrom", "network"]
+  boot_order: []
   menu: true
   strict: true
   reboot_timeout: 1000
@@ -84,8 +84,6 @@ devices:
       addr: "0x12"
 
 
-  displays:
-    - type: "qxl"
   serials:
     - type: "pty"
       port: 0
@@ -126,7 +124,7 @@ hostpci:
 # Add XHCI controller and USB host device
 usb_devices:
   - id: "usb0"
-    host: "1-2.3"
+    host: "1-2.2"
     bus: "xhci.0"
     port: "1"
 
