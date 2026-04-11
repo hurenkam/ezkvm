@@ -146,7 +146,7 @@ impl QemuArgs {
         // Add chardev for guest agent
         let chardev_id = "qga0";
         self.push_str("-chardev");
-        let mut chardev_spec = format!("socket,path={},server=on,wait=off,id={}",
+        let chardev_spec = format!("socket,path={},server=on,wait=off,id={}",
             socket_path.unwrap_or("/var/run/qemu-server/qga.sock"), chardev_id);
         self.push(chardev_spec);
 
@@ -230,7 +230,7 @@ impl QemuArgs {
     }
 
     /// Add SPICE display server
-    pub fn add_spice(&mut self, port: u16, addr: &str, disable_ticketing: bool, audio: bool, vdagent: bool) {
+    pub fn add_spice(&mut self, port: u16, addr: &str, disable_ticketing: bool, vdagent: bool) {
         self.push_str("-spice");
         let mut spice_spec = format!("port={},addr={}", port, addr);
         if disable_ticketing {
@@ -241,12 +241,6 @@ impl QemuArgs {
         // Add SPICE display device
         self.push_str("-device");
         self.push("qxl-vga,id=video0".to_string());
-
-        // Add SPICE audio if enabled
-        if audio {
-            self.push_str("-device");
-            self.push("spice-audio,id=audio0".to_string());
-        }
 
         // Add vdagent channel for clipboard sharing
         if vdagent {
@@ -259,8 +253,38 @@ impl QemuArgs {
         }
     }
 
+    /// Add a SPICE audiodev backend
+    pub fn add_spice_audiodev(&mut self, id: &str) {
+        self.push_str("-audiodev");
+        self.push(format!("spice,id={}", id));
+    }
+
+    /// Add an audio device
+    pub fn add_audio_device(&mut self, device_type: &str, id: &str, bus: Option<&str>, addr: Option<&str>, cad: Option<u8>, audiodev: Option<&str>) {
+        self.push_str("-device");
+        let mut device_spec = format!("{},id={}", device_type, id);
+
+        if let Some(bus) = bus {
+            device_spec.push_str(&format!(",bus={}", bus));
+        }
+
+        if let Some(addr) = addr {
+            device_spec.push_str(&format!(",addr={}", addr));
+        }
+
+        if let Some(cad) = cad {
+            device_spec.push_str(&format!(",cad={}", cad));
+        }
+
+        if let Some(audiodev) = audiodev {
+            device_spec.push_str(&format!(",audiodev={}", audiodev));
+        }
+
+        self.push(device_spec);
+    }
+
     /// Add Looking Glass shared memory device
-    pub fn add_ivshmem(&mut self, size_mib: u32, vectors: u32, id: &str) {
+    pub fn add_ivshmem(&mut self, size_mib: u32, _vectors: u32, id: &str) {
         self.push_str("-device");
         let size_bytes = size_mib * 1024 * 1024;
         self.push(format!("ivshmem-plain,memdev=ivshmem,id={},size={}", id, size_bytes));
@@ -591,5 +615,22 @@ mod tests {
         assert!(built[1].contains(",password=chap-pass"));
         assert_eq!(built[2], "-device");
         assert!(built[3].contains("scsi-hd,drive=iscsi0,id=iscsi0,bus=scsihw0.0"));
+    }
+
+    #[test]
+    fn test_spice_audio_devices() {
+        let mut args = QemuArgs::new();
+        args.add_spice(5903, "0.0.0.0", true, true);
+        args.add_spice_audiodev("spice-backend0");
+        args.add_audio_device("ich9-intel-hda", "audiodev0", Some("pci.2"), Some("0xc"), None, None);
+        args.add_audio_device("hda-micro", "audiodev0-codec0", Some("audiodev0.0"), None, Some(0), Some("spice-backend0"));
+        args.add_audio_device("hda-duplex", "audiodev0-codec1", Some("audiodev0.0"), None, Some(1), Some("spice-backend0"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "spice,id=spice-backend0"));
+        assert!(built.iter().any(|arg| arg == "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc"));
+        assert!(built.iter().any(|arg| arg == "hda-micro,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0"));
+        assert!(built.iter().any(|arg| arg == "hda-duplex,id=audiodev0-codec1,bus=audiodev0.0,cad=1,audiodev=spice-backend0"));
+        assert!(!built.iter().any(|arg| arg.contains("spice-audio")));
     }
 }

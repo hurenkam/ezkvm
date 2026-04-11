@@ -94,6 +94,10 @@ pub struct VmConfig {
     /// SPICE display configuration
     #[serde(default)]
     pub spice: Option<SpiceConfig>,
+
+    /// Audio devices backed by the selected audio backend
+    #[serde(default)]
+    pub audio_devices: Vec<AudioDeviceConfig>,
     
     /// Looking Glass shared memory configuration
     #[serde(default)]
@@ -516,6 +520,28 @@ fn default_spice_addr() -> String {
     "127.0.0.1".to_string()
 }
 
+/// Audio device configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioDeviceConfig {
+    /// QEMU audio device type
+    pub r#type: String,
+
+    /// Unique identifier for the audio device
+    pub id: String,
+
+    /// Bus placement for the device
+    pub bus: Option<String>,
+
+    /// Address on the selected bus
+    pub addr: Option<String>,
+
+    /// Codec address on the parent HDA controller
+    pub cad: Option<u8>,
+
+    /// Backend ID used by codec devices
+    pub audiodev: Option<String>,
+}
+
 /// Looking Glass shared memory configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IvshmemConfig {
@@ -795,6 +821,7 @@ impl VmConfig {
     }
     
     /// Load configuration from a YAML string
+    #[allow(dead_code)]
     pub fn from_str(content: &str) -> anyhow::Result<Self> {
         let processed_content = Self::substitute_env_vars(content)?;
         let config: VmConfig = serde_yaml::from_str(&processed_content)?;

@@ -173,7 +173,7 @@ options:
     base: "localtime"
     driftfix: "slew"
 
-# Advanced QEMU audio devices (manual section)
+# SPICE-backed audio devices
 audio_devices:
   - type: "ich9-intel-hda"
     id: "audiodev0"

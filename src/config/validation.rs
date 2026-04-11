@@ -50,6 +50,9 @@ pub fn validate_config(config: &VmConfig) -> Result<()> {
     if let Some(spice) = &config.spice {
         validate_spice_config(spice)?;
     }
+
+    // Validate audio device configuration
+    validate_audio_devices(&config.audio_devices, config.spice.as_ref())?;
     
     // Validate ivshmem configuration
     if let Some(ivshmem) = &config.ivshmem {
@@ -370,7 +373,7 @@ fn validate_tpm_config(tpm: &super::TpmConfig) -> Result<()> {
 }
 
 /// Validate guest agent configuration
-fn validate_guest_agent_config(guest_agent: &super::GuestAgentConfig) -> Result<()> {
+fn validate_guest_agent_config(_guest_agent: &super::GuestAgentConfig) -> Result<()> {
     // Basic validation - guest agent config is mostly boolean flags
     // Could add socket path validation if needed
     Ok(())
@@ -463,7 +466,7 @@ fn validate_usb_device_config(usb_device: &super::UsbDeviceConfig) -> Result<()>
 /// Validate SPICE configuration
 fn validate_spice_config(spice: &super::SpiceConfig) -> Result<()> {
     // Validate port range
-    if spice.port == 0 || spice.port > 65535 {
+    if spice.port == 0 {
         return Err(anyhow!("Invalid SPICE port: {}. Must be between 1 and 65535", spice.port));
     }
     
@@ -472,6 +475,79 @@ fn validate_spice_config(spice: &super::SpiceConfig) -> Result<()> {
         return Err(anyhow!("SPICE address cannot be empty"));
     }
     
+    Ok(())
+}
+
+/// Validate audio device configuration
+fn validate_audio_devices(audio_devices: &[super::AudioDeviceConfig], spice: Option<&super::SpiceConfig>) -> Result<()> {
+    if audio_devices.is_empty() {
+        if let Some(spice) = spice {
+            if spice.enabled && spice.audio {
+                return Err(anyhow!("SPICE audio requires at least one configured audio device"));
+            }
+        }
+        return Ok(());
+    }
+
+    match spice {
+        Some(spice) if spice.enabled && spice.audio => {}
+        Some(_) => {
+            return Err(anyhow!("Audio devices currently require spice.enabled=true and spice.audio=true"));
+        }
+        None => {
+            return Err(anyhow!("Audio devices currently require a SPICE configuration with audio enabled"));
+        }
+    }
+
+    let mut has_controller = false;
+
+    for audio_device in audio_devices {
+        match audio_device.r#type.as_str() {
+            "ich9-intel-hda" => {
+                has_controller = true;
+
+                if audio_device.id.trim().is_empty() {
+                    return Err(anyhow!("Audio controller ID cannot be empty"));
+                }
+
+                if audio_device.cad.is_some() {
+                    return Err(anyhow!("Audio controller '{}' cannot define cad", audio_device.id));
+                }
+
+                if audio_device.audiodev.is_some() {
+                    return Err(anyhow!("Audio controller '{}' cannot define audiodev", audio_device.id));
+                }
+            }
+            "hda-micro" | "hda-duplex" => {
+                if audio_device.id.trim().is_empty() {
+                    return Err(anyhow!("Audio codec ID cannot be empty"));
+                }
+
+                if audio_device.bus.as_deref().unwrap_or("").trim().is_empty() {
+                    return Err(anyhow!("Audio codec '{}' requires a bus assignment", audio_device.id));
+                }
+
+                if audio_device.audiodev.as_deref().unwrap_or("").trim().is_empty() {
+                    return Err(anyhow!("Audio codec '{}' requires an audiodev backend ID", audio_device.id));
+                }
+
+                if audio_device.cad.is_none() {
+                    return Err(anyhow!("Audio codec '{}' requires a cad value", audio_device.id));
+                }
+            }
+            other => {
+                return Err(anyhow!(
+                    "Unsupported audio device type: {}. Supported: [\"ich9-intel-hda\", \"hda-micro\", \"hda-duplex\"]",
+                    other
+                ));
+            }
+        }
+    }
+
+    if !has_controller {
+        return Err(anyhow!("Audio device configuration requires an ich9-intel-hda controller"));
+    }
+
     Ok(())
 }
 
@@ -631,7 +707,7 @@ fn validate_hyperv_config(hyperv: &super::HypervConfig) -> Result<()> {
     
     // Validate spinlock_retry if provided
     if let Some(retry_count) = hyperv.spinlock_retry {
-        if retry_count == 0 || retry_count > 0xFFFFFFFF {
+        if retry_count == 0 {
             return Err(anyhow!("Hyper-V spinlock_retry must be between 1 and 4294967295"));
         }
     }

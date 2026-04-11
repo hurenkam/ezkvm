@@ -1,0 +1,406 @@
+//! Unit tests for configuration parsing and validation
+
+use ezkvm::config::VmConfig;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_config_parsing() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  vcpus: 2
+  cpu_model: "host"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.name, "test-vm");
+        assert_eq!(config.backend, "qemu");
+        assert_eq!(config.system.architecture, "x86_64");
+        assert_eq!(config.system.machine, "q35");
+        assert_eq!(config.system.memory, 1024);
+        assert_eq!(config.system.vcpus, 2);
+        assert_eq!(config.system.cpu_model, "host");
+    }
+
+    #[test]
+    fn test_config_with_devices() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "root"
+      path: "/path/to/disk.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+      cache: "none"
+      aio: "io_uring"
+      detect_zeroes: "unmap"
+
+  networks:
+    - id: "net0"
+      model: "virtio-net"
+      mode: "user"
+      mac: "52:54:00:12:34:56"
+      rx_queue_size: 1024
+      tx_queue_size: 256
+      boot_index: 102
+      bus: "pci.0"
+      addr: "0x12"
+
+  displays:
+    - type: "virtio-gpu"
+      vram: 256
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.devices.drives.len(), 1);
+        assert_eq!(config.devices.networks.len(), 1);
+        assert_eq!(config.devices.displays.len(), 1);
+
+        let drive = &config.devices.drives[0];
+        assert_eq!(drive.id, "root");
+        assert_eq!(drive.path, "/path/to/disk.qcow2");
+        assert_eq!(drive.interface, "virtio");
+        assert_eq!(drive.cache.as_deref(), Some("none"));
+        assert_eq!(drive.aio.as_deref(), Some("io_uring"));
+        assert_eq!(drive.detect_zeroes.as_deref(), Some("unmap"));
+
+        let network = &config.devices.networks[0];
+        assert_eq!(network.id, "net0");
+        assert_eq!(network.model, "virtio-net");
+        assert_eq!(network.mac.as_ref().unwrap(), "52:54:00:12:34:56");
+        assert_eq!(network.rx_queue_size, Some(1024));
+        assert_eq!(network.tx_queue_size, Some(256));
+        assert_eq!(network.boot_index, Some(102));
+        assert_eq!(network.bus.as_deref(), Some("pci.0"));
+        assert_eq!(network.addr.as_deref(), Some("0x12"));
+
+        let display = &config.devices.displays[0];
+        assert_eq!(display.r#type, "virtio-gpu");
+        assert_eq!(display.vram.unwrap(), 256);
+    }
+
+    #[test]
+    fn test_env_var_substitution() {
+        unsafe {
+            std::env::set_var("TEST_MEMORY", "4096");
+            std::env::set_var("TEST_CPUS", "4");
+        }
+
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: ${TEST_MEMORY}
+  vcpus: ${TEST_CPUS}
+  cpu_model: "host"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.system.memory, 4096);
+        assert_eq!(config.system.vcpus, 4);
+
+        // Clean up
+        unsafe {
+            std::env::remove_var("TEST_MEMORY");
+            std::env::remove_var("TEST_CPUS");
+        }
+    }
+
+    #[test]
+    fn test_simple_env_var_substitution() {
+        unsafe {
+            std::env::set_var("HOME", "/home/test");
+        }
+
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "root"
+      path: "$HOME/disk.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.devices.drives[0].path, "/home/test/disk.qcow2");
+
+        // Clean up
+        unsafe {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn test_missing_env_var() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: ${MISSING_VAR}
+  vcpus: 2
+  cpu_model: "host"
+"#;
+
+        let result = VmConfig::from_str(yaml);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("MISSING_VAR"));
+    }
+
+    #[test]
+    fn test_invalid_config_missing_required_fields() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  # missing machine, memory, vcpus, cpu_model
+"#;
+
+        let result = VmConfig::from_str(yaml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_config_with_boot_options() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+boot:
+  firmware: "uefi"
+  boot_order: ["disk", "cdrom"]
+  kernel: "/boot/vmlinuz"
+  initrd: "/boot/initrd.img"
+  cmdline: "console=ttyS0 root=/dev/vda1"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.boot.firmware.as_ref().unwrap(), "uefi");
+        assert_eq!(config.boot.boot_order, vec!["disk", "cdrom"]);
+        assert_eq!(config.boot.kernel.as_ref().unwrap(), "/boot/vmlinuz");
+        assert_eq!(config.boot.initrd.as_ref().unwrap(), "/boot/initrd.img");
+        assert_eq!(config.boot.cmdline.as_ref().unwrap(), "console=ttyS0 root=/dev/vda1");
+    }
+
+    #[test]
+    fn test_config_with_options() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+options:
+  enable_kvm: false
+  daemonize: true
+  uefi_vars: "/path/to/vars.fd"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.options.enable_kvm, false);
+        assert_eq!(config.options.daemonize, true);
+        assert_eq!(config.options.uefi_vars.as_ref().unwrap(), "/path/to/vars.fd");
+    }
+
+    #[test]
+    fn test_config_with_advanced_qemu_options() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "pc-q35-8.1+pve0"
+  machine_options:
+    - "hpet=off"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+boot:
+  boot_order: ["disk", "network"]
+  menu: true
+  strict: true
+  reboot_timeout: 1000
+  splash: "/usr/share/qemu-server/bootsplash.jpg"
+
+options:
+  enable_kvm: true
+  daemonize: false
+  nodefaults: true
+  pid_file: "/tmp/test-vm.pid"
+  log_dir: "/tmp/test-vm-logs"
+  log_keep: 5
+  global_options:
+    - "kvm-pit.lost_tick_policy=discard"
+  rtc:
+    base: "localtime"
+    driftfix: "slew"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.system.machine, "pc-q35-8.1+pve0");
+        assert_eq!(config.system.machine_options, vec!["hpet=off"]);
+        assert_eq!(config.boot.boot_order, vec!["disk", "network"]);
+        assert!(config.boot.menu);
+        assert!(config.boot.strict);
+        assert_eq!(config.boot.reboot_timeout, Some(1000));
+        assert_eq!(config.boot.splash.as_deref(), Some("/usr/share/qemu-server/bootsplash.jpg"));
+        assert!(config.options.nodefaults);
+        assert_eq!(config.options.pid_file.as_deref(), Some("/tmp/test-vm.pid"));
+        assert_eq!(config.options.log_dir.as_deref(), Some("/tmp/test-vm-logs"));
+        assert_eq!(config.options.log_keep, Some(5));
+        assert_eq!(config.options.global_options, vec!["kvm-pit.lost_tick_policy=discard"]);
+        let rtc = config.options.rtc.as_ref().unwrap();
+        assert_eq!(rtc.base.as_deref(), Some("localtime"));
+        assert_eq!(rtc.driftfix.as_deref(), Some("slew"));
+    }
+
+    #[test]
+    fn test_config_with_iscsi_initiator_and_auth() {
+        let yaml = r#"
+name: "iscsi-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+iscsi_disks:
+  - id: "iscsi0"
+    portal: "10.0.0.1:3260"
+    target: "iqn.2024-01.example:storage.vm0"
+    lun: 1
+    initiator: "iqn.1993-08.org.debian:01:622fd71731a1"
+    username: "chap-user"
+    password: "chap-pass"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        let disk = &config.iscsi_disks[0];
+        assert_eq!(disk.initiator.as_deref(), Some("iqn.1993-08.org.debian:01:622fd71731a1"));
+        assert_eq!(disk.username.as_deref(), Some("chap-user"));
+        assert_eq!(disk.password.as_deref(), Some("chap-pass"));
+    }
+
+    #[test]
+    fn test_config_with_spice_audio_devices() {
+        let yaml = r#"
+name: "audio-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 4
+  cpu_model: "host"
+
+spice:
+  enabled: true
+  port: 5903
+  addr: "0.0.0.0"
+  disable_ticketing: true
+  audio: true
+
+audio_devices:
+  - type: "ich9-intel-hda"
+    id: "audiodev0"
+    bus: "pci.2"
+    addr: "0xc"
+  - type: "hda-micro"
+    id: "audiodev0-codec0"
+    bus: "audiodev0.0"
+    cad: 0
+    audiodev: "spice-backend0"
+  - type: "hda-duplex"
+    id: "audiodev0-codec1"
+    bus: "audiodev0.0"
+    cad: 1
+    audiodev: "spice-backend0"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.audio_devices.len(), 3);
+        assert_eq!(config.audio_devices[0].r#type, "ich9-intel-hda");
+        assert_eq!(config.audio_devices[0].bus.as_deref(), Some("pci.2"));
+        assert_eq!(config.audio_devices[0].addr.as_deref(), Some("0xc"));
+        assert_eq!(config.audio_devices[1].cad, Some(0));
+        assert_eq!(config.audio_devices[1].audiodev.as_deref(), Some("spice-backend0"));
+    }
+
+    #[test]
+    fn test_spice_audio_requires_audio_devices() {
+        let yaml = r#"
+name: "audio-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 4
+  cpu_model: "host"
+
+spice:
+  enabled: true
+  audio: true
+"#;
+
+        let result = VmConfig::from_str(yaml);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("SPICE audio requires at least one configured audio device"));
+    }
+}

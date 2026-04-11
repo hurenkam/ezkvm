@@ -106,7 +106,31 @@ impl QemuManager {
         // Add SPICE arguments
         if let Some(spice) = &self.config.spice {
             if spice.enabled {
-                args.add_spice(spice.port, &spice.addr, spice.disable_ticketing, spice.audio, spice.vdagent);
+                args.add_spice(spice.port, &spice.addr, spice.disable_ticketing, spice.vdagent);
+
+                if spice.audio {
+                    let mut emitted_backends: Vec<&str> = Vec::new();
+
+                    for audio_device in &self.config.audio_devices {
+                        if let Some(audiodev) = audio_device.audiodev.as_deref() {
+                            if !emitted_backends.contains(&audiodev) {
+                                args.add_spice_audiodev(audiodev);
+                                emitted_backends.push(audiodev);
+                            }
+                        }
+                    }
+
+                    for audio_device in &self.config.audio_devices {
+                        args.add_audio_device(
+                            &audio_device.r#type,
+                            &audio_device.id,
+                            audio_device.bus.as_deref(),
+                            audio_device.addr.as_deref(),
+                            audio_device.cad,
+                            audio_device.audiodev.as_deref(),
+                        );
+                    }
+                }
             }
         }
         
