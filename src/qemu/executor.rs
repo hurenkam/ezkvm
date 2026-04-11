@@ -63,6 +63,7 @@ impl QemuExecutor {
     }
     
     /// Execute QEMU asynchronously (background)
+    #[allow(dead_code)]
     pub async fn execute_async(&self) -> Result<QemuProcess> {
         let mut cmd = TokioCommand::new(&self.binary);
         cmd.args(self.args.as_ref());
@@ -85,6 +86,7 @@ impl QemuExecutor {
     }
     
     /// Dry run - just print the command that would be executed
+    #[allow(dead_code)]
     pub fn dry_run(&self) -> String {
         let mut cmd = vec![self.binary.clone()];
         cmd.extend(self.args.clone().into_inner());
@@ -93,11 +95,13 @@ impl QemuExecutor {
 }
 
 /// Handle to a running QEMU process
+#[allow(dead_code)]
 pub struct QemuProcess {
     pid: i32,
     child: Option<tokio::process::Child>,
 }
 
+#[allow(dead_code)]
 impl QemuProcess {
     /// Get the process ID
     pub fn pid(&self) -> i32 {
@@ -165,6 +169,7 @@ pub fn check_qemu_available(binary: &str) -> Result<()> {
 }
 
 /// Get QEMU version
+#[allow(dead_code)]
 pub fn get_qemu_version(binary: &str) -> Result<String> {
     let output = Command::new(binary)
         .arg("--version")

@@ -2,6 +2,8 @@
 //!
 //! Handles QCOW2 image creation, snapshots, and disk operations.
 
+#![allow(dead_code)]
+
 use anyhow::{anyhow, Result};
 use std::fs;
 use std::path::{Path, PathBuf};

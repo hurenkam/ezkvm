@@ -2,6 +2,8 @@
 //!
 //! Provides a fluent interface for building QEMU commands.
 
+#![allow(dead_code)]
+
 use super::types::QemuArgs;
 use crate::config::VmConfig;
 

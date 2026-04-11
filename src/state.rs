@@ -25,6 +25,7 @@ pub fn get_state_dir() -> Result<PathBuf> {
 }
 
 /// Get the PID file path for a VM
+#[allow(dead_code)]
 pub fn get_pid_file(vm_name: &str) -> Result<PathBuf> {
     get_pid_file_at(vm_name, None)
 }
@@ -46,6 +47,7 @@ pub fn get_config_cache(vm_name: &str) -> Result<PathBuf> {
 }
 
 /// Get the logs directory for a VM
+#[allow(dead_code)]
 pub fn get_logs_dir(vm_name: &str) -> Result<PathBuf> {
     get_logs_dir_at(vm_name, None)
 }
@@ -64,6 +66,7 @@ pub fn get_logs_dir_at(vm_name: &str, custom_dir: Option<&str>) -> Result<PathBu
 }
 
 /// Save VM PID to file
+#[allow(dead_code)]
 pub fn save_pid(vm_name: &str, pid: i32) -> Result<()> {
     save_pid_at(vm_name, pid, None)
 }
@@ -79,6 +82,7 @@ pub fn save_pid_at(vm_name: &str, pid: i32, custom_path: Option<&str>) -> Result
 }
 
 /// Read VM PID from file
+#[allow(dead_code)]
 pub fn read_pid(vm_name: &str) -> Result<Option<i32>> {
     read_pid_at(vm_name, None)
 }
@@ -99,6 +103,7 @@ pub fn read_pid_at(vm_name: &str, custom_path: Option<&str>) -> Result<Option<i3
 }
 
 /// Delete VM PID file
+#[allow(dead_code)]
 pub fn delete_pid(vm_name: &str) -> Result<()> {
     delete_pid_at(vm_name, None)
 }
@@ -113,6 +118,7 @@ pub fn delete_pid_at(vm_name: &str, custom_path: Option<&str>) -> Result<()> {
 }
 
 /// Get the log file for a VM
+#[allow(dead_code)]
 pub fn get_log_file(vm_name: &str, session: &str) -> Result<PathBuf> {
     get_log_file_at(vm_name, session, None)
 }
@@ -135,6 +141,7 @@ pub fn create_session_log_file(vm_name: &str, custom_dir: Option<&str>) -> Resul
 }
 
 /// Clean up old log files (keep last N)
+#[allow(dead_code)]
 pub fn cleanup_old_logs(vm_name: &str) -> Result<()> {
     cleanup_old_logs_at(vm_name, None, None)
 }
@@ -178,6 +185,7 @@ pub fn cache_config(vm_name: &str, config: &VmConfig) -> Result<()> {
 }
 
 /// Load cached VM configuration
+#[allow(dead_code)]
 pub fn load_cached_config(vm_name: &str) -> Result<Option<VmConfig>> {
     let config_file = get_config_cache(vm_name)?;
     
@@ -191,6 +199,7 @@ pub fn load_cached_config(vm_name: &str) -> Result<Option<VmConfig>> {
 }
 
 /// Delete cached VM configuration
+#[allow(dead_code)]
 pub fn delete_cached_config(vm_name: &str) -> Result<()> {
     let config_file = get_config_cache(vm_name)?;
     if config_file.exists() {

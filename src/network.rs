@@ -2,8 +2,9 @@
 //!
 //! Handles networking configuration including bridges, port forwarding, and isolation.
 
+#![allow(dead_code)]
+
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
 use std::process::Command;
 
 /// Network mode for a VM
@@ -213,11 +214,9 @@ pub fn get_network_stats(interface: &str) -> Result<NetworkStats> {
         .output()
         .map_err(|e| anyhow!("Failed to get network stats: {}", e))?;
     
-    let output_str = String::from_utf8(output.stdout)?;
+    let _output_str = String::from_utf8(output.stdout)?;
     
     // Parse output (simplified)
-    let lines: Vec<&str> = output_str.lines().collect();
-    
     let stats = NetworkStats {
         interface: interface.to_string(),
         bytes_sent: 0,

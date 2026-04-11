@@ -330,7 +330,7 @@ fn spawn_remote_viewer(config: &crate::config::VmConfig, central_config: &crate:
 }
 
 fn spawn_looking_glass(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
-    let ivshmem = match &config.ivshmem {
+    let _ivshmem = match &config.ivshmem {
         Some(ivshmem) if ivshmem.enabled => ivshmem,
         _ => return Ok(()),
     };
