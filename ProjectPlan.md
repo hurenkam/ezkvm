@@ -102,6 +102,7 @@ options:
 - Global tool configuration loaded from `/etc/ezkvm.yaml`
 
 ### 2.4 Central Tool Configuration
+**Status**: ✅ COMPLETED
 - Store external tool paths and runtime directories in a central config file so they do not need to appear in every VM YAML
 - Default location: `/etc/ezkvm.yaml`
 - Support override via `EZKVM_CONFIG` or CLI flags

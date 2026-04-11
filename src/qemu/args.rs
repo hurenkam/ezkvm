@@ -111,19 +111,14 @@ impl QemuArgs {
     }
 
     /// Add TPM device
-    pub fn add_tpm(&mut self, version: &str, backend: &str, state_path: Option<&str>, model: &str) {
+    pub fn add_tpm(&mut self, _version: &str, backend: &str, socket_path: &str, model: &str, external_swtpm: bool) {
         match backend {
             "emulator" => {
-                // Add chardev for TPM emulator
+                // Add chardev for TPM emulator or external swtpm socket
                 let chardev_id = "tpmchar";
                 self.push_str("-chardev");
-                let mut chardev_spec = format!("socket,id={},server=on,wait=off", chardev_id);
-                if let Some(path) = state_path {
-                    chardev_spec.push_str(&format!(",path={}", path));
-                } else {
-                    // Default path for TPM state
-                    chardev_spec.push_str(",path=/var/run/qemu-server/tpm");
-                }
+                let server_mode = if external_swtpm { "off" } else { "on" };
+                let chardev_spec = format!("socket,id={},server={},wait=off,path={}", chardev_id, server_mode, socket_path);
                 self.push(chardev_spec);
 
                 // Add TPM device

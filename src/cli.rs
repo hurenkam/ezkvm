@@ -4,6 +4,8 @@
 
 use clap::{Parser, Subcommand};
 use anyhow::Result;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
 /// ezkvm - Easy KVM virtual machine manager
 #[derive(Parser)]
@@ -236,6 +238,122 @@ async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {
     Ok(())
 }
 
+fn ensure_run_dir(central_config: &crate::config::CentralConfig) -> Result<PathBuf> {
+    let run_dir = central_config.locations.run_dir.as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/var/run/ezkvm"));
+
+    std::fs::create_dir_all(&run_dir)?;
+    Ok(run_dir)
+}
+
+fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> String {
+    if let Some(tpm) = &config.tpm {
+        if let Some(state_path) = &tpm.state_path {
+            return state_path.clone();
+        }
+    }
+
+    if let Some(run_dir) = &central_config.locations.run_dir {
+        return format!("{}/tpm", run_dir);
+    }
+
+    "/var/run/qemu-server/tpm".to_string()
+}
+
+fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
+    let tpm = match &config.tpm {
+        Some(tpm) if tpm.backend == "emulator" => tpm,
+        _ => return Ok(()),
+    };
+
+    let swtpm_path = match &central_config.tools.swtpm {
+        Some(path) => path,
+        None => return Ok(()),
+    };
+
+    let run_dir = ensure_run_dir(central_config)?;
+    let socket_path = resolve_tpm_socket_path(config, central_config);
+    let state_dir = run_dir.join("tpm-state");
+    let ctrl_path = run_dir.join("swtpm-ctrl.sock");
+
+    std::fs::create_dir_all(&state_dir)?;
+
+    let mut cmd = Command::new(swtpm_path);
+    cmd.arg("socket")
+        .arg(if tpm.version == "2.0" { "--tpm2" } else { "--tpm" })
+        .arg("--tpmstate")
+        .arg(format!("dir={}", state_dir.display()))
+        .arg("--ctrl")
+        .arg(format!("type=unixio,path={}", ctrl_path.display()))
+        .arg("--server")
+        .arg(format!("type=unixio,path={}", socket_path))
+        .arg("--daemon")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    if let Err(err) = cmd.spawn() {
+        println!("Warning: failed to start swtpm at '{}': {}", swtpm_path, err);
+    } else {
+        println!("✓ Started swtpm emulator using socket {}", socket_path);
+    }
+
+    Ok(())
+}
+
+fn spawn_remote_viewer(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
+    let spice = match &config.spice {
+        Some(spice) if spice.enabled => spice,
+        _ => return Ok(()),
+    };
+
+    let remote_viewer_path = match &central_config.tools.remote_viewer {
+        Some(path) => path,
+        None => return Ok(()),
+    };
+
+    let uri = format!("spice://{}:{}", spice.addr, spice.port);
+    let mut cmd = Command::new(remote_viewer_path);
+    cmd.arg(uri)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    if let Err(err) = cmd.spawn() {
+        println!("Warning: failed to start remote-viewer at '{}': {}", remote_viewer_path, err);
+    } else {
+        println!("✓ Started remote-viewer for SPICE session");
+    }
+
+    Ok(())
+}
+
+fn spawn_looking_glass(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
+    let ivshmem = match &config.ivshmem {
+        Some(ivshmem) if ivshmem.enabled => ivshmem,
+        _ => return Ok(()),
+    };
+
+    let looking_glass_path = match &central_config.tools.looking_glass {
+        Some(path) => path,
+        None => return Ok(()),
+    };
+
+    let mut cmd = Command::new(looking_glass_path);
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    if let Err(err) = cmd.spawn() {
+        println!("Warning: failed to start Looking Glass client at '{}': {}", looking_glass_path, err);
+    } else {
+        println!("✓ Started Looking Glass client for ivshmem session");
+    }
+
+    Ok(())
+}
+
 /// Handle start command
 async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
@@ -243,16 +361,22 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     let mut config = crate::config::VmConfig::from_file(config_path)?;
     println!("✓ Configuration loaded and validated");
     
+    // Load central configuration
+    let central_config = crate::config::CentralConfig::load()?;
+    println!("✓ Central configuration loaded");
+    
+    // Optional service startup for TPM and viewer tools
+    start_swtpm_if_configured(&config, &central_config)?;
+
+    let central_config_clone = central_config.clone();
+
     // Override daemonize option based on CLI flag
     config.options.daemonize = daemon;
     
     // Cache the configuration for quick restarts
     crate::state::cache_config(&config.name, &config)?;
     
-    // Cache the configuration for quick restarts
-    crate::state::cache_config(&config.name, &config)?;
-    
-    let manager = crate::qemu::QemuManager::new(config);
+    let manager = crate::qemu::QemuManager::new(config, central_config);
     let args = manager.build_command()?;
     
     println!("Starting VM: {}", manager.config().name);
@@ -277,7 +401,7 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
         println!("Starting in daemon mode...");
         // With -daemonize, QEMU detaches so this should return quickly
         let _status = executor.execute_sync()?;
-        
+
         // Try to find the PID of the started VM
         std::thread::sleep(std::time::Duration::from_millis(100));
         if let Ok(pids) = crate::qemu::process::find_qemu_processes(&manager.config().name) {
@@ -290,8 +414,17 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
         } else {
             println!("✓ VM '{}' started (daemonized)", manager.config().name);
         }
+
+        // Launch post-start viewer clients when available
+        let _ = spawn_remote_viewer(manager.config(), &central_config_clone);
+        let _ = spawn_looking_glass(manager.config(), &central_config_clone);
     } else {
         println!("Starting interactively...");
+
+        // Launch viewer clients before interactive start so they can connect as soon as QEMU is ready
+        let _ = spawn_remote_viewer(manager.config(), &central_config_clone);
+        let _ = spawn_looking_glass(manager.config(), &central_config_clone);
+
         let status = executor.execute_sync()?;
         // Clean up PID file for interactive mode
         let _ = crate::state::delete_pid(&manager.config().name);

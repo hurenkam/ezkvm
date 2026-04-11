@@ -8,19 +8,43 @@ pub mod args;
 pub mod types;
 pub mod process;
 
-use crate::config::VmConfig;
+use crate::config::{VmConfig, CentralConfig};
 use crate::qemu::types::QemuArgs;
 use anyhow::Result;
 
 /// Main QEMU manager
 pub struct QemuManager {
     config: VmConfig,
+    central_config: CentralConfig,
+}
+
+impl QemuManager {
+    fn uses_external_swtpm(&self) -> bool {
+        self.config.tpm.as_ref()
+            .map(|tpm| tpm.backend == "emulator")
+            .unwrap_or(false)
+            && self.central_config.tools.swtpm.is_some()
+    }
+
+    fn resolve_tpm_socket_path(&self) -> String {
+        if let Some(tpm) = &self.config.tpm {
+            if let Some(state_path) = &tpm.state_path {
+                return state_path.clone();
+            }
+        }
+
+        if let Some(run_dir) = &self.central_config.locations.run_dir {
+            return format!("{}/tpm", run_dir);
+        }
+
+        "/var/run/qemu-server/tpm".to_string()
+    }
 }
 
 impl QemuManager {
     /// Create a new QEMU manager for a VM configuration
-    pub fn new(config: VmConfig) -> Self {
-        Self { config }
+    pub fn new(config: VmConfig, central_config: CentralConfig) -> Self {
+        Self { config, central_config }
     }
     
     /// Get a reference to the VM configuration
@@ -46,7 +70,9 @@ impl QemuManager {
         
         // Add TPM arguments
         if let Some(tpm) = &self.config.tpm {
-            args.add_tpm(&tpm.version, &tpm.backend, tpm.state_path.as_deref(), &tpm.model);
+            let socket_path = self.resolve_tpm_socket_path();
+            let external_swtpm = self.uses_external_swtpm();
+            args.add_tpm(&tpm.version, &tpm.backend, &socket_path, &tpm.model, external_swtpm);
         }
         
         // Add guest agent arguments
@@ -198,8 +224,15 @@ impl QemuManager {
         // UEFI firmware (enhanced support)
         if let Some(firmware) = &self.config.boot.firmware {
             if firmware == "uefi" || firmware == "ovmf" {
+                let code_path = if let Some(code) = &self.config.boot.uefi_code {
+                    Some(code.clone())
+                } else if let Some(ovmf_dir) = &self.central_config.locations.ovmf_dir {
+                    Some(format!("{}/OVMF.fd", ovmf_dir))
+                } else {
+                    None
+                };
                 args.add_uefi(
-                    self.config.boot.uefi_code.as_deref(),
+                    code_path.as_deref(),
                     self.config.boot.uefi_vars.as_deref(),
                     self.config.boot.secure_boot
                 );

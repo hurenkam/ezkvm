@@ -10,6 +10,47 @@ pub mod validation;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+/// Central tool configuration structure
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CentralConfig {
+    /// Tool paths
+    #[serde(default)]
+    pub tools: ToolsConfig,
+    
+    /// Directory locations
+    #[serde(default)]
+    pub locations: LocationsConfig,
+}
+
+/// Tool paths configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToolsConfig {
+    /// Path to swtpm executable
+    pub swtpm: Option<String>,
+    
+    /// Path to remote-viewer executable
+    pub remote_viewer: Option<String>,
+    
+    /// Path to looking-glass-client executable
+    pub looking_glass: Option<String>,
+}
+
+/// Directory locations configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LocationsConfig {
+    /// Runtime directory for PID files, sockets, etc.
+    pub run_dir: Option<String>,
+    
+    /// Directory containing OVMF firmware files
+    pub ovmf_dir: Option<String>,
+    
+    /// Default directory for VM configuration files
+    pub vm_dir: Option<String>,
+    
+    /// Directory for VM templates
+    pub template_dir: Option<String>,
+}
+
 /// Main configuration structure for a virtual machine
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VmConfig {
@@ -682,6 +723,28 @@ impl VmConfig {
         // Validate the configuration
         validation::validate_config(&config)?;
         
+        Ok(config)
+    }
+}
+
+impl CentralConfig {
+    /// Load central configuration from the default location or environment variable
+    pub fn load() -> anyhow::Result<Self> {
+        let config_path = std::env::var("EZKVM_CONFIG")
+            .unwrap_or_else(|_| "/etc/ezkvm.yaml".to_string());
+        
+        if std::path::Path::new(&config_path).exists() {
+            Self::from_file(&config_path)
+        } else {
+            // Return default if file doesn't exist
+            Ok(Self::default())
+        }
+    }
+    
+    /// Load central configuration from a specific file
+    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        let config: CentralConfig = serde_yaml::from_str(&content)?;
         Ok(config)
     }
 }
