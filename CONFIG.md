@@ -8,11 +8,11 @@ ezkvm uses YAML configuration files to define virtual machines in a human-readab
 
 ## Central Configuration
 
-ezkvm supports a central configuration file (`/etc/ezkvm.yaml`) that stores global tool paths and directory locations. This allows VM configurations to be more concise by referencing central settings implicitly.
+ezkvm supports a central configuration file (`/etc/ezkvm/ezkvm.yaml` or the legacy `/etc/ezkvm.yaml`) that stores global tool paths and directory locations. This allows VM configurations to be more concise by referencing central settings implicitly.
 
 ### Loading Central Configuration
 
-- **Default location**: `/etc/ezkvm.yaml`
+- **Default locations**: `/etc/ezkvm/ezkvm.yaml`, then legacy `/etc/ezkvm.yaml`
 - **Environment override**: Set `EZKVM_CONFIG` to specify a custom path
 - **Fallback**: If the file doesn't exist, default values are used
 

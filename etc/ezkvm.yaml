@@ -1,0 +1,12 @@
+tools:
+  qemu: "/usr/bin/qemu-system-x86_64"
+  swtpm: "/usr/bin/swtpm"
+  remote_viewer: "/usr/bin/remote-viewer"
+
+locations:
+  #ovmf_dir: "/usr/share/OVMF"
+  ovmf_dir: "/usr/share/pve-edk2-firmware"
+  run_dir: "/var/run/ezkvm"
+  pid_dir: "/var/run/ezkvm/pids"
+  socket_dir: "/var/run/ezkvm/sockets"
+  log_dir: "/var/log/ezkvm"

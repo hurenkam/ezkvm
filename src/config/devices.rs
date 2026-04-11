@@ -36,6 +36,7 @@ impl From<DeviceConfig> for QemuArgs {
 impl From<DriveConfig> for QemuArgs {
     fn from(drive: DriveConfig) -> Self {
         let mut args = QemuArgs::new();
+        let has_path = !drive.path.trim().is_empty();
 
         let drive_node_id = format!("drive-{}", drive.id);
         let needs_attached_device = drive.controller.is_some()
@@ -48,7 +49,7 @@ impl From<DriveConfig> for QemuArgs {
         args.push_str("-drive");
 
         let mut drive_parts = Vec::new();
-        if !drive.path.is_empty() {
+        if has_path {
             drive_parts.push(format!("file={}", drive.path));
         }
 
@@ -62,30 +63,34 @@ impl From<DriveConfig> for QemuArgs {
             drive_parts.push(format!("if={}", drive.interface));
         }
 
-        drive_parts.push(format!("format={}", drive.format));
+        if has_path {
+            drive_parts.push(format!("format={}", drive.format));
+        }
 
         if drive.readonly {
             drive_parts.push("readonly=on".to_string());
         }
 
-        if drive.discard {
+        if has_path && drive.discard {
             drive_parts.push("discard=unmap".to_string());
         }
 
-        if drive.ssd {
+        if has_path && drive.ssd {
             drive_parts.push("ssd=on".to_string());
         }
 
-        if let Some(cache) = drive.cache.as_ref() {
+        if has_path {
+            if let Some(cache) = drive.cache.as_ref() {
             drive_parts.push(format!("cache={}", cache));
-        }
+            }
 
-        if let Some(aio) = drive.aio.as_ref() {
-            drive_parts.push(format!("aio={}", aio));
-        }
+            if let Some(aio) = drive.aio.as_ref() {
+                drive_parts.push(format!("aio={}", aio));
+            }
 
-        if let Some(detect_zeroes) = drive.detect_zeroes.as_ref() {
-            drive_parts.push(format!("detect-zeroes={}", detect_zeroes));
+            if let Some(detect_zeroes) = drive.detect_zeroes.as_ref() {
+                drive_parts.push(format!("detect-zeroes={}", detect_zeroes));
+            }
         }
 
         args.push(drive_parts.join(","));
@@ -319,6 +324,8 @@ mod tests {
         assert_eq!(args[0], "-drive");
         assert!(args[1].contains("if=none"));
         assert!(args[1].contains("media=cdrom"));
+        assert!(!args[1].contains("format="));
+        assert!(!args[1].contains("aio="));
         assert_eq!(args[2], "-device");
         assert!(args[3].contains("ide-cd,drive=drive-ide2,id=ide2"));
         assert!(args[3].contains(",bus=ide.1"));

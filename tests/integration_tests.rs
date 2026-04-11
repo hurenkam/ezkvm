@@ -111,6 +111,7 @@ system:
       #[test]
       fn test_wakiza_matches_key_proxmox_fragments() {
         let config = VmConfig::from_file("examples/wakiza.yaml").unwrap();
+        let has_cdrom = config.devices.drives.iter().any(|drive| drive.r#type == "cdrom");
         let manager = QemuManager::new(config, CentralConfig::default());
         let args = manager.build_command().unwrap();
         let generated = format!(
@@ -128,7 +129,6 @@ system:
           &["hda-duplex", "id=audiodev0-codec1", "bus=audiodev0.0", "cad=1", "audiodev=spice-backend0"],
           &["spice,id=spice-backend0"],
           &["virtio-balloon-pci", "id=balloon0", "bus=pci.0", "addr=0x3", "free-page-reporting=on"],
-          &["ide-cd", "drive=drive-ide2", "id=ide2", "bus=ide.1", "unit=0", "bootindex=101"],
           &["pvscsi", "id=scsihw0", "bus=pci.0", "addr=0x5"],
           &["scsi-hd", "drive=drive-scsi0", "id=scsi0", "bus=scsihw0.0", "scsi-id=0", "bootindex=100"],
           &["scsi-hd", "drive=drive-scsi1", "id=scsi1", "bus=scsihw0.0", "scsi-id=1"],
@@ -142,6 +142,15 @@ system:
 
         for group in expected_fragment_groups {
           for fragment in *group {
+            assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
+            assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
+          }
+        }
+
+        if has_cdrom {
+          let cdrom_fragments = ["ide-cd", "drive=drive-ide2", "id=ide2", "bus=ide.1", "unit=0", "bootindex=101"];
+
+          for fragment in cdrom_fragments {
             assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
             assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
           }

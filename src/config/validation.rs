@@ -218,6 +218,8 @@ fn validate_device_config(devices: &super::DeviceConfig) -> Result<()> {
 
 /// Validate drive configuration
 fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
+    let has_path = !drive.path.trim().is_empty();
+
     // Validate interface
     let valid_interfaces = ["virtio", "scsi", "ide", "nvme"];
     if !valid_interfaces.contains(&drive.interface.as_str()) {
@@ -289,9 +291,13 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
             return Err(anyhow!("Drive unit cannot exceed 3 for ide interfaces"));
         }
     }
+
+    if !has_path && drive.r#type != "cdrom" {
+        return Err(anyhow!("Drive path cannot be empty unless drive type is cdrom"));
+    }
     
     // Check if path exists (optional, but warn if not)
-    if !std::path::Path::new(&drive.path).exists() {
+    if has_path && !std::path::Path::new(&drive.path).exists() {
         eprintln!("Warning: Drive path '{}' does not exist", drive.path);
     }
     

@@ -117,8 +117,11 @@ impl QemuArgs {
                 // Add chardev for TPM emulator or external swtpm socket
                 let chardev_id = "tpmchar";
                 self.push_str("-chardev");
-                let server_mode = if external_swtpm { "off" } else { "on" };
-                let chardev_spec = format!("socket,id={},server={},wait=off,path={}", chardev_id, server_mode, socket_path);
+                let chardev_spec = if external_swtpm {
+                    format!("socket,id={},path={}", chardev_id, socket_path)
+                } else {
+                    format!("socket,id={},server=on,wait=off,path={}", chardev_id, socket_path)
+                };
                 self.push(chardev_spec);
 
                 // Add TPM device
@@ -433,12 +436,15 @@ impl QemuArgs {
         
         let socket_spec = match socket_type {
             "tcp" => {
-                // Default to localhost:4444 if no path specified
-                socket_path.map(|p| format!("tcp:{}", p)).unwrap_or_else(|| "tcp:127.0.0.1:4444".to_string())
+                // QEMU should listen for QMP connections rather than attempting to connect to a pre-existing peer.
+                socket_path
+                    .map(|p| format!("tcp:{},server=on,wait=off", p))
+                    .unwrap_or_else(|| "tcp:127.0.0.1:4444,server=on,wait=off".to_string())
             },
             _ => {
-                // Unix socket (default)
-                socket_path.map(|p| format!("unix:{}", p)).unwrap_or_else(|| "unix:/var/run/qemu-monitor.sock".to_string())
+                socket_path
+                    .map(|p| format!("unix:{},server=on,wait=off", p))
+                    .unwrap_or_else(|| "unix:/var/run/qemu-monitor.sock,server=on,wait=off".to_string())
             }
         };
         
@@ -666,6 +672,35 @@ mod tests {
         
         let built = args.build();
         assert_eq!(built, vec!["-drive", "file=/path/to/cd.iso,if=ide,format=raw,readonly=on"]);
+    }
+
+    #[test]
+    fn test_tpm_uses_server_mode_for_internal_emulator() {
+        let mut args = QemuArgs::new();
+        args.add_tpm("2.0", "emulator", "/tmp/tpm.sock", "tpm-tis", false);
+
+        let built = args.build();
+        assert_eq!(built[0], "-chardev");
+        assert_eq!(built[1], "socket,id=tpmchar,server=on,wait=off,path=/tmp/tpm.sock");
+    }
+
+    #[test]
+    fn test_tpm_omits_wait_for_external_swtpm_client_mode() {
+        let mut args = QemuArgs::new();
+        args.add_tpm("2.0", "emulator", "/tmp/tpm.sock", "tpm-tis", true);
+
+        let built = args.build();
+        assert_eq!(built[0], "-chardev");
+        assert_eq!(built[1], "socket,id=tpmchar,path=/tmp/tpm.sock");
+    }
+
+    #[test]
+    fn test_qmp_uses_listening_unix_socket() {
+        let mut args = QemuArgs::new();
+        args.add_qmp(Some("/tmp/qmp.sock"), "unix");
+
+        let built = args.build();
+        assert_eq!(built, vec!["-qmp", "unix:/tmp/qmp.sock,server=on,wait=off"]);
     }
 
     #[test]

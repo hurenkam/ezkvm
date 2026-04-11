@@ -99,6 +99,60 @@ devices:
     }
 
     #[test]
+    fn test_empty_cdrom_path_is_allowed() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "ide2"
+      path: ""
+      interface: "ide"
+      type: "cdrom"
+      format: "raw"
+      readonly: true
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.devices.drives[0].r#type, "cdrom");
+        assert!(config.devices.drives[0].path.is_empty());
+    }
+
+    #[test]
+    fn test_empty_disk_path_is_rejected() {
+        let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "disk0"
+      path: ""
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+"#;
+
+        let err = VmConfig::from_str(yaml).unwrap_err();
+        assert!(err.to_string().contains("Drive path cannot be empty unless drive type is cdrom"));
+    }
+
+    #[test]
     fn test_env_var_substitution() {
         unsafe {
             std::env::set_var("TEST_MEMORY", "4096");

@@ -3,9 +3,12 @@
 //! Provides the main CLI commands for managing virtual machines.
 
 use clap::{Parser, Subcommand};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use std::os::unix::net::UnixStream;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 /// ezkvm - Easy KVM virtual machine manager
 #[derive(Parser)]
@@ -247,6 +250,95 @@ fn ensure_run_dir(central_config: &crate::config::CentralConfig) -> Result<PathB
     Ok(run_dir)
 }
 
+fn ensure_socket_parent_dir(socket_path: &str, label: &str) -> Result<()> {
+    let parent = Path::new(socket_path)
+        .parent()
+        .ok_or_else(|| anyhow!("{} '{}' does not have a parent directory", label, socket_path))?;
+
+    std::fs::create_dir_all(parent)
+        .map_err(|err| anyhow!("failed to create parent directory for {} '{}': {}", label, socket_path, err))
+}
+
+fn wait_for_unix_socket(socket_path: &str, timeout: Duration, label: &str) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    let mut last_error = None;
+
+    while Instant::now() < deadline {
+        match UnixStream::connect(socket_path) {
+            Ok(stream) => {
+                drop(stream);
+                return Ok(());
+            }
+            Err(err) => {
+                last_error = Some(err);
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
+
+    match last_error {
+        Some(err) => Err(anyhow!("timed out waiting for {} '{}' to become ready: {}", label, socket_path, err)),
+        None => Err(anyhow!("timed out waiting for {} '{}' to become ready", label, socket_path)),
+    }
+}
+
+fn ensure_runtime_socket_dirs(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
+    if let Some(tpm) = &config.tpm {
+        if tpm.backend == "emulator" {
+            ensure_socket_parent_dir(&resolve_tpm_socket_path(config, central_config), "TPM socket")?;
+        }
+    }
+
+    if let Some(guest_agent) = &config.guest_agent {
+        if guest_agent.enabled {
+            if let Some(socket_path) = guest_agent.socket_path.as_deref() {
+                ensure_socket_parent_dir(socket_path, "guest agent socket")?;
+            }
+        }
+    }
+
+    if let Some(qmp) = &config.qmp {
+        if qmp.enabled {
+            if let crate::config::QmpSocketType::Unix = qmp.socket_type {
+                if let Some(socket_path) = qmp.socket_path.as_deref() {
+                    ensure_socket_parent_dir(socket_path, "QMP socket")?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct AuxiliaryLaunch {
+    label: &'static str,
+    program: String,
+    args: Vec<String>,
+}
+
+fn format_auxiliary_launch(launch: &AuxiliaryLaunch) -> String {
+    if launch.args.is_empty() {
+        launch.program.clone()
+    } else {
+        format!("{} {}", launch.program, launch.args.join(" "))
+    }
+}
+
+fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
+    let mut cmd = Command::new(&launch.program);
+    cmd.args(&launch.args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    cmd.spawn()
+        .map_err(|err| anyhow!("failed to start {} at '{}': {}", launch.label, launch.program, err))?;
+
+    println!("✓ Started {}", launch.label);
+    Ok(())
+}
+
 fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> String {
     if let Some(tpm) = &config.tpm {
         if let Some(state_path) = &tpm.state_path {
@@ -261,6 +353,41 @@ fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &cr
     "/var/run/qemu-server/tpm".to_string()
 }
 
+fn build_remote_viewer_launch(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Option<AuxiliaryLaunch> {
+    let spice = match &config.spice {
+        Some(spice) if spice.enabled => spice,
+        _ => return None,
+    };
+
+    let remote_viewer_path = central_config.tools.remote_viewer.as_ref()?;
+    let uri = format!("spice://{}:{}", spice.addr, spice.port);
+
+    Some(AuxiliaryLaunch {
+        label: "remote-viewer for SPICE session",
+        program: remote_viewer_path.clone(),
+        args: vec![uri],
+    })
+}
+
+fn build_looking_glass_launch(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<Option<AuxiliaryLaunch>> {
+    let ivshmem = match &config.ivshmem {
+        Some(ivshmem) if ivshmem.enabled => ivshmem,
+        _ => return Ok(None),
+    };
+
+    let looking_glass_path = match &central_config.tools.looking_glass {
+        Some(path) if !path.trim().is_empty() => path,
+        Some(_) => return Err(anyhow!("Looking Glass client path is empty")),
+        None => return Ok(None),
+    };
+
+    Ok(Some(AuxiliaryLaunch {
+        label: "Looking Glass client for ivshmem session",
+        program: looking_glass_path.clone(),
+        args: vec![format!("app:shmFile={}", ivshmem.mem_path)],
+    }))
+}
+
 fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
     let tpm = match &config.tpm {
         Some(tpm) if tpm.backend == "emulator" => tpm,
@@ -269,11 +396,12 @@ fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &
 
     let swtpm_path = match &central_config.tools.swtpm {
         Some(path) => path,
-        None => return Ok(()),
+        None => return Err(anyhow!("TPM emulator backend requires tools.swtpm to be configured in the central config")),
     };
 
     let run_dir = ensure_run_dir(central_config)?;
     let socket_path = resolve_tpm_socket_path(config, central_config);
+    ensure_socket_parent_dir(&socket_path, "TPM socket")?;
     let state_dir = run_dir.join("tpm-state");
     let ctrl_path = run_dir.join("swtpm-ctrl.sock");
 
@@ -296,6 +424,7 @@ fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &
     if let Err(err) = cmd.spawn() {
         println!("Warning: failed to start swtpm at '{}': {}", swtpm_path, err);
     } else {
+        wait_for_unix_socket(&socket_path, Duration::from_secs(3), "swtpm socket")?;
         println!("✓ Started swtpm emulator using socket {}", socket_path);
     }
 
@@ -303,53 +432,26 @@ fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &
 }
 
 fn spawn_remote_viewer(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
-    let spice = match &config.spice {
-        Some(spice) if spice.enabled => spice,
-        _ => return Ok(()),
-    };
-
-    let remote_viewer_path = match &central_config.tools.remote_viewer {
-        Some(path) => path,
-        None => return Ok(()),
-    };
-
-    let uri = format!("spice://{}:{}", spice.addr, spice.port);
-    let mut cmd = Command::new(remote_viewer_path);
-    cmd.arg(uri)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-
-    if let Err(err) = cmd.spawn() {
-        println!("Warning: failed to start remote-viewer at '{}': {}", remote_viewer_path, err);
-    } else {
-        println!("✓ Started remote-viewer for SPICE session");
+    if let Some(launch) = build_remote_viewer_launch(config, central_config) {
+        run_auxiliary_launch(&launch)?;
     }
 
     Ok(())
 }
 
 fn spawn_looking_glass(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
-    let _ivshmem = match &config.ivshmem {
-        Some(ivshmem) if ivshmem.enabled => ivshmem,
-        _ => return Ok(()),
+    let Some(launch) = build_looking_glass_launch(config, central_config)? else {
+        return Ok(());
     };
 
-    let looking_glass_path = match &central_config.tools.looking_glass {
-        Some(path) => path,
-        None => return Ok(()),
-    };
-
-    let mut cmd = Command::new(looking_glass_path);
-    cmd.stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-
-    if let Err(err) = cmd.spawn() {
-        println!("Warning: failed to start Looking Glass client at '{}': {}", looking_glass_path, err);
-    } else {
-        println!("✓ Started Looking Glass client for ivshmem session");
+    if !std::path::Path::new(&config.ivshmem.as_ref().unwrap().mem_path).exists() {
+        return Err(anyhow!(
+            "Looking Glass shared memory path '{}' does not exist",
+            config.ivshmem.as_ref().unwrap().mem_path
+        ));
     }
+
+    run_auxiliary_launch(&launch)?;
 
     Ok(())
 }
@@ -364,9 +466,13 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
     // Load central configuration
     let central_config = crate::config::CentralConfig::load()?;
     println!("✓ Central configuration loaded");
-    
-    // Optional service startup for TPM and viewer tools
-    start_swtpm_if_configured(&config, &central_config)?;
+
+    if !dry_run {
+        ensure_runtime_socket_dirs(&config, &central_config)?;
+
+        // Optional service startup for TPM and viewer tools
+        start_swtpm_if_configured(&config, &central_config)?;
+    }
 
     let central_config_clone = central_config.clone();
 
@@ -401,6 +507,21 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
         if let Some(log_file) = &log_file {
             println!("Log file: {}", log_file.display());
         }
+
+        if let Some(launch) = build_remote_viewer_launch(manager.config(), &central_config_clone) {
+            println!("Auxiliary launch (SPICE): {}", format_auxiliary_launch(&launch));
+        }
+
+        match build_looking_glass_launch(manager.config(), &central_config_clone) {
+            Ok(Some(launch)) => {
+                println!("Auxiliary launch (Looking Glass): {}", format_auxiliary_launch(&launch));
+                if !std::path::Path::new(&manager.config().ivshmem.as_ref().unwrap().mem_path).exists() {
+                    println!("Looking Glass note: shared memory path '{}' does not exist on this host", manager.config().ivshmem.as_ref().unwrap().mem_path);
+                }
+            }
+            Ok(None) => {}
+            Err(err) => println!("Looking Glass configuration error: {}", err),
+        }
         return Ok(());
     }
     
@@ -433,14 +554,22 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
         }
 
         // Launch post-start viewer clients when available
-        let _ = spawn_remote_viewer(manager.config(), &central_config_clone);
-        let _ = spawn_looking_glass(manager.config(), &central_config_clone);
+        if let Err(err) = spawn_remote_viewer(manager.config(), &central_config_clone) {
+            eprintln!("Warning: {}", err);
+        }
+        if let Err(err) = spawn_looking_glass(manager.config(), &central_config_clone) {
+            eprintln!("Warning: {}", err);
+        }
     } else {
         println!("Starting interactively...");
 
         // Launch viewer clients before interactive start so they can connect as soon as QEMU is ready
-        let _ = spawn_remote_viewer(manager.config(), &central_config_clone);
-        let _ = spawn_looking_glass(manager.config(), &central_config_clone);
+        if let Err(err) = spawn_remote_viewer(manager.config(), &central_config_clone) {
+            eprintln!("Warning: {}", err);
+        }
+        if let Err(err) = spawn_looking_glass(manager.config(), &central_config_clone) {
+            eprintln!("Warning: {}", err);
+        }
 
         let status = if let Some(log_file) = &log_file {
             println!("Logging QEMU output to {}", log_file.display());
@@ -792,3 +921,110 @@ async fn handle_network(cmd: NetworkCommands) -> Result<()> {
         }
     }
 }
+
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+
+                fn base_config() -> crate::config::VmConfig {
+                    crate::config::VmConfig::from_str(r#"
+            name: "test-vm"
+            backend: "qemu"
+
+            system:
+              architecture: "x86_64"
+              machine: "q35"
+              memory: 1024
+              vcpus: 1
+              cpu_model: "host"
+
+            ivshmem:
+              enabled: true
+              size: 128
+              id: "ivshmem0"
+              mem_path: "/dev/kvmfr0"
+            "#).unwrap()
+                }
+
+                #[test]
+                fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
+                    let config = base_config();
+                    let central_config = crate::config::CentralConfig {
+                        tools: crate::config::ToolsConfig {
+                            swtpm: None,
+                            remote_viewer: None,
+                            looking_glass: Some("looking-glass-client".to_string()),
+                        },
+                        locations: crate::config::LocationsConfig::default(),
+                    };
+
+                    let launch = build_looking_glass_launch(&config, &central_config)
+                        .unwrap()
+                        .unwrap();
+
+                    assert_eq!(launch.program, "looking-glass-client");
+                    assert_eq!(launch.args, vec!["app:shmFile=/dev/kvmfr0"]);
+                }
+
+                #[test]
+                fn test_build_looking_glass_launch_returns_none_without_tool() {
+                    let config = base_config();
+                    let central_config = crate::config::CentralConfig::default();
+
+                    let launch = build_looking_glass_launch(&config, &central_config).unwrap();
+                    assert!(launch.is_none());
+                }
+
+                #[test]
+                fn test_build_looking_glass_launch_rejects_empty_tool_path() {
+                    let config = base_config();
+                    let central_config = crate::config::CentralConfig {
+                        tools: crate::config::ToolsConfig {
+                            swtpm: None,
+                            remote_viewer: None,
+                            looking_glass: Some("   ".to_string()),
+                        },
+                        locations: crate::config::LocationsConfig::default(),
+                    };
+
+                    let err = build_looking_glass_launch(&config, &central_config).unwrap_err();
+                    assert!(err.to_string().contains("Looking Glass client path is empty"));
+                }
+
+                                #[test]
+                                fn test_tpm_emulator_requires_swtpm_tool() {
+                                        let config = crate::config::VmConfig::from_str(r#"
+                        name: "test-vm"
+                        backend: "qemu"
+
+                        system:
+                            architecture: "x86_64"
+                            machine: "q35"
+                            memory: 1024
+                            vcpus: 1
+                            cpu_model: "host"
+
+                        tpm:
+                            version: "2.0"
+                            backend: "emulator"
+                            model: "tpm-tis"
+                        "#).unwrap();
+
+                                        let err = start_swtpm_if_configured(&config, &crate::config::CentralConfig::default()).unwrap_err();
+                                        assert!(err.to_string().contains("tools.swtpm"));
+                                }
+
+                #[test]
+                fn test_format_auxiliary_launch() {
+                    let launch = AuxiliaryLaunch {
+                        label: "Looking Glass client for ivshmem session",
+                        program: "looking-glass-client".to_string(),
+                        args: vec!["app:shmFile=/dev/kvmfr0".to_string()],
+                    };
+
+                    assert_eq!(
+                        format_auxiliary_launch(&launch),
+                        "looking-glass-client app:shmFile=/dev/kvmfr0"
+                    );
+                }
+            }

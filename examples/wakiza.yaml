@@ -212,3 +212,4 @@ audio_devices:
     bus: "audiodev0.0"
     cad: 1
     audiodev: "spice-backend0"
+  

@@ -60,6 +60,6 @@
 - [x] Add tests that verify display and serial config sections produce the expected QEMU arguments
 
 ### 10. Looking Glass Client Integration
-- [ ] Use `ivshmem` and central tool configuration to build real `looking-glass-client` arguments instead of only spawning the binary
-- [ ] Validate that auto-started Looking Glass sessions fail clearly when the shared-memory device or client binary is misconfigured
-- [ ] Add a dry-run or logging path for auxiliary tool startup so viewer-launch behavior can be verified without starting the VM
+- [x] Use `ivshmem` and central tool configuration to build real `looking-glass-client` arguments instead of only spawning the binary
+- [x] Validate that auto-started Looking Glass sessions fail clearly when the shared-memory device or client binary is misconfigured
+- [x] Add a dry-run or logging path for auxiliary tool startup so viewer-launch behavior can be verified without starting the VM

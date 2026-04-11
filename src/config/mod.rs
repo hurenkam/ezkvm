@@ -10,6 +10,11 @@ pub mod validation;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+const DEFAULT_CENTRAL_CONFIG_PATHS: &[&str] = &[
+    "/etc/ezkvm/ezkvm.yaml",
+    "/etc/ezkvm.yaml",
+];
+
 /// Central tool configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CentralConfig {
@@ -938,15 +943,21 @@ impl VmConfig {
 impl CentralConfig {
     /// Load central configuration from the default location or environment variable
     pub fn load() -> anyhow::Result<Self> {
-        let config_path = std::env::var("EZKVM_CONFIG")
-            .unwrap_or_else(|_| "/etc/ezkvm.yaml".to_string());
-        
-        if std::path::Path::new(&config_path).exists() {
-            Self::from_file(&config_path)
-        } else {
-            // Return default if file doesn't exist
-            Ok(Self::default())
+        if let Ok(config_path) = std::env::var("EZKVM_CONFIG") {
+            return if std::path::Path::new(&config_path).exists() {
+                Self::from_file(&config_path)
+            } else {
+                Ok(Self::default())
+            };
         }
+
+        for config_path in DEFAULT_CENTRAL_CONFIG_PATHS {
+            if std::path::Path::new(config_path).exists() {
+                return Self::from_file(config_path);
+            }
+        }
+
+        Ok(Self::default())
     }
     
     /// Load central configuration from a specific file
@@ -954,5 +965,48 @@ impl CentralConfig {
         let content = std::fs::read_to_string(path)?;
         let config: CentralConfig = serde_yaml::from_str(&content)?;
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_central_config_load_honors_env_override() {
+        let temp_path = std::env::temp_dir().join(format!(
+            "ezkvm-central-config-{}-{}.yaml",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        std::fs::write(
+            &temp_path,
+            "tools:\n  swtpm: \"/custom/swtpm\"\n",
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &temp_path);
+        }
+
+        let config = CentralConfig::load().unwrap();
+        assert_eq!(config.tools.swtpm.as_deref(), Some("/custom/swtpm"));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn test_default_central_config_search_order_prefers_directory_path() {
+        assert_eq!(
+            DEFAULT_CENTRAL_CONFIG_PATHS,
+            &["/etc/ezkvm/ezkvm.yaml", "/etc/ezkvm.yaml"]
+        );
     }
 }
