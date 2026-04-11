@@ -591,6 +591,24 @@ fn validate_ivshmem_config(ivshmem: &super::IvshmemConfig) -> Result<()> {
     if ivshmem.vectors == 0 || ivshmem.vectors > 32 {
         return Err(anyhow!("ivshmem vectors must be between 1 and 32"));
     }
+
+    if ivshmem.id.trim().is_empty() {
+        return Err(anyhow!("ivshmem id cannot be empty"));
+    }
+
+    if let Some(bus) = &ivshmem.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("ivshmem bus cannot be empty"));
+        }
+    }
+
+    if ivshmem.mem_path.trim().is_empty() {
+        return Err(anyhow!("ivshmem mem_path cannot be empty"));
+    }
+
+    if !ivshmem.mem_path.starts_with('/') {
+        return Err(anyhow!("ivshmem mem_path must be an absolute path"));
+    }
     
     Ok(())
 }

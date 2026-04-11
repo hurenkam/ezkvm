@@ -141,7 +141,13 @@ impl QemuManager {
         // Add ivshmem arguments
         if let Some(ivshmem) = &self.config.ivshmem {
             if ivshmem.enabled {
-                args.add_ivshmem(ivshmem.size, ivshmem.vectors, &ivshmem.id);
+                args.add_ivshmem(
+                    ivshmem.size,
+                    ivshmem.vectors,
+                    &ivshmem.id,
+                    ivshmem.bus.as_deref(),
+                    &ivshmem.mem_path,
+                );
             }
         }
         

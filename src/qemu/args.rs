@@ -290,13 +290,16 @@ impl QemuArgs {
     }
 
     /// Add Looking Glass shared memory device
-    pub fn add_ivshmem(&mut self, size_mib: u32, _vectors: u32, id: &str) {
+    pub fn add_ivshmem(&mut self, size_mib: u32, _vectors: u32, id: &str, bus: Option<&str>, mem_path: &str) {
         self.push_str("-device");
-        let size_bytes = size_mib * 1024 * 1024;
-        self.push(format!("ivshmem-plain,memdev=ivshmem,id={},size={}", id, size_bytes));
+        let mut device_spec = format!("ivshmem-plain,memdev={}", id);
+        if let Some(bus) = bus {
+            device_spec.push_str(&format!(",bus={}", bus));
+        }
+        self.push(device_spec);
 
         self.push_str("-object");
-        self.push(format!("memory-backend-file,id=ivshmem,share=on,mem-path=/dev/shm/looking-glass,size={}M", size_mib));
+        self.push(format!("memory-backend-file,id={},share=on,mem-path={},size={}M", id, mem_path, size_mib));
     }
 
     /// Add SCSI controller
@@ -655,5 +658,15 @@ mod tests {
         assert_eq!(keyboard_count, 1);
         assert!(built.iter().any(|arg| arg == "virtio-serial-pci,id=virtio-serial0"));
         assert!(built.iter().any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0"));
+    }
+
+    #[test]
+    fn test_ivshmem_bus_and_mem_path() {
+        let mut args = QemuArgs::new();
+        args.add_ivshmem(128, 1, "ivshmem0", Some("pcie.0"), "/dev/kvmfr0");
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0"));
+        assert!(built.iter().any(|arg| arg == "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M"));
     }
 }

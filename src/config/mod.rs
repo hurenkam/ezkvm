@@ -571,6 +571,13 @@ pub struct IvshmemConfig {
     /// Shared memory device ID
     #[serde(default = "default_ivshmem_id")]
     pub id: String,
+
+    /// Bus placement for the ivshmem device
+    pub bus: Option<String>,
+
+    /// Shared memory file path
+    #[serde(default = "default_ivshmem_mem_path")]
+    pub mem_path: String,
 }
 
 fn default_ivshmem_size() -> u32 {
@@ -583,6 +590,10 @@ fn default_ivshmem_vectors() -> u32 {
 
 fn default_ivshmem_id() -> String {
     "ivshmem0".to_string()
+}
+
+fn default_ivshmem_mem_path() -> String {
+    "/dev/kvmfr0".to_string()
 }
 
 /// SCSI controller configuration

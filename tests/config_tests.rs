@@ -454,4 +454,56 @@ input_devices:
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Duplicate input device type configured"));
     }
+
+    #[test]
+    fn test_config_with_ivshmem_bus_and_mem_path() {
+        let yaml = r#"
+name: "ivshmem-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+ivshmem:
+  enabled: true
+  size: 128
+  vectors: 1
+  id: "ivshmem0"
+  bus: "pcie.0"
+  mem_path: "/dev/kvmfr0"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        let ivshmem = config.ivshmem.as_ref().unwrap();
+        assert_eq!(ivshmem.id, "ivshmem0");
+        assert_eq!(ivshmem.bus.as_deref(), Some("pcie.0"));
+        assert_eq!(ivshmem.mem_path, "/dev/kvmfr0");
+    }
+
+    #[test]
+    fn test_ivshmem_mem_path_must_be_absolute() {
+        let yaml = r#"
+name: "ivshmem-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+ivshmem:
+  enabled: true
+  mem_path: "dev/kvmfr0"
+"#;
+
+        let result = VmConfig::from_str(yaml);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("ivshmem mem_path must be an absolute path"));
+    }
 }

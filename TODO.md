@@ -53,10 +53,10 @@
 - [ ] Keep existing USB validation, but add normalization/tests for the Proxmox `1-2.2` form
 
 ### 4. ivshmem And Looking Glass Parity
-- [ ] Extend `ivshmem` config to support `bus` placement and custom `mem_path`
-- [ ] Change the current default mem-path handling so `/dev/kvmfr0` can be emitted directly from config
-- [ ] Emit `ivshmem-plain` and `memory-backend-file` with Proxmox-like IDs and placement
-- [ ] Add tests verifying `bus=pcie.0` and `mem-path=/dev/kvmfr0`
+- [x] Extend `ivshmem` config to support `bus` placement and custom `mem_path`
+- [x] Change the current default mem-path handling so `/dev/kvmfr0` can be emitted directly from config
+- [x] Emit `ivshmem-plain` and `memory-backend-file` with Proxmox-like IDs and placement
+- [x] Add tests verifying `bus=pcie.0` and `mem-path=/dev/kvmfr0`
 
 ### 5. Non-VFIO Device Placement Parity
 - [ ] Add bus/address support for guest agent `virtio-serial`, balloon, SCSI controller, and other non-VFIO devices
