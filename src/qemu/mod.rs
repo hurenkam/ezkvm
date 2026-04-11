@@ -133,6 +133,10 @@ impl QemuManager {
                 }
             }
         }
+
+        for input_device in &self.config.input_devices {
+            args.add_input_device(&input_device.r#type);
+        }
         
         // Add ivshmem arguments
         if let Some(ivshmem) = &self.config.ivshmem {

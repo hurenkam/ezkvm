@@ -283,6 +283,12 @@ impl QemuArgs {
         self.push(device_spec);
     }
 
+    /// Add an input device
+    pub fn add_input_device(&mut self, device_type: &str) {
+        self.push_str("-device");
+        self.push(device_type.to_string());
+    }
+
     /// Add Looking Glass shared memory device
     pub fn add_ivshmem(&mut self, size_mib: u32, _vectors: u32, id: &str) {
         self.push_str("-device");
@@ -632,5 +638,22 @@ mod tests {
         assert!(built.iter().any(|arg| arg == "hda-micro,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0"));
         assert!(built.iter().any(|arg| arg == "hda-duplex,id=audiodev0-codec1,bus=audiodev0.0,cad=1,audiodev=spice-backend0"));
         assert!(!built.iter().any(|arg| arg.contains("spice-audio")));
+    }
+
+    #[test]
+    fn test_input_devices() {
+        let mut args = QemuArgs::new();
+        args.add_spice(5903, "0.0.0.0", true, true);
+        args.add_input_device("virtio-mouse");
+        args.add_input_device("virtio-keyboard");
+
+        let built = args.build();
+        let mouse_count = built.iter().filter(|arg| *arg == "virtio-mouse").count();
+        let keyboard_count = built.iter().filter(|arg| *arg == "virtio-keyboard").count();
+
+        assert_eq!(mouse_count, 1);
+        assert_eq!(keyboard_count, 1);
+        assert!(built.iter().any(|arg| arg == "virtio-serial-pci,id=virtio-serial0"));
+        assert!(built.iter().any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0"));
     }
 }

@@ -41,10 +41,10 @@
 - [x] Add validation and tests that compare emitted audio arguments against the Proxmox pattern
 
 ### 2. Real Input Device Support
-- [ ] Make `input_devices` a real parsed/validated config section instead of an inert top-level block
-- [ ] Emit `virtio-mouse` and `virtio-keyboard` only when configured
-- [ ] Ensure SPICE/vdagent setup and input-device emission work together without duplicate devices
-- [ ] Add tests for parsed input devices and emitted QEMU arguments
+- [x] Make `input_devices` a real parsed/validated config section instead of an inert top-level block
+- [x] Emit `virtio-mouse` and `virtio-keyboard` only when configured
+- [x] Ensure SPICE/vdagent setup and input-device emission work together without duplicate devices
+- [x] Add tests for parsed input devices and emitted QEMU arguments
 
 ### 3. XHCI And USB Parity
 - [ ] Extend the XHCI controller model to support `p2`, `p3`, `bus`, and `addr`

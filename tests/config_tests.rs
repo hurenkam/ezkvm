@@ -403,4 +403,55 @@ spice:
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("SPICE audio requires at least one configured audio device"));
     }
+
+    #[test]
+    fn test_config_with_input_devices() {
+        let yaml = r#"
+name: "input-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+spice:
+  enabled: true
+  vdagent: true
+
+input_devices:
+  - type: "virtio-mouse"
+  - type: "virtio-keyboard"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.input_devices.len(), 2);
+        assert_eq!(config.input_devices[0].r#type, "virtio-mouse");
+        assert_eq!(config.input_devices[1].r#type, "virtio-keyboard");
+    }
+
+    #[test]
+    fn test_duplicate_input_devices_are_rejected() {
+        let yaml = r#"
+name: "input-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+input_devices:
+  - type: "virtio-mouse"
+  - type: "virtio-mouse"
+"#;
+
+        let result = VmConfig::from_str(yaml);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Duplicate input device type configured"));
+    }
 }

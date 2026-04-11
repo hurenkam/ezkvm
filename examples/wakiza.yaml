@@ -88,7 +88,7 @@ devices:
     - type: "pty"
       port: 0
 
-# Add virtio-mouse and virtio-keyboard for SPICE (top-level)
+# Explicit SPICE input devices
 input_devices:
   - type: "virtio-mouse"
   - type: "virtio-keyboard"

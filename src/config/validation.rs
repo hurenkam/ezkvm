@@ -53,6 +53,9 @@ pub fn validate_config(config: &VmConfig) -> Result<()> {
 
     // Validate audio device configuration
     validate_audio_devices(&config.audio_devices, config.spice.as_ref())?;
+
+    // Validate input device configuration
+    validate_input_devices(&config.input_devices)?;
     
     // Validate ivshmem configuration
     if let Some(ivshmem) = &config.ivshmem {
@@ -546,6 +549,28 @@ fn validate_audio_devices(audio_devices: &[super::AudioDeviceConfig], spice: Opt
 
     if !has_controller {
         return Err(anyhow!("Audio device configuration requires an ich9-intel-hda controller"));
+    }
+
+    Ok(())
+}
+
+/// Validate input device configuration
+fn validate_input_devices(input_devices: &[super::InputDeviceConfig]) -> Result<()> {
+    let valid_types = ["virtio-mouse", "virtio-keyboard"];
+    let mut seen_types = std::collections::HashSet::new();
+
+    for input_device in input_devices {
+        if !valid_types.contains(&input_device.r#type.as_str()) {
+            return Err(anyhow!(
+                "Unsupported input device type: {}. Supported: {:?}",
+                input_device.r#type,
+                valid_types
+            ));
+        }
+
+        if !seen_types.insert(input_device.r#type.as_str()) {
+            return Err(anyhow!("Duplicate input device type configured: {}", input_device.r#type));
+        }
     }
 
     Ok(())

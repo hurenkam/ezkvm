@@ -98,6 +98,10 @@ pub struct VmConfig {
     /// Audio devices backed by the selected audio backend
     #[serde(default)]
     pub audio_devices: Vec<AudioDeviceConfig>,
+
+    /// Explicit input devices
+    #[serde(default)]
+    pub input_devices: Vec<InputDeviceConfig>,
     
     /// Looking Glass shared memory configuration
     #[serde(default)]
@@ -540,6 +544,13 @@ pub struct AudioDeviceConfig {
 
     /// Backend ID used by codec devices
     pub audiodev: Option<String>,
+}
+
+/// Input device configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InputDeviceConfig {
+    /// QEMU input device type
+    pub r#type: String,
 }
 
 /// Looking Glass shared memory configuration
