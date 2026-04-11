@@ -40,7 +40,7 @@ boot:
 
 devices:
   drives:
-    - id: "boot"
+    - id: "scsi0"
       path: "/dev/vm1/vm-108-boot"
       interface: "scsi"
       type: "disk"
@@ -51,8 +51,10 @@ devices:
       aio: "io_uring"
       detect_zeroes: "unmap"
       controller: "scsihw0"
+      scsi_id: 0
+      boot_index: 100
 
-    - id: "tmp"
+    - id: "scsi1"
       path: "/dev/vm1/vm-108-tmp"
       interface: "scsi"
       type: "disk"
@@ -63,14 +65,18 @@ devices:
       aio: "io_uring"
       detect_zeroes: "unmap"
       controller: "scsihw0"
+      scsi_id: 1
 
-    - id: "cdrom"
+    - id: "ide2"
       path: ""  # Empty for CDROM
       interface: "ide"
       type: "cdrom"
       format: "raw"
       readonly: true
       aio: "io_uring"
+      bus: "ide.1"
+      unit: 0
+      boot_index: 101
 
   networks:
     - id: "net0"
@@ -103,12 +109,17 @@ tpm:
 guest_agent:
   enabled: true
   socket_path: "/var/run/qemu-server/108.qga"
+  bus: "pci.0"
+  addr: "0x8"
 
 # Memory ballooning
 ballooning:
   enabled: true
   free_page_reporting: true
   model: "virtio-balloon-pci"
+  id: "balloon0"
+  bus: "pci.0"
+  addr: "0x3"
 
 # Hardware passthrough for GPU
 hostpci:
@@ -142,6 +153,8 @@ usb_devices:
 scsi_controllers:
   - id: "scsihw0"
     type: "pvscsi"
+    bus: "pci.0"
+    addr: "0x5"
 
 # SPICE display server
 spice:

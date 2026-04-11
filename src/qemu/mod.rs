@@ -78,14 +78,25 @@ impl QemuManager {
         // Add guest agent arguments
         if let Some(guest_agent) = &self.config.guest_agent {
             if guest_agent.enabled {
-                args.add_guest_agent(guest_agent.socket_path.as_deref(), guest_agent.freeze_cpu);
+                args.add_guest_agent(
+                    guest_agent.socket_path.as_deref(),
+                    guest_agent.freeze_cpu,
+                    guest_agent.bus.as_deref(),
+                    guest_agent.addr.as_deref(),
+                );
             }
         }
         
         // Add ballooning arguments
         if let Some(ballooning) = &self.config.ballooning {
             if ballooning.enabled {
-                args.add_balloon(&ballooning.model, ballooning.free_page_reporting);
+                args.add_balloon(
+                    &ballooning.model,
+                    ballooning.free_page_reporting,
+                    ballooning.id.as_deref(),
+                    ballooning.bus.as_deref(),
+                    ballooning.addr.as_deref(),
+                );
             }
         }
         
@@ -171,7 +182,8 @@ impl QemuManager {
         // Add SCSI controller arguments
         for scsi_controller in &self.config.scsi_controllers {
             args.add_scsi_controller(&scsi_controller.id, &scsi_controller.r#type, 
-                                   scsi_controller.iothread.as_deref(), scsi_controller.max_targets);
+                                   scsi_controller.iothread.as_deref(), scsi_controller.max_targets,
+                                   scsi_controller.bus.as_deref(), scsi_controller.addr.as_deref());
         }
         
         // Add iSCSI disk arguments

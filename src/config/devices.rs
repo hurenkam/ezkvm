@@ -36,37 +36,90 @@ impl From<DeviceConfig> for QemuArgs {
 impl From<DriveConfig> for QemuArgs {
     fn from(drive: DriveConfig) -> Self {
         let mut args = QemuArgs::new();
-        
+
+        let drive_node_id = format!("drive-{}", drive.id);
+        let needs_attached_device = drive.controller.is_some()
+            || drive.boot_index.is_some()
+            || drive.scsi_id.is_some()
+            || drive.bus.is_some()
+            || drive.unit.is_some()
+            || drive.interface == "ide";
+
         args.push_str("-drive");
-        
-        let mut drive_spec = format!("file={},if={},format={}",
-                                   drive.path, drive.interface, drive.format);
-        
+
+        let mut drive_parts = Vec::new();
+        if !drive.path.is_empty() {
+            drive_parts.push(format!("file={}", drive.path));
+        }
+
+        if needs_attached_device {
+            drive_parts.push("if=none".to_string());
+            drive_parts.push(format!("id={}", drive_node_id));
+            if drive.r#type == "cdrom" {
+                drive_parts.push("media=cdrom".to_string());
+            }
+        } else {
+            drive_parts.push(format!("if={}", drive.interface));
+        }
+
+        drive_parts.push(format!("format={}", drive.format));
+
         if drive.readonly {
-            drive_spec.push_str(",readonly=on");
+            drive_parts.push("readonly=on".to_string());
         }
 
         if drive.discard {
-            drive_spec.push_str(",discard=unmap");
+            drive_parts.push("discard=unmap".to_string());
         }
 
         if drive.ssd {
-            drive_spec.push_str(",ssd=on");
+            drive_parts.push("ssd=on".to_string());
         }
 
-        if let Some(cache) = drive.cache {
-            drive_spec.push_str(&format!(",cache={}", cache));
+        if let Some(cache) = drive.cache.as_ref() {
+            drive_parts.push(format!("cache={}", cache));
         }
 
-        if let Some(aio) = drive.aio {
-            drive_spec.push_str(&format!(",aio={}", aio));
+        if let Some(aio) = drive.aio.as_ref() {
+            drive_parts.push(format!("aio={}", aio));
         }
 
-        if let Some(detect_zeroes) = drive.detect_zeroes {
-            drive_spec.push_str(&format!(",detect-zeroes={}", detect_zeroes));
+        if let Some(detect_zeroes) = drive.detect_zeroes.as_ref() {
+            drive_parts.push(format!("detect-zeroes={}", detect_zeroes));
         }
-        
-        args.push(drive_spec);
+
+        args.push(drive_parts.join(","));
+
+        if needs_attached_device {
+            args.push_str("-device");
+            let mut device_spec = match drive.interface.as_str() {
+                "scsi" => format!("{},drive={},id={}", if drive.r#type == "cdrom" { "scsi-cd" } else { "scsi-hd" }, drive_node_id, drive.id),
+                "ide" => format!("{},drive={},id={}", if drive.r#type == "cdrom" { "ide-cd" } else { "ide-hd" }, drive_node_id, drive.id),
+                "virtio" => format!("virtio-blk-pci,drive={},id={}", drive_node_id, drive.id),
+                "nvme" => format!("nvme,drive={},id={}", drive_node_id, drive.id),
+                _ => format!("{},drive={},id={}", drive.interface, drive_node_id, drive.id),
+            };
+
+            let attachment_bus = drive.bus.clone().or_else(|| drive.controller.as_ref().map(|controller| format!("{}.0", controller)));
+            if let Some(bus) = attachment_bus {
+                device_spec.push_str(&format!(",bus={}", bus));
+            }
+
+            if let Some(unit) = drive.unit {
+                device_spec.push_str(&format!(",unit={}", unit));
+            }
+
+            if let Some(scsi_id) = drive.scsi_id {
+                device_spec.push_str(&format!(",scsi-id={}", scsi_id));
+            }
+
+            if let Some(boot_index) = drive.boot_index {
+                device_spec.push_str(&format!(",bootindex={}", boot_index));
+            }
+
+            args.push(device_spec);
+        }
+
         args
     }
 }
@@ -180,6 +233,10 @@ mod tests {
             aio: Some("io_uring".to_string()),
             detect_zeroes: Some("unmap".to_string()),
             controller: None,
+            boot_index: None,
+            scsi_id: None,
+            bus: None,
+            unit: None,
         };
 
         let args = QemuArgs::from(drive).into_inner();
@@ -189,6 +246,70 @@ mod tests {
         assert!(args[1].contains(",cache=none"));
         assert!(args[1].contains(",aio=io_uring"));
         assert!(args[1].contains(",detect-zeroes=unmap"));
+    }
+
+    #[test]
+    fn test_scsi_drive_with_device_attachment_options() {
+        let drive = DriveConfig {
+            id: "scsi0".to_string(),
+            path: "/path/to/disk.raw".to_string(),
+            interface: "scsi".to_string(),
+            r#type: "disk".to_string(),
+            format: "raw".to_string(),
+            readonly: false,
+            discard: true,
+            ssd: false,
+            cache: Some("none".to_string()),
+            aio: Some("io_uring".to_string()),
+            detect_zeroes: Some("unmap".to_string()),
+            controller: Some("scsihw0".to_string()),
+            boot_index: Some(100),
+            scsi_id: Some(0),
+            bus: None,
+            unit: None,
+        };
+
+        let args = QemuArgs::from(drive).into_inner();
+        assert_eq!(args[0], "-drive");
+        assert!(args[1].contains("if=none"));
+        assert!(args[1].contains("id=drive-scsi0"));
+        assert_eq!(args[2], "-device");
+        assert!(args[3].contains("scsi-hd,drive=drive-scsi0,id=scsi0"));
+        assert!(args[3].contains(",bus=scsihw0.0"));
+        assert!(args[3].contains(",scsi-id=0"));
+        assert!(args[3].contains(",bootindex=100"));
+    }
+
+    #[test]
+    fn test_ide_cdrom_with_bus_and_unit() {
+        let drive = DriveConfig {
+            id: "ide2".to_string(),
+            path: "".to_string(),
+            interface: "ide".to_string(),
+            r#type: "cdrom".to_string(),
+            format: "raw".to_string(),
+            readonly: true,
+            discard: false,
+            ssd: false,
+            cache: None,
+            aio: Some("io_uring".to_string()),
+            detect_zeroes: None,
+            controller: None,
+            boot_index: Some(101),
+            scsi_id: None,
+            bus: Some("ide.1".to_string()),
+            unit: Some(0),
+        };
+
+        let args = QemuArgs::from(drive).into_inner();
+        assert_eq!(args[0], "-drive");
+        assert!(args[1].contains("if=none"));
+        assert!(args[1].contains("media=cdrom"));
+        assert_eq!(args[2], "-device");
+        assert!(args[3].contains("ide-cd,drive=drive-ide2,id=ide2"));
+        assert!(args[3].contains(",bus=ide.1"));
+        assert!(args[3].contains(",unit=0"));
+        assert!(args[3].contains(",bootindex=101"));
     }
 
     #[test]

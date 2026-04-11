@@ -1,7 +1,8 @@
 //! Integration tests for ezkvm functionality
 
 use std::fs;
-use ezkvm::config::VmConfig;
+use ezkvm::config::{CentralConfig, VmConfig};
+use ezkvm::qemu::QemuManager;
 
 #[cfg(test)]
 mod tests {
@@ -106,4 +107,44 @@ system:
         assert_eq!(config.options.enable_kvm, true); // default_true
         assert_eq!(config.options.daemonize, false);
     }
+
+      #[test]
+      fn test_wakiza_matches_key_proxmox_fragments() {
+        let config = VmConfig::from_file("examples/wakiza.yaml").unwrap();
+        let manager = QemuManager::new(config, CentralConfig::default());
+        let args = manager.build_command().unwrap();
+        let generated = format!(
+          "{} {}",
+          manager.binary_name(),
+          args.iter().map(|arg| arg.as_str()).collect::<Vec<_>>().join(" ")
+        );
+
+        let proxmox_cmd = include_str!("../input/wakiza/108.cmd");
+        let expected_fragment_groups: &[&[&str]] = &[
+          &["qemu-xhci", "id=xhci", "p2=15", "p3=15", "bus=pci.1", "addr=0x1b"],
+          &["usb-host", "hostbus=1", "hostport=2.2", "id=usb0", "bus=xhci.0", "port=1"],
+          &["ich9-intel-hda", "id=audiodev0", "bus=pci.2", "addr=0xc"],
+          &["hda-micro", "id=audiodev0-codec0", "bus=audiodev0.0", "cad=0", "audiodev=spice-backend0"],
+          &["hda-duplex", "id=audiodev0-codec1", "bus=audiodev0.0", "cad=1", "audiodev=spice-backend0"],
+          &["spice,id=spice-backend0"],
+          &["virtio-balloon-pci", "id=balloon0", "bus=pci.0", "addr=0x3", "free-page-reporting=on"],
+          &["ide-cd", "drive=drive-ide2", "id=ide2", "bus=ide.1", "unit=0", "bootindex=101"],
+          &["pvscsi", "id=scsihw0", "bus=pci.0", "addr=0x5"],
+          &["scsi-hd", "drive=drive-scsi0", "id=scsi0", "bus=scsihw0.0", "scsi-id=0", "bootindex=100"],
+          &["scsi-hd", "drive=drive-scsi1", "id=scsi1", "bus=scsihw0.0", "scsi-id=1"],
+          &["virtio-net-pci", "netdev=net0", "mac=BC:24:11:3A:21:B7", "bus=pci.0", "addr=0x12", "rx_queue_size=1024", "tx_queue_size=256", "bootindex=102"],
+          &["port=5903", "addr=0.0.0.0", "disable-ticketing=on"],
+          &["virtio-mouse"],
+          &["virtio-keyboard"],
+          &["ivshmem-plain", "memdev=ivshmem0", "bus=pcie.0"],
+          &["memory-backend-file", "id=ivshmem0", "share=on", "mem-path=/dev/kvmfr0", "size=128M"],
+        ];
+
+        for group in expected_fragment_groups {
+          for fragment in *group {
+            assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
+            assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
+          }
+        }
+      }
 }

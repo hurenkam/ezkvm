@@ -280,6 +280,18 @@ pub struct DriveConfig {
     
     /// SCSI controller to attach to (for SCSI drives)
     pub controller: Option<String>,
+
+    /// Boot index for firmware boot ordering
+    pub boot_index: Option<u32>,
+
+    /// SCSI target ID for attached SCSI devices
+    pub scsi_id: Option<u32>,
+
+    /// Explicit attachment bus for device-based drive emission
+    pub bus: Option<String>,
+
+    /// Unit number for IDE/SATA style drive placement
+    pub unit: Option<u32>,
 }
 
 /// Network configuration
@@ -429,6 +441,12 @@ pub struct GuestAgentConfig {
     /// Freeze CPU on suspend
     #[serde(default)]
     pub freeze_cpu: bool,
+
+    /// PCI/PCIe bus placement for the virtio-serial controller
+    pub bus: Option<String>,
+
+    /// Slot or function address on the selected bus
+    pub addr: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -449,6 +467,15 @@ pub struct BallooningConfig {
     /// Balloon device model
     #[serde(default = "default_balloon_model")]
     pub model: String,
+
+    /// Optional device identifier
+    pub id: Option<String>,
+
+    /// PCI/PCIe bus placement for the balloon device
+    pub bus: Option<String>,
+
+    /// Slot or function address on the selected bus
+    pub addr: Option<String>,
 }
 
 fn default_balloon_model() -> String {
@@ -643,6 +670,12 @@ pub struct ScsiControllerConfig {
     /// Maximum number of targets
     #[serde(default)]
     pub max_targets: Option<u32>,
+
+    /// PCI/PCIe bus placement for the controller
+    pub bus: Option<String>,
+
+    /// Slot or function address on the selected bus
+    pub addr: Option<String>,
 }
 
 fn default_scsi_controller_type() -> String {

@@ -59,15 +59,15 @@
 - [x] Add tests verifying `bus=pcie.0` and `mem-path=/dev/kvmfr0`
 
 ### 5. Non-VFIO Device Placement Parity
-- [ ] Add bus/address support for guest agent `virtio-serial`, balloon, SCSI controller, and other non-VFIO devices
-- [ ] Add per-drive attachment options for `bootindex`, `scsi-id`, controller bus placement, and CDROM unit/bus layout
-- [ ] Support richer drive emission where needed (`if=none` plus matching `-device` attachment) for closer Proxmox parity
+- [x] Add bus/address support for guest agent `virtio-serial`, balloon, SCSI controller, and other non-VFIO devices
+- [x] Add per-drive attachment options for `bootindex`, `scsi-id`, controller bus placement, and CDROM unit/bus layout
+- [x] Support richer drive emission where needed (`if=none` plus matching `-device` attachment) for closer Proxmox parity
 - [ ] Do not change VFIO bus/address mapping in this plan
 
 ### 6. Validation And Comparison Pass
-- [ ] Add targeted tests for each new config section and argument builder path
-- [ ] Add a regression test or fixture comparison against the key fragments from `input/wakiza/108.cmd`
-- [ ] Re-run `validate` and `start --dry-run` on `examples/wakiza.yaml` after each milestone
+- [x] Add targeted tests for each new config section and argument builder path
+- [x] Add a regression test or fixture comparison against the key fragments from `input/wakiza/108.cmd`
+- [x] Re-run `validate` and `start --dry-run` on `examples/wakiza.yaml` after each milestone
 
 ## Code Review Follow-Ups
 

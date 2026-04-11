@@ -566,4 +566,67 @@ usb_devices:
         let config = VmConfig::from_str(yaml).unwrap();
         assert_eq!(config.usb_devices[0].host, "1-2.2");
     }
+
+    #[test]
+    fn test_config_with_non_vfio_device_placement() {
+        let yaml = r#"
+name: "placement-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 4
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "scsi0"
+      path: "/dev/vm1/vm-108-boot"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      controller: "scsihw0"
+      scsi_id: 0
+      boot_index: 100
+    - id: "ide2"
+      path: ""
+      interface: "ide"
+      type: "cdrom"
+      format: "raw"
+      readonly: true
+      bus: "ide.1"
+      unit: 0
+      boot_index: 101
+
+guest_agent:
+  enabled: true
+  socket_path: "/var/run/qemu-server/108.qga"
+  bus: "pci.0"
+  addr: "0x8"
+
+ballooning:
+  enabled: true
+  model: "virtio-balloon-pci"
+  id: "balloon0"
+  bus: "pci.0"
+  addr: "0x3"
+
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+    bus: "pci.0"
+    addr: "0x5"
+"#;
+
+        let config = VmConfig::from_str(yaml).unwrap();
+        assert_eq!(config.devices.drives[0].scsi_id, Some(0));
+        assert_eq!(config.devices.drives[0].boot_index, Some(100));
+        assert_eq!(config.devices.drives[1].bus.as_deref(), Some("ide.1"));
+        assert_eq!(config.devices.drives[1].unit, Some(0));
+        assert_eq!(config.guest_agent.as_ref().unwrap().bus.as_deref(), Some("pci.0"));
+        assert_eq!(config.ballooning.as_ref().unwrap().addr.as_deref(), Some("0x3"));
+        assert_eq!(config.scsi_controllers[0].addr.as_deref(), Some("0x5"));
+    }
 }

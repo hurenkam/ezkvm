@@ -138,10 +138,17 @@ impl QemuArgs {
     }
 
     /// Add QEMU guest agent
-    pub fn add_guest_agent(&mut self, socket_path: Option<&str>, freeze_cpu: bool) {
+    pub fn add_guest_agent(&mut self, socket_path: Option<&str>, freeze_cpu: bool, bus: Option<&str>, addr: Option<&str>) {
         // Add virtio-serial device for guest agent
         self.push_str("-device");
-        self.push("virtio-serial-pci,id=virtio-serial0".to_string());
+        let mut serial_spec = "virtio-serial-pci,id=virtio-serial0".to_string();
+        if let Some(bus) = bus {
+            serial_spec.push_str(&format!(",bus={}", bus));
+        }
+        if let Some(addr) = addr {
+            serial_spec.push_str(&format!(",addr={}", addr));
+        }
+        self.push(serial_spec);
 
         // Add chardev for guest agent
         let chardev_id = "qga0";
@@ -160,9 +167,18 @@ impl QemuArgs {
     }
 
     /// Add memory ballooning device
-    pub fn add_balloon(&mut self, model: &str, free_page_reporting: bool) {
+    pub fn add_balloon(&mut self, model: &str, free_page_reporting: bool, id: Option<&str>, bus: Option<&str>, addr: Option<&str>) {
         self.push_str("-device");
         let mut balloon_spec = model.to_string();
+        if let Some(id) = id {
+            balloon_spec.push_str(&format!(",id={}", id));
+        }
+        if let Some(bus) = bus {
+            balloon_spec.push_str(&format!(",bus={}", bus));
+        }
+        if let Some(addr) = addr {
+            balloon_spec.push_str(&format!(",addr={}", addr));
+        }
         if free_page_reporting {
             balloon_spec.push_str(",free-page-reporting=on");
         }
@@ -326,7 +342,7 @@ impl QemuArgs {
     }
 
     /// Add SCSI controller
-    pub fn add_scsi_controller(&mut self, id: &str, controller_type: &str, iothread: Option<&str>, max_targets: Option<u32>) {
+    pub fn add_scsi_controller(&mut self, id: &str, controller_type: &str, iothread: Option<&str>, max_targets: Option<u32>, bus: Option<&str>, addr: Option<&str>) {
         self.push_str("-device");
         let mut controller_spec = format!("{},id={}", controller_type, id);
         
@@ -336,6 +352,14 @@ impl QemuArgs {
         
         if let Some(max_targets) = max_targets {
             controller_spec.push_str(&format!(",max_targets={}", max_targets));
+        }
+
+        if let Some(bus) = bus {
+            controller_spec.push_str(&format!(",bus={}", bus));
+        }
+
+        if let Some(addr) = addr {
+            controller_spec.push_str(&format!(",addr={}", addr));
         }
         
         self.push(controller_spec);
@@ -735,5 +759,32 @@ mod tests {
 
         let built = args.build();
         assert!(built.iter().any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1"));
+    }
+
+    #[test]
+    fn test_guest_agent_with_bus_and_addr() {
+        let mut args = QemuArgs::new();
+        args.add_guest_agent(Some("/var/run/qemu-server/108.qga"), false, Some("pci.0"), Some("0x8"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8"));
+    }
+
+    #[test]
+    fn test_balloon_with_bus_addr_and_id() {
+        let mut args = QemuArgs::new();
+        args.add_balloon("virtio-balloon-pci", true, Some("balloon0"), Some("pci.0"), Some("0x3"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x3,free-page-reporting=on"));
+    }
+
+    #[test]
+    fn test_scsi_controller_with_bus_and_addr() {
+        let mut args = QemuArgs::new();
+        args.add_scsi_controller("scsihw0", "pvscsi", None, None, Some("pci.0"), Some("0x5"));
+
+        let built = args.build();
+        assert!(built.iter().any(|arg| arg == "pvscsi,id=scsihw0,bus=pci.0,addr=0x5"));
     }
 }

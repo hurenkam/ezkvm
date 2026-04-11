@@ -254,6 +254,36 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
             return Err(anyhow!("Unsupported detect-zeroes mode: {}. Supported: {:?}", detect_zeroes, valid_detect_zeroes));
         }
     }
+
+    if let Some(boot_index) = drive.boot_index {
+        if boot_index == 0 {
+            return Err(anyhow!("Drive boot_index must be greater than 0"));
+        }
+    }
+
+    if let Some(scsi_id) = drive.scsi_id {
+        if drive.interface != "scsi" {
+            return Err(anyhow!("Drive scsi_id is only valid for scsi interfaces"));
+        }
+        if scsi_id > 255 {
+            return Err(anyhow!("Drive scsi_id cannot exceed 255"));
+        }
+    }
+
+    if let Some(bus) = &drive.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("Drive bus cannot be empty"));
+        }
+    }
+
+    if let Some(unit) = drive.unit {
+        if drive.interface != "ide" {
+            return Err(anyhow!("Drive unit is currently only supported for ide interfaces"));
+        }
+        if unit > 3 {
+            return Err(anyhow!("Drive unit cannot exceed 3 for ide interfaces"));
+        }
+    }
     
     // Check if path exists (optional, but warn if not)
     if !std::path::Path::new(&drive.path).exists() {
@@ -384,6 +414,18 @@ fn validate_tpm_config(tpm: &super::TpmConfig) -> Result<()> {
 fn validate_guest_agent_config(_guest_agent: &super::GuestAgentConfig) -> Result<()> {
     // Basic validation - guest agent config is mostly boolean flags
     // Could add socket path validation if needed
+    if let Some(bus) = &_guest_agent.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("Guest agent bus cannot be empty"));
+        }
+    }
+
+    if let Some(addr) = &_guest_agent.addr {
+        if addr.trim().is_empty() {
+            return Err(anyhow!("Guest agent address cannot be empty"));
+        }
+    }
+
     Ok(())
 }
 
@@ -438,6 +480,24 @@ fn validate_ballooning_config(ballooning: &super::BallooningConfig) -> Result<()
     if !valid_models.contains(&ballooning.model.as_str()) {
         return Err(anyhow!("Unsupported balloon model: {}. Supported: {:?}", 
                           ballooning.model, valid_models));
+    }
+
+    if let Some(id) = &ballooning.id {
+        if id.trim().is_empty() {
+            return Err(anyhow!("Balloon device id cannot be empty"));
+        }
+    }
+
+    if let Some(bus) = &ballooning.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("Balloon device bus cannot be empty"));
+        }
+    }
+
+    if let Some(addr) = &ballooning.addr {
+        if addr.trim().is_empty() {
+            return Err(anyhow!("Balloon device address cannot be empty"));
+        }
     }
     
     Ok(())
@@ -678,6 +738,18 @@ fn validate_scsi_controller_config(scsi_controller: &super::ScsiControllerConfig
     if let Some(max_targets) = scsi_controller.max_targets {
         if max_targets == 0 || max_targets > 256 {
             return Err(anyhow!("max_targets must be between 1 and 256"));
+        }
+    }
+
+    if let Some(bus) = &scsi_controller.bus {
+        if bus.trim().is_empty() {
+            return Err(anyhow!("SCSI controller bus cannot be empty"));
+        }
+    }
+
+    if let Some(addr) = &scsi_controller.addr {
+        if addr.trim().is_empty() {
+            return Err(anyhow!("SCSI controller addr cannot be empty"));
         }
     }
     
