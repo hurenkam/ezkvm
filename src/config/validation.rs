@@ -224,10 +224,12 @@ fn validate_network_config(network: &super::NetworkConfig) -> Result<()> {
     }
     
     // Validate mode
-    let valid_modes = ["user", "bridge", "socket", "tap"];
-    if !valid_modes.contains(&network.mode.as_str()) {
-        return Err(anyhow!("Unsupported network mode: {}. Supported: {:?}", 
-                          network.mode, valid_modes));
+    let valid_mode_prefixes = ["user", "bridge", "socket", "tap"];
+    let mode_valid = valid_mode_prefixes.iter()
+        .any(|prefix| network.mode.starts_with(prefix));
+    if !mode_valid {
+        return Err(anyhow!("Unsupported network mode: {}. Must start with one of: {:?}", 
+                          network.mode, valid_mode_prefixes));
     }
     
     // Validate MAC address format if provided
@@ -243,7 +245,7 @@ fn validate_network_config(network: &super::NetworkConfig) -> Result<()> {
 /// Validate display configuration
 fn validate_display_config(display: &super::DisplayConfig) -> Result<()> {
     // Validate type
-    let valid_types = ["virtio-gpu", "qxl", "cirrus", "vga", "vmware-svga"];
+    let valid_types = ["virtio-gpu", "qxl", "cirrus", "vga", "vmware-svga", "none"];
     if !valid_types.contains(&display.r#type.as_str()) {
         return Err(anyhow!("Unsupported display type: {}. Supported: {:?}", 
                           display.r#type, valid_types));
@@ -377,7 +379,8 @@ fn validate_ivshmem_config(ivshmem: &super::IvshmemConfig) -> Result<()> {
         return Err(anyhow!("ivshmem size cannot exceed 1024 MiB"));
     }
     
-    // Validate vectors (reasonable bounds)
+    // Validate vectors (reasonable bounds)  run_dir: "/var/run/ezkvm"
+
     if ivshmem.vectors == 0 || ivshmem.vectors > 32 {
         return Err(anyhow!("ivshmem vectors must be between 1 and 32"));
     }
@@ -529,11 +532,9 @@ fn is_valid_pci_address(addr: &str) -> bool {
         return false;
     }
     
-    // All parts should be valid hex
-    for part in &parts[0..2] {
-        if part.len() != 4 || u16::from_str_radix(part, 16).is_err() {
-            return false;
-        }
+    // Domain should be 4 chars, bus should be 2 chars
+    if parts[0].len() != 4 || parts[1].len() != 2 {
+        return false;
     }
     
     // Bus/slot should be 2 chars, function should be 1 char
@@ -541,6 +542,9 @@ fn is_valid_pci_address(addr: &str) -> bool {
         return false;
     }
     
+    // All parts should be valid hex
+    u16::from_str_radix(parts[0], 16).is_ok() &&
+    u8::from_str_radix(parts[1], 16).is_ok() &&
     u8::from_str_radix(bus_slot_func[0], 16).is_ok() && 
     u8::from_str_radix(bus_slot_func[1], 16).is_ok()
 }
