@@ -1,0 +1,59 @@
+# Windows 11 VM configuration split into reusable profiles.
+# Use with: EZKVM_CONFIG=examples/ezkvm-profiles.yaml
+name: "wakiza"
+backend: "qemu"
+
+profiles:
+  - "windows_11_base"
+  - "proxmox_q35_topology"
+  - "spice_looking_glass"
+  - "gpu_passthrough"
+  - "storage_network_defaults"
+
+system:
+  memory: 16384          # 16 GiB
+  vcpus: 8
+
+boot:
+  uefi_vars: "/dev/vm1/vm-108-efidisk"
+
+devices:
+  drives:
+    - id: "scsi0"
+      path: "/dev/vm1/vm-108-boot"
+
+    - id: "scsi1"
+      path: "/dev/vm1/vm-108-tmp"
+
+    - id: "ide2"
+      path: ""  # Empty for CDROM
+
+  networks:
+    - id: "net0"
+      mode: "tap,ifname=tap108i0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on"
+      mac: "BC:24:11:3A:21:B7"
+
+# TPM configuration
+tpm:
+  state_path: "/var/run/qemu-server/108.swtpm"
+  state_backend_uri: "file:///dev/vm1/vm-108-tpmstate"
+
+# Guest agent
+guest_agent:
+  socket_path: "/var/run/qemu-server/108.qga"
+
+# SMBIOS system information
+smbios:
+  uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
+  vm_generation_id: "c13b46f3-9743-49f0-92e8-297b9feac497"
+
+# QMP monitoring
+qmp:
+  enabled: true
+  socket_path: "/var/run/qemu-server/108.qmp"
+
+options:
+  pid_file: "/tmp/ezkvm/wakiza.pid"
+  log_dir: "/tmp/ezkvm/logs"
+  log_keep: 5
+  

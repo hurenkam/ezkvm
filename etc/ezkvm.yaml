@@ -5,6 +5,8 @@ tools:
   looking_glass: "/usr/local/bin/looking-glass-client"
 
 locations:
+  vms_dir: "/etc/ezkvm/vms.d"
+  profile_dir: "/etc/ezkvm/profiles.d"
   #ovmf_dir: "/usr/share/OVMF"
   ovmf_dir: "/usr/share/pve-edk2-firmware"
   run_dir: "/var/run/ezkvm"

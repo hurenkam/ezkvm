@@ -1,0 +1,29 @@
+system:
+  machine_options:
+    - "hpet=off"
+  readconfig:
+    - "/usr/share/qemu-server/pve-q35-4.0.cfg"
+
+devices:
+  serials:
+    - type: "pty"
+      port: 0
+
+guest_agent:
+  enabled: true
+  bus: "pci.0"
+  addr: "0x8"
+
+ballooning:
+  enabled: true
+  free_page_reporting: true
+  model: "virtio-balloon-pci"
+  id: "balloon0"
+  bus: "pci.0"
+  addr: "0x3"
+
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+    bus: "pci.0"
+    addr: "0x5"

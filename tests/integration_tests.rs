@@ -116,6 +116,12 @@ system:
 
       #[test]
       fn test_wakiza_matches_key_proxmox_fragments() {
+        let _guard = env_lock().lock().unwrap();
+
+        unsafe {
+          std::env::set_var("EZKVM_CONFIG", "examples/ezkvm-profiles.yaml");
+        }
+
         let config = VmConfig::from_file("examples/wakiza.yaml").unwrap();
         let has_cdrom = config.devices.drives.iter().any(|drive| drive.r#type == "cdrom");
         let has_passthrough = config.hostpci.iter().any(|d| d.id.starts_with("hostpci0"));
@@ -193,6 +199,10 @@ system:
 
         let virtio_serial_controller_count = generated.matches("virtio-serial-pci").count();
         assert_eq!(virtio_serial_controller_count, 1, "Expected a single virtio-serial-pci controller in generated command\n{generated}");
+
+        unsafe {
+          std::env::remove_var("EZKVM_CONFIG");
+        }
       }
 
     #[test]

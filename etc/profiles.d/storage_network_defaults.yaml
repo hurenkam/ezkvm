@@ -1,0 +1,43 @@
+devices:
+  drives:
+    - id: "scsi0"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      readonly: false
+      discard: true
+      cache: "none"
+      aio: "io_uring"
+      detect_zeroes: "unmap"
+      controller: "scsihw0"
+      scsi_id: 0
+      boot_index: 100
+    - id: "scsi1"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      readonly: false
+      discard: true
+      cache: "none"
+      aio: "io_uring"
+      detect_zeroes: "unmap"
+      controller: "scsihw0"
+      scsi_id: 1
+    - id: "ide2"
+      interface: "ide"
+      type: "cdrom"
+      format: "raw"
+      readonly: true
+      aio: "io_uring"
+      bus: "ide.1"
+      unit: 0
+      boot_index: 101
+
+  networks:
+    - id: "net0"
+      model: "virtio-net-pci"
+      rx_queue_size: 1024
+      tx_queue_size: 256
+      boot_index: 102
+      bus: "pci.0"
+      addr: "0x12"
