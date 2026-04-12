@@ -395,7 +395,10 @@ fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
 }
 
 fn has_primary_passthrough_gpu(config: &crate::config::VmConfig) -> bool {
-    config.hostpci.iter().any(|device| device.x_vga)
+    config
+        .hostpci
+        .iter()
+        .any(|device| device.x_vga || device.id.starts_with("hostpci0"))
 }
 
 fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> String {
@@ -406,10 +409,10 @@ fn resolve_tpm_socket_path(config: &crate::config::VmConfig, central_config: &cr
     }
 
     if let Some(run_dir) = &central_config.locations.run_dir {
-        return format!("{}/tpm", run_dir);
+        return format!("{}/{}.swtpm", run_dir, config.name);
     }
 
-    "/var/run/qemu-server/tpm".to_string()
+    format!("/var/run/qemu-server/{}.swtpm", config.name)
 }
 
 fn build_remote_viewer_launch(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Option<AuxiliaryLaunch> {
@@ -435,6 +438,10 @@ fn build_remote_viewer_launch(config: &crate::config::VmConfig, central_config: 
 }
 
 fn build_looking_glass_launch(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<Option<AuxiliaryLaunch>> {
+    if !has_primary_passthrough_gpu(config) {
+        return Ok(None);
+    }
+
     let ivshmem = match &config.ivshmem {
         Some(ivshmem) if ivshmem.enabled => ivshmem,
         _ => return Ok(None),
@@ -498,20 +505,72 @@ fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &
     let run_dir = ensure_run_dir(central_config)?;
     let socket_path = resolve_tpm_socket_path(config, central_config);
     ensure_socket_parent_dir(&socket_path, "TPM socket")?;
-    let state_dir = run_dir.join("tpm-state");
-    let ctrl_path = run_dir.join("swtpm-ctrl.sock");
+    let pid_path = run_dir.join(format!("{}.swtpm.pid", config.name));
+    let log_path = run_dir.join(format!("{}-swtpm.log", config.name));
 
-    std::fs::create_dir_all(&state_dir)?;
+    // Prefer an explicit backend URI when provided.
+    // Otherwise use explicit state_dir, then fall back to the run-dir default.
+    let tpmstate_arg = if let Some(uri) = tpm.state_backend_uri.as_deref() {
+        let trimmed = uri.trim();
+        let normalized = if let Some(stripped) = trimmed.strip_prefix("file://dev/") {
+            format!("file:///dev/{}", stripped)
+        } else {
+            trimmed.to_string()
+        };
+        // Accept bare absolute paths and normalize them into file:// URIs.
+        let mut backend = if normalized.starts_with('/') {
+            format!("backend-uri=file://{}", normalized)
+        } else {
+            format!("backend-uri={}", normalized)
+        };
+        if !backend.contains(",mode=") {
+            backend.push_str(",mode=0600");
+        }
+        backend
+    } else {
+        let state_dir_path: std::path::PathBuf = if let Some(explicit) = tpm.state_dir.as_deref() {
+            explicit.into()
+        } else {
+            let default = run_dir.join("tpm-state");
+            std::fs::create_dir_all(&default)?;
+            default
+        };
+        format!("dir={}", state_dir_path.display())
+    };
 
     let mut cmd = Command::new(swtpm_path);
+    let mut rendered_cmd: Vec<String> = vec![swtpm_path.clone(), "socket".to_string()];
+
+    let tpm_flag = if tpm.version == "2.0" { "--tpm2" } else { "--tpm" };
+    let ctrl_arg = format!("type=unixio,path={},mode=0600", socket_path);
+    let pid_arg = format!("file={}", pid_path.display());
+    let log_arg = format!("file={},level=1", log_path.display());
+
+    rendered_cmd.push(tpm_flag.to_string());
+    rendered_cmd.push("--tpmstate".to_string());
+    rendered_cmd.push(tpmstate_arg.clone());
+    rendered_cmd.push("--ctrl".to_string());
+    rendered_cmd.push(ctrl_arg.clone());
+    rendered_cmd.push("--pid".to_string());
+    rendered_cmd.push(pid_arg.clone());
+    rendered_cmd.push("--terminate".to_string());
+    rendered_cmd.push("--log".to_string());
+    rendered_cmd.push(log_arg.clone());
+    rendered_cmd.push("--daemon".to_string());
+
+    println!("Launching swtpm: {}", rendered_cmd.join(" "));
+
     cmd.arg("socket")
-        .arg(if tpm.version == "2.0" { "--tpm2" } else { "--tpm" })
+        .arg(tpm_flag)
         .arg("--tpmstate")
-        .arg(format!("dir={}", state_dir.display()))
+        .arg(tpmstate_arg)
         .arg("--ctrl")
-        .arg(format!("type=unixio,path={}", ctrl_path.display()))
-        .arg("--server")
-        .arg(format!("type=unixio,path={}", socket_path))
+        .arg(ctrl_arg)
+        .arg("--pid")
+        .arg(pid_arg)
+        .arg("--terminate")
+        .arg("--log")
+        .arg(log_arg)
         .arg("--daemon")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1045,6 +1104,11 @@ system:
     vcpus: 1
     cpu_model: "host"
 
+hostpci:
+    - device: "0000:03:00.0"
+      id: "hostpci0"
+      x_vga: true
+
 ivshmem:
     enabled: true
     size: 128
@@ -1101,6 +1165,40 @@ spice:
                 fn test_build_looking_glass_launch_returns_none_without_tool() {
                     let config = base_config();
                     let central_config = crate::config::CentralConfig::default();
+
+                    let launch = build_looking_glass_launch(&config, &central_config).unwrap();
+                    assert!(launch.is_none());
+                }
+
+                #[test]
+                fn test_build_looking_glass_launch_returns_none_without_passthrough_gpu() {
+                    let config = crate::config::VmConfig::from_str(r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory: 1024
+    vcpus: 1
+    cpu_model: "host"
+
+ivshmem:
+    enabled: true
+    size: 128
+    id: "ivshmem0"
+    mem_path: "/dev/kvmfr0"
+                    "#).unwrap();
+
+                    let central_config = crate::config::CentralConfig {
+                        tools: crate::config::ToolsConfig {
+                            swtpm: None,
+                            remote_viewer: None,
+                            looking_glass: Some("looking-glass-client".to_string()),
+                        },
+                        locations: crate::config::LocationsConfig::default(),
+                        looking_glass: crate::config::LookingGlassOptions::default(),
+                    };
 
                     let launch = build_looking_glass_launch(&config, &central_config).unwrap();
                     assert!(launch.is_none());
@@ -1194,6 +1292,42 @@ spice:
               - device: "0000:03:00.0"
                 id: "hostpci0"
                 x_vga: true
+
+            spice:
+              enabled: true
+              port: 5903
+              addr: "0.0.0.0"
+            "#).unwrap();
+
+                    let central_config = crate::config::CentralConfig {
+                        tools: crate::config::ToolsConfig {
+                            swtpm: None,
+                            remote_viewer: Some("remote-viewer".to_string()),
+                            looking_glass: None,
+                        },
+                        locations: crate::config::LocationsConfig::default(),
+                        looking_glass: crate::config::LookingGlassOptions::default(),
+                    };
+
+                    assert!(build_remote_viewer_launch(&config, &central_config).is_none());
+                }
+
+                #[test]
+                fn test_remote_viewer_is_suppressed_for_hostpci0_without_x_vga() {
+                    let config = crate::config::VmConfig::from_str(r#"
+            name: "test-vm"
+            backend: "qemu"
+
+            system:
+              architecture: "x86_64"
+              machine: "q35"
+              memory: 1024
+              vcpus: 1
+              cpu_model: "host"
+
+            hostpci:
+              - device: "0000:03:00.0"
+                id: "hostpci0.0"
 
             spice:
               enabled: true

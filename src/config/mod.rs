@@ -190,6 +190,13 @@ pub struct SystemConfig {
     /// CPU-specific features
     #[serde(default)]
     pub cpu_features: Vec<CpuFeature>,
+    
+    /// Optional QEMU config file(s) to load via -readconfig.
+    /// Use this to supply machine topology files such as
+    /// /usr/share/qemu-server/pve-q35-4.0.cfg which define the
+    /// PCI/PCIe bridge buses (pci.0, pci.1, ich9-pcie-port-*, etc.)
+    #[serde(default)]
+    pub readconfig: Vec<String>,
 }
 
 /// CPU feature configuration
@@ -458,8 +465,22 @@ pub struct TpmConfig {
     /// TPM backend type (emulator or passthrough)
     pub backend: String,
     
-    /// Path to TPM state file (for emulator backend)
+    /// Path to TPM socket file (overrides the default run-dir path)
     pub state_path: Option<String>,
+
+    /// Directory containing swtpm state files.
+    /// When set, swtpm is invoked with --tpmstate dir=<state_dir> using this path
+    /// instead of the default empty run-dir subdirectory.
+    /// Use this to point at a mounted Proxmox TPM-state disk so Windows keeps its
+    /// existing BitLocker keys (e.g. mount /dev/vm1/vm-108-tpmstate → /mnt/tpmstate).
+    pub state_dir: Option<String>,
+
+    /// URI for swtpm state backend, passed as `--tpmstate backend-uri=<uri>`.
+    /// This can be used instead of mounting a TPM-state volume and configuring
+    /// `state_dir`.
+    /// Example: `file:///dev/vm1/vm-108-tpmstate`
+    #[serde(alias = "state_backend_url")]
+    pub state_backend_uri: Option<String>,
     
     /// Device model (tpm-tis or tpm-crb)
     #[serde(default = "default_tpm_model")]

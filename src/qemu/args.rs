@@ -214,14 +214,11 @@ impl QemuArgs {
     }
 
     /// Add VFIO-PCI device passthrough
-    pub fn add_vfio_pci(&mut self, device: &str, id: &str, pcie: bool, x_vga: bool, bus: Option<&str>, addr: Option<&str>, multifunction: bool, romfile: Option<&str>) {
+    pub fn add_vfio_pci(&mut self, device: &str, id: &str, _pcie: bool, x_vga: bool, bus: Option<&str>, addr: Option<&str>, multifunction: bool, romfile: Option<&str>) {
         self.push_str("-device");
         let mut vfio_spec = format!("vfio-pci,host={},id={}", device, id);
-        if pcie {
-            vfio_spec.push_str(",pcie=1");
-        }
         if x_vga {
-            vfio_spec.push_str(",x-vga=1");
+            vfio_spec.push_str(",x-vga=on");
         }
         if let Some(bus) = bus {
             vfio_spec.push_str(&format!(",bus={}", bus));
@@ -730,7 +727,7 @@ mod tests {
         assert_eq!(built[0], "-device");
         assert_eq!(
             built[1],
-            "vfio-pci,host=0000:03:00.0,id=hostpci0.0,pcie=1,x-vga=1,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on"
+            "vfio-pci,host=0000:03:00.0,id=hostpci0.0,x-vga=on,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on"
         );
     }
 

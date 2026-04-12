@@ -27,7 +27,10 @@ impl QemuManager {
     }
 
     fn has_primary_passthrough_gpu(&self) -> bool {
-        self.config.hostpci.iter().any(|device| device.x_vga)
+        self.config
+            .hostpci
+            .iter()
+            .any(|device| device.x_vga || device.id.starts_with("hostpci0"))
     }
 
     fn resolve_tpm_socket_path(&self) -> String {
@@ -38,10 +41,10 @@ impl QemuManager {
         }
 
         if let Some(run_dir) = &self.central_config.locations.run_dir {
-            return format!("{}/tpm", run_dir);
+            return format!("{}/{}.swtpm", run_dir, self.config.name);
         }
 
-        "/var/run/qemu-server/tpm".to_string()
+        format!("/var/run/qemu-server/{}.swtpm", self.config.name)
     }
 }
 
@@ -65,11 +68,25 @@ impl QemuManager {
         
         // Add system arguments
         args.extend(QemuArgs::from(self.config.system.clone()));
+
+        // Load readconfig files first — they must precede any device that
+        // references buses they create (pci.0, ich9-pcie-port-*, etc.)
+        for path in &self.config.system.readconfig {
+            args.push_str("-readconfig");
+            args.push(path.clone());
+        }
+
+        // Add SCSI controller arguments before any drives that reference them
+        for scsi_controller in &self.config.scsi_controllers {
+            args.add_scsi_controller(&scsi_controller.id, &scsi_controller.r#type,
+                                   scsi_controller.iothread.as_deref(), scsi_controller.max_targets,
+                                   scsi_controller.bus.as_deref(), scsi_controller.addr.as_deref());
+        }
         
         // Add device arguments
         args.extend(QemuArgs::from(self.config.devices.clone()));
         
-        // Add boot arguments
+                // Add boot arguments
         args.extend(self.build_boot_args());
         
         // Add TPM arguments
@@ -201,13 +218,6 @@ impl QemuManager {
                     &ivshmem.mem_path,
                 );
             }
-        }
-        
-        // Add SCSI controller arguments
-        for scsi_controller in &self.config.scsi_controllers {
-            args.add_scsi_controller(&scsi_controller.id, &scsi_controller.r#type, 
-                                   scsi_controller.iothread.as_deref(), scsi_controller.max_targets,
-                                   scsi_controller.bus.as_deref(), scsi_controller.addr.as_deref());
         }
         
         // Add iSCSI disk arguments
@@ -371,7 +381,6 @@ impl QemuManager {
 
         if self.has_primary_passthrough_gpu() {
             args.add_vga_none();
-            args.add_nographic();
         }
 
         for global in &self.config.options.global_options {

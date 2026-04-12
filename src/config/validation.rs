@@ -128,9 +128,13 @@ fn validate_system_config(system: &super::SystemConfig) -> Result<()> {
     }
     
     // Validate CPU features
+    // Features may be:
+    //   +flag / -flag  — enable/disable a standard x86 CPU flag
+    //   flag           — bare Hyper-V enlightenment (e.g. hv_ipi, hv_relaxed)
+    //   flag=value     — key=value form (e.g. hv_spinlocks=0x1fff, kvm=off)
     for feature in &system.cpu_features {
-        if !feature.name.starts_with('+') && !feature.name.starts_with('-') {
-            return Err(anyhow!("CPU feature '{}' must start with '+' or '-'", feature.name));
+        if feature.name.trim().is_empty() {
+            return Err(anyhow!("CPU feature name cannot be empty"));
         }
     }
 

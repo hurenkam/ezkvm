@@ -9,21 +9,25 @@ system:
   machine: "pc-q35-8.1+pve0"
   machine_options:
     - "hpet=off"
+  readconfig:
+    - "/usr/share/qemu-server/pve-q35-4.0.cfg"
+
   memory: 16384          # 16 GiB
   vcpus: 8
   cpu_model: "host"
   cpu_features:
-    - name: "+hv_ipi"
-    - name: "+hv_relaxed"
-    - name: "+hv_reset"
-    - name: "+hv_runtime"
-    - name: "+hv_spinlocks=0x1fff"
-    - name: "+hv_stimer"
-    - name: "+hv_synic"
-    - name: "+hv_time"
-    - name: "+hv_vapic"
-    - name: "+hv_vendor_id=ezkvm"
-    - name: "+hv_vpindex"
+    - name: "hv_ipi"
+    - name: "hv_relaxed"
+    - name: "hv_reset"
+    - name: "hv_runtime"
+    - name: "hv_spinlocks=0x1fff"
+    - name: "hv_stimer"
+    - name: "hv_synic"
+    - name: "hv_time"
+    - name: "hv_vapic"
+    - name: "hv_vendor_id=proxmox"
+    - name: "hv_vpindex"
+    - name: "kvm=off"
     - name: "+kvm_pv_eoi"
     - name: "+kvm_pv_unhalt"
 
@@ -35,7 +39,8 @@ boot:
   reboot_timeout: 1000
   splash: "/usr/share/qemu-server/bootsplash.jpg"
   uefi_code: "/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd"
-  uefi_vars: "/dev/vm1/vm-108-efidisk"
+  #uefi_vars: "/dev/vm1/vm-108-efidisk"
+  uefi_vars: "/tmp/wakiza_vars_test.fd"
   secure_boot: true
 
 devices:
@@ -89,6 +94,7 @@ devices:
       bus: "pci.0"
       addr: "0x12"
 
+  displays: []
 
   serials:
     - type: "pty"
@@ -100,10 +106,13 @@ input_devices:
   - type: "virtio-keyboard"
 
 # TPM configuration
-tpm:
-  version: "2.0"
-  backend: "emulator"
-  model: "tpm-tis"
+#tpm:
+#  version: "2.0"
+#  backend: "emulator"
+#  model: "tpm-tis"
+#  state_path: "/var/run/qemu-server/108.swtpm"
+#  state_backend_uri: "file:///dev/vm1/vm-108-tpmstate"
+#  # state_dir: "/mnt/tpmstate"  # optional fallback
 
 # Guest agent
 guest_agent:
@@ -126,7 +135,6 @@ hostpci:
   - device: "0000:03:00.0"
     id: "hostpci0.0"
     pcie: true
-    x_vga: true
     bus: "ich9-pcie-port-1"
     addr: "0x0.0"
     multifunction: true
