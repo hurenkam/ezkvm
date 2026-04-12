@@ -17,12 +17,12 @@
 ### Profiles Feature Plan
 
 #### Phase 1: Schema And Loader Wiring (MVP)
-- [ ] Add optional `profiles: Vec<String>` to VM config parsing input (without breaking existing files)
-- [ ] Add `locations.profile_dir: Option<String>` to central config
-- [ ] Use default profile directory `/etc/ezkvm/profiles.d` when `locations.profile_dir` is unset
-- [ ] Load VM YAML as raw value, then resolve and merge referenced profile files before `VmConfig` deserialization
-- [ ] Resolve profile names to files (for example `windows_11` -> `<profile_dir>/windows_11.yaml`)
-- [ ] Return clear errors for unknown profile names, missing files, unreadable files, or non-map YAML roots
+- [x] Add optional `profiles: Vec<String>` to VM config parsing input (without breaking existing files)
+- [x] Add `locations.profile_dir: Option<String>` to central config
+- [x] Use default profile directory `/etc/ezkvm/profiles.d` when `locations.profile_dir` is unset
+- [x] Load VM YAML as raw value, then resolve and merge referenced profile files before `VmConfig` deserialization
+- [x] Resolve profile names to files (for example `windows_11` -> `<profile_dir>/windows_11.yaml`)
+- [x] Return clear errors for unknown profile names, missing files, unreadable files, or non-map YAML roots
 
 #### Phase 2: Merge Semantics
 - [ ] Implement deterministic merge order: base -> profiles in listed order -> VM file

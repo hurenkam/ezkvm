@@ -15,6 +15,8 @@ const DEFAULT_CENTRAL_CONFIG_PATHS: &[&str] = &[
     "/etc/ezkvm.yaml",
 ];
 
+const DEFAULT_PROFILE_DIR: &str = "/etc/ezkvm/profiles.d";
+
 /// Central tool configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CentralConfig {
@@ -58,6 +60,9 @@ pub struct LocationsConfig {
     
     /// Directory for VM templates
     pub template_dir: Option<String>,
+
+    /// Directory containing reusable VM profile files
+    pub profile_dir: Option<String>,
 }
 
 /// Looking Glass client options
@@ -84,6 +89,11 @@ pub struct VmConfig {
     
     /// Backend to use (currently only "qemu" is supported)
     pub backend: String,
+
+    /// Optional list of profile names to layer before applying VM overrides.
+    /// Profile files are resolved from the configured profile directory.
+    #[serde(default)]
+    pub profiles: Vec<String>,
     
     /// System configuration (CPU, memory, etc.)
     pub system: SystemConfig,
@@ -915,12 +925,141 @@ impl VmConfig {
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let processed_content = Self::substitute_env_vars(&content)?;
-        let config: VmConfig = serde_yaml::from_str(&processed_content)?;
+        let vm_value: serde_yaml::Value = serde_yaml::from_str(&processed_content)?;
+        Self::ensure_yaml_mapping_root(&vm_value, "VM config")?;
+
+        let profile_names = Self::extract_profile_names(&vm_value)?;
+        let profile_dir = Self::resolve_profile_dir()?;
+
+        let mut merged_value = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
+        for profile_name in &profile_names {
+            let profile_value = Self::load_profile_value(&profile_dir, profile_name)?;
+            Self::merge_yaml_values(&mut merged_value, profile_value);
+        }
+        Self::merge_yaml_values(&mut merged_value, vm_value);
+
+        let config: VmConfig = serde_yaml::from_value(merged_value)?;
         
         // Validate the configuration
         validation::validate_config(&config)?;
         
         Ok(config)
+    }
+
+    fn resolve_profile_dir() -> anyhow::Result<String> {
+        let central_config = CentralConfig::load()?;
+        Ok(central_config
+            .locations
+            .profile_dir
+            .unwrap_or_else(|| DEFAULT_PROFILE_DIR.to_string()))
+    }
+
+    fn extract_profile_names(vm_value: &serde_yaml::Value) -> anyhow::Result<Vec<String>> {
+        let serde_yaml::Value::Mapping(vm_map) = vm_value else {
+            return Err(anyhow::anyhow!(
+                "VM config must be a YAML mapping/object at the root"
+            ));
+        };
+
+        let profiles_key = serde_yaml::Value::String("profiles".to_string());
+        let Some(profiles_value) = vm_map.get(&profiles_key) else {
+            return Ok(Vec::new());
+        };
+
+        match profiles_value {
+            serde_yaml::Value::Sequence(items) => {
+                let mut profile_names = Vec::with_capacity(items.len());
+                for item in items {
+                    match item {
+                        serde_yaml::Value::String(name) if !name.trim().is_empty() => {
+                            profile_names.push(name.to_string());
+                        }
+                        _ => {
+                            return Err(anyhow::anyhow!(
+                                "VM config field 'profiles' must contain non-empty string names"
+                            ));
+                        }
+                    }
+                }
+                Ok(profile_names)
+            }
+            serde_yaml::Value::Null => Ok(Vec::new()),
+            _ => Err(anyhow::anyhow!(
+                "VM config field 'profiles' must be a list of profile names"
+            )),
+        }
+    }
+
+    fn load_profile_value(profile_dir: &str, profile_name: &str) -> anyhow::Result<serde_yaml::Value> {
+        if profile_name.is_empty()
+            || !profile_name
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+        {
+            return Err(anyhow::anyhow!(
+                "Unknown profile name '{}': only [A-Za-z0-9_-] are allowed",
+                profile_name
+            ));
+        }
+
+        let profile_path = Path::new(profile_dir).join(format!("{}.yaml", profile_name));
+        if !profile_path.exists() {
+            return Err(anyhow::anyhow!(
+                "Unknown profile '{}': profile file not found at '{}'",
+                profile_name,
+                profile_path.display()
+            ));
+        }
+
+        let profile_content = std::fs::read_to_string(&profile_path).map_err(|err| {
+            anyhow::anyhow!(
+                "Failed to read profile '{}' from '{}': {}",
+                profile_name,
+                profile_path.display(),
+                err
+            )
+        })?;
+        let processed_content = Self::substitute_env_vars(&profile_content)?;
+        let profile_value: serde_yaml::Value = serde_yaml::from_str(&processed_content).map_err(|err| {
+            anyhow::anyhow!(
+                "Failed to parse profile '{}' from '{}': {}",
+                profile_name,
+                profile_path.display(),
+                err
+            )
+        })?;
+        Self::ensure_yaml_mapping_root(
+            &profile_value,
+            &format!("Profile '{}'", profile_name),
+        )?;
+        Ok(profile_value)
+    }
+
+    fn ensure_yaml_mapping_root(value: &serde_yaml::Value, context: &str) -> anyhow::Result<()> {
+        if !matches!(value, serde_yaml::Value::Mapping(_)) {
+            return Err(anyhow::anyhow!(
+                "{} must be a YAML mapping/object at the root",
+                context
+            ));
+        }
+        Ok(())
+    }
+
+    fn merge_yaml_values(base: &mut serde_yaml::Value, overlay: serde_yaml::Value) {
+        match (base, overlay) {
+            (serde_yaml::Value::Mapping(base_map), serde_yaml::Value::Mapping(overlay_map)) => {
+                for (key, overlay_value) in overlay_map {
+                    if let Some(base_value) = base_map.get_mut(&key) {
+                        Self::merge_yaml_values(base_value, overlay_value);
+                    } else {
+                        base_map.insert(key, overlay_value);
+                    }
+                }
+            }
+            (base_value, overlay_value) => {
+                *base_value = overlay_value;
+            }
+        }
     }
     
     /// Substitute environment variables in configuration content
@@ -1026,9 +1165,31 @@ impl CentralConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn unique_test_dir(prefix: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "{}-{}-{}",
+            prefix,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     #[test]
     fn test_central_config_load_honors_env_override() {
+        let _guard = env_lock().lock().unwrap();
+
         let temp_path = std::env::temp_dir().join(format!(
             "ezkvm-central-config-{}-{}.yaml",
             std::process::id(),
@@ -1063,5 +1224,191 @@ mod tests {
             DEFAULT_CENTRAL_CONFIG_PATHS,
             &["/etc/ezkvm/ezkvm.yaml", "/etc/ezkvm.yaml"]
         );
+    }
+
+    #[test]
+    fn test_vm_config_from_file_merges_profiles_from_profile_dir() {
+        let _guard = env_lock().lock().unwrap();
+
+        let root = unique_test_dir("ezkvm-profile-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("windows_11.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+boot:
+  firmware: "uefi"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("gpu_passthrough.yaml"),
+            r#"
+devices:
+  displays: []
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "test-vm"
+backend: "qemu"
+profiles:
+  - "windows_11"
+  - "gpu_passthrough"
+system:
+  memory: 8192
+  vcpus: 8
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.name, "test-vm");
+        assert_eq!(config.backend, "qemu");
+        assert_eq!(config.system.architecture, "x86_64");
+        assert_eq!(config.system.machine, "q35");
+        assert_eq!(config.system.cpu_model, "host");
+        assert_eq!(config.system.memory, 8192);
+        assert_eq!(config.system.vcpus, 8);
+        assert!(config.devices.displays.is_empty());
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_errors_on_missing_profile_file() {
+        let _guard = env_lock().lock().unwrap();
+
+        let root = unique_test_dir("ezkvm-profile-missing");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "test-vm"
+backend: "qemu"
+profiles:
+  - "does_not_exist"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let err = VmConfig::from_file(&vm_config_path).unwrap_err().to_string();
+        assert!(err.contains("Unknown profile 'does_not_exist'"));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_errors_on_non_mapping_profile_root() {
+        let _guard = env_lock().lock().unwrap();
+
+        let root = unique_test_dir("ezkvm-profile-nonmap");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("bad_profile.yaml"),
+            r#"
+- not
+- a
+- mapping
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "test-vm"
+backend: "qemu"
+profiles:
+  - "bad_profile"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let err = VmConfig::from_file(&vm_config_path).unwrap_err().to_string();
+        assert!(err.contains("must be a YAML mapping/object at the root"));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
     }
 }
