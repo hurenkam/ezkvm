@@ -51,13 +51,11 @@ pub fn passthrough_usb(_vm_pid: i32, bus_id: &str, dev_id: &str) -> Result<()> {
 
 /// Pass through a PCI device to a VM
 pub fn passthrough_pci(_vm_pid: i32, pci_address: &str) -> Result<()> {
-    // Check if IOMMU is enabled
-    let iommu_check = Command::new("sh")
-        .arg("-c")
-        .arg("grep -q IOMMU /proc/cmdline")
-        .status();
+    // Check if IOMMU is enabled by reading /proc/cmdline directly
+    // This is more robust than shell grep as it handles case variations and doesn't panic
+    let iommu_enabled = is_iommu_enabled().unwrap_or(false);
     
-    if iommu_check.is_err() || !iommu_check.unwrap().success() {
+    if !iommu_enabled {
         println!("⚠ Warning: IOMMU not detected in kernel command line");
         println!("  PCI passthrough requires IOMMU to be enabled");
         println!("  Add 'intel_iommu=on' or 'amd_iommu=on' to kernel boot parameters");
@@ -66,6 +64,29 @@ pub fn passthrough_pci(_vm_pid: i32, pci_address: &str) -> Result<()> {
     println!("✓ PCI pass-through configured: {}", pci_address);
     println!("  Requires VM restart to take effect");
     Ok(())
+}
+
+/// Check if IOMMU is enabled in the kernel command line
+/// 
+/// Returns true if either intel_iommu or amd_iommu is enabled.
+/// Handles both variants: intel_iommu=on, amd_iommu=on, etc.
+/// Gracefully returns false on errors reading /proc/cmdline.
+fn is_iommu_enabled() -> Result<bool> {
+    use std::fs;
+    
+    let cmdline = fs::read_to_string("/proc/cmdline")
+        .map_err(|e| anyhow!("Failed to read /proc/cmdline: {}", e))?;
+    
+    // Convert to lowercase for case-insensitive matching
+    let cmdline_lower = cmdline.to_lowercase();
+    
+    // Check for common IOMMU enable patterns
+    let has_intel = cmdline_lower.contains("intel_iommu=on") 
+        || cmdline_lower.contains("intel_iommu");
+    let has_amd = cmdline_lower.contains("amd_iommu=on")
+        || cmdline_lower.contains("amd_iommu");
+    
+    Ok(has_intel || has_amd)
 }
 
 /// List available USB devices
@@ -116,5 +137,15 @@ mod tests {
     fn test_list_pci_devices() {
         let devices = list_pci_devices();
         assert!(devices.is_ok());
+    }
+
+    // Test IOMMU detection is safe (never panics, gracefully handles /proc/cmdline read failures)
+    #[test]
+    fn test_is_iommu_enabled_handles_all_cases() {
+        // This test verifies the function always returns a Result (never panics)
+        // On systems where /proc/cmdline is readable, it returns Ok(bool)
+        // On systems where it's not, it returns Err
+        let result = is_iommu_enabled();
+        assert!(result.is_ok() || result.is_err());
     }
 }

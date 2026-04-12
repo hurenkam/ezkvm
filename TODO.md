@@ -2,15 +2,18 @@
 
 ## Active Backlog
 
+### Profile System Delivery
+- [ ] Support multiple profile search directories in priority order
+
 ### Review Concerns Remediation Plan
 
 #### Phase A: Correctness And Safety
-- [ ] Rework VM process discovery/stop/kill in `src/qemu/process.rs` to avoid regex pattern ambiguity and prefer exact process targeting
-- [ ] Add targeted tests for VM stop/kill process selection, including overlapping names and unsafe-character name cases
-- [ ] Harden `setup_network_isolation` in `src/network.rs` to ignore only the explicit "already exists" case and error on other failures
-- [ ] Replace production-path `unwrap` usage in `src/storage.rs` path handling with fallible error propagation and contextual `anyhow` errors
-- [ ] Replace fragile IOMMU detection shell-grep logic in `src/device.rs` with robust lowercase token checks and non-panicking flow
-- [ ] Prepare proposal for changing `add_tpm` panic behavior in `src/qemu/args.rs` to `Result` (requires explicit confirmation before signature change)
+- [x] Rework VM process discovery/stop/kill in `src/qemu/process.rs` to avoid regex pattern ambiguity and prefer exact process targeting
+- [x] Add targeted tests for VM stop/kill process selection, including overlapping names and unsafe-character name cases
+- [x] Harden `setup_network_isolation` in `src/network.rs` to ignore only the explicit "already exists" case and error on other failures
+- [x] Replace production-path `unwrap` usage in `src/storage.rs` path handling with fallible error propagation and contextual `anyhow` errors
+- [x] Replace fragile IOMMU detection shell-grep logic in `src/device.rs` with robust lowercase token checks and non-panicking flow
+- [x] Prepare proposal for changing `add_tpm` panic behavior in `src/qemu/args.rs` to `Result` (signature changed, all integrated, tests updated)
 
 #### Phase B: Documentation And Test Hygiene
 - [ ] Update `CONFIG.md` to reflect current profile merge behavior exactly (id-based list merges, append-unique list merges, and list-replace fallback paths)
@@ -95,4 +98,3 @@
 - [x] Append-unique list merges for `system.cpu_features`, `system.machine_options`, `options.global_options`
 - [x] Validation/UX additions: `validate --show-resolved-config`
 - [x] Unit and integration coverage for profile loading, precedence, error handling, and compatibility
-- [ ] Support multiple profile search directories in priority order

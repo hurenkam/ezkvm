@@ -43,7 +43,9 @@ pub fn create_qcow2(name: &str, size_gb: u32, backing_file: Option<&str>) -> Res
         cmd.args(&["-b", backing, "-F", "qcow2"]);
     }
     
-    cmd.args(&[disk_path.to_str().unwrap(), &size]);
+    let disk_path_str = disk_path.to_str()
+        .ok_or_else(|| anyhow!("Disk path contains invalid Unicode: {}", disk_path.display()))?;
+    cmd.args(&[disk_path_str, &size]);
     
     let output = cmd.output()
         .map_err(|e| anyhow!("Failed to run qemu-img: {}", e))?;
@@ -63,8 +65,11 @@ pub fn get_disk_info(disk_path: &Path) -> Result<DiskInfo> {
         return Err(anyhow!("Disk image not found: {}", disk_path.display()));
     }
     
+    let disk_path_str = disk_path.to_str()
+        .ok_or_else(|| anyhow!("Disk path contains invalid Unicode: {}", disk_path.display()))?;
+    
     let cmd = Command::new("qemu-img")
-        .args(&["info", "--output=json", disk_path.to_str().unwrap()])
+        .args(&["info", "--output=json", disk_path_str])
         .output()
         .map_err(|e| anyhow!("Failed to run qemu-img: {}", e))?;
     
@@ -112,16 +117,20 @@ pub fn create_snapshot(disk_path: &Path, snapshot_name: &str) -> Result<PathBuf>
         return Err(anyhow!("Disk image not found: {}", disk_path.display()));
     }
     
-    let snapshot_path = disk_path.with_file_name(
-        format!("{}-{}.qcow2", 
-            disk_path.file_stem().unwrap().to_str().unwrap(),
-            snapshot_name)
-    );
+    let file_stem = disk_path.file_stem()
+        .ok_or_else(|| anyhow!("Invalid disk path, cannot extract filename: {}", disk_path.display()))?
+        .to_str()
+        .ok_or_else(|| anyhow!("Disk filename contains invalid Unicode: {}", disk_path.display()))?;
+    
+    let snapshot_path = disk_path.with_file_name(format!("{}-{}.qcow2", file_stem, snapshot_name));
+    
+    let disk_path_str = disk_path.to_str()
+        .ok_or_else(|| anyhow!("Disk path contains invalid Unicode: {}", disk_path.display()))?;
+    let snapshot_path_str = snapshot_path.to_str()
+        .ok_or_else(|| anyhow!("Snapshot path contains invalid Unicode: {}", snapshot_path.display()))?;
     
     let cmd = Command::new("qemu-img")
-        .args(&["create", "-f", "qcow2", "-b", 
-                disk_path.to_str().unwrap(), "-F", "qcow2",
-                snapshot_path.to_str().unwrap()])
+        .args(&["create", "-f", "qcow2", "-b", disk_path_str, "-F", "qcow2", snapshot_path_str])
         .output()
         .map_err(|e| anyhow!("Failed to run qemu-img: {}", e))?;
     
@@ -167,9 +176,12 @@ pub fn resize_disk(disk_path: &Path, new_size_gb: u32) -> Result<()> {
         return Err(anyhow!("Disk image not found: {}", disk_path.display()));
     }
     
+    let disk_path_str = disk_path.to_str()
+        .ok_or_else(|| anyhow!("Disk path contains invalid Unicode: {}", disk_path.display()))?;
+    
     let size = format!("{}G", new_size_gb);
     let cmd = Command::new("qemu-img")
-        .args(&["resize", disk_path.to_str().unwrap(), &size])
+        .args(&["resize", disk_path_str, &size])
         .output()
         .map_err(|e| anyhow!("Failed to run qemu-img: {}", e))?;
     
@@ -192,9 +204,13 @@ pub fn convert_disk(source: &Path, dest: &Path, format: &str) -> Result<()> {
         return Err(anyhow!("Destination already exists: {}", dest.display()));
     }
     
+    let source_str = source.to_str()
+        .ok_or_else(|| anyhow!("Source path contains invalid Unicode: {}", source.display()))?;
+    let dest_str = dest.to_str()
+        .ok_or_else(|| anyhow!("Destination path contains invalid Unicode: {}", dest.display()))?;
+    
     let cmd = Command::new("qemu-img")
-        .args(&["convert", "-f", "qcow2", "-O", format, 
-                source.to_str().unwrap(), dest.to_str().unwrap()])
+        .args(&["convert", "-f", "qcow2", "-O", format, source_str, dest_str])
         .output()
         .map_err(|e| anyhow!("Failed to run qemu-img: {}", e))?;
     

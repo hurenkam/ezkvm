@@ -111,7 +111,10 @@ impl QemuArgs {
     }
 
     /// Add TPM device
-    pub fn add_tpm(&mut self, _version: &str, backend: &str, socket_path: &str, model: &str, external_swtpm: bool) {
+    ///
+    /// Returns an error if the backend is unsupported, rather than panicking.
+    /// Supported backends: "emulator", "passthrough"
+    pub fn add_tpm(&mut self, _version: &str, backend: &str, socket_path: &str, model: &str, external_swtpm: bool) -> Result<(), String> {
         match backend {
             "emulator" => {
                 // Add chardev for TPM emulator or external swtpm socket
@@ -132,12 +135,14 @@ impl QemuArgs {
                 self.push_str("-tpmdev");
                 self.push("passthrough,id=tpmdev".to_string());
             }
-            _ => panic!("Unsupported TPM backend: {}", backend),
+            _ => return Err(format!("Unsupported TPM backend: '{}'. Supported backends: 'emulator', 'passthrough'", backend)),
         }
 
         // Add TPM device
         self.push_str("-device");
         self.push(format!("{},tpmdev=tpmdev", model));
+        
+        Ok(())
     }
 
     /// Add QEMU guest agent
@@ -756,7 +761,8 @@ mod tests {
     #[test]
     fn test_tpm_uses_server_mode_for_internal_emulator() {
         let mut args = QemuArgs::new();
-        args.add_tpm("2.0", "emulator", "/tmp/tpm.sock", "tpm-tis", false);
+        let result = args.add_tpm("2.0", "emulator", "/tmp/tpm.sock", "tpm-tis", false);
+        assert!(result.is_ok());
 
         let built = args.build();
         assert_eq!(built[0], "-chardev");
@@ -766,11 +772,20 @@ mod tests {
     #[test]
     fn test_tpm_omits_wait_for_external_swtpm_client_mode() {
         let mut args = QemuArgs::new();
-        args.add_tpm("2.0", "emulator", "/tmp/tpm.sock", "tpm-tis", true);
+        let result = args.add_tpm("2.0", "emulator", "/tmp/tpm.sock", "tpm-tis", true);
+        assert!(result.is_ok());
 
         let built = args.build();
         assert_eq!(built[0], "-chardev");
         assert_eq!(built[1], "socket,id=tpmchar,path=/tmp/tpm.sock");
+    }
+
+    #[test]
+    fn test_tpm_rejects_unsupported_backend() {
+        let mut args = QemuArgs::new();
+        let result = args.add_tpm("2.0", "unsupported-backend", "/tmp/tpm.sock", "tpm-tis", false);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unsupported TPM backend"));
     }
 
     #[test]

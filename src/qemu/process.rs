@@ -6,31 +6,123 @@ use anyhow::{anyhow, Result};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use std::process::Command;
+use crate::state;
 
 /// Find QEMU processes by VM name
+///
+/// Uses PID-file-first strategy:
+/// 1. Try reading the saved PID file (most reliable)
+/// 2. Verify the PID is running and is a qemu-system process
+/// 3. Fall back to exact command-line matching if PID file lookup fails
+///
+/// This approach avoids regex pattern ambiguities that can match partial VM names.
 pub fn find_qemu_processes(vm_name: &str) -> Result<Vec<i32>> {
-    // Use pgrep to find processes with the specific name argument
-    let output = Command::new("pgrep")
-        .args(&["-f", &format!("qemu-system.*-name {}", vm_name)])
+    // Strategy 1: Try to read saved PID file
+    if let Ok(Some(pid)) = state::read_pid(vm_name) {
+        if is_process_alive(pid)? && is_qemu_process(pid, Some(vm_name))? {
+            return Ok(vec![pid]);
+        }
+        // PID file exists but process is not running or is not the right one
+        // Fall through to process lookup below
+    }
+
+    // Strategy 2: Fall back to exact command-line matching
+    // Find all qemu-system processes and check for exact -name match
+    find_qemu_processes_by_exact_name(vm_name)
+}
+
+/// Check if a process is still alive
+fn is_process_alive(pid: i32) -> Result<bool> {
+    let output = Command::new("ps")
+        .args(&["-p", &pid.to_string()])
         .output()
-        .map_err(|e| anyhow!("Failed to run pgrep: {}", e))?;
+        .map_err(|e| anyhow!("Failed to run ps: {}", e))?;
+
+    Ok(output.status.success())
+}
+
+/// Check if a process is a QEMU VM, optionally matching a specific VM name
+fn is_qemu_process(pid: i32, vm_name: Option<&str>) -> Result<bool> {
+    let cmd_line = get_process_cmdline(pid)?;
+    
+    if !cmd_line.contains("qemu-system") {
+        return Ok(false);
+    }
+
+    if let Some(name) = vm_name {
+        // Check for exact -name match to avoid partial matches
+        return Ok(contains_exact_qemu_name_arg(&cmd_line, name));
+    }
+
+    Ok(true)
+}
+
+/// Find QEMU processes by exact command-line name matching
+fn find_qemu_processes_by_exact_name(vm_name: &str) -> Result<Vec<i32>> {
+    // Get all processes
+    let output = Command::new("ps")
+        .args(&["aux"])
+        .output()
+        .map_err(|e| anyhow!("Failed to run ps aux: {}", e))?;
 
     if !output.status.success() {
-        // pgrep returns non-zero when no processes found
         return Ok(Vec::new());
     }
 
     let stdout = String::from_utf8(output.stdout)
-        .map_err(|e| anyhow!("Invalid UTF-8 in pgrep output: {}", e))?;
+        .map_err(|e| anyhow!("Invalid UTF-8 in ps output: {}", e))?;
 
     let mut pids = Vec::new();
     for line in stdout.lines() {
-        if let Ok(pid) = line.trim().parse::<i32>() {
-            pids.push(pid);
+        // Skip header line
+        if line.starts_with("USER") {
+            continue;
+        }
+
+        // Parse process line: USER PID CPU MEM VSZ RSS TT STAT START TIME COMMAND
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 11 {
+            continue;
+        }
+
+        // Extract PID (second column)
+        if let Ok(pid) = parts[1].parse::<i32>() {
+            // Extract command (everything from 10th column onward)
+            let cmd = parts[10..].join(" ");
+            
+            // Check if this is a qemu-system process with exact -name match
+            if cmd.contains("qemu-system") && contains_exact_qemu_name_arg(&cmd, vm_name) {
+                pids.push(pid);
+            }
         }
     }
 
     Ok(pids)
+}
+
+/// Check if a command line contains exact -name argument matching the VM name.
+/// This avoids matching partial names (e.g., "test-vm" should not match "test-vm-backup").
+fn contains_exact_qemu_name_arg(cmd_line: &str, vm_name: &str) -> bool {
+    // Check for exact -name match with different terminators (space, quote, tab, end of string)
+    // Pattern: space, then -name, then space, then the exact name, then terminator
+    
+    if cmd_line.contains(&format!(" -name {} ", vm_name)) {
+        return true;
+    }
+    if cmd_line.contains(&format!(" -name {}\"", vm_name)) {
+        return true;
+    }
+    if cmd_line.contains(&format!(" -name {}'", vm_name)) {
+        return true;
+    }
+    if cmd_line.contains(&format!(" -name {}\t", vm_name)) {
+        return true;
+    }
+    if cmd_line.ends_with(&format!(" -name {}", vm_name)) {
+        return true;
+    }
+
+    false
 }
 
 /// Send signal to a process
@@ -176,5 +268,58 @@ mod tests {
 
         let cmd2 = "qemu-system-x86_64 -machine type=q35";
         assert_eq!(extract_vm_name_from_cmd(cmd2), None);
+    }
+
+    #[test]
+    fn test_contains_exact_qemu_name_arg_exact_match() {
+        // Exact match with space after
+        assert!(contains_exact_qemu_name_arg(" -name test-vm ", "test-vm"));
+        
+        // Exact match at end of command
+        assert!(contains_exact_qemu_name_arg(" -name test-vm", "test-vm"));
+        
+        // Exact match with quote
+        assert!(contains_exact_qemu_name_arg(" -name test-vm\"", "test-vm"));
+    }
+
+    #[test]
+    fn test_contains_exact_qemu_name_arg_rejects_partial_match() {
+        // Should not match partial overlaps
+        assert!(!contains_exact_qemu_name_arg(" -name test-vm-production ", "test-vm"));
+        assert!(!contains_exact_qemu_name_arg(" -name test-vm-backup ", "test-vm"));
+        
+        // Should not match if name is substring but not exact
+        assert!(!contains_exact_qemu_name_arg(" -name prefix-test-vm ", "test-vm"));
+    }
+
+    #[test]
+    fn test_contains_exact_qemu_name_arg_overlapping_names() {
+        // Two similar names should not cross-match
+        let cmd_for_prod = " -name production-vm ";
+        let cmd_for_test = " -name test-vm ";
+        
+        assert!(contains_exact_qemu_name_arg(cmd_for_prod, "production-vm"));
+        assert!(!contains_exact_qemu_name_arg(cmd_for_prod, "test-vm"));
+        
+        assert!(contains_exact_qemu_name_arg(cmd_for_test, "test-vm"));
+        assert!(!contains_exact_qemu_name_arg(cmd_for_test, "production-vm"));
+    }
+
+    #[test]
+    fn test_contains_exact_qemu_name_arg_unsafe_characters() {
+        // VM names with underscores, numbers, dashes should work
+        assert!(contains_exact_qemu_name_arg(" -name my_vm_2024 ", "my_vm_2024"));
+        assert!(contains_exact_qemu_name_arg(" -name vm-01 ", "vm-01"));
+        
+        // Should not match if unsafe chars differ
+        assert!(!contains_exact_qemu_name_arg(" -name my_vm_2024 ", "my-vm-2024"));
+    }
+
+    #[test]
+    fn test_full_command_line_with_multiple_spaces() {
+        let cmd = "qemu-system-x86_64 -machine type=q35 -name test-vm -smp 4 -m 4096";
+        assert!(contains_exact_qemu_name_arg(cmd, "test-vm"));
+        assert!(!contains_exact_qemu_name_arg(cmd, "test"));
+        assert!(!contains_exact_qemu_name_arg(cmd, "vm"));
     }
 }

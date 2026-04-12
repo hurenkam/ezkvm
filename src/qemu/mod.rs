@@ -10,7 +10,7 @@ pub mod process;
 
 use crate::config::{VmConfig, CentralConfig};
 use crate::qemu::types::QemuArgs;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 /// Main QEMU manager
 pub struct QemuManager {
@@ -93,7 +93,8 @@ impl QemuManager {
         if let Some(tpm) = &self.config.tpm {
             let socket_path = self.resolve_tpm_socket_path();
             let external_swtpm = self.uses_external_swtpm();
-            args.add_tpm(&tpm.version, &tpm.backend, &socket_path, &tpm.model, external_swtpm);
+            args.add_tpm(&tpm.version, &tpm.backend, &socket_path, &tpm.model, external_swtpm)
+                .map_err(|e| anyhow!("Failed to configure TPM: {}", e))?;
         }
         
         // Add guest agent arguments

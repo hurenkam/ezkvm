@@ -192,17 +192,33 @@ pub fn setup_network_isolation(vm_name: &str, vlan_id: u16) -> Result<()> {
     // Create VLAN interface
     let cmd = Command::new("ip")
         .args(&["link", "add", "link", "eth0", "name", &vlan_name, "type", "vlan", "id", &vlan_id.to_string()])
-        .output();
-    
-    if cmd.is_ok() && !cmd.unwrap().status.success() {
-        // Interface might already exist, continue
+        .output()
+        .map_err(|e| anyhow!("Failed to execute ip link add command: {}", e))?;
+
+    // Check for specific "already exists" error vs. actual failures
+    if !cmd.status.success() {
+        let stderr = String::from_utf8_lossy(&cmd.stderr);
+        
+        // Only ignore the specific "File exists" error case
+        if !stderr.contains("File exists") && !stderr.contains("already exists") {
+            return Err(anyhow!("Failed to create VLAN interface '{}': {}", vlan_name, stderr));
+        }
+        
+        // If it's just "already exists", log and continue
+        eprintln!("ℹ VLAN interface '{}' already exists, proceeding with setup", vlan_name);
     }
     
     // Enable VLAN interface
-    Command::new("ip")
+    let enable_cmd = Command::new("ip")
         .args(&["link", "set", &vlan_name, "up"])
-        .output()?;
+        .output()
+        .map_err(|e| anyhow!("Failed to enable VLAN interface '{}': {}", vlan_name, e))?;
     
+    if !enable_cmd.status.success() {
+        let stderr = String::from_utf8_lossy(&enable_cmd.stderr);
+        return Err(anyhow!("Failed to bring up VLAN interface '{}': {}", vlan_name, stderr));
+    }
+
     println!("✓ Setup network isolation for VM '{}' on VLAN {}", vm_name, vlan_id);
     Ok(())
 }
