@@ -16,9 +16,9 @@
 - [x] Prepare proposal for changing `add_tpm` panic behavior in `src/qemu/args.rs` to `Result` (signature changed, all integrated, tests updated)
 
 #### Phase B: Documentation And Test Hygiene
-- [ ] Update `CONFIG.md` to reflect current profile merge behavior exactly (id-based list merges, append-unique list merges, and list-replace fallback paths)
-- [ ] Replace fixed `/tmp` test artifacts with unique temporary paths in integration/config tests
-- [ ] Apply consistent environment-variable locking strategy across tests that mutate process environment
+- [x] Update `CONFIG.md` to reflect current profile merge behavior exactly (id-based list merges, append-unique list merges, and list-replace fallback paths)
+- [x] Replace fixed `/tmp` test artifacts with unique temporary paths in integration/config tests
+- [x] Apply consistent environment-variable locking strategy across tests that mutate process environment
 
 #### Phase C: Quality Gate Cleanup
 - [ ] Make `cargo fmt --all --check` pass across repository

@@ -133,19 +133,109 @@ Name-to-file mapping:
 
 Profile files must use a YAML mapping/object at the root.
 
-### Profile Merge Semantics (MVP)
+### Profile Merge Semantics
 
 Merge order is deterministic:
 1. Empty base object
 2. Profiles in the exact order listed in `profiles`
 3. VM config file values
 
-Conflict handling:
-- Scalars: replace
-- Maps: deep merge
-- Lists: replace entirely
+Conflict handling is path-aware and type-specific:
 
-This means the VM file always has final precedence over profile content.
+#### Scalar Values
+All scalar values (strings, numbers, booleans) use **replace** semantics:
+- VM file value replaces profile value
+- Profile value replaces base value
+- Last write wins
+
+#### Maps (Objects)
+Maps use **deep merge** semantics:
+- Merges recursively at all nesting levels
+- Partial overlays are supported (only provided keys override)
+- Example: A profile can provide partial `system` config; the VM file can override only specific fields without replacing the entire map
+
+#### Lists (Sequences) - Path-Aware Behavior
+
+The merge strategy for lists depends on the path in the configuration:
+
+**ID-Based Merge** (for device and controller lists):
+- Used for: `devices.drives`, `devices.networks`, `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`
+- Matching: Items are matched by their `id` field
+- Behavior: 
+  - Existing items with matching `id` are patched (deep merge of fields)
+  - New items without `id` in base are appended
+  - Allows profiles to override specific drives/networks/devices while preserving others
+- Example: A profile can define a base set of drives, and the VM file can override specific drives by `id`
+
+**Append-Unique Merge** (for feature and option lists):
+- Used for: `system.cpu_features`, `system.machine_options`, `options.global_options`
+- Matching: Items are matched by value (or by `name` field for mappings)
+- Behavior:
+  - Duplicates are removed (preserving order)
+  - New unique items are appended
+  - Allows combining features from multiple profiles without duplication
+- Example: Profiles can contribute CPU features; the final list contains all unique features
+
+**Full Replace** (all other lists):
+- Default behavior for any list not matching the above paths
+- Behavior: The value from the last merge step (VM file > profile > base) completely replaces earlier values
+- Example: A list of "other_devices" from a profile is replaced entirely if the VM file provides its own list
+
+#### Example Merge Scenario
+
+```yaml
+# Base profile: windows_11_base.yaml
+system:
+  cpu_features: ["vmx", "sse4.1"]
+  machine_options: ["smm=on"]
+
+devices:
+  drives:
+    - id: "boot"
+      path: "/var/lib/boot.qcow2"
+    - id: "data"
+      path: "/var/lib/data.qcow2"
+
+---
+
+# Second profile: gpu_passthrough.yaml
+system:
+  cpu_features: ["vmx", "avx2"]  # Overlaps with base
+  
+devices:
+  drives:
+    - id: "boot"  # Patch: override path only
+      path: "/var/lib/custom-boot.qcow2"
+
+---
+
+# VM file: my-vm.yaml
+system:
+  cpu_features: ["sse4.1"]  # Should preserve "vmx", "avx2" from profiles via append-unique
+
+devices:
+  drives:
+    - id: "scratch"  # New drive, appended
+      path: "/var/lib/scratch.qcow2"
+
+---
+
+# Result after merge:
+system:
+  cpu_features: ["vmx", "sse4.1", "avx2"]  # Append-unique deduplicates and combines
+  machine_options: ["smm=on"]  # From first profile
+
+devices:
+  drives:
+    - id: "boot"  
+      path: "/var/lib/custom-boot.qcow2"  # VM override (patched by id)
+    - id: "data"
+      path: "/var/lib/data.qcow2"  # From base (not in VM or later profiles)
+    - id: "scratch"
+      path: "/var/lib/scratch.qcow2"  # New from VM (appended)
+```
+
+This means the VM file always has final precedence over profile content, and profiles can be combined in a composable way.
 
 ## System Configuration
 
@@ -188,7 +278,8 @@ The `system` section defines the core virtual machine hardware specifications.
   - `"qemu64"` - Basic x86_64 emulation
   - `"cortex-a72"` - ARM Cortex-A72 (for aarch64)
 - **Example**: `"host"`
-
+```
+```yaml
 ### `system.cpu_features` (optional)
 - **Type**: Array of objects
 - **Description**: CPU feature flags to enable/disable
@@ -197,7 +288,8 @@ The `system` section defines the core virtual machine hardware specifications.
 Each feature object has:
 - `name` (string): Feature specification (e.g., `"+vmx"`, `"-avx"`)
 
-**Example**:
+```
+```yaml
 ```yaml
 cpu_features:
   - name: "+vmx"    # Enable Intel VT-x
@@ -206,7 +298,8 @@ cpu_features:
 
 ## Boot Configuration
 
-The `boot` section controls how the virtual machine starts up.
+```
+**Result after merge:**
 
 ### `boot.firmware` (optional)
 - **Type**: String
@@ -221,6 +314,7 @@ The `boot` section controls how the virtual machine starts up.
 - **Allowed values**: `"disk"`, `"cdrom"`, `"network"`
 - **Default**: QEMU default order
 - **Example**: `["disk", "cdrom"]`
+This means the VM file always has final precedence over profile content, and profiles can be combined in a composable way.
 
 ### `boot.kernel` (optional)
 - **Type**: String
@@ -1082,6 +1176,8 @@ options:
 ```
 
 # Phase 3 Features - Display & Audio Protocols
+
+```yaml
 spice:
   enabled: true
   port: 5901

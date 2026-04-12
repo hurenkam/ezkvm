@@ -1976,9 +1976,13 @@ profiles:
             let profile_dir = root.join("profiles");
             std::fs::create_dir_all(&profile_dir).unwrap();
 
+            let root_disk = root.join("root.qcow2");
+            let data_disk = root.join("data.raw");
+
             std::fs::write(
                 profile_dir.join("base.yaml"),
-                r#"
+                format!(
+                    r#"
     system:
       architecture: "x86_64"
       machine: "q35"
@@ -1988,29 +1992,34 @@ profiles:
     devices:
       drives:
         - id: "root"
-          path: "/tmp/root.qcow2"
+          path: "{}"
           interface: "virtio"
           type: "disk"
           format: "qcow2"
     "#,
+                    root_disk.display()
+                ),
             )
             .unwrap();
 
             std::fs::write(
                 profile_dir.join("drive_overlay.yaml"),
-                r#"
+                format!(
+                    r#"
     devices:
       drives:
         - id: "root"
           cache: "none"
           boot_index: 100
         - id: "data"
-          path: "/tmp/data.raw"
+          path: "{}"
           interface: "scsi"
           type: "disk"
           format: "raw"
           controller: "scsihw0"
     "#,
+                    data_disk.display()
+                ),
             )
             .unwrap();
 
@@ -2045,7 +2054,7 @@ profiles:
             assert_eq!(config.devices.drives.len(), 2);
 
             let root_drive = config.devices.drives.iter().find(|d| d.id == "root").unwrap();
-            assert_eq!(root_drive.path, "/tmp/root.qcow2");
+            assert_eq!(root_drive.path, root_disk.to_str().unwrap());
             assert_eq!(root_drive.cache.as_deref(), Some("none"));
             assert_eq!(root_drive.boot_index, Some(100));
 

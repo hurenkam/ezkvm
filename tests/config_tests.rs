@@ -1,10 +1,16 @@
 //! Unit tests for configuration parsing and validation
 
 use ezkvm::config::VmConfig;
+use std::sync::{Mutex, OnceLock};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_basic_config_parsing() {
@@ -154,6 +160,8 @@ devices:
 
     #[test]
     fn test_env_var_substitution() {
+        let _guard = env_lock().lock().unwrap();
+
         unsafe {
             std::env::set_var("TEST_MEMORY", "4096");
             std::env::set_var("TEST_CPUS", "4");
@@ -184,6 +192,8 @@ system:
 
     #[test]
     fn test_simple_env_var_substitution() {
+        let _guard = env_lock().lock().unwrap();
+
         unsafe {
             std::env::set_var("HOME", "/home/test");
         }
@@ -307,7 +317,11 @@ options:
 
     #[test]
     fn test_config_with_advanced_qemu_options() {
-        let yaml = r#"
+        let temp_dir = std::env::temp_dir();
+        let pid_file = temp_dir.join("test-vm-advanced.pid");
+        let log_dir = temp_dir.join("test-vm-advanced-logs");
+        
+        let yaml = format!(r#"
 name: "test-vm"
 backend: "qemu"
 
@@ -331,17 +345,17 @@ options:
   enable_kvm: true
   daemonize: false
   nodefaults: true
-  pid_file: "/tmp/test-vm.pid"
-  log_dir: "/tmp/test-vm-logs"
+  pid_file: "{}"
+  log_dir: "{}"
   log_keep: 5
   global_options:
     - "kvm-pit.lost_tick_policy=discard"
   rtc:
     base: "localtime"
     driftfix: "slew"
-"#;
+"#, pid_file.display(), log_dir.display());
 
-        let config = VmConfig::from_str(yaml).unwrap();
+        let config = VmConfig::from_str(&yaml).unwrap();
         assert_eq!(config.system.machine, "pc-q35-8.1+pve0");
         assert_eq!(config.system.machine_options, vec!["hpet=off"]);
         assert_eq!(config.boot.boot_order, vec!["disk", "network"]);
@@ -350,8 +364,8 @@ options:
         assert_eq!(config.boot.reboot_timeout, Some(1000));
         assert_eq!(config.boot.splash.as_deref(), Some("/usr/share/qemu-server/bootsplash.jpg"));
         assert!(config.options.nodefaults);
-        assert_eq!(config.options.pid_file.as_deref(), Some("/tmp/test-vm.pid"));
-        assert_eq!(config.options.log_dir.as_deref(), Some("/tmp/test-vm-logs"));
+        assert_eq!(config.options.pid_file.as_deref(), Some(pid_file.to_str().unwrap()));
+        assert_eq!(config.options.log_dir.as_deref(), Some(log_dir.to_str().unwrap()));
         assert_eq!(config.options.log_keep, Some(5));
         assert_eq!(config.options.global_options, vec!["kvm-pit.lost_tick_policy=discard"]);
         let rtc = config.options.rtc.as_ref().unwrap();

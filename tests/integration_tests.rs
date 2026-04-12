@@ -16,8 +16,21 @@ mod tests {
 
     #[test]
     fn test_full_config_file_parsing() {
-        // Create a temporary config file
-        let config_content = r#"
+        // Create a temporary directory with unique paths
+        let root = std::env::temp_dir().join(format!(
+            "ezkvm-integration-parse-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+
+        let temp_disk_path = root.join("test-disk.qcow2");
+        let temp_config_path = root.join("test_config.yaml");
+
+        let config_content = format!(r#"
 name: "integration-test-vm"
 backend: "qemu"
 
@@ -35,7 +48,7 @@ boot:
 devices:
   drives:
     - id: "root"
-      path: "/tmp/test-disk.qcow2"
+      path: "{}"
       interface: "virtio"
       type: "disk"
       format: "qcow2"
@@ -52,13 +65,12 @@ devices:
 options:
   enable_kvm: true
   daemonize: false
-"#;
+"#, temp_disk_path.display());
 
-        let temp_path = "/tmp/test_config.yaml";
-        fs::write(temp_path, config_content).unwrap();
+        fs::write(&temp_config_path, config_content).unwrap();
 
         // Test parsing from file
-        let config = VmConfig::from_file(temp_path).unwrap();
+        let config = VmConfig::from_file(&temp_config_path).unwrap();
 
         assert_eq!(config.name, "integration-test-vm");
         assert_eq!(config.system.memory, 1024);
@@ -67,7 +79,7 @@ options:
         assert_eq!(config.devices.displays.len(), 1);
 
         // Clean up
-        fs::remove_file(temp_path).unwrap();
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
