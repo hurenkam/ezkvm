@@ -19,11 +19,13 @@ use std::process::Command;
 pub fn find_qemu_processes(vm_name: &str) -> Result<Vec<i32>> {
     // Strategy 1: Try to read saved PID file
     if let Ok(Some(pid)) = state::read_pid(vm_name)
-        && is_process_alive(pid)? && is_qemu_process(pid, Some(vm_name))? {
-            return Ok(vec![pid]);
-        }
-        // PID file exists but process is not running or is not the right one
-        // Fall through to process lookup below
+        && is_process_alive(pid)?
+        && is_qemu_process(pid, Some(vm_name))?
+    {
+        return Ok(vec![pid]);
+    }
+    // PID file exists but process is not running or is not the right one
+    // Fall through to process lookup below
 
     // Strategy 2: Fall back to exact command-line matching
     // Find all qemu-system processes and check for exact -name match
@@ -259,9 +261,10 @@ fn extract_vm_name_from_cmd(cmd_line: &str) -> Option<String> {
             let path = &drive_part[12..end]; // Skip "-drive file="
             // Extract filename without extension
             if let Some(filename) = path.split('/').next_back()
-                && let Some(name) = filename.split('.').next() {
-                    return Some(name.to_string());
-                }
+                && let Some(name) = filename.split('.').next()
+            {
+                return Some(name.to_string());
+            }
         }
     }
 

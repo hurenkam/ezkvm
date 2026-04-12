@@ -37,9 +37,10 @@ impl QemuManager {
 
     fn resolve_tpm_socket_path(&self) -> String {
         if let Some(tpm) = &self.config.tpm
-            && let Some(state_path) = &tpm.state_path {
-                return state_path.clone();
-            }
+            && let Some(state_path) = &tpm.state_path
+        {
+            return state_path.clone();
+        }
 
         if let Some(run_dir) = &self.central_config.locations.run_dir {
             return format!("{}/{}.swtpm", run_dir, self.config.name);
@@ -114,26 +115,28 @@ impl QemuManager {
 
         // Add guest agent arguments
         if let Some(guest_agent) = &self.config.guest_agent
-            && guest_agent.enabled {
-                args.add_guest_agent(
-                    guest_agent.socket_path.as_deref(),
-                    guest_agent.freeze_cpu,
-                    guest_agent.bus.as_deref(),
-                    guest_agent.addr.as_deref(),
-                );
-            }
+            && guest_agent.enabled
+        {
+            args.add_guest_agent(
+                guest_agent.socket_path.as_deref(),
+                guest_agent.freeze_cpu,
+                guest_agent.bus.as_deref(),
+                guest_agent.addr.as_deref(),
+            );
+        }
 
         // Add ballooning arguments
         if let Some(ballooning) = &self.config.ballooning
-            && ballooning.enabled {
-                args.add_balloon(
-                    &ballooning.model,
-                    ballooning.free_page_reporting,
-                    ballooning.id.as_deref(),
-                    ballooning.bus.as_deref(),
-                    ballooning.addr.as_deref(),
-                );
-            }
+            && ballooning.enabled
+        {
+            args.add_balloon(
+                &ballooning.model,
+                ballooning.free_page_reporting,
+                ballooning.id.as_deref(),
+                ballooning.bus.as_deref(),
+                ballooning.addr.as_deref(),
+            );
+        }
 
         // Add VFIO-PCI device arguments
         for hostpci in &self.config.hostpci {
@@ -177,46 +180,48 @@ impl QemuManager {
 
         // Add SPICE arguments
         if let Some(spice) = &self.config.spice
-            && spice.enabled {
-                let has_serial_controller = self
-                    .config
-                    .guest_agent
-                    .as_ref()
-                    .map(|guest_agent| guest_agent.enabled)
-                    .unwrap_or(false);
-                let attach_display_device = !self.has_primary_passthrough_gpu();
-                args.add_spice(
-                    spice.port,
-                    &spice.addr,
-                    spice.disable_ticketing,
-                    spice.vdagent,
-                    has_serial_controller,
-                    attach_display_device,
-                );
+            && spice.enabled
+        {
+            let has_serial_controller = self
+                .config
+                .guest_agent
+                .as_ref()
+                .map(|guest_agent| guest_agent.enabled)
+                .unwrap_or(false);
+            let attach_display_device = !self.has_primary_passthrough_gpu();
+            args.add_spice(
+                spice.port,
+                &spice.addr,
+                spice.disable_ticketing,
+                spice.vdagent,
+                has_serial_controller,
+                attach_display_device,
+            );
 
-                if spice.audio {
-                    let mut emitted_backends: Vec<&str> = Vec::new();
+            if spice.audio {
+                let mut emitted_backends: Vec<&str> = Vec::new();
 
-                    for audio_device in &self.config.audio_devices {
-                        if let Some(audiodev) = audio_device.audiodev.as_deref()
-                            && !emitted_backends.contains(&audiodev) {
-                                args.add_spice_audiodev(audiodev);
-                                emitted_backends.push(audiodev);
-                            }
-                    }
-
-                    for audio_device in &self.config.audio_devices {
-                        args.add_audio_device(
-                            &audio_device.r#type,
-                            &audio_device.id,
-                            audio_device.bus.as_deref(),
-                            audio_device.addr.as_deref(),
-                            audio_device.cad,
-                            audio_device.audiodev.as_deref(),
-                        );
+                for audio_device in &self.config.audio_devices {
+                    if let Some(audiodev) = audio_device.audiodev.as_deref()
+                        && !emitted_backends.contains(&audiodev)
+                    {
+                        args.add_spice_audiodev(audiodev);
+                        emitted_backends.push(audiodev);
                     }
                 }
+
+                for audio_device in &self.config.audio_devices {
+                    args.add_audio_device(
+                        &audio_device.r#type,
+                        &audio_device.id,
+                        audio_device.bus.as_deref(),
+                        audio_device.addr.as_deref(),
+                        audio_device.cad,
+                        audio_device.audiodev.as_deref(),
+                    );
+                }
             }
+        }
 
         for input_device in &self.config.input_devices {
             args.add_input_device(&input_device.r#type);
@@ -224,15 +229,16 @@ impl QemuManager {
 
         // Add ivshmem arguments
         if let Some(ivshmem) = &self.config.ivshmem
-            && ivshmem.enabled {
-                args.add_ivshmem(
-                    ivshmem.size,
-                    ivshmem.vectors,
-                    &ivshmem.id,
-                    ivshmem.bus.as_deref(),
-                    &ivshmem.mem_path,
-                );
-            }
+            && ivshmem.enabled
+        {
+            args.add_ivshmem(
+                ivshmem.size,
+                ivshmem.vectors,
+                &ivshmem.id,
+                ivshmem.bus.as_deref(),
+                &ivshmem.mem_path,
+            );
+        }
 
         // Add iSCSI disk arguments
         for iscsi_disk in &self.config.iscsi_disks {
@@ -250,13 +256,14 @@ impl QemuManager {
 
         // Add QMP monitoring
         if let Some(qmp) = &self.config.qmp
-            && qmp.enabled {
-                let socket_type = match qmp.socket_type {
-                    super::config::QmpSocketType::Tcp => "tcp",
-                    super::config::QmpSocketType::Unix => "unix",
-                };
-                args.add_qmp(qmp.socket_path.as_deref(), socket_type);
-            }
+            && qmp.enabled
+        {
+            let socket_type = match qmp.socket_type {
+                super::config::QmpSocketType::Tcp => "tcp",
+                super::config::QmpSocketType::Unix => "unix",
+            };
+            args.add_qmp(qmp.socket_path.as_deref(), socket_type);
+        }
 
         // Add SMBIOS system information
         if let Some(smbios) = &self.config.smbios {
@@ -283,21 +290,22 @@ impl QemuManager {
 
         // Add Hyper-V enlightenments
         if let Some(hyperv) = &self.config.hyperv
-            && hyperv.enabled {
-                args.add_hyperv(
-                    hyperv.relaxed,
-                    hyperv.vapic,
-                    hyperv.time,
-                    hyperv.crash,
-                    hyperv.reset,
-                    hyperv.vendor_id.as_deref(),
-                    hyperv.frequencies,
-                    hyperv.reenlightenment,
-                    hyperv.tlbflush,
-                    hyperv.ipi,
-                    hyperv.spinlock_retry,
-                );
-            }
+            && hyperv.enabled
+        {
+            args.add_hyperv(
+                hyperv.relaxed,
+                hyperv.vapic,
+                hyperv.time,
+                hyperv.crash,
+                hyperv.reset,
+                hyperv.vendor_id.as_deref(),
+                hyperv.frequencies,
+                hyperv.reenlightenment,
+                hyperv.tlbflush,
+                hyperv.ipi,
+                hyperv.spinlock_retry,
+            );
+        }
 
         // Add option arguments
         args.extend(self.build_option_args()?);
@@ -383,17 +391,24 @@ impl QemuManager {
 
         // UEFI firmware (enhanced support)
         if let Some(firmware) = &self.config.boot.firmware
-            && (firmware == "uefi" || firmware == "ovmf") {
-                let code_path = if let Some(code) = &self.config.boot.uefi_code {
-                    Some(code.clone())
-                } else { self.central_config.locations.ovmf_dir.as_ref().map(|ovmf_dir| format!("{}/OVMF.fd", ovmf_dir)) };
-                args.add_uefi(
-                    code_path.as_deref(),
-                    self.config.boot.uefi_vars.as_deref(),
-                    self.config.boot.uefi_vars_size,
-                    self.config.boot.secure_boot,
-                );
-            }
+            && (firmware == "uefi" || firmware == "ovmf")
+        {
+            let code_path = if let Some(code) = &self.config.boot.uefi_code {
+                Some(code.clone())
+            } else {
+                self.central_config
+                    .locations
+                    .ovmf_dir
+                    .as_ref()
+                    .map(|ovmf_dir| format!("{}/OVMF.fd", ovmf_dir))
+            };
+            args.add_uefi(
+                code_path.as_deref(),
+                self.config.boot.uefi_vars.as_deref(),
+                self.config.boot.uefi_vars_size,
+                self.config.boot.secure_boot,
+            );
+        }
 
         args
     }

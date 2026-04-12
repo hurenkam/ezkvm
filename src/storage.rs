@@ -195,10 +195,12 @@ pub fn list_disks() -> Result<Vec<DiskInfo>> {
         let entry = entry?;
         let path = entry.path();
 
-        if path.is_file() && path.extension().map(|e| e == "qcow2").unwrap_or(false)
-            && let Ok(info) = get_disk_info(&path) {
-                disks.push(info);
-            }
+        if path.is_file()
+            && path.extension().map(|e| e == "qcow2").unwrap_or(false)
+            && let Ok(info) = get_disk_info(&path)
+        {
+            disks.push(info);
+        }
     }
 
     // Sort by path for consistent output

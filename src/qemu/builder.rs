@@ -3,11 +3,16 @@
 //! Provides a fluent interface for building QEMU commands.
 
 #![allow(dead_code)]
+#![allow(deprecated)]
 
 use super::types::QemuArgs;
 use crate::config::VmConfig;
 
 /// Builder for QEMU commands
+#[deprecated(
+    since = "0.1.0",
+    note = "QemuCommandBuilder is currently not used by the runtime path. Prefer QemuManager::build_command()."
+)]
 pub struct QemuCommandBuilder {
     args: QemuArgs,
 }

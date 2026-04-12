@@ -27,11 +27,12 @@ impl QemuArgs {
     pub fn add_cpu_feature(&mut self, feature: &str) {
         // CPU features are added to the existing CPU argument
         if let Some(last) = self.last_mut()
-            && *last != "-cpu" {
-                last.push(',');
-                last.push_str(feature);
-                return;
-            }
+            && *last != "-cpu"
+        {
+            last.push(',');
+            last.push_str(feature);
+            return;
+        }
         // If no CPU argument exists, add a default one
         self.add_cpu(&format!("host{}", feature));
     }
