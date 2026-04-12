@@ -155,7 +155,7 @@ system:
         // Passthrough-dependent fragments: only checked when hostpci is configured
         if has_passthrough {
           let passthrough_fragments: &[&[&str]] = &[
-            &["-vga", "none"],
+            &["-vga", "none", "-nographic"],
             &["vfio-pci", "host=0000:03:00.0", "id=hostpci0.0", "bus=ich9-pcie-port-1", "addr=0x0.0", "multifunction=on"],
             &["vfio-pci", "host=0000:03:00.1", "id=hostpci0.1", "bus=ich9-pcie-port-1", "addr=0x0.1"],
           ];

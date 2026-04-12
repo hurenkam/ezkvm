@@ -245,6 +245,10 @@ pub struct BootConfig {
     
     /// UEFI variables path
     pub uefi_vars: Option<String>,
+
+    /// Optional explicit UEFI variables drive size in bytes for pflash unit 1.
+    /// Proxmox uses `size=540672` for OVMF vars even when the backing device is larger.
+    pub uefi_vars_size: Option<u64>,
     
     /// Enable secure boot
     #[serde(default)]

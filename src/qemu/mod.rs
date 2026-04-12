@@ -357,6 +357,7 @@ impl QemuManager {
                 args.add_uefi(
                     code_path.as_deref(),
                     self.config.boot.uefi_vars.as_deref(),
+                    self.config.boot.uefi_vars_size,
                     self.config.boot.secure_boot
                 );
             }
@@ -381,6 +382,7 @@ impl QemuManager {
 
         if self.has_primary_passthrough_gpu() {
             args.add_vga_none();
+            args.add_nographic();
         }
 
         for global in &self.config.options.global_options {

@@ -189,7 +189,7 @@ impl QemuArgs {
     }
 
     /// Add UEFI firmware
-    pub fn add_uefi(&mut self, code_path: Option<&str>, vars_path: Option<&str>, secure_boot: bool) {
+    pub fn add_uefi(&mut self, code_path: Option<&str>, vars_path: Option<&str>, vars_size: Option<u64>, secure_boot: bool) {
         let firmware_code = code_path.unwrap_or("/usr/share/ovmf/OVMF.fd");
 
         self.push_str("-drive");
@@ -200,10 +200,14 @@ impl QemuArgs {
 
         if let Some(vars) = vars_path {
             self.push_str("-drive");
-            self.push(format!(
+            let mut vars_spec = format!(
                 "if=pflash,unit=1,id=drive-efidisk0,format=raw,file={}",
                 vars
-            ));
+            );
+            if let Some(size) = vars_size {
+                vars_spec.push_str(&format!(",size={}", size));
+            }
+            self.push(vars_spec);
         }
 
         // Enable secure boot if requested
@@ -695,7 +699,7 @@ mod tests {
     #[test]
     fn test_uefi_uses_pflash_drives() {
         let mut args = QemuArgs::new();
-        args.add_uefi(Some("/usr/share/OVMF_CODE.fd"), Some("/var/lib/vm/vars.fd"), true);
+        args.add_uefi(Some("/usr/share/OVMF_CODE.fd"), Some("/var/lib/vm/vars.fd"), None, true);
 
         let built = args.build();
         assert_eq!(
@@ -706,6 +710,24 @@ mod tests {
                 "-drive",
                 "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/var/lib/vm/vars.fd",
             ]
+        );
+    }
+
+    #[test]
+    fn test_uefi_with_vars_size() {
+        let mut args = QemuArgs::new();
+        args.add_uefi(
+            Some("/usr/share/OVMF_CODE.fd"),
+            Some("/var/lib/vm/vars.fd"),
+            Some(540672),
+            true,
+        );
+
+        let built = args.build();
+        assert_eq!(built[2], "-drive");
+        assert_eq!(
+            built[3],
+            "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/var/lib/vm/vars.fd,size=540672"
         );
     }
 
