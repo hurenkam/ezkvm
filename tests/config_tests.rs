@@ -155,7 +155,10 @@ devices:
 "#;
 
         let err = VmConfig::from_str(yaml).unwrap_err();
-        assert!(err.to_string().contains("Drive path cannot be empty unless drive type is cdrom"));
+        assert!(
+            err.to_string()
+                .contains("Drive path cannot be empty unless drive type is cdrom")
+        );
     }
 
     #[test]
@@ -287,7 +290,10 @@ boot:
         assert_eq!(config.boot.boot_order, vec!["disk", "cdrom"]);
         assert_eq!(config.boot.kernel.as_ref().unwrap(), "/boot/vmlinuz");
         assert_eq!(config.boot.initrd.as_ref().unwrap(), "/boot/initrd.img");
-        assert_eq!(config.boot.cmdline.as_ref().unwrap(), "console=ttyS0 root=/dev/vda1");
+        assert_eq!(
+            config.boot.cmdline.as_ref().unwrap(),
+            "console=ttyS0 root=/dev/vda1"
+        );
     }
 
     #[test]
@@ -310,9 +316,12 @@ options:
 "#;
 
         let config = VmConfig::from_str(yaml).unwrap();
-        assert_eq!(config.options.enable_kvm, false);
-        assert_eq!(config.options.daemonize, true);
-        assert_eq!(config.options.uefi_vars.as_ref().unwrap(), "/path/to/vars.fd");
+        assert!(!config.options.enable_kvm);
+        assert!(config.options.daemonize);
+        assert_eq!(
+            config.options.uefi_vars.as_ref().unwrap(),
+            "/path/to/vars.fd"
+        );
     }
 
     #[test]
@@ -320,8 +329,9 @@ options:
         let temp_dir = std::env::temp_dir();
         let pid_file = temp_dir.join("test-vm-advanced.pid");
         let log_dir = temp_dir.join("test-vm-advanced-logs");
-        
-        let yaml = format!(r#"
+
+        let yaml = format!(
+            r#"
 name: "test-vm"
 backend: "qemu"
 
@@ -353,7 +363,10 @@ options:
   rtc:
     base: "localtime"
     driftfix: "slew"
-"#, pid_file.display(), log_dir.display());
+"#,
+            pid_file.display(),
+            log_dir.display()
+        );
 
         let config = VmConfig::from_str(&yaml).unwrap();
         assert_eq!(config.system.machine, "pc-q35-8.1+pve0");
@@ -362,12 +375,24 @@ options:
         assert!(config.boot.menu);
         assert!(config.boot.strict);
         assert_eq!(config.boot.reboot_timeout, Some(1000));
-        assert_eq!(config.boot.splash.as_deref(), Some("/usr/share/qemu-server/bootsplash.jpg"));
+        assert_eq!(
+            config.boot.splash.as_deref(),
+            Some("/usr/share/qemu-server/bootsplash.jpg")
+        );
         assert!(config.options.nodefaults);
-        assert_eq!(config.options.pid_file.as_deref(), Some(pid_file.to_str().unwrap()));
-        assert_eq!(config.options.log_dir.as_deref(), Some(log_dir.to_str().unwrap()));
+        assert_eq!(
+            config.options.pid_file.as_deref(),
+            Some(pid_file.to_str().unwrap())
+        );
+        assert_eq!(
+            config.options.log_dir.as_deref(),
+            Some(log_dir.to_str().unwrap())
+        );
         assert_eq!(config.options.log_keep, Some(5));
-        assert_eq!(config.options.global_options, vec!["kvm-pit.lost_tick_policy=discard"]);
+        assert_eq!(
+            config.options.global_options,
+            vec!["kvm-pit.lost_tick_policy=discard"]
+        );
         let rtc = config.options.rtc.as_ref().unwrap();
         assert_eq!(rtc.base.as_deref(), Some("localtime"));
         assert_eq!(rtc.driftfix.as_deref(), Some("slew"));
@@ -398,7 +423,10 @@ iscsi_disks:
 
         let config = VmConfig::from_str(yaml).unwrap();
         let disk = &config.iscsi_disks[0];
-        assert_eq!(disk.initiator.as_deref(), Some("iqn.1993-08.org.debian:01:622fd71731a1"));
+        assert_eq!(
+            disk.initiator.as_deref(),
+            Some("iqn.1993-08.org.debian:01:622fd71731a1")
+        );
         assert_eq!(disk.username.as_deref(), Some("chap-user"));
         assert_eq!(disk.password.as_deref(), Some("chap-pass"));
     }
@@ -481,7 +509,10 @@ audio_devices:
         assert_eq!(config.audio_devices[0].bus.as_deref(), Some("pci.2"));
         assert_eq!(config.audio_devices[0].addr.as_deref(), Some("0xc"));
         assert_eq!(config.audio_devices[1].cad, Some(0));
-        assert_eq!(config.audio_devices[1].audiodev.as_deref(), Some("spice-backend0"));
+        assert_eq!(
+            config.audio_devices[1].audiodev.as_deref(),
+            Some("spice-backend0")
+        );
     }
 
     #[test]
@@ -504,7 +535,12 @@ spice:
 
         let result = VmConfig::from_str(yaml);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("SPICE audio requires at least one configured audio device"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("SPICE audio requires at least one configured audio device")
+        );
     }
 
     #[test]
@@ -555,7 +591,12 @@ input_devices:
 
         let result = VmConfig::from_str(yaml);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Duplicate input device type configured"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Duplicate input device type configured")
+        );
     }
 
     #[test]
@@ -607,7 +648,12 @@ ivshmem:
 
         let result = VmConfig::from_str(yaml);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("ivshmem mem_path must be an absolute path"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("ivshmem mem_path must be an absolute path")
+        );
     }
 
     #[test]
@@ -728,8 +774,14 @@ scsi_controllers:
         assert_eq!(config.devices.drives[0].boot_index, Some(100));
         assert_eq!(config.devices.drives[1].bus.as_deref(), Some("ide.1"));
         assert_eq!(config.devices.drives[1].unit, Some(0));
-        assert_eq!(config.guest_agent.as_ref().unwrap().bus.as_deref(), Some("pci.0"));
-        assert_eq!(config.ballooning.as_ref().unwrap().addr.as_deref(), Some("0x3"));
+        assert_eq!(
+            config.guest_agent.as_ref().unwrap().bus.as_deref(),
+            Some("pci.0")
+        );
+        assert_eq!(
+            config.ballooning.as_ref().unwrap().addr.as_deref(),
+            Some("0x3")
+        );
         assert_eq!(config.scsi_controllers[0].addr.as_deref(), Some("0x5"));
     }
 
@@ -759,7 +811,10 @@ devices:
 
         let config = VmConfig::from_str(yaml).unwrap();
         assert_eq!(config.devices.serials.len(), 2);
-        assert_eq!(config.devices.serials[0].path.as_deref(), Some("/tmp/serial.log"));
+        assert_eq!(
+            config.devices.serials[0].path.as_deref(),
+            Some("/tmp/serial.log")
+        );
         assert_eq!(config.devices.serials[1].host.as_deref(), Some("127.0.0.1"));
         assert_eq!(config.devices.serials[1].socket_port, Some(4444));
     }
@@ -784,7 +839,12 @@ devices:
 
         let result = VmConfig::from_str(yaml);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Serial file backend requires a non-empty path"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Serial file backend requires a non-empty path")
+        );
     }
 
     #[test]
@@ -810,7 +870,10 @@ devices:
         let result = VmConfig::from_str(yaml);
         assert!(result.is_err());
         let error = result.unwrap_err().to_string();
-        assert!(error.contains("Serial socket backend requires a non-empty host") || error.contains("Serial socket backend requires a TCP port between 1 and 65535"));
+        assert!(
+            error.contains("Serial socket backend requires a non-empty host")
+                || error.contains("Serial socket backend requires a TCP port between 1 and 65535")
+        );
     }
 
     #[test]
@@ -834,6 +897,11 @@ devices:
 
         let result = VmConfig::from_str(yaml);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("does not support configurable VRAM"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("does not support configurable VRAM")
+        );
     }
 }

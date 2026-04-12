@@ -1,18 +1,18 @@
 //! Integration tests for ezkvm functionality
 
-use std::fs;
 use ezkvm::config::{CentralConfig, VmConfig};
 use ezkvm::qemu::QemuManager;
+use std::fs;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-  use std::sync::{Mutex, OnceLock};
+    use std::sync::{Mutex, OnceLock};
 
-  fn env_lock() -> &'static Mutex<()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
-  }
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_full_config_file_parsing() {
@@ -30,7 +30,8 @@ mod tests {
         let temp_disk_path = root.join("test-disk.qcow2");
         let temp_config_path = root.join("test_config.yaml");
 
-        let config_content = format!(r#"
+        let config_content = format!(
+            r#"
 name: "integration-test-vm"
 backend: "qemu"
 
@@ -65,7 +66,9 @@ devices:
 options:
   enable_kvm: true
   daemonize: false
-"#, temp_disk_path.display());
+"#,
+            temp_disk_path.display()
+        );
 
         fs::write(&temp_config_path, config_content).unwrap();
 
@@ -122,100 +125,214 @@ system:
         assert_eq!(config.system.memory, 512);
         assert_eq!(config.system.vcpus, 1);
         // Check defaults
-        assert_eq!(config.options.enable_kvm, true); // default_true
-        assert_eq!(config.options.daemonize, false);
+        assert!(config.options.enable_kvm); // default_true
+        assert!(!config.options.daemonize);
     }
 
-      #[test]
-      fn test_wakiza_matches_key_proxmox_fragments() {
+    #[test]
+    fn test_wakiza_matches_key_proxmox_fragments() {
         let _guard = env_lock().lock().unwrap();
 
         unsafe {
-          std::env::set_var("EZKVM_CONFIG", "examples/ezkvm-profiles.yaml");
+            std::env::set_var("EZKVM_CONFIG", "examples/ezkvm-profiles.yaml");
         }
 
         let config = VmConfig::from_file("examples/wakiza.yaml").unwrap();
-        let has_cdrom = config.devices.drives.iter().any(|drive| drive.r#type == "cdrom");
+        let has_cdrom = config
+            .devices
+            .drives
+            .iter()
+            .any(|drive| drive.r#type == "cdrom");
         let has_passthrough = config.hostpci.iter().any(|d| d.id.starts_with("hostpci0"));
         let has_usb = !config.usb_devices.is_empty();
         let manager = QemuManager::new(config, CentralConfig::default());
         let args = manager.build_command().unwrap();
         let generated = format!(
-          "{} {}",
-          manager.binary_name(),
-          args.iter().map(|arg| arg.as_str()).collect::<Vec<_>>().join(" ")
+            "{} {}",
+            manager.binary_name(),
+            args.iter()
+                .map(|arg| arg.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
         );
 
         let proxmox_cmd = include_str!("../input/wakiza/108.cmd");
 
         // Always-present fragments (independent of passthrough / TPM / USB)
         let always_fragments: &[&[&str]] = &[
-          &["if=pflash,unit=0", "readonly=on", "OVMF_CODE_4M.secboot.fd"],
-          &["if=pflash,unit=1", "id=drive-efidisk0", "format=raw"],
-          &["qemu-xhci", "id=xhci", "p2=15", "p3=15", "bus=pci.1", "addr=0x1b"],
-          &["ich9-intel-hda", "id=audiodev0", "bus=pci.2", "addr=0xc"],
-          &["hda-micro", "id=audiodev0-codec0", "bus=audiodev0.0", "cad=0", "audiodev=spice-backend0"],
-          &["hda-duplex", "id=audiodev0-codec1", "bus=audiodev0.0", "cad=1", "audiodev=spice-backend0"],
-          &["spice,id=spice-backend0"],
-          &["virtio-balloon-pci", "id=balloon0", "bus=pci.0", "addr=0x3", "free-page-reporting=on"],
-          &["pvscsi", "id=scsihw0", "bus=pci.0", "addr=0x5"],
-          &["scsi-hd", "drive=drive-scsi0", "id=scsi0", "bus=scsihw0.0", "scsi-id=0", "bootindex=100"],
-          &["scsi-hd", "drive=drive-scsi1", "id=scsi1", "bus=scsihw0.0", "scsi-id=1"],
-          &["virtio-net-pci", "netdev=net0", "mac=BC:24:11:3A:21:B7", "bus=pci.0", "addr=0x12", "rx_queue_size=1024", "tx_queue_size=256", "bootindex=102"],
-          &["port=5903", "addr=0.0.0.0", "disable-ticketing=on"],
-          &["virtio-mouse"],
-          &["virtio-keyboard"],
-          &["ivshmem-plain", "memdev=ivshmem0", "bus=pcie.0"],
-          &["memory-backend-file", "id=ivshmem0", "share=on", "mem-path=/dev/kvmfr0", "size=128M"],
+            &["if=pflash,unit=0", "readonly=on", "OVMF_CODE_4M.secboot.fd"],
+            &["if=pflash,unit=1", "id=drive-efidisk0", "format=raw"],
+            &[
+                "qemu-xhci",
+                "id=xhci",
+                "p2=15",
+                "p3=15",
+                "bus=pci.1",
+                "addr=0x1b",
+            ],
+            &["ich9-intel-hda", "id=audiodev0", "bus=pci.2", "addr=0xc"],
+            &[
+                "hda-micro",
+                "id=audiodev0-codec0",
+                "bus=audiodev0.0",
+                "cad=0",
+                "audiodev=spice-backend0",
+            ],
+            &[
+                "hda-duplex",
+                "id=audiodev0-codec1",
+                "bus=audiodev0.0",
+                "cad=1",
+                "audiodev=spice-backend0",
+            ],
+            &["spice,id=spice-backend0"],
+            &[
+                "virtio-balloon-pci",
+                "id=balloon0",
+                "bus=pci.0",
+                "addr=0x3",
+                "free-page-reporting=on",
+            ],
+            &["pvscsi", "id=scsihw0", "bus=pci.0", "addr=0x5"],
+            &[
+                "scsi-hd",
+                "drive=drive-scsi0",
+                "id=scsi0",
+                "bus=scsihw0.0",
+                "scsi-id=0",
+                "bootindex=100",
+            ],
+            &[
+                "scsi-hd",
+                "drive=drive-scsi1",
+                "id=scsi1",
+                "bus=scsihw0.0",
+                "scsi-id=1",
+            ],
+            &[
+                "virtio-net-pci",
+                "netdev=net0",
+                "mac=BC:24:11:3A:21:B7",
+                "bus=pci.0",
+                "addr=0x12",
+                "rx_queue_size=1024",
+                "tx_queue_size=256",
+                "bootindex=102",
+            ],
+            &["port=5903", "addr=0.0.0.0", "disable-ticketing=on"],
+            &["virtio-mouse"],
+            &["virtio-keyboard"],
+            &["ivshmem-plain", "memdev=ivshmem0", "bus=pcie.0"],
+            &[
+                "memory-backend-file",
+                "id=ivshmem0",
+                "share=on",
+                "mem-path=/dev/kvmfr0",
+                "size=128M",
+            ],
         ];
 
         for group in always_fragments {
-          for fragment in *group {
-            assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
-            assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
-          }
+            for fragment in *group {
+                assert!(
+                    proxmox_cmd.contains(fragment),
+                    "Fixture is missing fragment: {fragment}"
+                );
+                assert!(
+                    generated.contains(fragment),
+                    "Generated command is missing fragment: {fragment}\n{generated}"
+                );
+            }
         }
 
         // Passthrough-dependent fragments: only checked when hostpci is configured
         if has_passthrough {
-          let passthrough_fragments: &[&[&str]] = &[
-            &["-vga", "none", "-nographic"],
-            &["vfio-pci", "host=0000:03:00.0", "id=hostpci0.0", "bus=ich9-pcie-port-1", "addr=0x0.0", "multifunction=on"],
-            &["vfio-pci", "host=0000:03:00.1", "id=hostpci0.1", "bus=ich9-pcie-port-1", "addr=0x0.1"],
-          ];
-          for group in passthrough_fragments {
-            for fragment in *group {
-              assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
-              assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
+            let passthrough_fragments: &[&[&str]] = &[
+                &["-vga", "none", "-nographic"],
+                &[
+                    "vfio-pci",
+                    "host=0000:03:00.0",
+                    "id=hostpci0.0",
+                    "bus=ich9-pcie-port-1",
+                    "addr=0x0.0",
+                    "multifunction=on",
+                ],
+                &[
+                    "vfio-pci",
+                    "host=0000:03:00.1",
+                    "id=hostpci0.1",
+                    "bus=ich9-pcie-port-1",
+                    "addr=0x0.1",
+                ],
+            ];
+            for group in passthrough_fragments {
+                for fragment in *group {
+                    assert!(
+                        proxmox_cmd.contains(fragment),
+                        "Fixture is missing fragment: {fragment}"
+                    );
+                    assert!(
+                        generated.contains(fragment),
+                        "Generated command is missing fragment: {fragment}\n{generated}"
+                    );
+                }
             }
-          }
         }
 
         // USB fragments: only checked when usb_devices are configured
         if has_usb {
-          let usb_fragments = ["usb-host", "hostbus=1", "hostport=2.2", "id=usb0", "bus=xhci.0", "port=1"];
-          for fragment in usb_fragments {
-            assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
-            assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
-          }
+            let usb_fragments = [
+                "usb-host",
+                "hostbus=1",
+                "hostport=2.2",
+                "id=usb0",
+                "bus=xhci.0",
+                "port=1",
+            ];
+            for fragment in usb_fragments {
+                assert!(
+                    proxmox_cmd.contains(fragment),
+                    "Fixture is missing fragment: {fragment}"
+                );
+                assert!(
+                    generated.contains(fragment),
+                    "Generated command is missing fragment: {fragment}\n{generated}"
+                );
+            }
         }
 
         if has_cdrom {
-          let cdrom_fragments = ["ide-cd", "drive=drive-ide2", "id=ide2", "bus=ide.1", "unit=0", "bootindex=101"];
+            let cdrom_fragments = [
+                "ide-cd",
+                "drive=drive-ide2",
+                "id=ide2",
+                "bus=ide.1",
+                "unit=0",
+                "bootindex=101",
+            ];
 
-          for fragment in cdrom_fragments {
-            assert!(proxmox_cmd.contains(fragment), "Fixture is missing fragment: {fragment}");
-            assert!(generated.contains(fragment), "Generated command is missing fragment: {fragment}\n{generated}");
-          }
+            for fragment in cdrom_fragments {
+                assert!(
+                    proxmox_cmd.contains(fragment),
+                    "Fixture is missing fragment: {fragment}"
+                );
+                assert!(
+                    generated.contains(fragment),
+                    "Generated command is missing fragment: {fragment}\n{generated}"
+                );
+            }
         }
 
         let virtio_serial_controller_count = generated.matches("virtio-serial-pci").count();
-        assert_eq!(virtio_serial_controller_count, 1, "Expected a single virtio-serial-pci controller in generated command\n{generated}");
+        assert_eq!(
+            virtio_serial_controller_count, 1,
+            "Expected a single virtio-serial-pci controller in generated command\n{generated}"
+        );
 
         unsafe {
-          std::env::remove_var("EZKVM_CONFIG");
+            std::env::remove_var("EZKVM_CONFIG");
         }
-      }
+    }
 
     #[test]
     fn test_profile_based_config_file_parsing() {

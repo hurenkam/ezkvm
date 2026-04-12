@@ -26,13 +26,12 @@ impl QemuArgs {
     /// Add a CPU feature
     pub fn add_cpu_feature(&mut self, feature: &str) {
         // CPU features are added to the existing CPU argument
-        if let Some(last) = self.last_mut() {
-            if *last != "-cpu" {
+        if let Some(last) = self.last_mut()
+            && *last != "-cpu" {
                 last.push(',');
                 last.push_str(feature);
                 return;
             }
-        }
         // If no CPU argument exists, add a default one
         self.add_cpu(&format!("host{}", feature));
     }
@@ -48,7 +47,7 @@ impl QemuArgs {
         self.push_str("-smp");
         self.push(format!("cpus={}", cpus));
     }
-    
+
     /// Add drive argument
     pub fn add_drive(&mut self, path: &str, interface: &str, format: &str, readonly: bool) {
         self.push_str("-drive");
@@ -103,7 +102,7 @@ impl QemuArgs {
         self.push_str("-initrd");
         self.push(initrd.to_string());
     }
-    
+
     /// Add append argument
     pub fn add_append(&mut self, cmdline: &str) {
         self.push_str("-append");
@@ -114,7 +113,14 @@ impl QemuArgs {
     ///
     /// Returns an error if the backend is unsupported, rather than panicking.
     /// Supported backends: "emulator", "passthrough"
-    pub fn add_tpm(&mut self, _version: &str, backend: &str, socket_path: &str, model: &str, external_swtpm: bool) -> Result<(), String> {
+    pub fn add_tpm(
+        &mut self,
+        _version: &str,
+        backend: &str,
+        socket_path: &str,
+        model: &str,
+        external_swtpm: bool,
+    ) -> Result<(), String> {
         match backend {
             "emulator" => {
                 // Add chardev for TPM emulator or external swtpm socket
@@ -123,7 +129,10 @@ impl QemuArgs {
                 let chardev_spec = if external_swtpm {
                     format!("socket,id={},path={}", chardev_id, socket_path)
                 } else {
-                    format!("socket,id={},server=on,wait=off,path={}", chardev_id, socket_path)
+                    format!(
+                        "socket,id={},server=on,wait=off,path={}",
+                        chardev_id, socket_path
+                    )
                 };
                 self.push(chardev_spec);
 
@@ -135,18 +144,29 @@ impl QemuArgs {
                 self.push_str("-tpmdev");
                 self.push("passthrough,id=tpmdev".to_string());
             }
-            _ => return Err(format!("Unsupported TPM backend: '{}'. Supported backends: 'emulator', 'passthrough'", backend)),
+            _ => {
+                return Err(format!(
+                    "Unsupported TPM backend: '{}'. Supported backends: 'emulator', 'passthrough'",
+                    backend
+                ));
+            }
         }
 
         // Add TPM device
         self.push_str("-device");
         self.push(format!("{},tpmdev=tpmdev", model));
-        
+
         Ok(())
     }
 
     /// Add QEMU guest agent
-    pub fn add_guest_agent(&mut self, socket_path: Option<&str>, freeze_cpu: bool, bus: Option<&str>, addr: Option<&str>) {
+    pub fn add_guest_agent(
+        &mut self,
+        socket_path: Option<&str>,
+        freeze_cpu: bool,
+        bus: Option<&str>,
+        addr: Option<&str>,
+    ) {
         // Add virtio-serial device for guest agent
         self.push_str("-device");
         let mut serial_spec = "virtio-serial-pci,id=virtio-serial0".to_string();
@@ -161,13 +181,19 @@ impl QemuArgs {
         // Add chardev for guest agent
         let chardev_id = "qga0";
         self.push_str("-chardev");
-        let chardev_spec = format!("socket,path={},server=on,wait=off,id={}",
-            socket_path.unwrap_or("/var/run/qemu-server/qga.sock"), chardev_id);
+        let chardev_spec = format!(
+            "socket,path={},server=on,wait=off,id={}",
+            socket_path.unwrap_or("/var/run/qemu-server/qga.sock"),
+            chardev_id
+        );
         self.push(chardev_spec);
 
         // Add guest agent channel
         self.push_str("-device");
-        let mut channel_spec = format!("virtserialport,chardev={},name=org.qemu.guest_agent.0", chardev_id);
+        let mut channel_spec = format!(
+            "virtserialport,chardev={},name=org.qemu.guest_agent.0",
+            chardev_id
+        );
         if freeze_cpu {
             channel_spec.push_str(",freeze=on");
         }
@@ -175,7 +201,14 @@ impl QemuArgs {
     }
 
     /// Add memory ballooning device
-    pub fn add_balloon(&mut self, model: &str, free_page_reporting: bool, id: Option<&str>, bus: Option<&str>, addr: Option<&str>) {
+    pub fn add_balloon(
+        &mut self,
+        model: &str,
+        free_page_reporting: bool,
+        id: Option<&str>,
+        bus: Option<&str>,
+        addr: Option<&str>,
+    ) {
         self.push_str("-device");
         let mut balloon_spec = model.to_string();
         if let Some(id) = id {
@@ -194,7 +227,13 @@ impl QemuArgs {
     }
 
     /// Add UEFI firmware
-    pub fn add_uefi(&mut self, code_path: Option<&str>, vars_path: Option<&str>, vars_size: Option<u64>, secure_boot: bool) {
+    pub fn add_uefi(
+        &mut self,
+        code_path: Option<&str>,
+        vars_path: Option<&str>,
+        vars_size: Option<u64>,
+        secure_boot: bool,
+    ) {
         let firmware_code = code_path.unwrap_or("/usr/share/ovmf/OVMF.fd");
 
         self.push_str("-drive");
@@ -223,7 +262,18 @@ impl QemuArgs {
     }
 
     /// Add VFIO-PCI device passthrough
-    pub fn add_vfio_pci(&mut self, device: &str, id: &str, _pcie: bool, x_vga: bool, bus: Option<&str>, addr: Option<&str>, multifunction: bool, romfile: Option<&str>) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_vfio_pci(
+        &mut self,
+        device: &str,
+        id: &str,
+        _pcie: bool,
+        x_vga: bool,
+        bus: Option<&str>,
+        addr: Option<&str>,
+        multifunction: bool,
+        romfile: Option<&str>,
+    ) {
         self.push_str("-device");
         let mut vfio_spec = format!("vfio-pci,host={},id={}", device, id);
         if x_vga {
@@ -245,14 +295,25 @@ impl QemuArgs {
     }
 
     /// Add USB host device passthrough
-    pub fn add_usb_host(&mut self, host_spec: &str, hostbus: Option<&str>, hostport: Option<&str>, id: &str, bus: Option<&str>, port: Option<&str>) {
+    pub fn add_usb_host(
+        &mut self,
+        host_spec: &str,
+        hostbus: Option<&str>,
+        hostport: Option<&str>,
+        id: &str,
+        bus: Option<&str>,
+        port: Option<&str>,
+    ) {
         self.push_str("-device");
         let mut usb_spec = String::from("usb-host");
 
         if let (Some(hostbus), Some(hostport)) = (hostbus, hostport) {
             usb_spec.push_str(&format!(",hostbus={},hostport={}", hostbus, hostport));
         } else if let Some((normalized_bus, normalized_port)) = normalize_usb_host_spec(host_spec) {
-            usb_spec.push_str(&format!(",hostbus={},hostport={}", normalized_bus, normalized_port));
+            usb_spec.push_str(&format!(
+                ",hostbus={},hostport={}",
+                normalized_bus, normalized_port
+            ));
         } else if !host_spec.trim().is_empty() {
             usb_spec.push_str(&format!(",host={}", host_spec));
         }
@@ -268,7 +329,14 @@ impl QemuArgs {
     }
 
     /// Add XHCI USB controller
-    pub fn add_xhci_controller(&mut self, id: &str, p2: Option<u8>, p3: Option<u8>, bus: Option<&str>, addr: Option<&str>) {
+    pub fn add_xhci_controller(
+        &mut self,
+        id: &str,
+        p2: Option<u8>,
+        p3: Option<u8>,
+        bus: Option<&str>,
+        addr: Option<&str>,
+    ) {
         self.push_str("-device");
         let mut controller_spec = format!("qemu-xhci,id={}", id);
         if let Some(p2) = p2 {
@@ -287,7 +355,15 @@ impl QemuArgs {
     }
 
     /// Add SPICE display server
-    pub fn add_spice(&mut self, port: u16, addr: &str, disable_ticketing: bool, vdagent: bool, has_serial_controller: bool, attach_display_device: bool) {
+    pub fn add_spice(
+        &mut self,
+        port: u16,
+        addr: &str,
+        disable_ticketing: bool,
+        vdagent: bool,
+        has_serial_controller: bool,
+        attach_display_device: bool,
+    ) {
         self.push_str("-spice");
         let mut spice_spec = format!("port={},addr={}", port, addr);
         if disable_ticketing {
@@ -320,7 +396,15 @@ impl QemuArgs {
     }
 
     /// Add an audio device
-    pub fn add_audio_device(&mut self, device_type: &str, id: &str, bus: Option<&str>, addr: Option<&str>, cad: Option<u8>, audiodev: Option<&str>) {
+    pub fn add_audio_device(
+        &mut self,
+        device_type: &str,
+        id: &str,
+        bus: Option<&str>,
+        addr: Option<&str>,
+        cad: Option<u8>,
+        audiodev: Option<&str>,
+    ) {
         self.push_str("-device");
         let mut device_spec = format!("{},id={}", device_type, id);
 
@@ -350,7 +434,14 @@ impl QemuArgs {
     }
 
     /// Add Looking Glass shared memory device
-    pub fn add_ivshmem(&mut self, size_mib: u32, _vectors: u32, id: &str, bus: Option<&str>, mem_path: &str) {
+    pub fn add_ivshmem(
+        &mut self,
+        size_mib: u32,
+        _vectors: u32,
+        id: &str,
+        bus: Option<&str>,
+        mem_path: &str,
+    ) {
         self.push_str("-device");
         let mut device_spec = format!("ivshmem-plain,memdev={}", id);
         if let Some(bus) = bus {
@@ -359,18 +450,29 @@ impl QemuArgs {
         self.push(device_spec);
 
         self.push_str("-object");
-        self.push(format!("memory-backend-file,id={},share=on,mem-path={},size={}M", id, mem_path, size_mib));
+        self.push(format!(
+            "memory-backend-file,id={},share=on,mem-path={},size={}M",
+            id, mem_path, size_mib
+        ));
     }
 
     /// Add SCSI controller
-    pub fn add_scsi_controller(&mut self, id: &str, controller_type: &str, iothread: Option<&str>, max_targets: Option<u32>, bus: Option<&str>, addr: Option<&str>) {
+    pub fn add_scsi_controller(
+        &mut self,
+        id: &str,
+        controller_type: &str,
+        iothread: Option<&str>,
+        max_targets: Option<u32>,
+        bus: Option<&str>,
+        addr: Option<&str>,
+    ) {
         self.push_str("-device");
         let mut controller_spec = format!("{},id={}", controller_type, id);
-        
+
         if let Some(iothread) = iothread {
             controller_spec.push_str(&format!(",iothread={}", iothread));
         }
-        
+
         if let Some(max_targets) = max_targets {
             controller_spec.push_str(&format!(",max_targets={}", max_targets));
         }
@@ -382,125 +484,157 @@ impl QemuArgs {
         if let Some(addr) = addr {
             controller_spec.push_str(&format!(",addr={}", addr));
         }
-        
+
         self.push(controller_spec);
     }
 
     /// Add iSCSI disk
-    pub fn add_iscsi_disk(&mut self, id: &str, portal: &str, target: &str, lun: u32, 
-                         initiator: Option<&str>, username: Option<&str>, password: Option<&str>,
-                         controller: Option<&str>) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_iscsi_disk(
+        &mut self,
+        id: &str,
+        portal: &str,
+        target: &str,
+        lun: u32,
+        initiator: Option<&str>,
+        username: Option<&str>,
+        password: Option<&str>,
+        controller: Option<&str>,
+    ) {
         // Add iSCSI block device
         self.push_str("-blockdev");
-        let mut blockdev_spec = format!("driver=iscsi,portal={},target={},lun={},node-name={}",
-            portal, target, lun, id);
-        
+        let mut blockdev_spec = format!(
+            "driver=iscsi,portal={},target={},lun={},node-name={}",
+            portal, target, lun, id
+        );
+
         if let Some(initiator) = initiator {
             blockdev_spec.push_str(&format!(",initiator-name={}", initiator));
         }
-        
+
         if let Some(username) = username {
             blockdev_spec.push_str(&format!(",user={}", username));
         }
-        
+
         if let Some(password) = password {
             blockdev_spec.push_str(&format!(",password={}", password));
         }
-        
+
         self.push(blockdev_spec);
-        
+
         // Add device attachment
         self.push_str("-device");
-        let device_type = if controller.is_some() { "scsi-hd" } else { "virtio-blk-pci" };
+        let device_type = if controller.is_some() {
+            "scsi-hd"
+        } else {
+            "virtio-blk-pci"
+        };
         let mut device_spec = format!("{},drive={},id={}", device_type, id, id);
-        
+
         if let Some(controller) = controller {
             device_spec.push_str(&format!(",bus={}.0", controller));
         }
-        
+
         self.push(device_spec);
     }
 
     /// Add enhanced drive with advanced options
-    pub fn add_drive_enhanced(&mut self, path: &str, interface: &str, format: &str, readonly: bool,
-                             discard: bool, ssd: bool, controller: Option<&str>) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_drive_enhanced(
+        &mut self,
+        path: &str,
+        interface: &str,
+        format: &str,
+        readonly: bool,
+        discard: bool,
+        ssd: bool,
+        controller: Option<&str>,
+    ) {
         self.push_str("-drive");
         let mut spec = format!("file={},if={},format={}", path, interface, format);
-        
+
         if readonly {
             spec.push_str(",readonly=on");
         }
-        
+
         if discard {
             spec.push_str(",discard=unmap");
         }
-        
+
         if ssd {
             spec.push_str(",ssd=on");
         }
-        
+
         if let Some(controller) = controller {
             spec.push_str(&format!(",bus={}", controller));
         }
-        
+
         self.push(spec);
     }
 
     /// Add QMP monitoring
     pub fn add_qmp(&mut self, socket_path: Option<&str>, socket_type: &str) {
         self.push_str("-qmp");
-        
+
         let socket_spec = match socket_type {
             "tcp" => {
                 // QEMU should listen for QMP connections rather than attempting to connect to a pre-existing peer.
                 socket_path
                     .map(|p| format!("tcp:{},server=on,wait=off", p))
                     .unwrap_or_else(|| "tcp:127.0.0.1:4444,server=on,wait=off".to_string())
-            },
-            _ => {
-                socket_path
-                    .map(|p| format!("unix:{},server=on,wait=off", p))
-                    .unwrap_or_else(|| "unix:/var/run/qemu-monitor.sock,server=on,wait=off".to_string())
             }
+            _ => socket_path
+                .map(|p| format!("unix:{},server=on,wait=off", p))
+                .unwrap_or_else(|| {
+                    "unix:/var/run/qemu-monitor.sock,server=on,wait=off".to_string()
+                }),
         };
-        
+
         self.push(socket_spec);
     }
 
     /// Add SMBIOS system information
-    pub fn add_smbios(&mut self, manufacturer: Option<&str>, product: Option<&str>, 
-                     version: Option<&str>, serial: Option<&str>, uuid: Option<&str>,
-                     sku: Option<&str>, family: Option<&str>) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_smbios(
+        &mut self,
+        manufacturer: Option<&str>,
+        product: Option<&str>,
+        version: Option<&str>,
+        serial: Option<&str>,
+        uuid: Option<&str>,
+        sku: Option<&str>,
+        family: Option<&str>,
+    ) {
         let mut smbios_spec = "type=1".to_string();
-        
+
         if let Some(manufacturer) = manufacturer {
             smbios_spec.push_str(&format!(",manufacturer={}", manufacturer));
         }
-        
+
         if let Some(product) = product {
             smbios_spec.push_str(&format!(",product={}", product));
         }
-        
+
         if let Some(version) = version {
             smbios_spec.push_str(&format!(",version={}", version));
         }
-        
+
         if let Some(serial) = serial {
             smbios_spec.push_str(&format!(",serial={}", serial));
         }
-        
+
         if let Some(uuid) = uuid {
             smbios_spec.push_str(&format!(",uuid={}", uuid));
         }
-        
+
         if let Some(sku) = sku {
             smbios_spec.push_str(&format!(",sku={}", sku));
         }
-        
+
         if let Some(family) = family {
             smbios_spec.push_str(&format!(",family={}", family));
         }
-        
+
         self.push_str("-smbios");
         self.push(smbios_spec);
     }
@@ -512,16 +646,22 @@ impl QemuArgs {
     }
 
     /// Add NUMA node configuration
-    pub fn add_numa_node(&mut self, node_id: u32, memory_mib: u32, cpus: &[u32], host_node: Option<u32>) {
+    pub fn add_numa_node(
+        &mut self,
+        node_id: u32,
+        memory_mib: u32,
+        cpus: &[u32],
+        host_node: Option<u32>,
+    ) {
         self.push_str("-numa");
         let mut numa_spec = format!("node,nodeid={},mem={}", node_id, memory_mib);
-        
+
         if let Some(host_node) = host_node {
             numa_spec.push_str(&format!(",memdev=mem{}", host_node));
         }
-        
+
         self.push(numa_spec);
-        
+
         // Add CPU assignment to this node
         for cpu in cpus {
             self.push_str("-numa");
@@ -530,53 +670,66 @@ impl QemuArgs {
     }
 
     /// Add Hyper-V enlightenments
-    pub fn add_hyperv(&mut self, relaxed: bool, vapic: bool, time: bool, crash: bool,
-                     reset: bool, vendor_id: Option<&str>, frequencies: bool,
-                     reenlightenment: bool, tlbflush: bool, ipi: bool,
-                     spinlock_retry: Option<u32>) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_hyperv(
+        &mut self,
+        relaxed: bool,
+        vapic: bool,
+        time: bool,
+        crash: bool,
+        reset: bool,
+        vendor_id: Option<&str>,
+        frequencies: bool,
+        reenlightenment: bool,
+        tlbflush: bool,
+        ipi: bool,
+        spinlock_retry: Option<u32>,
+    ) {
         // Add Hyper-V CPU features
         if relaxed {
             self.push_str("-cpu");
-            self.push_str("host,+hypervisor,+invtsc,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time");
+            self.push_str(
+                "host,+hypervisor,+invtsc,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time",
+            );
         }
-        
+
         // Add individual Hyper-V features
         if vapic {
             self.add_cpu_feature("+hv_vapic");
         }
-        
+
         if time {
             self.add_cpu_feature("+hv_time");
         }
-        
+
         if crash {
             self.add_cpu_feature("+hv_crash");
         }
-        
+
         if reset {
             self.add_cpu_feature("+hv_reset");
         }
-        
+
         if let Some(vendor_id) = vendor_id {
             self.add_cpu_feature(&format!("+hv_vendor_id={}", vendor_id));
         }
-        
+
         if frequencies {
             self.add_cpu_feature("+hv_frequencies");
         }
-        
+
         if reenlightenment {
             self.add_cpu_feature("+hv_reenlightenment");
         }
-        
+
         if tlbflush {
             self.add_cpu_feature("+hv_tlbflush");
         }
-        
+
         if ipi {
             self.add_cpu_feature("+hv_ipi");
         }
-        
+
         if let Some(retry) = spinlock_retry {
             self.add_cpu_feature(&format!("+hv_spinlocks=0x{:x}", retry));
         }
@@ -672,39 +825,53 @@ fn normalize_usb_host_spec(host_spec: &str) -> Option<(&str, &str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_basic_args() {
         let mut args = QemuArgs::new();
         args.add_memory(1024);
         args.add_smp(2);
-        
+
         let built = args.build();
         assert_eq!(built, vec!["-m", "1024M", "-smp", "cpus=2"]);
     }
-    
+
     #[test]
     fn test_drive_args() {
         let mut args = QemuArgs::new();
         args.add_drive("/path/to/disk.qcow2", "virtio", "qcow2", false);
-        
+
         let built = args.build();
-        assert_eq!(built, vec!["-drive", "file=/path/to/disk.qcow2,if=virtio,format=qcow2"]);
+        assert_eq!(
+            built,
+            vec!["-drive", "file=/path/to/disk.qcow2,if=virtio,format=qcow2"]
+        );
     }
-    
+
     #[test]
     fn test_readonly_drive() {
         let mut args = QemuArgs::new();
         args.add_drive("/path/to/cd.iso", "ide", "raw", true);
-        
+
         let built = args.build();
-        assert_eq!(built, vec!["-drive", "file=/path/to/cd.iso,if=ide,format=raw,readonly=on"]);
+        assert_eq!(
+            built,
+            vec![
+                "-drive",
+                "file=/path/to/cd.iso,if=ide,format=raw,readonly=on"
+            ]
+        );
     }
 
     #[test]
     fn test_uefi_uses_pflash_drives() {
         let mut args = QemuArgs::new();
-        args.add_uefi(Some("/usr/share/OVMF_CODE.fd"), Some("/var/lib/vm/vars.fd"), None, true);
+        args.add_uefi(
+            Some("/usr/share/OVMF_CODE.fd"),
+            Some("/var/lib/vm/vars.fd"),
+            None,
+            true,
+        );
 
         let built = args.build();
         assert_eq!(
@@ -762,7 +929,7 @@ mod tests {
     fn test_tpm_uses_server_mode_for_internal_emulator() {
         let tpm_sock = std::env::temp_dir().join("ezkvm-test-tpm.sock");
         let tpm_sock_str = tpm_sock.to_string_lossy().to_string();
-        
+
         let mut args = QemuArgs::new();
         let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", false);
         assert!(result.is_ok());
@@ -777,7 +944,7 @@ mod tests {
     fn test_tpm_omits_wait_for_external_swtpm_client_mode() {
         let tpm_sock = std::env::temp_dir().join("ezkvm-test-external-tpm.sock");
         let tpm_sock_str = tpm_sock.to_string_lossy().to_string();
-        
+
         let mut args = QemuArgs::new();
         let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", true);
         assert!(result.is_ok());
@@ -795,9 +962,15 @@ mod tests {
     fn test_tpm_rejects_unsupported_backend() {
         let tpm_sock = std::env::temp_dir().join("ezkvm-test-invalid-tpm.sock");
         let tpm_sock_str = tpm_sock.to_string_lossy().to_string();
-        
+
         let mut args = QemuArgs::new();
-        let result = args.add_tpm("2.0", "unsupported-backend", &tpm_sock_str, "tpm-tis", false);
+        let result = args.add_tpm(
+            "2.0",
+            "unsupported-backend",
+            &tpm_sock_str,
+            "tpm-tis",
+            false,
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Unsupported TPM backend"));
     }
@@ -806,7 +979,7 @@ mod tests {
     fn test_qmp_uses_listening_unix_socket() {
         let qmp_sock = std::env::temp_dir().join("ezkvm-test-qmp.sock");
         let qmp_sock_str = qmp_sock.to_string_lossy().to_string();
-        
+
         let mut args = QemuArgs::new();
         args.add_qmp(Some(&qmp_sock_str), "unix");
 
@@ -847,15 +1020,42 @@ mod tests {
         let mut args = QemuArgs::new();
         args.add_spice(5903, "0.0.0.0", true, true, false, true);
         args.add_spice_audiodev("spice-backend0");
-        args.add_audio_device("ich9-intel-hda", "audiodev0", Some("pci.2"), Some("0xc"), None, None);
-        args.add_audio_device("hda-micro", "audiodev0-codec0", Some("audiodev0.0"), None, Some(0), Some("spice-backend0"));
-        args.add_audio_device("hda-duplex", "audiodev0-codec1", Some("audiodev0.0"), None, Some(1), Some("spice-backend0"));
+        args.add_audio_device(
+            "ich9-intel-hda",
+            "audiodev0",
+            Some("pci.2"),
+            Some("0xc"),
+            None,
+            None,
+        );
+        args.add_audio_device(
+            "hda-micro",
+            "audiodev0-codec0",
+            Some("audiodev0.0"),
+            None,
+            Some(0),
+            Some("spice-backend0"),
+        );
+        args.add_audio_device(
+            "hda-duplex",
+            "audiodev0-codec1",
+            Some("audiodev0.0"),
+            None,
+            Some(1),
+            Some("spice-backend0"),
+        );
 
         let built = args.build();
         assert!(built.iter().any(|arg| arg == "spice,id=spice-backend0"));
-        assert!(built.iter().any(|arg| arg == "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc"));
-        assert!(built.iter().any(|arg| arg == "hda-micro,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0"));
-        assert!(built.iter().any(|arg| arg == "hda-duplex,id=audiodev0-codec1,bus=audiodev0.0,cad=1,audiodev=spice-backend0"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc")
+        );
+        assert!(built.iter().any(|arg| arg
+            == "hda-micro,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0"));
+        assert!(built.iter().any(|arg| arg
+            == "hda-duplex,id=audiodev0-codec1,bus=audiodev0.0,cad=1,audiodev=spice-backend0"));
         assert!(!built.iter().any(|arg| arg.contains("spice-audio")));
     }
 
@@ -872,14 +1072,27 @@ mod tests {
 
         assert_eq!(mouse_count, 1);
         assert_eq!(keyboard_count, 1);
-        assert!(built.iter().any(|arg| arg == "virtio-serial-pci,id=virtio-serial0"));
-        assert!(built.iter().any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "virtio-serial-pci,id=virtio-serial0")
+        );
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0")
+        );
     }
 
     #[test]
     fn test_spice_vdagent_reuses_existing_serial_controller() {
         let mut args = QemuArgs::new();
-        args.add_guest_agent(Some("/var/run/qemu-server/108.qga"), false, Some("pci.0"), Some("0x8"));
+        args.add_guest_agent(
+            Some("/var/run/qemu-server/108.qga"),
+            false,
+            Some("pci.0"),
+            Some("0x8"),
+        );
         args.add_spice(5903, "0.0.0.0", true, true, true, true);
 
         let built = args.build();
@@ -889,8 +1102,16 @@ mod tests {
             .count();
 
         assert_eq!(serial_controller_count, 1);
-        assert!(built.iter().any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0"));
-        assert!(built.iter().any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0")
+        );
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0")
+        );
     }
 
     #[test]
@@ -899,9 +1120,17 @@ mod tests {
         args.add_spice(5903, "0.0.0.0", true, true, false, false);
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "port=5903,addr=0.0.0.0,disable-ticketing=on"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "port=5903,addr=0.0.0.0,disable-ticketing=on")
+        );
         assert!(!built.iter().any(|arg| arg == "qxl-vga,id=video0"));
-        assert!(built.iter().any(|arg| arg == "spicevmc,id=vdagent,name=vdagent"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "spicevmc,id=vdagent,name=vdagent")
+        );
     }
 
     #[test]
@@ -910,8 +1139,15 @@ mod tests {
         args.add_ivshmem(128, 1, "ivshmem0", Some("pcie.0"), "/dev/kvmfr0");
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0"));
-        assert!(built.iter().any(|arg| arg == "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0")
+        );
+        assert!(
+            built.iter().any(|arg| arg
+                == "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M")
+        );
     }
 
     #[test]
@@ -920,7 +1156,11 @@ mod tests {
         args.add_xhci_controller("xhci", Some(15), Some(15), Some("pci.1"), Some("0x1b"));
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b")
+        );
     }
 
     #[test]
@@ -929,34 +1169,67 @@ mod tests {
         args.add_usb_host("1-2.2", None, None, "usb0", Some("xhci.0"), Some("1"));
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1")
+        );
     }
 
     #[test]
     fn test_usb_host_explicit_hostbus_hostport() {
         let mut args = QemuArgs::new();
-        args.add_usb_host("", Some("1"), Some("2.2"), "usb0", Some("xhci.0"), Some("1"));
+        args.add_usb_host(
+            "",
+            Some("1"),
+            Some("2.2"),
+            "usb0",
+            Some("xhci.0"),
+            Some("1"),
+        );
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1")
+        );
     }
 
     #[test]
     fn test_guest_agent_with_bus_and_addr() {
         let mut args = QemuArgs::new();
-        args.add_guest_agent(Some("/var/run/qemu-server/108.qga"), false, Some("pci.0"), Some("0x8"));
+        args.add_guest_agent(
+            Some("/var/run/qemu-server/108.qga"),
+            false,
+            Some("pci.0"),
+            Some("0x8"),
+        );
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8")
+        );
     }
 
     #[test]
     fn test_balloon_with_bus_addr_and_id() {
         let mut args = QemuArgs::new();
-        args.add_balloon("virtio-balloon-pci", true, Some("balloon0"), Some("pci.0"), Some("0x3"));
+        args.add_balloon(
+            "virtio-balloon-pci",
+            true,
+            Some("balloon0"),
+            Some("pci.0"),
+            Some("0x3"),
+        );
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x3,free-page-reporting=on"));
+        assert!(
+            built.iter().any(|arg| arg
+                == "virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x3,free-page-reporting=on")
+        );
     }
 
     #[test]
@@ -965,6 +1238,10 @@ mod tests {
         args.add_scsi_controller("scsihw0", "pvscsi", None, None, Some("pci.0"), Some("0x5"));
 
         let built = args.build();
-        assert!(built.iter().any(|arg| arg == "pvscsi,id=scsihw0,bus=pci.0,addr=0x5"));
+        assert!(
+            built
+                .iter()
+                .any(|arg| arg == "pvscsi,id=scsihw0,bus=pci.0,addr=0x5")
+        );
     }
 }

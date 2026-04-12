@@ -2,33 +2,33 @@
 //!
 //! Handles configuration of virtual devices like drives, networks, displays.
 
-use super::{DeviceConfig, DriveConfig, NetworkConfig, DisplayConfig, SerialConfig};
+use super::{DeviceConfig, DisplayConfig, DriveConfig, NetworkConfig, SerialConfig};
 use crate::qemu::types::QemuArgs;
 
 impl From<DeviceConfig> for QemuArgs {
     fn from(config: DeviceConfig) -> Self {
         let mut args = QemuArgs::new();
-        
+
         // Add drive arguments
         for drive in config.drives {
             args.extend(QemuArgs::from(drive));
         }
-        
+
         // Add network arguments
         for network in config.networks {
             args.extend(QemuArgs::from(network));
         }
-        
+
         // Add display arguments
         for display in config.displays {
             args.extend(QemuArgs::from(display));
         }
-        
+
         // Add serial arguments
         for serial in config.serials {
             args.extend(QemuArgs::from(serial));
         }
-        
+
         args
     }
 }
@@ -81,7 +81,7 @@ impl From<DriveConfig> for QemuArgs {
 
         if has_path {
             if let Some(cache) = drive.cache.as_ref() {
-            drive_parts.push(format!("cache={}", cache));
+                drive_parts.push(format!("cache={}", cache));
             }
 
             if let Some(aio) = drive.aio.as_ref() {
@@ -98,14 +98,40 @@ impl From<DriveConfig> for QemuArgs {
         if needs_attached_device {
             args.push_str("-device");
             let mut device_spec = match drive.interface.as_str() {
-                "scsi" => format!("{},drive={},id={}", if drive.r#type == "cdrom" { "scsi-cd" } else { "scsi-hd" }, drive_node_id, drive.id),
-                "ide" => format!("{},drive={},id={}", if drive.r#type == "cdrom" { "ide-cd" } else { "ide-hd" }, drive_node_id, drive.id),
+                "scsi" => format!(
+                    "{},drive={},id={}",
+                    if drive.r#type == "cdrom" {
+                        "scsi-cd"
+                    } else {
+                        "scsi-hd"
+                    },
+                    drive_node_id,
+                    drive.id
+                ),
+                "ide" => format!(
+                    "{},drive={},id={}",
+                    if drive.r#type == "cdrom" {
+                        "ide-cd"
+                    } else {
+                        "ide-hd"
+                    },
+                    drive_node_id,
+                    drive.id
+                ),
                 "virtio" => format!("virtio-blk-pci,drive={},id={}", drive_node_id, drive.id),
                 "nvme" => format!("nvme,drive={},id={}", drive_node_id, drive.id),
-                _ => format!("{},drive={},id={}", drive.interface, drive_node_id, drive.id),
+                _ => format!(
+                    "{},drive={},id={}",
+                    drive.interface, drive_node_id, drive.id
+                ),
             };
 
-            let attachment_bus = drive.bus.clone().or_else(|| drive.controller.as_ref().map(|controller| format!("{}.0", controller)));
+            let attachment_bus = drive.bus.clone().or_else(|| {
+                drive
+                    .controller
+                    .as_ref()
+                    .map(|controller| format!("{}.0", controller))
+            });
             if let Some(bus) = attachment_bus {
                 device_spec.push_str(&format!(",bus={}", bus));
             }
@@ -132,17 +158,17 @@ impl From<DriveConfig> for QemuArgs {
 impl From<NetworkConfig> for QemuArgs {
     fn from(network: NetworkConfig) -> Self {
         let mut args = QemuArgs::new();
-        
+
         args.push_str("-netdev");
         let netdev_spec = match network.mode.as_str() {
             "user" => format!("type=user,id={}", network.id),
             _ => format!("type={},id={}", network.mode, network.id),
         };
         args.push(netdev_spec);
-        
+
         args.push_str("-device");
         let mut device_spec = format!("{},netdev={}", network.model, network.id);
-        
+
         if let Some(mac) = network.mac {
             device_spec.push_str(&format!(",mac={}", mac));
         }
@@ -166,7 +192,7 @@ impl From<NetworkConfig> for QemuArgs {
         if let Some(boot_index) = network.boot_index {
             device_spec.push_str(&format!(",bootindex={}", boot_index));
         }
-        
+
         args.push(device_spec);
         args
     }
@@ -175,7 +201,7 @@ impl From<NetworkConfig> for QemuArgs {
 impl From<DisplayConfig> for QemuArgs {
     fn from(display: DisplayConfig) -> Self {
         let mut args = QemuArgs::new();
-        
+
         args.push_str("-device");
         let mut device_spec = display.r#type.clone();
 
@@ -195,7 +221,7 @@ impl From<DisplayConfig> for QemuArgs {
 impl From<SerialConfig> for QemuArgs {
     fn from(serial: SerialConfig) -> Self {
         let mut args = QemuArgs::new();
-        
+
         match serial.r#type.as_str() {
             "pty" => {
                 args.push_str("-serial");
@@ -207,7 +233,10 @@ impl From<SerialConfig> for QemuArgs {
             }
             "file" => {
                 args.push_str("-serial");
-                args.push(format!("file:{}", serial.path.unwrap_or_else(|| "/dev/null".to_string())));
+                args.push(format!(
+                    "file:{}",
+                    serial.path.unwrap_or_else(|| "/dev/null".to_string())
+                ));
             }
             "socket" => {
                 args.push_str("-serial");
@@ -228,7 +257,7 @@ impl From<SerialConfig> for QemuArgs {
                 args.push("pty".to_string());
             }
         }
-        
+
         args
     }
 }

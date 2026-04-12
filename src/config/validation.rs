@@ -3,44 +3,47 @@
 //! Validates VM configurations for correctness and compatibility.
 
 use super::VmConfig;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 /// Validate a complete VM configuration
 pub fn validate_config(config: &VmConfig) -> Result<()> {
     // Validate backend
     if config.backend != "qemu" {
-        return Err(anyhow!("Unsupported backend: {}. Only 'qemu' is currently supported.", config.backend));
+        return Err(anyhow!(
+            "Unsupported backend: {}. Only 'qemu' is currently supported.",
+            config.backend
+        ));
     }
-    
+
     // Validate system configuration
     validate_system_config(&config.system)?;
-    
+
     // Validate boot configuration
     validate_boot_config(&config.boot)?;
-    
+
     // Validate device configuration
     validate_device_config(&config.devices)?;
-    
+
     // Validate TPM configuration
     if let Some(tpm) = &config.tpm {
         validate_tpm_config(tpm)?;
     }
-    
+
     // Validate guest agent configuration
     if let Some(guest_agent) = &config.guest_agent {
         validate_guest_agent_config(guest_agent)?;
     }
-    
+
     // Validate ballooning configuration
     if let Some(ballooning) = &config.ballooning {
         validate_ballooning_config(ballooning)?;
     }
-    
+
     // Validate hardware passthrough configuration
     for hostpci in &config.hostpci {
         validate_hostpci_config(hostpci)?;
     }
-    
+
     // Validate USB device configuration
     for usb_device in &config.usb_devices {
         validate_usb_device_config(usb_device)?;
@@ -50,7 +53,7 @@ pub fn validate_config(config: &VmConfig) -> Result<()> {
     for xhci_controller in &config.xhci_controllers {
         validate_xhci_controller_config(xhci_controller)?;
     }
-    
+
     // Validate SPICE configuration
     if let Some(spice) = &config.spice {
         validate_spice_config(spice)?;
@@ -61,44 +64,44 @@ pub fn validate_config(config: &VmConfig) -> Result<()> {
 
     // Validate input device configuration
     validate_input_devices(&config.input_devices)?;
-    
+
     // Validate ivshmem configuration
     if let Some(ivshmem) = &config.ivshmem {
         validate_ivshmem_config(ivshmem)?;
     }
-    
+
     // Validate SCSI controller configuration
     for scsi_controller in &config.scsi_controllers {
         validate_scsi_controller_config(scsi_controller)?;
     }
-    
+
     // Validate iSCSI disk configuration
     for iscsi_disk in &config.iscsi_disks {
         validate_iscsi_disk_config(iscsi_disk)?;
     }
-    
+
     // Validate QMP configuration
     if let Some(qmp) = &config.qmp {
         validate_qmp_config(qmp)?;
     }
-    
+
     // Validate SMBIOS configuration
     if let Some(smbios) = &config.smbios {
         validate_smbios_config(smbios)?;
     }
-    
+
     // Validate NUMA configuration
     for numa in &config.numa {
         validate_numa_config(numa)?;
     }
-    
+
     // Validate Hyper-V configuration
     if let Some(hyperv) = &config.hyperv {
         validate_hyperv_config(hyperv)?;
     }
 
     validate_vm_options(&config.options)?;
-    
+
     Ok(())
 }
 
@@ -107,18 +110,22 @@ fn validate_system_config(system: &super::SystemConfig) -> Result<()> {
     // Validate architecture
     let valid_architectures = ["x86_64", "aarch64", "x86", "ppc64", "riscv64"];
     if !valid_architectures.contains(&system.architecture.as_str()) {
-        return Err(anyhow!("Unsupported architecture: {}. Supported: {:?}", 
-                          system.architecture, valid_architectures));
+        return Err(anyhow!(
+            "Unsupported architecture: {}. Supported: {:?}",
+            system.architecture,
+            valid_architectures
+        ));
     }
-    
+
     // Validate memory (reasonable bounds)
     if system.memory < 128 {
         return Err(anyhow!("Memory must be at least 128 MiB"));
     }
-    if system.memory > 1024 * 1024 { // 1 TiB
+    if system.memory > 1024 * 1024 {
+        // 1 TiB
         return Err(anyhow!("Memory cannot exceed 1 TiB"));
     }
-    
+
     // Validate vCPUs
     if system.vcpus == 0 {
         return Err(anyhow!("Must have at least 1 vCPU"));
@@ -126,7 +133,7 @@ fn validate_system_config(system: &super::SystemConfig) -> Result<()> {
     if system.vcpus > 1024 {
         return Err(anyhow!("Cannot have more than 1024 vCPUs"));
     }
-    
+
     // Validate CPU features
     // Features may be:
     //   +flag / -flag  — enable/disable a standard x86 CPU flag
@@ -143,10 +150,13 @@ fn validate_system_config(system: &super::SystemConfig) -> Result<()> {
             return Err(anyhow!("Machine options cannot be empty"));
         }
         if !option.contains('=') {
-            return Err(anyhow!("Machine option '{}' must use key=value format", option));
+            return Err(anyhow!(
+                "Machine option '{}' must use key=value format",
+                option
+            ));
         }
     }
-    
+
     Ok(())
 }
 
@@ -156,42 +166,44 @@ fn validate_boot_config(boot: &super::BootConfig) -> Result<()> {
     if let Some(firmware) = &boot.firmware {
         let valid_firmware = ["uefi", "bios", "ovmf"];
         if !valid_firmware.contains(&firmware.as_str()) {
-            return Err(anyhow!("Unsupported firmware: {}. Supported: {:?}", 
-                              firmware, valid_firmware));
+            return Err(anyhow!(
+                "Unsupported firmware: {}. Supported: {:?}",
+                firmware,
+                valid_firmware
+            ));
         }
     }
-    
+
     // Validate boot order
     let valid_boot_devices = ["disk", "cdrom", "network", "hd", "cd"];
     for device in &boot.boot_order {
         if !valid_boot_devices.contains(&device.as_str()) {
-            return Err(anyhow!("Unsupported boot device: {}. Supported: {:?}", 
-                              device, valid_boot_devices));
-        }
-    }
-    
-    // Validate UEFI paths if firmware is UEFI
-    if let Some(firmware) = &boot.firmware {
-        if firmware == "uefi" || firmware == "ovmf" {
-            if let Some(code_path) = &boot.uefi_code {
-                if !std::path::Path::new(code_path).exists() {
-                    eprintln!("Warning: UEFI code path '{}' does not exist", code_path);
-                }
-            }
-            if let Some(vars_path) = &boot.uefi_vars {
-                if !std::path::Path::new(vars_path).exists() {
-                    eprintln!("Warning: UEFI vars path '{}' does not exist", vars_path);
-                }
-            }
+            return Err(anyhow!(
+                "Unsupported boot device: {}. Supported: {:?}",
+                device,
+                valid_boot_devices
+            ));
         }
     }
 
-    if let Some(splash) = &boot.splash {
-        if splash.trim().is_empty() {
+    // Validate UEFI paths if firmware is UEFI
+    if let Some(firmware) = &boot.firmware
+        && (firmware == "uefi" || firmware == "ovmf") {
+            if let Some(code_path) = &boot.uefi_code
+                && !std::path::Path::new(code_path).exists() {
+                    eprintln!("Warning: UEFI code path '{}' does not exist", code_path);
+                }
+            if let Some(vars_path) = &boot.uefi_vars
+                && !std::path::Path::new(vars_path).exists() {
+                    eprintln!("Warning: UEFI vars path '{}' does not exist", vars_path);
+                }
+        }
+
+    if let Some(splash) = &boot.splash
+        && splash.trim().is_empty() {
             return Err(anyhow!("Boot splash path cannot be empty"));
         }
-    }
-    
+
     Ok(())
 }
 
@@ -201,12 +213,12 @@ fn validate_device_config(devices: &super::DeviceConfig) -> Result<()> {
     for drive in &devices.drives {
         validate_drive_config(drive)?;
     }
-    
+
     // Validate networks
     for network in &devices.networks {
         validate_network_config(network)?;
     }
-    
+
     // Validate displays
     for display in &devices.displays {
         validate_display_config(display)?;
@@ -216,7 +228,7 @@ fn validate_device_config(devices: &super::DeviceConfig) -> Result<()> {
     for serial in &devices.serials {
         validate_serial_config(serial)?;
     }
-    
+
     Ok(())
 }
 
@@ -227,50 +239,70 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
     // Validate interface
     let valid_interfaces = ["virtio", "scsi", "ide", "nvme"];
     if !valid_interfaces.contains(&drive.interface.as_str()) {
-        return Err(anyhow!("Unsupported drive interface: {}. Supported: {:?}", 
-                          drive.interface, valid_interfaces));
+        return Err(anyhow!(
+            "Unsupported drive interface: {}. Supported: {:?}",
+            drive.interface,
+            valid_interfaces
+        ));
     }
-    
+
     // Validate type
     let valid_types = ["disk", "cdrom"];
     if !valid_types.contains(&drive.r#type.as_str()) {
-        return Err(anyhow!("Unsupported drive type: {}. Supported: {:?}", 
-                          drive.r#type, valid_types));
+        return Err(anyhow!(
+            "Unsupported drive type: {}. Supported: {:?}",
+            drive.r#type,
+            valid_types
+        ));
     }
-    
+
     // Validate format
     let valid_formats = ["qcow2", "raw", "vmdk", "vdi"];
     if !valid_formats.contains(&drive.format.as_str()) {
-        return Err(anyhow!("Unsupported drive format: {}. Supported: {:?}", 
-                          drive.format, valid_formats));
+        return Err(anyhow!(
+            "Unsupported drive format: {}. Supported: {:?}",
+            drive.format,
+            valid_formats
+        ));
     }
 
     if let Some(cache) = &drive.cache {
         let valid_cache = ["none", "writeback", "writethrough", "unsafe", "directsync"];
         if !valid_cache.contains(&cache.as_str()) {
-            return Err(anyhow!("Unsupported drive cache mode: {}. Supported: {:?}", cache, valid_cache));
+            return Err(anyhow!(
+                "Unsupported drive cache mode: {}. Supported: {:?}",
+                cache,
+                valid_cache
+            ));
         }
     }
 
     if let Some(aio) = &drive.aio {
         let valid_aio = ["threads", "native", "io_uring"];
         if !valid_aio.contains(&aio.as_str()) {
-            return Err(anyhow!("Unsupported drive aio mode: {}. Supported: {:?}", aio, valid_aio));
+            return Err(anyhow!(
+                "Unsupported drive aio mode: {}. Supported: {:?}",
+                aio,
+                valid_aio
+            ));
         }
     }
 
     if let Some(detect_zeroes) = &drive.detect_zeroes {
         let valid_detect_zeroes = ["off", "on", "unmap"];
         if !valid_detect_zeroes.contains(&detect_zeroes.as_str()) {
-            return Err(anyhow!("Unsupported detect-zeroes mode: {}. Supported: {:?}", detect_zeroes, valid_detect_zeroes));
+            return Err(anyhow!(
+                "Unsupported detect-zeroes mode: {}. Supported: {:?}",
+                detect_zeroes,
+                valid_detect_zeroes
+            ));
         }
     }
 
-    if let Some(boot_index) = drive.boot_index {
-        if boot_index == 0 {
+    if let Some(boot_index) = drive.boot_index
+        && boot_index == 0 {
             return Err(anyhow!("Drive boot_index must be greater than 0"));
         }
-    }
 
     if let Some(scsi_id) = drive.scsi_id {
         if drive.interface != "scsi" {
@@ -281,15 +313,16 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
         }
     }
 
-    if let Some(bus) = &drive.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &drive.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("Drive bus cannot be empty"));
         }
-    }
 
     if let Some(unit) = drive.unit {
         if drive.interface != "ide" {
-            return Err(anyhow!("Drive unit is currently only supported for ide interfaces"));
+            return Err(anyhow!(
+                "Drive unit is currently only supported for ide interfaces"
+            ));
         }
         if unit > 3 {
             return Err(anyhow!("Drive unit cannot exceed 3 for ide interfaces"));
@@ -297,14 +330,16 @@ fn validate_drive_config(drive: &super::DriveConfig) -> Result<()> {
     }
 
     if !has_path && drive.r#type != "cdrom" {
-        return Err(anyhow!("Drive path cannot be empty unless drive type is cdrom"));
+        return Err(anyhow!(
+            "Drive path cannot be empty unless drive type is cdrom"
+        ));
     }
-    
+
     // Check if path exists (optional, but warn if not)
     if has_path && !std::path::Path::new(&drive.path).exists() {
         eprintln!("Warning: Drive path '{}' does not exist", drive.path);
     }
-    
+
     Ok(())
 }
 
@@ -313,50 +348,52 @@ fn validate_network_config(network: &super::NetworkConfig) -> Result<()> {
     // Validate model
     let valid_models = ["virtio-net", "virtio-net-pci", "e1000", "e1000e", "rtl8139"];
     if !valid_models.contains(&network.model.as_str()) {
-        return Err(anyhow!("Unsupported network model: {}. Supported: {:?}", 
-                          network.model, valid_models));
+        return Err(anyhow!(
+            "Unsupported network model: {}. Supported: {:?}",
+            network.model,
+            valid_models
+        ));
     }
-    
+
     // Validate mode
     let valid_mode_prefixes = ["user", "bridge", "socket", "tap"];
-    let mode_valid = valid_mode_prefixes.iter()
+    let mode_valid = valid_mode_prefixes
+        .iter()
         .any(|prefix| network.mode.starts_with(prefix));
     if !mode_valid {
-        return Err(anyhow!("Unsupported network mode: {}. Must start with one of: {:?}", 
-                          network.mode, valid_mode_prefixes));
+        return Err(anyhow!(
+            "Unsupported network mode: {}. Must start with one of: {:?}",
+            network.mode,
+            valid_mode_prefixes
+        ));
     }
-    
+
     // Validate MAC address format if provided
-    if let Some(mac) = &network.mac {
-        if !is_valid_mac_address(mac) {
+    if let Some(mac) = &network.mac
+        && !is_valid_mac_address(mac) {
             return Err(anyhow!("Invalid MAC address format: {}", mac));
         }
-    }
 
-    if let Some(rx_queue_size) = network.rx_queue_size {
-        if rx_queue_size == 0 {
+    if let Some(rx_queue_size) = network.rx_queue_size
+        && rx_queue_size == 0 {
             return Err(anyhow!("RX queue size must be greater than 0"));
         }
-    }
 
-    if let Some(tx_queue_size) = network.tx_queue_size {
-        if tx_queue_size == 0 {
+    if let Some(tx_queue_size) = network.tx_queue_size
+        && tx_queue_size == 0 {
             return Err(anyhow!("TX queue size must be greater than 0"));
         }
-    }
 
-    if let Some(bus) = &network.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &network.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("Network bus cannot be empty"));
         }
-    }
 
-    if let Some(addr) = &network.addr {
-        if addr.trim().is_empty() {
+    if let Some(addr) = &network.addr
+        && addr.trim().is_empty() {
             return Err(anyhow!("Network device address cannot be empty"));
         }
-    }
-    
+
     Ok(())
 }
 
@@ -365,16 +402,20 @@ fn validate_display_config(display: &super::DisplayConfig) -> Result<()> {
     // Validate type
     let valid_types = ["virtio-gpu", "qxl", "cirrus", "vga", "vmware-svga", "none"];
     if !valid_types.contains(&display.r#type.as_str()) {
-        return Err(anyhow!("Unsupported display type: {}. Supported: {:?}", 
-                          display.r#type, valid_types));
+        return Err(anyhow!(
+            "Unsupported display type: {}. Supported: {:?}",
+            display.r#type,
+            valid_types
+        ));
     }
-    
+
     // Validate VRAM
     if let Some(vram) = display.vram {
         if vram == 0 {
             return Err(anyhow!("VRAM must be greater than 0 when specified"));
         }
-        if vram > 1024 { // 1 GiB
+        if vram > 1024 {
+            // 1 GiB
             return Err(anyhow!("VRAM cannot exceed 1024 MiB"));
         }
 
@@ -387,7 +428,7 @@ fn validate_display_config(display: &super::DisplayConfig) -> Result<()> {
             ));
         }
     }
-    
+
     Ok(())
 }
 
@@ -395,7 +436,11 @@ fn validate_display_config(display: &super::DisplayConfig) -> Result<()> {
 fn validate_serial_config(serial: &super::SerialConfig) -> Result<()> {
     let valid_types = ["pty", "stdio", "file", "socket"];
     if !valid_types.contains(&serial.r#type.as_str()) {
-        return Err(anyhow!("Unsupported serial type: {}. Supported: {:?}", serial.r#type, valid_types));
+        return Err(anyhow!(
+            "Unsupported serial type: {}. Supported: {:?}",
+            serial.r#type,
+            valid_types
+        ));
     }
 
     match serial.r#type.as_str() {
@@ -413,7 +458,9 @@ fn validate_serial_config(serial: &super::SerialConfig) -> Result<()> {
 
             match serial.socket_port {
                 Some(0) | None => {
-                    return Err(anyhow!("Serial socket backend requires a TCP port between 1 and 65535"));
+                    return Err(anyhow!(
+                        "Serial socket backend requires a TCP port between 1 and 65535"
+                    ));
                 }
                 Some(_) => {}
             }
@@ -432,7 +479,7 @@ fn is_valid_mac_address(mac: &str) -> bool {
     if parts.len() != 6 {
         return false;
     }
-    
+
     for part in parts {
         if part.len() != 2 {
             return false;
@@ -441,7 +488,7 @@ fn is_valid_mac_address(mac: &str) -> bool {
             return false;
         }
     }
-    
+
     true
 }
 
@@ -450,24 +497,33 @@ fn validate_tpm_config(tpm: &super::TpmConfig) -> Result<()> {
     // Validate version
     let valid_versions = ["1.2", "2.0"];
     if !valid_versions.contains(&tpm.version.as_str()) {
-        return Err(anyhow!("Unsupported TPM version: {}. Supported: {:?}", 
-                          tpm.version, valid_versions));
+        return Err(anyhow!(
+            "Unsupported TPM version: {}. Supported: {:?}",
+            tpm.version,
+            valid_versions
+        ));
     }
-    
+
     // Validate backend
     let valid_backends = ["emulator", "passthrough"];
     if !valid_backends.contains(&tpm.backend.as_str()) {
-        return Err(anyhow!("Unsupported TPM backend: {}. Supported: {:?}", 
-                          tpm.backend, valid_backends));
+        return Err(anyhow!(
+            "Unsupported TPM backend: {}. Supported: {:?}",
+            tpm.backend,
+            valid_backends
+        ));
     }
-    
+
     // Validate model
     let valid_models = ["tpm-tis", "tpm-crb"];
     if !valid_models.contains(&tpm.model.as_str()) {
-        return Err(anyhow!("Unsupported TPM model: {}. Supported: {:?}", 
-                          tpm.model, valid_models));
+        return Err(anyhow!(
+            "Unsupported TPM model: {}. Supported: {:?}",
+            tpm.model,
+            valid_models
+        ));
     }
-    
+
     Ok(())
 }
 
@@ -475,17 +531,15 @@ fn validate_tpm_config(tpm: &super::TpmConfig) -> Result<()> {
 fn validate_guest_agent_config(_guest_agent: &super::GuestAgentConfig) -> Result<()> {
     // Basic validation - guest agent config is mostly boolean flags
     // Could add socket path validation if needed
-    if let Some(bus) = &_guest_agent.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &_guest_agent.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("Guest agent bus cannot be empty"));
         }
-    }
 
-    if let Some(addr) = &_guest_agent.addr {
-        if addr.trim().is_empty() {
+    if let Some(addr) = &_guest_agent.addr
+        && addr.trim().is_empty() {
             return Err(anyhow!("Guest agent address cannot be empty"));
         }
-    }
 
     Ok(())
 }
@@ -501,35 +555,40 @@ fn validate_vm_options(options: &super::VmOptions) -> Result<()> {
         if let Some(base) = &rtc.base {
             let valid = ["utc", "localtime"];
             if !valid.contains(&base.as_str()) {
-                return Err(anyhow!("Unsupported RTC base: {}. Supported: {:?}", base, valid));
+                return Err(anyhow!(
+                    "Unsupported RTC base: {}. Supported: {:?}",
+                    base,
+                    valid
+                ));
             }
         }
 
         if let Some(driftfix) = &rtc.driftfix {
             let valid = ["none", "slew"];
             if !valid.contains(&driftfix.as_str()) {
-                return Err(anyhow!("Unsupported RTC driftfix: {}. Supported: {:?}", driftfix, valid));
+                return Err(anyhow!(
+                    "Unsupported RTC driftfix: {}. Supported: {:?}",
+                    driftfix,
+                    valid
+                ));
             }
         }
     }
 
-    if let Some(pid_file) = &options.pid_file {
-        if pid_file.trim().is_empty() {
+    if let Some(pid_file) = &options.pid_file
+        && pid_file.trim().is_empty() {
             return Err(anyhow!("PID file path cannot be empty"));
         }
-    }
 
-    if let Some(log_dir) = &options.log_dir {
-        if log_dir.trim().is_empty() {
+    if let Some(log_dir) = &options.log_dir
+        && log_dir.trim().is_empty() {
             return Err(anyhow!("Log directory cannot be empty"));
         }
-    }
 
-    if let Some(log_keep) = options.log_keep {
-        if log_keep == 0 {
+    if let Some(log_keep) = options.log_keep
+        && log_keep == 0 {
             return Err(anyhow!("log_keep must be greater than 0"));
         }
-    }
 
     Ok(())
 }
@@ -539,28 +598,28 @@ fn validate_ballooning_config(ballooning: &super::BallooningConfig) -> Result<()
     // Validate model
     let valid_models = ["virtio-balloon-pci", "virtio-balloon-ccw"];
     if !valid_models.contains(&ballooning.model.as_str()) {
-        return Err(anyhow!("Unsupported balloon model: {}. Supported: {:?}", 
-                          ballooning.model, valid_models));
+        return Err(anyhow!(
+            "Unsupported balloon model: {}. Supported: {:?}",
+            ballooning.model,
+            valid_models
+        ));
     }
 
-    if let Some(id) = &ballooning.id {
-        if id.trim().is_empty() {
+    if let Some(id) = &ballooning.id
+        && id.trim().is_empty() {
             return Err(anyhow!("Balloon device id cannot be empty"));
         }
-    }
 
-    if let Some(bus) = &ballooning.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &ballooning.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("Balloon device bus cannot be empty"));
         }
-    }
 
-    if let Some(addr) = &ballooning.addr {
-        if addr.trim().is_empty() {
+    if let Some(addr) = &ballooning.addr
+        && addr.trim().is_empty() {
             return Err(anyhow!("Balloon device address cannot be empty"));
         }
-    }
-    
+
     Ok(())
 }
 
@@ -568,53 +627,80 @@ fn validate_ballooning_config(ballooning: &super::BallooningConfig) -> Result<()
 fn validate_hostpci_config(hostpci: &super::HostPciConfig) -> Result<()> {
     // Validate PCI device address format (basic check)
     if !is_valid_pci_address(&hostpci.device) {
-        return Err(anyhow!("Invalid PCI device address format: {}", hostpci.device));
+        return Err(anyhow!(
+            "Invalid PCI device address format: {}",
+            hostpci.device
+        ));
     }
 
-    if let Some(bus) = &hostpci.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &hostpci.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("Host PCI guest bus cannot be empty"));
         }
-    }
 
-    if let Some(addr) = &hostpci.addr {
-        if addr.trim().is_empty() {
+    if let Some(addr) = &hostpci.addr
+        && addr.trim().is_empty() {
             return Err(anyhow!("Host PCI guest address cannot be empty"));
         }
-    }
-    
+
     // Check if ROM file exists if specified
-    if let Some(romfile) = &hostpci.romfile {
-        if !std::path::Path::new(romfile).exists() {
+    if let Some(romfile) = &hostpci.romfile
+        && !std::path::Path::new(romfile).exists() {
             eprintln!("Warning: ROM file '{}' does not exist", romfile);
         }
-    }
-    
+
     Ok(())
 }
 
 /// Validate USB device configuration
 fn validate_usb_device_config(usb_device: &super::UsbDeviceConfig) -> Result<()> {
     let has_host_spec = !usb_device.host.trim().is_empty();
-    let has_hostbus = usb_device.hostbus.as_deref().map(|value| !value.trim().is_empty()).unwrap_or(false);
-    let has_hostport = usb_device.hostport.as_deref().map(|value| !value.trim().is_empty()).unwrap_or(false);
+    let has_hostbus = usb_device
+        .hostbus
+        .as_deref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    let has_hostport = usb_device
+        .hostport
+        .as_deref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
 
     if has_host_spec {
         if !is_valid_usb_spec(&usb_device.host) {
-            return Err(anyhow!("Invalid USB device specification: {}. Expected format: 'bus-port.path', 'vendor:product', or use hostbus/hostport fields", usb_device.host));
+            return Err(anyhow!(
+                "Invalid USB device specification: {}. Expected format: 'bus-port.path', 'vendor:product', or use hostbus/hostport fields",
+                usb_device.host
+            ));
         }
     } else if !(has_hostbus && has_hostport) {
-        return Err(anyhow!("USB device '{}' requires either host or both hostbus and hostport", usb_device.id));
+        return Err(anyhow!(
+            "USB device '{}' requires either host or both hostbus and hostport",
+            usb_device.id
+        ));
     }
 
-    if has_hostbus && !usb_device.hostbus.as_ref().unwrap().chars().all(|c| c.is_ascii_digit()) {
-        return Err(anyhow!("USB hostbus must be numeric: {}", usb_device.hostbus.as_ref().unwrap()));
+    if has_hostbus
+        && !usb_device
+            .hostbus
+            .as_ref()
+            .unwrap()
+            .chars()
+            .all(|c| c.is_ascii_digit())
+    {
+        return Err(anyhow!(
+            "USB hostbus must be numeric: {}",
+            usb_device.hostbus.as_ref().unwrap()
+        ));
     }
 
     if has_hostport && !is_valid_usb_hostport(usb_device.hostport.as_ref().unwrap()) {
-        return Err(anyhow!("Invalid USB hostport format: {}", usb_device.hostport.as_ref().unwrap()));
+        return Err(anyhow!(
+            "Invalid USB hostport format: {}",
+            usb_device.hostport.as_ref().unwrap()
+        ));
     }
-    
+
     Ok(())
 }
 
@@ -624,29 +710,29 @@ fn validate_xhci_controller_config(xhci_controller: &super::XhciControllerConfig
         return Err(anyhow!("XHCI controller id cannot be empty"));
     }
 
-    if let Some(p2) = xhci_controller.p2 {
-        if p2 == 0 {
-            return Err(anyhow!("XHCI controller p2 must be greater than 0 when specified"));
+    if let Some(p2) = xhci_controller.p2
+        && p2 == 0 {
+            return Err(anyhow!(
+                "XHCI controller p2 must be greater than 0 when specified"
+            ));
         }
-    }
 
-    if let Some(p3) = xhci_controller.p3 {
-        if p3 == 0 {
-            return Err(anyhow!("XHCI controller p3 must be greater than 0 when specified"));
+    if let Some(p3) = xhci_controller.p3
+        && p3 == 0 {
+            return Err(anyhow!(
+                "XHCI controller p3 must be greater than 0 when specified"
+            ));
         }
-    }
 
-    if let Some(bus) = &xhci_controller.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &xhci_controller.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("XHCI controller bus cannot be empty"));
         }
-    }
 
-    if let Some(addr) = &xhci_controller.addr {
-        if addr.trim().is_empty() {
+    if let Some(addr) = &xhci_controller.addr
+        && addr.trim().is_empty() {
             return Err(anyhow!("XHCI controller addr cannot be empty"));
         }
-    }
 
     Ok(())
 }
@@ -655,35 +741,46 @@ fn validate_xhci_controller_config(xhci_controller: &super::XhciControllerConfig
 fn validate_spice_config(spice: &super::SpiceConfig) -> Result<()> {
     // Validate port range
     if spice.port == 0 {
-        return Err(anyhow!("Invalid SPICE port: {}. Must be between 1 and 65535", spice.port));
+        return Err(anyhow!(
+            "Invalid SPICE port: {}. Must be between 1 and 65535",
+            spice.port
+        ));
     }
-    
+
     // Validate IP address format (basic check)
     if spice.addr.is_empty() {
         return Err(anyhow!("SPICE address cannot be empty"));
     }
-    
+
     Ok(())
 }
 
 /// Validate audio device configuration
-fn validate_audio_devices(audio_devices: &[super::AudioDeviceConfig], spice: Option<&super::SpiceConfig>) -> Result<()> {
+fn validate_audio_devices(
+    audio_devices: &[super::AudioDeviceConfig],
+    spice: Option<&super::SpiceConfig>,
+) -> Result<()> {
     if audio_devices.is_empty() {
-        if let Some(spice) = spice {
-            if spice.enabled && spice.audio {
-                return Err(anyhow!("SPICE audio requires at least one configured audio device"));
+        if let Some(spice) = spice
+            && spice.enabled && spice.audio {
+                return Err(anyhow!(
+                    "SPICE audio requires at least one configured audio device"
+                ));
             }
-        }
         return Ok(());
     }
 
     match spice {
         Some(spice) if spice.enabled && spice.audio => {}
         Some(_) => {
-            return Err(anyhow!("Audio devices currently require spice.enabled=true and spice.audio=true"));
+            return Err(anyhow!(
+                "Audio devices currently require spice.enabled=true and spice.audio=true"
+            ));
         }
         None => {
-            return Err(anyhow!("Audio devices currently require a SPICE configuration with audio enabled"));
+            return Err(anyhow!(
+                "Audio devices currently require a SPICE configuration with audio enabled"
+            ));
         }
     }
 
@@ -699,11 +796,17 @@ fn validate_audio_devices(audio_devices: &[super::AudioDeviceConfig], spice: Opt
                 }
 
                 if audio_device.cad.is_some() {
-                    return Err(anyhow!("Audio controller '{}' cannot define cad", audio_device.id));
+                    return Err(anyhow!(
+                        "Audio controller '{}' cannot define cad",
+                        audio_device.id
+                    ));
                 }
 
                 if audio_device.audiodev.is_some() {
-                    return Err(anyhow!("Audio controller '{}' cannot define audiodev", audio_device.id));
+                    return Err(anyhow!(
+                        "Audio controller '{}' cannot define audiodev",
+                        audio_device.id
+                    ));
                 }
             }
             "hda-micro" | "hda-duplex" => {
@@ -712,15 +815,30 @@ fn validate_audio_devices(audio_devices: &[super::AudioDeviceConfig], spice: Opt
                 }
 
                 if audio_device.bus.as_deref().unwrap_or("").trim().is_empty() {
-                    return Err(anyhow!("Audio codec '{}' requires a bus assignment", audio_device.id));
+                    return Err(anyhow!(
+                        "Audio codec '{}' requires a bus assignment",
+                        audio_device.id
+                    ));
                 }
 
-                if audio_device.audiodev.as_deref().unwrap_or("").trim().is_empty() {
-                    return Err(anyhow!("Audio codec '{}' requires an audiodev backend ID", audio_device.id));
+                if audio_device
+                    .audiodev
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(anyhow!(
+                        "Audio codec '{}' requires an audiodev backend ID",
+                        audio_device.id
+                    ));
                 }
 
                 if audio_device.cad.is_none() {
-                    return Err(anyhow!("Audio codec '{}' requires a cad value", audio_device.id));
+                    return Err(anyhow!(
+                        "Audio codec '{}' requires a cad value",
+                        audio_device.id
+                    ));
                 }
             }
             other => {
@@ -733,7 +851,9 @@ fn validate_audio_devices(audio_devices: &[super::AudioDeviceConfig], spice: Opt
     }
 
     if !has_controller {
-        return Err(anyhow!("Audio device configuration requires an ich9-intel-hda controller"));
+        return Err(anyhow!(
+            "Audio device configuration requires an ich9-intel-hda controller"
+        ));
     }
 
     Ok(())
@@ -754,7 +874,10 @@ fn validate_input_devices(input_devices: &[super::InputDeviceConfig]) -> Result<
         }
 
         if !seen_types.insert(input_device.r#type.as_str()) {
-            return Err(anyhow!("Duplicate input device type configured: {}", input_device.r#type));
+            return Err(anyhow!(
+                "Duplicate input device type configured: {}",
+                input_device.r#type
+            ));
         }
     }
 
@@ -767,10 +890,11 @@ fn validate_ivshmem_config(ivshmem: &super::IvshmemConfig) -> Result<()> {
     if ivshmem.size == 0 {
         return Err(anyhow!("ivshmem size must be greater than 0"));
     }
-    if ivshmem.size > 1024 { // 1 GiB
+    if ivshmem.size > 1024 {
+        // 1 GiB
         return Err(anyhow!("ivshmem size cannot exceed 1024 MiB"));
     }
-    
+
     // Validate vectors (reasonable bounds)  run_dir: "/var/run/ezkvm"
 
     if ivshmem.vectors == 0 || ivshmem.vectors > 32 {
@@ -781,11 +905,10 @@ fn validate_ivshmem_config(ivshmem: &super::IvshmemConfig) -> Result<()> {
         return Err(anyhow!("ivshmem id cannot be empty"));
     }
 
-    if let Some(bus) = &ivshmem.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &ivshmem.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("ivshmem bus cannot be empty"));
         }
-    }
 
     if ivshmem.mem_path.trim().is_empty() {
         return Err(anyhow!("ivshmem mem_path cannot be empty"));
@@ -794,38 +917,45 @@ fn validate_ivshmem_config(ivshmem: &super::IvshmemConfig) -> Result<()> {
     if !ivshmem.mem_path.starts_with('/') {
         return Err(anyhow!("ivshmem mem_path must be an absolute path"));
     }
-    
+
     Ok(())
 }
 
 /// Validate SCSI controller configuration
 fn validate_scsi_controller_config(scsi_controller: &super::ScsiControllerConfig) -> Result<()> {
     // Validate controller type
-    let valid_types = ["virtio-scsi-pci", "pvscsi", "lsi", "lsi53c895a", "megasas", "megasas-gen2"];
+    let valid_types = [
+        "virtio-scsi-pci",
+        "pvscsi",
+        "lsi",
+        "lsi53c895a",
+        "megasas",
+        "megasas-gen2",
+    ];
     if !valid_types.contains(&scsi_controller.r#type.as_str()) {
-        return Err(anyhow!("Unsupported SCSI controller type: {}. Supported: {:?}", 
-                          scsi_controller.r#type, valid_types));
+        return Err(anyhow!(
+            "Unsupported SCSI controller type: {}. Supported: {:?}",
+            scsi_controller.r#type,
+            valid_types
+        ));
     }
-    
+
     // Validate max_targets if specified
-    if let Some(max_targets) = scsi_controller.max_targets {
-        if max_targets == 0 || max_targets > 256 {
+    if let Some(max_targets) = scsi_controller.max_targets
+        && (max_targets == 0 || max_targets > 256) {
             return Err(anyhow!("max_targets must be between 1 and 256"));
         }
-    }
 
-    if let Some(bus) = &scsi_controller.bus {
-        if bus.trim().is_empty() {
+    if let Some(bus) = &scsi_controller.bus
+        && bus.trim().is_empty() {
             return Err(anyhow!("SCSI controller bus cannot be empty"));
         }
-    }
 
-    if let Some(addr) = &scsi_controller.addr {
-        if addr.trim().is_empty() {
+    if let Some(addr) = &scsi_controller.addr
+        && addr.trim().is_empty() {
             return Err(anyhow!("SCSI controller addr cannot be empty"));
         }
-    }
-    
+
     Ok(())
 }
 
@@ -835,23 +965,26 @@ fn validate_iscsi_disk_config(iscsi_disk: &super::IscsiDiskConfig) -> Result<()>
     if !iscsi_disk.portal.contains(':') {
         return Err(anyhow!("iSCSI portal must be in format 'host:port'"));
     }
-    
+
     // Validate target IQN format (basic check)
     if !iscsi_disk.target.starts_with("iqn.") {
-        return Err(anyhow!("iSCSI target must be a valid IQN starting with 'iqn.'"));
+        return Err(anyhow!(
+            "iSCSI target must be a valid IQN starting with 'iqn.'"
+        ));
     }
-    
+
     // Validate LUN
     if iscsi_disk.lun > 255 {
         return Err(anyhow!("iSCSI LUN cannot exceed 255"));
     }
-    
+
     // Validate initiator IQN if provided
-    if let Some(initiator) = &iscsi_disk.initiator {
-        if !initiator.starts_with("iqn.") {
-            return Err(anyhow!("iSCSI initiator must be a valid IQN starting with 'iqn.'"));
+    if let Some(initiator) = &iscsi_disk.initiator
+        && !initiator.starts_with("iqn.") {
+            return Err(anyhow!(
+                "iSCSI initiator must be a valid IQN starting with 'iqn.'"
+            ));
         }
-    }
 
     match (&iscsi_disk.username, &iscsi_disk.password) {
         (Some(username), Some(password)) => {
@@ -863,11 +996,13 @@ fn validate_iscsi_disk_config(iscsi_disk: &super::IscsiDiskConfig) -> Result<()>
             }
         }
         (Some(_), None) | (None, Some(_)) => {
-            return Err(anyhow!("iSCSI authentication requires both username and password"));
+            return Err(anyhow!(
+                "iSCSI authentication requires both username and password"
+            ));
         }
         (None, None) => {}
     }
-    
+
     Ok(())
 }
 
@@ -883,26 +1018,28 @@ fn validate_qmp_config(qmp: &super::QmpConfig) -> Result<()> {
             return Err(anyhow!("QMP socket path must be an absolute path"));
         }
     }
-    
+
     Ok(())
 }
 
 /// Validate SMBIOS configuration
 fn validate_smbios_config(smbios: &super::SmbiosConfig) -> Result<()> {
     // Validate UUID format if provided
-    if let Some(uuid) = &smbios.uuid {
-        if uuid.len() != 36 || !uuid.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
-            return Err(anyhow!("SMBIOS UUID must be in format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"));
+    if let Some(uuid) = &smbios.uuid
+        && (uuid.len() != 36 || !uuid.chars().all(|c| c.is_ascii_hexdigit() || c == '-')) {
+            return Err(anyhow!(
+                "SMBIOS UUID must be in format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+            ));
         }
-    }
-    
+
     // Validate VM generation ID format if provided
-    if let Some(vm_gen_id) = &smbios.vm_generation_id {
-        if vm_gen_id.len() != 36 || !vm_gen_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
-            return Err(anyhow!("VM generation ID must be in format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"));
+    if let Some(vm_gen_id) = &smbios.vm_generation_id
+        && (vm_gen_id.len() != 36 || !vm_gen_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-')) {
+            return Err(anyhow!(
+                "VM generation ID must be in format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+            ));
         }
-    }
-    
+
     Ok(())
 }
 
@@ -912,19 +1049,19 @@ fn validate_numa_config(numa: &super::NumaConfig) -> Result<()> {
     if numa.memory == 0 {
         return Err(anyhow!("NUMA node memory must be greater than 0"));
     }
-    
+
     // Validate CPU list is not empty
     if numa.cpus.is_empty() {
         return Err(anyhow!("NUMA node must have at least one CPU"));
     }
-    
+
     // Validate CPU IDs are reasonable
     for cpu in &numa.cpus {
         if *cpu > 1023 {
             return Err(anyhow!("CPU ID {} exceeds maximum of 1023", cpu));
         }
     }
-    
+
     // Check for duplicate CPU IDs in this node
     let mut seen_cpus = std::collections::HashSet::new();
     for cpu in &numa.cpus {
@@ -932,26 +1069,26 @@ fn validate_numa_config(numa: &super::NumaConfig) -> Result<()> {
             return Err(anyhow!("Duplicate CPU ID {} in NUMA node {}", cpu, numa.id));
         }
     }
-    
+
     Ok(())
 }
 
 /// Validate Hyper-V configuration
 fn validate_hyperv_config(hyperv: &super::HypervConfig) -> Result<()> {
     // Validate vendor_id if provided
-    if let Some(vendor_id) = &hyperv.vendor_id {
-        if vendor_id.len() > 12 {
+    if let Some(vendor_id) = &hyperv.vendor_id
+        && vendor_id.len() > 12 {
             return Err(anyhow!("Hyper-V vendor_id cannot exceed 12 characters"));
         }
-    }
-    
+
     // Validate spinlock_retry if provided
-    if let Some(retry_count) = hyperv.spinlock_retry {
-        if retry_count == 0 {
-            return Err(anyhow!("Hyper-V spinlock_retry must be between 1 and 4294967295"));
+    if let Some(retry_count) = hyperv.spinlock_retry
+        && retry_count == 0 {
+            return Err(anyhow!(
+                "Hyper-V spinlock_retry must be between 1 and 4294967295"
+            ));
         }
-    }
-    
+
     Ok(())
 }
 
@@ -962,28 +1099,28 @@ fn is_valid_pci_address(addr: &str) -> bool {
     if parts.len() != 3 {
         return false;
     }
-    
+
     // Check domain:bus:slot.function format
     let bus_slot_func: Vec<&str> = parts[2].split('.').collect();
     if bus_slot_func.len() != 2 {
         return false;
     }
-    
+
     // Domain should be 4 chars, bus should be 2 chars
     if parts[0].len() != 4 || parts[1].len() != 2 {
         return false;
     }
-    
+
     // Bus/slot should be 2 chars, function should be 1 char
     if bus_slot_func[0].len() != 2 || bus_slot_func[1].len() != 1 {
         return false;
     }
-    
+
     // All parts should be valid hex
-    u16::from_str_radix(parts[0], 16).is_ok() &&
-    u8::from_str_radix(parts[1], 16).is_ok() &&
-    u8::from_str_radix(bus_slot_func[0], 16).is_ok() && 
-    u8::from_str_radix(bus_slot_func[1], 16).is_ok()
+    u16::from_str_radix(parts[0], 16).is_ok()
+        && u8::from_str_radix(parts[1], 16).is_ok()
+        && u8::from_str_radix(bus_slot_func[0], 16).is_ok()
+        && u8::from_str_radix(bus_slot_func[1], 16).is_ok()
 }
 
 /// Check if a string is a valid USB device specification
@@ -993,16 +1130,16 @@ fn is_valid_usb_spec(spec: &str) -> bool {
         // Basic validation - could be more strict
         return true;
     }
-    
+
     // Check for vendor:product format (e.g., "1234:5678")
     if spec.contains(':') {
         let parts: Vec<&str> = spec.split(':').collect();
         if parts.len() == 2 {
-            return u16::from_str_radix(parts[0], 16).is_ok() && 
-                   u16::from_str_radix(parts[1], 16).is_ok();
+            return u16::from_str_radix(parts[0], 16).is_ok()
+                && u16::from_str_radix(parts[1], 16).is_ok();
         }
     }
-    
+
     false
 }
 

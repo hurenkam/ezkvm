@@ -2,11 +2,11 @@
 //!
 //! Handles PID files, configuration caching, and VM state persistence.
 
-use anyhow::{anyhow, Result};
+use crate::config::VmConfig;
+use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::config::VmConfig;
 
 const DEFAULT_LOG_KEEP: usize = 10;
 
@@ -15,11 +15,11 @@ pub fn get_state_dir() -> Result<PathBuf> {
     let state_dir = if let Ok(xdg_runtime) = std::env::var("XDG_RUNTIME_DIR") {
         PathBuf::from(xdg_runtime).join("ezkvm")
     } else {
-        let home = std::env::var("HOME")
-            .map_err(|_| anyhow!("HOME environment variable not set"))?;
+        let home =
+            std::env::var("HOME").map_err(|_| anyhow!("HOME environment variable not set"))?;
         PathBuf::from(home).join(".local/run/ezkvm")
     };
-    
+
     fs::create_dir_all(&state_dir)?;
     Ok(state_dir)
 }
@@ -90,11 +90,11 @@ pub fn read_pid(vm_name: &str) -> Result<Option<i32>> {
 /// Read VM PID from file at an optional custom location.
 pub fn read_pid_at(vm_name: &str, custom_path: Option<&str>) -> Result<Option<i32>> {
     let pid_file = get_pid_file_at(vm_name, custom_path)?;
-    
+
     if !pid_file.exists() {
         return Ok(None);
     }
-    
+
     let content = fs::read_to_string(&pid_file)?;
     match content.trim().parse::<i32>() {
         Ok(pid) => Ok(Some(pid)),
@@ -147,10 +147,14 @@ pub fn cleanup_old_logs(vm_name: &str) -> Result<()> {
 }
 
 /// Clean up old log files in an optional custom logs directory.
-pub fn cleanup_old_logs_at(vm_name: &str, custom_dir: Option<&str>, keep: Option<usize>) -> Result<()> {
+pub fn cleanup_old_logs_at(
+    vm_name: &str,
+    custom_dir: Option<&str>,
+    keep: Option<usize>,
+) -> Result<()> {
     let logs_dir = get_logs_dir_at(vm_name, custom_dir)?;
     let keep = keep.unwrap_or(DEFAULT_LOG_KEEP);
-    
+
     let mut log_files: Vec<_> = fs::read_dir(&logs_dir)?
         .filter_map(|entry| {
             let entry = entry.ok()?;
@@ -164,7 +168,7 @@ pub fn cleanup_old_logs_at(vm_name: &str, custom_dir: Option<&str>, keep: Option
             }
         })
         .collect();
-    
+
     if log_files.len() > keep {
         log_files.sort_by_key(|(_, mtime)| *mtime);
         while log_files.len() > keep {
@@ -172,7 +176,7 @@ pub fn cleanup_old_logs_at(vm_name: &str, custom_dir: Option<&str>, keep: Option
             let _ = fs::remove_file(path);
         }
     }
-    
+
     Ok(())
 }
 
@@ -188,11 +192,11 @@ pub fn cache_config(vm_name: &str, config: &VmConfig) -> Result<()> {
 #[allow(dead_code)]
 pub fn load_cached_config(vm_name: &str) -> Result<Option<VmConfig>> {
     let config_file = get_config_cache(vm_name)?;
-    
+
     if !config_file.exists() {
         return Ok(None);
     }
-    
+
     let content = fs::read_to_string(&config_file)?;
     let config = serde_yaml::from_str(&content)?;
     Ok(Some(config))
@@ -208,7 +212,6 @@ pub fn delete_cached_config(vm_name: &str) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,19 +225,19 @@ mod tests {
     #[test]
     fn test_pid_file_operations() {
         let test_vm = "test-vm-state";
-        
+
         // Save PID
         let result = save_pid(test_vm, 12345);
         assert!(result.is_ok());
-        
+
         // Read PID
         let pid = read_pid(test_vm).unwrap();
         assert_eq!(pid, Some(12345));
-        
+
         // Delete PID
         let result = delete_pid(test_vm);
         assert!(result.is_ok());
-        
+
         // Verify deleted
         let pid = read_pid(test_vm).unwrap();
         assert_eq!(pid, None);
@@ -261,7 +264,9 @@ mod tests {
         let custom_str = custom_dir.to_string_lossy().to_string();
 
         for index in 0..3 {
-            let log_file = get_log_file_at("log-vm", &format!("session-{}", index), Some(&custom_str)).unwrap();
+            let log_file =
+                get_log_file_at("log-vm", &format!("session-{}", index), Some(&custom_str))
+                    .unwrap();
             fs::write(log_file, format!("log {}", index)).unwrap();
         }
 
@@ -270,7 +275,13 @@ mod tests {
         let remaining = fs::read_dir(logs_dir)
             .unwrap()
             .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path().extension().map(|ext| ext == "log").unwrap_or(false))
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .map(|ext| ext == "log")
+                    .unwrap_or(false)
+            })
             .count();
 
         assert_eq!(remaining, 2);

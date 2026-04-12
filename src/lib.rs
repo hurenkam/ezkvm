@@ -5,8 +5,8 @@
 
 pub mod cli;
 pub mod config;
+pub mod device;
+pub mod network;
 pub mod qemu;
 pub mod state;
 pub mod storage;
-pub mod device;
-pub mod network;

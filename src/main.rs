@@ -5,11 +5,11 @@
 
 mod cli;
 mod config;
+mod device;
+mod network;
 mod qemu;
 mod state;
 mod storage;
-mod device;
-mod network;
 
 use anyhow::Result;
 use clap::Parser;
@@ -17,6 +17,6 @@ use clap::Parser;
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = cli::Cli::parse();
-    
+
     cli::execute(cli).await
 }

@@ -3,18 +3,15 @@
 //! This module handles parsing and validation of YAML configuration files
 //! that define virtual machine specifications.
 
-pub mod system;
 pub mod devices;
+pub mod system;
 pub mod validation;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-const DEFAULT_CENTRAL_CONFIG_PATHS: &[&str] = &[
-    "/etc/ezkvm/ezkvm.yaml",
-    "/etc/ezkvm.yaml",
-];
+const DEFAULT_CENTRAL_CONFIG_PATHS: &[&str] = &["/etc/ezkvm/ezkvm.yaml", "/etc/ezkvm.yaml"];
 
 const DEFAULT_PROFILE_DIR: &str = "/etc/ezkvm/profiles.d";
 
@@ -24,7 +21,7 @@ pub struct CentralConfig {
     /// Tool paths
     #[serde(default)]
     pub tools: ToolsConfig,
-    
+
     /// Directory locations
     #[serde(default)]
     pub locations: LocationsConfig,
@@ -39,10 +36,10 @@ pub struct CentralConfig {
 pub struct ToolsConfig {
     /// Path to swtpm executable
     pub swtpm: Option<String>,
-    
+
     /// Path to remote-viewer executable
     pub remote_viewer: Option<String>,
-    
+
     /// Path to looking-glass-client executable
     pub looking_glass: Option<String>,
 }
@@ -52,13 +49,13 @@ pub struct ToolsConfig {
 pub struct LocationsConfig {
     /// Runtime directory for PID files, sockets, etc.
     pub run_dir: Option<String>,
-    
+
     /// Directory containing OVMF firmware files
     pub ovmf_dir: Option<String>,
-    
+
     /// Default directory for VM configuration files
     pub vm_dir: Option<String>,
-    
+
     /// Directory for VM templates
     pub template_dir: Option<String>,
 
@@ -87,7 +84,7 @@ pub struct LookingGlassOptions {
 pub struct VmConfig {
     /// Name of the virtual machine
     pub name: String,
-    
+
     /// Backend to use (currently only "qemu" is supported)
     pub backend: String,
 
@@ -95,34 +92,34 @@ pub struct VmConfig {
     /// Profile files are resolved from the configured profile directory.
     #[serde(default)]
     pub profiles: Vec<String>,
-    
+
     /// System configuration (CPU, memory, etc.)
     pub system: SystemConfig,
-    
+
     /// Boot configuration
     #[serde(default)]
     pub boot: BootConfig,
-    
+
     /// Device configuration
     #[serde(default)]
     pub devices: DeviceConfig,
-    
+
     /// TPM configuration
     #[serde(default)]
     pub tpm: Option<TpmConfig>,
-    
+
     /// Guest agent configuration
     #[serde(default)]
     pub guest_agent: Option<GuestAgentConfig>,
-    
+
     /// Memory ballooning configuration
     #[serde(default)]
     pub ballooning: Option<BallooningConfig>,
-    
+
     /// Hardware passthrough configuration
     #[serde(default)]
     pub hostpci: Vec<HostPciConfig>,
-    
+
     /// USB device passthrough configuration
     #[serde(default)]
     pub usb_devices: Vec<UsbDeviceConfig>,
@@ -130,7 +127,7 @@ pub struct VmConfig {
     /// XHCI controller configuration
     #[serde(default)]
     pub xhci_controllers: Vec<XhciControllerConfig>,
-    
+
     /// SPICE display configuration
     #[serde(default)]
     pub spice: Option<SpiceConfig>,
@@ -142,35 +139,35 @@ pub struct VmConfig {
     /// Explicit input devices
     #[serde(default)]
     pub input_devices: Vec<InputDeviceConfig>,
-    
+
     /// Looking Glass shared memory configuration
     #[serde(default)]
     pub ivshmem: Option<IvshmemConfig>,
-    
+
     /// SCSI controller configuration
     #[serde(default)]
     pub scsi_controllers: Vec<ScsiControllerConfig>,
-    
+
     /// iSCSI storage configuration
     #[serde(default)]
     pub iscsi_disks: Vec<IscsiDiskConfig>,
-    
+
     /// QMP monitoring configuration
     #[serde(default)]
     pub qmp: Option<QmpConfig>,
-    
+
     /// SMBIOS system information configuration
     #[serde(default)]
     pub smbios: Option<SmbiosConfig>,
-    
+
     /// NUMA topology configuration
     #[serde(default)]
     pub numa: Vec<NumaConfig>,
-    
+
     /// Hyper-V enlightenments configuration
     #[serde(default)]
     pub hyperv: Option<HypervConfig>,
-    
+
     /// Additional options
     #[serde(default)]
     pub options: VmOptions,
@@ -181,27 +178,27 @@ pub struct VmConfig {
 pub struct SystemConfig {
     /// Target architecture (x86_64, aarch64, etc.)
     pub architecture: String,
-    
+
     /// Machine type (q35, pc, virt, etc.)
     pub machine: String,
 
     /// Additional machine-specific options appended to `-machine`
     #[serde(default)]
     pub machine_options: Vec<String>,
-    
+
     /// Memory in MiB
     pub memory: u32,
-    
+
     /// Number of virtual CPUs
     pub vcpus: u32,
-    
+
     /// CPU model to emulate
     pub cpu_model: String,
-    
+
     /// CPU-specific features
     #[serde(default)]
     pub cpu_features: Vec<CpuFeature>,
-    
+
     /// Optional QEMU config file(s) to load via -readconfig.
     /// Use this to supply machine topology files such as
     /// /usr/share/qemu-server/pve-q35-4.0.cfg which define the
@@ -223,7 +220,7 @@ pub struct BootConfig {
     /// Firmware type (uefi, bios, or ovmf)
     #[serde(default)]
     pub firmware: Option<String>,
-    
+
     /// Boot order (disk, cdrom, network)
     #[serde(default)]
     pub boot_order: Vec<String>,
@@ -241,26 +238,26 @@ pub struct BootConfig {
 
     /// Splash screen image path
     pub splash: Option<String>,
-    
+
     /// Kernel path (optional)
     pub kernel: Option<String>,
-    
+
     /// Initrd path (optional)
     pub initrd: Option<String>,
-    
+
     /// Kernel command line
     pub cmdline: Option<String>,
-    
+
     /// UEFI firmware code path (for custom OVMF)
     pub uefi_code: Option<String>,
-    
+
     /// UEFI variables path
     pub uefi_vars: Option<String>,
 
     /// Optional explicit UEFI variables drive size in bytes for pflash unit 1.
     /// Proxmox uses `size=540672` for OVMF vars even when the backing device is larger.
     pub uefi_vars_size: Option<u64>,
-    
+
     /// Enable secure boot
     #[serde(default)]
     pub secure_boot: bool,
@@ -272,15 +269,15 @@ pub struct DeviceConfig {
     /// Storage devices
     #[serde(default)]
     pub drives: Vec<DriveConfig>,
-    
+
     /// Network devices
     #[serde(default)]
     pub networks: Vec<NetworkConfig>,
-    
+
     /// Display devices
     #[serde(default)]
     pub displays: Vec<DisplayConfig>,
-    
+
     /// Serial devices
     #[serde(default)]
     pub serials: Vec<SerialConfig>,
@@ -291,27 +288,27 @@ pub struct DeviceConfig {
 pub struct DriveConfig {
     /// Unique identifier for the drive
     pub id: String,
-    
+
     /// Path to the disk image
     pub path: String,
-    
+
     /// Interface type (virtio, scsi, ide, nvme)
     pub interface: String,
-    
+
     /// Drive type (disk, cdrom)
     pub r#type: String,
-    
+
     /// Image format (qcow2, raw, etc.)
     pub format: String,
-    
+
     /// Whether the drive is read-only
     #[serde(default)]
     pub readonly: bool,
-    
+
     /// Enable discard (TRIM) support
     #[serde(default)]
     pub discard: bool,
-    
+
     /// Enable SSD emulation
     #[serde(default)]
     pub ssd: bool,
@@ -324,7 +321,7 @@ pub struct DriveConfig {
 
     /// Detect-zeroes behavior
     pub detect_zeroes: Option<String>,
-    
+
     /// SCSI controller to attach to (for SCSI drives)
     pub controller: Option<String>,
 
@@ -346,13 +343,13 @@ pub struct DriveConfig {
 pub struct NetworkConfig {
     /// Unique identifier for the network device
     pub id: String,
-    
+
     /// Network model (virtio-net, e1000, etc.)
     pub model: String,
-    
+
     /// Network mode (user, bridge, socket)
     pub mode: String,
-    
+
     /// MAC address
     pub mac: Option<String>,
 
@@ -377,7 +374,7 @@ pub struct NetworkConfig {
 pub struct DisplayConfig {
     /// Display type (virtio-gpu, qxl, cirrus)
     pub r#type: String,
-    
+
     /// Video RAM in MiB
     #[serde(default)]
     pub vram: Option<u32>,
@@ -388,7 +385,7 @@ pub struct DisplayConfig {
 pub struct SerialConfig {
     /// Serial type (pty, file, socket, stdio)
     pub r#type: String,
-    
+
     /// Port number (for multi-port setups)
     #[serde(default)]
     pub port: Option<u32>,
@@ -416,7 +413,7 @@ pub struct SerialConfig {
 pub struct VmOptions {
     /// Enable KVM acceleration
     pub enable_kvm: bool,
-    
+
     /// Run in daemon mode
     pub daemonize: bool,
 
@@ -440,7 +437,7 @@ pub struct VmOptions {
 
     /// Number of log files to retain during rotation
     pub log_keep: Option<usize>,
-    
+
     /// Path to UEFI variables file
     pub uefi_vars: Option<String>,
 }
@@ -476,10 +473,10 @@ pub struct RtcConfig {
 pub struct TpmConfig {
     /// TPM version (1.2 or 2.0)
     pub version: String,
-    
+
     /// TPM backend type (emulator or passthrough)
     pub backend: String,
-    
+
     /// Path to TPM socket file (overrides the default run-dir path)
     pub state_path: Option<String>,
 
@@ -496,7 +493,7 @@ pub struct TpmConfig {
     /// Example: `file:///dev/vm1/vm-108-tpmstate`
     #[serde(alias = "state_backend_url")]
     pub state_backend_uri: Option<String>,
-    
+
     /// Device model (tpm-tis or tpm-crb)
     #[serde(default = "default_tpm_model")]
     pub model: String,
@@ -512,10 +509,10 @@ pub struct GuestAgentConfig {
     /// Enable guest agent
     #[serde(default = "default_true")]
     pub enabled: bool,
-    
+
     /// Path to guest agent socket
     pub socket_path: Option<String>,
-    
+
     /// Freeze CPU on suspend
     #[serde(default)]
     pub freeze_cpu: bool,
@@ -537,11 +534,11 @@ pub struct BallooningConfig {
     /// Enable memory ballooning
     #[serde(default = "default_true")]
     pub enabled: bool,
-    
+
     /// Enable free page reporting
     #[serde(default)]
     pub free_page_reporting: bool,
-    
+
     /// Balloon device model
     #[serde(default = "default_balloon_model")]
     pub model: String,
@@ -565,14 +562,14 @@ fn default_balloon_model() -> String {
 pub struct HostPciConfig {
     /// PCI device address (e.g., "0000:03:00.0")
     pub device: String,
-    
+
     /// Unique identifier for the device
     pub id: String,
-    
+
     /// PCIe configuration
     #[serde(default)]
     pub pcie: bool,
-    
+
     /// VGA passthrough (for GPU devices)
     #[serde(default)]
     pub x_vga: bool,
@@ -586,7 +583,7 @@ pub struct HostPciConfig {
     /// Enable multifunction on the guest slot when grouping related functions
     #[serde(default)]
     pub multifunction: bool,
-    
+
     /// ROM file path (optional)
     pub romfile: Option<String>,
 }
@@ -596,7 +593,7 @@ pub struct HostPciConfig {
 pub struct UsbDeviceConfig {
     /// Unique identifier for the USB device
     pub id: String,
-    
+
     /// USB device specification
     #[serde(default)]
     pub host: String,
@@ -606,10 +603,10 @@ pub struct UsbDeviceConfig {
 
     /// USB host port path for Proxmox-style addressing
     pub hostport: Option<String>,
-    
+
     /// USB controller bus (optional)
     pub bus: Option<String>,
-    
+
     /// USB controller port (optional)
     pub port: Option<String>,
 }
@@ -639,23 +636,23 @@ pub struct SpiceConfig {
     /// Enable SPICE display
     #[serde(default = "default_true")]
     pub enabled: bool,
-    
+
     /// SPICE server port
     #[serde(default = "default_spice_port")]
     pub port: u16,
-    
+
     /// SPICE server address
     #[serde(default = "default_spice_addr")]
     pub addr: String,
-    
+
     /// Disable ticketing (password authentication)
     #[serde(default)]
     pub disable_ticketing: bool,
-    
+
     /// Enable SPICE audio
     #[serde(default)]
     pub audio: bool,
-    
+
     /// Enable vdagent (clipboard sharing)
     #[serde(default = "default_true")]
     pub vdagent: bool,
@@ -704,15 +701,15 @@ pub struct IvshmemConfig {
     /// Enable Looking Glass shared memory
     #[serde(default = "default_true")]
     pub enabled: bool,
-    
+
     /// Shared memory size in MiB
     #[serde(default = "default_ivshmem_size")]
     pub size: u32,
-    
+
     /// Shared memory device vectors
     #[serde(default = "default_ivshmem_vectors")]
     pub vectors: u32,
-    
+
     /// Shared memory device ID
     #[serde(default = "default_ivshmem_id")]
     pub id: String,
@@ -746,15 +743,15 @@ fn default_ivshmem_mem_path() -> String {
 pub struct ScsiControllerConfig {
     /// Unique identifier for the controller
     pub id: String,
-    
+
     /// Controller type (pvscsi, virtio-scsi, lsi, etc.)
     #[serde(default = "default_scsi_controller_type")]
     pub r#type: String,
-    
+
     /// Number of I/O queues (for virtio-scsi)
     #[serde(default)]
     pub iothread: Option<String>,
-    
+
     /// Maximum number of targets
     #[serde(default)]
     pub max_targets: Option<u32>,
@@ -775,26 +772,26 @@ fn default_scsi_controller_type() -> String {
 pub struct IscsiDiskConfig {
     /// Unique identifier for the disk
     pub id: String,
-    
+
     /// iSCSI target portal (host:port)
     pub portal: String,
-    
+
     /// iSCSI target IQN
     pub target: String,
-    
+
     /// LUN number
     #[serde(default)]
     pub lun: u32,
-    
+
     /// Initiator IQN (optional)
     pub initiator: Option<String>,
-    
+
     /// Username for authentication
     pub username: Option<String>,
-    
+
     /// Password for authentication
     pub password: Option<String>,
-    
+
     /// SCSI controller to attach to
     pub controller: Option<String>,
 }
@@ -805,10 +802,10 @@ pub struct QmpConfig {
     /// Enable QMP monitoring
     #[serde(default = "default_true")]
     pub enabled: bool,
-    
+
     /// Socket path for QMP connection
     pub socket_path: Option<String>,
-    
+
     /// Socket type (unix, tcp)
     #[serde(default)]
     pub socket_type: QmpSocketType,
@@ -828,25 +825,25 @@ pub enum QmpSocketType {
 pub struct SmbiosConfig {
     /// Manufacturer name
     pub manufacturer: Option<String>,
-    
+
     /// Product name
     pub product: Option<String>,
-    
+
     /// Version string
     pub version: Option<String>,
-    
+
     /// Serial number
     pub serial: Option<String>,
-    
+
     /// UUID for the VM
     pub uuid: Option<String>,
-    
+
     /// SKU number
     pub sku: Option<String>,
-    
+
     /// Family name
     pub family: Option<String>,
-    
+
     /// VM generation ID (for Windows Server 2016+)
     pub vm_generation_id: Option<String>,
 }
@@ -856,13 +853,13 @@ pub struct SmbiosConfig {
 pub struct NumaConfig {
     /// NUMA node ID
     pub id: u32,
-    
+
     /// Memory size for this node in MiB
     pub memory: u32,
-    
+
     /// CPU cores assigned to this node
     pub cpus: Vec<u32>,
-    
+
     /// Host NUMA node to bind to (for host-passthrough)
     pub host_node: Option<u32>,
 }
@@ -873,53 +870,51 @@ pub struct HypervConfig {
     /// Enable Hyper-V enlightenments
     #[serde(default = "default_true")]
     pub enabled: bool,
-    
+
     /// Enable Hyper-V relaxed timing
     #[serde(default = "default_true")]
     pub relaxed: bool,
-    
+
     /// Enable Hyper-V virtual APIC
     #[serde(default = "default_true")]
     pub vapic: bool,
-    
+
     /// Enable Hyper-V time reference counter
     #[serde(default = "default_true")]
     pub time: bool,
-    
+
     /// Enable Hyper-V crash MSRs
     #[serde(default)]
     pub crash: bool,
-    
+
     /// Enable Hyper-V reset MSR
     #[serde(default)]
     pub reset: bool,
-    
+
     /// Enable Hyper-V vendor ID spoofing
     #[serde(default)]
     pub vendor_id: Option<String>,
-    
+
     /// Enable Hyper-V frequency MSRs
     #[serde(default)]
     pub frequencies: bool,
-    
+
     /// Enable Hyper-V reenlightenment MSRs
     #[serde(default)]
     pub reenlightenment: bool,
-    
+
     /// Enable Hyper-V TLB flush
     #[serde(default)]
     pub tlbflush: bool,
-    
+
     /// Enable Hyper-V IPI optimization
     #[serde(default)]
     pub ipi: bool,
-    
+
     /// Enable Hyper-V spinlock retry
     #[serde(default)]
     pub spinlock_retry: Option<u32>,
 }
-
-
 
 impl VmConfig {
     /// Load configuration from a YAML file
@@ -940,10 +935,10 @@ impl VmConfig {
         Self::merge_yaml_values(&mut merged_value, vm_value);
 
         let config: VmConfig = serde_yaml::from_value(merged_value)?;
-        
+
         // Validate the configuration
         validation::validate_config(&config)?;
-        
+
         Ok(config)
     }
 
@@ -991,7 +986,10 @@ impl VmConfig {
         }
     }
 
-    fn load_profile_value(profile_dir: &str, profile_name: &str) -> anyhow::Result<serde_yaml::Value> {
+    fn load_profile_value(
+        profile_dir: &str,
+        profile_name: &str,
+    ) -> anyhow::Result<serde_yaml::Value> {
         if profile_name.is_empty()
             || !profile_name
                 .chars()
@@ -1021,18 +1019,16 @@ impl VmConfig {
             )
         })?;
         let processed_content = Self::substitute_env_vars(&profile_content)?;
-        let profile_value: serde_yaml::Value = serde_yaml::from_str(&processed_content).map_err(|err| {
-            anyhow::anyhow!(
-                "Failed to parse profile '{}' from '{}': {}",
-                profile_name,
-                profile_path.display(),
-                err
-            )
-        })?;
-        Self::ensure_yaml_mapping_root(
-            &profile_value,
-            &format!("Profile '{}'", profile_name),
-        )?;
+        let profile_value: serde_yaml::Value =
+            serde_yaml::from_str(&processed_content).map_err(|err| {
+                anyhow::anyhow!(
+                    "Failed to parse profile '{}' from '{}': {}",
+                    profile_name,
+                    profile_path.display(),
+                    err
+                )
+            })?;
+        Self::ensure_yaml_mapping_root(&profile_value, &format!("Profile '{}'", profile_name))?;
         Ok(profile_value)
     }
 
@@ -1076,12 +1072,20 @@ impl VmConfig {
                             && matches!(base_value, serde_yaml::Value::Sequence(_))
                             && matches!(overlay_value, serde_yaml::Value::Sequence(_))
                         {
-                            Self::merge_sequence_of_mappings_by_id(base_value, overlay_value, &child_path);
+                            Self::merge_sequence_of_mappings_by_id(
+                                base_value,
+                                overlay_value,
+                                &child_path,
+                            );
                         } else if Self::is_append_unique_list_path(&child_path)
                             && matches!(base_value, serde_yaml::Value::Sequence(_))
                             && matches!(overlay_value, serde_yaml::Value::Sequence(_))
                         {
-                            Self::merge_sequence_append_unique(base_value, overlay_value, &child_path);
+                            Self::merge_sequence_append_unique(
+                                base_value,
+                                overlay_value,
+                                &child_path,
+                            );
                         } else {
                             Self::merge_yaml_values_at_path(base_value, overlay_value, &child_path);
                         }
@@ -1123,8 +1127,12 @@ impl VmConfig {
             return;
         };
 
-        if base_seq.iter().any(|item| Self::yaml_mapping_id(item).is_none())
-            || overlay_seq.iter().any(|item| Self::yaml_mapping_id(item).is_none())
+        if base_seq
+            .iter()
+            .any(|item| Self::yaml_mapping_id(item).is_none())
+            || overlay_seq
+                .iter()
+                .any(|item| Self::yaml_mapping_id(item).is_none())
         {
             *base_seq = overlay_seq;
             return;
@@ -1208,75 +1216,82 @@ impl VmConfig {
             }
         }
     }
-    
+
     /// Substitute environment variables in configuration content
     /// Supports ${VAR_NAME} and $VAR_NAME syntax
     fn substitute_env_vars(content: &str) -> anyhow::Result<String> {
         let mut result = content.to_string();
-        
+
         // Find all ${VAR} patterns
         let re = regex::Regex::new(r"\$\{([^}]+)\}").unwrap();
         let mut replacements = Vec::new();
-        
+
         for cap in re.captures_iter(content) {
             let full_match = cap.get(0).unwrap();
             let var_name = cap.get(1).unwrap().as_str();
-            
+
             match std::env::var(var_name) {
                 Ok(value) => {
                     replacements.push((full_match.as_str().to_string(), value));
                 }
                 Err(_) => {
-                    return Err(anyhow::anyhow!("Environment variable '{}' not found", var_name));
+                    return Err(anyhow::anyhow!(
+                        "Environment variable '{}' not found",
+                        var_name
+                    ));
                 }
             }
         }
-        
+
         // Apply replacements
         for (pattern, value) in replacements {
             result = result.replace(&pattern, &value);
         }
-        
+
         // Also handle $VAR syntax (simple case)
         let re_simple = regex::Regex::new(r"\$([A-Z_][A-Z0-9_]*)").unwrap();
         let mut replacements_simple = Vec::new();
-        
+
         for cap in re_simple.captures_iter(&result) {
             let full_match = cap.get(0).unwrap();
             let var_name = cap.get(1).unwrap().as_str();
-            
+
             // Skip if it's part of a ${VAR} pattern that was already processed
             if result.contains(&format!("${{{}}}", var_name)) {
                 continue;
             }
-            
+
             match std::env::var(var_name) {
                 Ok(value) => {
                     replacements_simple.push((full_match.as_str().to_string(), value));
                 }
                 Err(_) => {
-                    return Err(anyhow::anyhow!("Environment variable '{}' not found", var_name));
+                    return Err(anyhow::anyhow!(
+                        "Environment variable '{}' not found",
+                        var_name
+                    ));
                 }
             }
         }
-        
+
         // Apply simple replacements
         for (pattern, value) in replacements_simple {
             result = result.replace(&pattern, &value);
         }
-        
+
         Ok(result)
     }
-    
+
     /// Load configuration from a YAML string
     #[allow(dead_code)]
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(content: &str) -> anyhow::Result<Self> {
         let processed_content = Self::substitute_env_vars(content)?;
         let config: VmConfig = serde_yaml::from_str(&processed_content)?;
-        
+
         // Validate the configuration
         validation::validate_config(&config)?;
-        
+
         Ok(config)
     }
 }
@@ -1300,7 +1315,7 @@ impl CentralConfig {
 
         Ok(Self::default())
     }
-    
+
     /// Load central configuration from a specific file
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
@@ -1335,7 +1350,9 @@ mod tests {
 
     #[test]
     fn test_central_config_load_honors_env_override() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let temp_path = std::env::temp_dir().join(format!(
             "ezkvm-central-config-{}-{}.yaml",
@@ -1346,11 +1363,7 @@ mod tests {
                 .as_nanos()
         ));
 
-        std::fs::write(
-            &temp_path,
-            "tools:\n  swtpm: \"/custom/swtpm\"\n",
-        )
-        .unwrap();
+        std::fs::write(&temp_path, "tools:\n  swtpm: \"/custom/swtpm\"\n").unwrap();
 
         unsafe {
             std::env::set_var("EZKVM_CONFIG", &temp_path);
@@ -1375,7 +1388,9 @@ mod tests {
 
     #[test]
     fn test_vm_config_from_file_merges_profiles_from_profile_dir() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-merge");
         let profile_dir = root.join("profiles");
@@ -1408,10 +1423,7 @@ devices:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1453,7 +1465,9 @@ system:
 
     #[test]
     fn test_vm_config_from_file_errors_on_missing_profile_file() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-missing");
         let profile_dir = root.join("profiles");
@@ -1462,10 +1476,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1491,7 +1502,9 @@ system:
             std::env::set_var("EZKVM_CONFIG", &central_config_path);
         }
 
-        let err = VmConfig::from_file(&vm_config_path).unwrap_err().to_string();
+        let err = VmConfig::from_file(&vm_config_path)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("Unknown profile 'does_not_exist'"));
 
         unsafe {
@@ -1502,7 +1515,9 @@ system:
 
     #[test]
     fn test_vm_config_from_file_errors_on_non_mapping_profile_root() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-nonmap");
         let profile_dir = root.join("profiles");
@@ -1521,10 +1536,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1550,7 +1562,9 @@ system:
             std::env::set_var("EZKVM_CONFIG", &central_config_path);
         }
 
-        let err = VmConfig::from_file(&vm_config_path).unwrap_err().to_string();
+        let err = VmConfig::from_file(&vm_config_path)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("must be a YAML mapping/object at the root"));
 
         unsafe {
@@ -1561,7 +1575,9 @@ system:
 
     #[test]
     fn test_vm_config_from_file_applies_profiles_in_listed_order() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-order");
         let profile_dir = root.join("profiles");
@@ -1592,10 +1608,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1627,7 +1640,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_deep_merges_nested_maps() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-deep-merge");
         let profile_dir = root.join("profiles");
@@ -1661,10 +1676,7 @@ boot:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1698,7 +1710,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_replaces_non_specialized_lists() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-list-replace");
         let profile_dir = root.join("profiles");
@@ -1733,10 +1747,7 @@ devices:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1769,7 +1780,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_vm_values_override_profile_values() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-vm-override");
         let profile_dir = root.join("profiles");
@@ -1791,10 +1804,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1829,7 +1839,9 @@ system:
 
     #[test]
     fn test_vm_config_from_file_still_runs_validation_after_profile_merge() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-validation");
         let profile_dir = root.join("profiles");
@@ -1851,10 +1863,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1874,7 +1883,9 @@ profiles:
             std::env::set_var("EZKVM_CONFIG", &central_config_path);
         }
 
-        let err = VmConfig::from_file(&vm_config_path).unwrap_err().to_string();
+        let err = VmConfig::from_file(&vm_config_path)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("Unsupported architecture"));
 
         unsafe {
@@ -1885,7 +1896,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_merges_hostpci_by_id() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-hostpci-id-merge");
         let profile_dir = root.join("profiles");
@@ -1926,10 +1939,7 @@ hostpci:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -1953,13 +1963,21 @@ profiles:
         let config = VmConfig::from_file(&vm_config_path).unwrap();
         assert_eq!(config.hostpci.len(), 2);
 
-        let gpu0 = config.hostpci.iter().find(|d| d.id == "hostpci0.0").unwrap();
+        let gpu0 = config
+            .hostpci
+            .iter()
+            .find(|d| d.id == "hostpci0.0")
+            .unwrap();
         assert_eq!(gpu0.device, "0000:03:00.0");
         assert_eq!(gpu0.bus.as_deref(), Some("ich9-pcie-port-1"));
         assert_eq!(gpu0.addr.as_deref(), Some("0x0.0"));
         assert!(gpu0.multifunction);
 
-        let gpu1 = config.hostpci.iter().find(|d| d.id == "hostpci0.1").unwrap();
+        let gpu1 = config
+            .hostpci
+            .iter()
+            .find(|d| d.id == "hostpci0.1")
+            .unwrap();
         assert_eq!(gpu1.device, "0000:03:00.1");
 
         unsafe {
@@ -1968,21 +1986,23 @@ profiles:
         let _ = std::fs::remove_dir_all(root);
     }
 
-        #[test]
-        fn test_vm_config_from_file_merges_devices_drives_by_id() {
-            let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    #[test]
+    fn test_vm_config_from_file_merges_devices_drives_by_id() {
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-            let root = unique_test_dir("ezkvm-profile-drives-id-merge");
-            let profile_dir = root.join("profiles");
-            std::fs::create_dir_all(&profile_dir).unwrap();
+        let root = unique_test_dir("ezkvm-profile-drives-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
 
-            let root_disk = root.join("root.qcow2");
-            let data_disk = root.join("data.raw");
+        let root_disk = root.join("root.qcow2");
+        let data_disk = root.join("data.raw");
 
-            std::fs::write(
-                profile_dir.join("base.yaml"),
-                format!(
-                    r#"
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            format!(
+                r#"
     system:
       architecture: "x86_64"
       machine: "q35"
@@ -1997,15 +2017,15 @@ profiles:
           type: "disk"
           format: "qcow2"
     "#,
-                    root_disk.display()
-                ),
-            )
-            .unwrap();
+                root_disk.display()
+            ),
+        )
+        .unwrap();
 
-            std::fs::write(
-                profile_dir.join("drive_overlay.yaml"),
-                format!(
-                    r#"
+        std::fs::write(
+            profile_dir.join("drive_overlay.yaml"),
+            format!(
+                r#"
     devices:
       drives:
         - id: "root"
@@ -2018,59 +2038,68 @@ profiles:
           format: "raw"
           controller: "scsihw0"
     "#,
-                    data_disk.display()
-                ),
-            )
-            .unwrap();
+                data_disk.display()
+            ),
+        )
+        .unwrap();
 
-            let central_config_path = root.join("ezkvm.yaml");
-            std::fs::write(
-                &central_config_path,
-                format!(
-                    "locations:\n  profile_dir: \"{}\"\n",
-                    profile_dir.display()
-                ),
-            )
-            .unwrap();
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+        )
+        .unwrap();
 
-            let vm_config_path = root.join("vm.yaml");
-            std::fs::write(
-                &vm_config_path,
-                r#"
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
     name: "drive-id-merge-test"
     backend: "qemu"
     profiles:
       - "base"
       - "drive_overlay"
     "#,
-            )
-            .unwrap();
+        )
+        .unwrap();
 
-            unsafe {
-                std::env::set_var("EZKVM_CONFIG", &central_config_path);
-            }
-
-            let config = VmConfig::from_file(&vm_config_path).unwrap();
-            assert_eq!(config.devices.drives.len(), 2);
-
-            let root_drive = config.devices.drives.iter().find(|d| d.id == "root").unwrap();
-            assert_eq!(root_drive.path, root_disk.to_str().unwrap());
-            assert_eq!(root_drive.cache.as_deref(), Some("none"));
-            assert_eq!(root_drive.boot_index, Some(100));
-
-            let data_drive = config.devices.drives.iter().find(|d| d.id == "data").unwrap();
-            assert_eq!(data_drive.interface, "scsi");
-            assert_eq!(data_drive.format, "raw");
-
-            unsafe {
-                std::env::remove_var("EZKVM_CONFIG");
-            }
-            let _ = std::fs::remove_dir_all(root);
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
         }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.devices.drives.len(), 2);
+
+        let root_drive = config
+            .devices
+            .drives
+            .iter()
+            .find(|d| d.id == "root")
+            .unwrap();
+        assert_eq!(root_drive.path, root_disk.to_str().unwrap());
+        assert_eq!(root_drive.cache.as_deref(), Some("none"));
+        assert_eq!(root_drive.boot_index, Some(100));
+
+        let data_drive = config
+            .devices
+            .drives
+            .iter()
+            .find(|d| d.id == "data")
+            .unwrap();
+        assert_eq!(data_drive.interface, "scsi");
+        assert_eq!(data_drive.format, "raw");
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
 
     #[test]
     fn test_vm_config_from_file_merges_devices_networks_by_id() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-networks-id-merge");
         let profile_dir = root.join("profiles");
@@ -2113,10 +2142,7 @@ devices:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2168,7 +2194,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_merges_usb_devices_by_id() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-usb-id-merge");
         let profile_dir = root.join("profiles");
@@ -2208,10 +2236,7 @@ usb_devices:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2252,7 +2277,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_merges_scsi_controllers_by_id() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-scsi-id-merge");
         let profile_dir = root.join("profiles");
@@ -2292,10 +2319,7 @@ scsi_controllers:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2343,7 +2367,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_merges_xhci_controllers_by_id() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-xhci-id-merge");
         let profile_dir = root.join("profiles");
@@ -2383,10 +2409,7 @@ xhci_controllers:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2436,7 +2459,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_merges_audio_devices_by_id() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-audio-id-merge");
         let profile_dir = root.join("profiles");
@@ -2486,10 +2511,7 @@ audio_devices:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2545,7 +2567,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_appends_unique_cpu_features() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-cpu-features-append");
         let profile_dir = root.join("profiles");
@@ -2581,10 +2605,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2622,7 +2643,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_appends_unique_machine_options() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-machine-options-append");
         let profile_dir = root.join("profiles");
@@ -2657,10 +2680,7 @@ system:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2692,7 +2712,9 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_appends_unique_global_options() {
-        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-global-options-append");
         let profile_dir = root.join("profiles");
@@ -2730,10 +2752,7 @@ options:
         let central_config_path = root.join("ezkvm.yaml");
         std::fs::write(
             &central_config_path,
-            format!(
-                "locations:\n  profile_dir: \"{}\"\n",
-                profile_dir.display()
-            ),
+            format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
         )
         .unwrap();
 
@@ -2757,10 +2776,7 @@ profiles:
         let config = VmConfig::from_file(&vm_config_path).unwrap();
         assert_eq!(
             config.options.global_options,
-            vec![
-                "kvm-pit.lost_tick_policy=discard",
-                "ICH9-LPC.disable_s3=1"
-            ]
+            vec!["kvm-pit.lost_tick_policy=discard", "ICH9-LPC.disable_s3=1"]
         );
 
         unsafe {

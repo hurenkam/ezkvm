@@ -21,9 +21,9 @@
 - [x] Apply consistent environment-variable locking strategy across tests that mutate process environment
 
 #### Phase C: Quality Gate Cleanup
-- [ ] Make `cargo fmt --all --check` pass across repository
-- [ ] Reduce and resolve current `cargo clippy --all-targets --all-features -- -D warnings` failures in staged batches
-- [ ] Re-run full `cargo test` after lint/format remediations and keep suite green
+- [x] Make `cargo fmt --all --check` pass across repository
+- [x] Reduce and resolve current `cargo clippy --all-targets --all-features -- -D warnings` failures in staged batches
+- [x] Re-run full `cargo test` after lint/format remediations and keep suite green
 
 #### Phase D: Module Refactor Program
 - [ ] Split `src/config/mod.rs` into focused modules (schema types, profile loading/merge, env substitution, entrypoint wiring)
