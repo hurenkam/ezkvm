@@ -586,6 +586,79 @@ fn start_swtpm_if_configured(config: &crate::config::VmConfig, central_config: &
     Ok(())
 }
 
+fn build_swtpm_launch_preview(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<Option<String>> {
+    let tpm = match &config.tpm {
+        Some(tpm) if tpm.backend == "emulator" => tpm,
+        _ => return Ok(None),
+    };
+
+    let swtpm_path = match &central_config.tools.swtpm {
+        Some(path) => path,
+        None => return Err(anyhow!("TPM emulator backend requires tools.swtpm to be configured in the central config")),
+    };
+
+    let run_dir = central_config
+        .locations
+        .run_dir
+        .as_deref()
+        .unwrap_or("/var/run/ezkvm");
+
+    let socket_path = resolve_tpm_socket_path(config, central_config);
+    let pid_path = Path::new(run_dir).join(format!("{}.swtpm.pid", config.name));
+    let log_path = Path::new(run_dir).join(format!("{}-swtpm.log", config.name));
+
+    let tpmstate_arg = if let Some(uri) = tpm.state_backend_uri.as_deref() {
+        let trimmed = uri.trim();
+        let normalized = if let Some(stripped) = trimmed.strip_prefix("file://dev/") {
+            format!("file:///dev/{}", stripped)
+        } else {
+            trimmed.to_string()
+        };
+        let mut backend = if normalized.starts_with('/') {
+            format!("backend-uri=file://{}", normalized)
+        } else {
+            format!("backend-uri={}", normalized)
+        };
+        if !backend.contains(",mode=") {
+            backend.push_str(",mode=0600");
+        }
+        backend
+    } else {
+        let state_dir = if let Some(explicit) = tpm.state_dir.as_deref() {
+            explicit.to_string()
+        } else {
+            Path::new(run_dir)
+                .join("tpm-state")
+                .to_string_lossy()
+                .to_string()
+        };
+        format!("dir={}", state_dir)
+    };
+
+    let tpm_flag = if tpm.version == "2.0" { "--tpm2" } else { "--tpm" };
+    let ctrl_arg = format!("type=unixio,path={},mode=0600", socket_path);
+    let pid_arg = format!("file={}", pid_path.display());
+    let log_arg = format!("file={},level=1", log_path.display());
+
+    let rendered = vec![
+        swtpm_path.clone(),
+        "socket".to_string(),
+        tpm_flag.to_string(),
+        "--tpmstate".to_string(),
+        tpmstate_arg,
+        "--ctrl".to_string(),
+        ctrl_arg,
+        "--pid".to_string(),
+        pid_arg,
+        "--terminate".to_string(),
+        "--log".to_string(),
+        log_arg,
+        "--daemon".to_string(),
+    ];
+
+    Ok(Some(rendered.join(" ")))
+}
+
 fn spawn_remote_viewer(config: &crate::config::VmConfig, central_config: &crate::config::CentralConfig) -> Result<()> {
     if let Some(launch) = build_remote_viewer_launch(config, central_config) {
         run_auxiliary_launch(&launch)?;
@@ -672,6 +745,12 @@ async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<
         println!("PID file: {}", pid_file.display());
         if let Some(log_file) = &log_file {
             println!("Log file: {}", log_file.display());
+        }
+
+        match build_swtpm_launch_preview(manager.config(), &central_config_clone) {
+            Ok(Some(cmd)) => println!("Auxiliary launch (swtpm): {}", cmd),
+            Ok(None) => {}
+            Err(err) => println!("swtpm configuration error: {}", err),
         }
 
         if let Some(launch) = build_remote_viewer_launch(manager.config(), &central_config_clone) {
