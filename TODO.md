@@ -2,6 +2,32 @@
 
 ## Active Backlog
 
+### Review Concerns Remediation Plan
+
+#### Phase A: Correctness And Safety
+- [ ] Rework VM process discovery/stop/kill in `src/qemu/process.rs` to avoid regex pattern ambiguity and prefer exact process targeting
+- [ ] Add targeted tests for VM stop/kill process selection, including overlapping names and unsafe-character name cases
+- [ ] Harden `setup_network_isolation` in `src/network.rs` to ignore only the explicit "already exists" case and error on other failures
+- [ ] Replace production-path `unwrap` usage in `src/storage.rs` path handling with fallible error propagation and contextual `anyhow` errors
+- [ ] Replace fragile IOMMU detection shell-grep logic in `src/device.rs` with robust lowercase token checks and non-panicking flow
+- [ ] Prepare proposal for changing `add_tpm` panic behavior in `src/qemu/args.rs` to `Result` (requires explicit confirmation before signature change)
+
+#### Phase B: Documentation And Test Hygiene
+- [ ] Update `CONFIG.md` to reflect current profile merge behavior exactly (id-based list merges, append-unique list merges, and list-replace fallback paths)
+- [ ] Replace fixed `/tmp` test artifacts with unique temporary paths in integration/config tests
+- [ ] Apply consistent environment-variable locking strategy across tests that mutate process environment
+
+#### Phase C: Quality Gate Cleanup
+- [ ] Make `cargo fmt --all --check` pass across repository
+- [ ] Reduce and resolve current `cargo clippy --all-targets --all-features -- -D warnings` failures in staged batches
+- [ ] Re-run full `cargo test` after lint/format remediations and keep suite green
+
+#### Phase D: Module Refactor Program
+- [ ] Split `src/config/mod.rs` into focused modules (schema types, profile loading/merge, env substitution, entrypoint wiring)
+- [ ] Split `src/config/validation.rs` into domain validators (system, boot, devices, vm options) with small function surfaces
+- [ ] Split `src/cli.rs` command handlers into submodules by command group while keeping top-level dispatch minimal
+- [ ] Review `src/qemu/builder.rs` usage and either integrate it as the command-building path or remove/deprecate it
+
 ### QMP Device Hotplug
 - [ ] Replace the print-only helpers in `src/device.rs` with real QMP `device_add` and `device_del` flows for disks and network devices
 - [ ] Stop using the unused `vm_pid` placeholder in hotplug helpers and resolve a real QMP socket or monitor endpoint from VM state/config
@@ -14,35 +40,6 @@
 - [ ] Remove the hard-coded `eth0` parent from `setup_network_isolation` and make the uplink/interface configurable
 - [ ] Expand the CLI network commands beyond bridge creation so the existing network helper functionality is reachable from the CLI
 
-### Profiles Feature Plan
-
-#### Phase 1: Schema And Loader Wiring (MVP)
-- [x] Add optional `profiles: Vec<String>` to VM config parsing input (without breaking existing files)
-- [x] Add `locations.profile_dir: Option<String>` to central config
-- [x] Use default profile directory `/etc/ezkvm/profiles.d` when `locations.profile_dir` is unset
-- [x] Load VM YAML as raw value, then resolve and merge referenced profile files before `VmConfig` deserialization
-- [x] Resolve profile names to files (for example `windows_11` -> `<profile_dir>/windows_11.yaml`)
-- [x] Return clear errors for unknown profile names, missing files, unreadable files, or non-map YAML roots
-
-#### Phase 2: Merge Semantics
-- [x] Implement deterministic merge order: base -> profiles in listed order -> VM file
-- [x] Implement scalar replace and deep map merge
-- [x] Implement MVP list behavior as full replacement
-- [x] Document merge precedence and list semantics in user docs
-
-#### Phase 3: Validation, CLI Visibility, And Tests
-- [x] Keep existing `VmConfig` validation unchanged after merge, adding only pre-deserialize profile resolution checks
-- [x] Add `ezkvm config resolve <vm.yaml>` or `--show-resolved-config` to inspect final merged config
-- [x] Add unit tests for profile load/merge order, VM override precedence, and error paths
-- [x] Add integration tests proving profile-based configs and legacy non-profile configs both work
-
-#### Phase 4: Optional Enhancements
-- [x] Add first-slice id-based merge for `devices.drives` and `hostpci`
-- [x] Extend id-based merge to `devices.networks` and `usb_devices`
-- [x] Extend id-based merge to `scsi_controllers` and `xhci_controllers`
-- [x] Extend id-based merge to remaining object lists (`audio_devices`)
-- [x] Add append-unique behavior for option/feature lists (`system.cpu_features`, `system.machine_options`, `options.global_options`)
-- [ ] Consider supporting multiple profile search directories in priority order
 
 ## Completed Work (Consolidated) ✅
 
@@ -88,3 +85,14 @@
 - [x] Looking Glass client integration with validation and dry-run visibility
 - [x] Regression comparison against key fragments from `input/wakiza/108.cmd`
 - [x] Dry-run and validation coverage for `examples/wakiza.yaml`
+
+### Profiles System Delivery
+- [x] Profile references in VM config (`profiles`) with central profile directory support (`locations.profile_dir`)
+- [x] Default profile directory fallback to `/etc/ezkvm/profiles.d`
+- [x] Deterministic merge order: base -> profiles in listed order -> VM file
+- [x] Merge semantics: scalar replace, deep map merge, path-aware list behaviors
+- [x] ID-based list merges for `devices.drives`, `devices.networks`, `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`
+- [x] Append-unique list merges for `system.cpu_features`, `system.machine_options`, `options.global_options`
+- [x] Validation/UX additions: `validate --show-resolved-config`
+- [x] Unit and integration coverage for profile loading, precedence, error handling, and compatibility
+- [ ] Support multiple profile search directories in priority order

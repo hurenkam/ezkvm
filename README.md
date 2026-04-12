@@ -181,6 +181,43 @@ ezkvm follows a modular architecture with clear separation of concerns:
 
 ## Development
 
+## Rust Guidelines Monitor Agent
+
+Use the repository coding standard in [CODING_GUIDELINES.md](CODING_GUIDELINES.md) together with the review agent in [.github/rust-guidelines-monitor.agent.md](.github/rust-guidelines-monitor.agent.md).
+
+When to run it:
+- Before opening or merging a pull request.
+- After refactors that touch multiple modules.
+- After schema, merge, or CLI behavior changes.
+- When a file grows significantly and maintainability is a concern.
+
+What to ask it to review:
+- Correctness and behavior regressions.
+- Error handling and actionable failure messages.
+- API clarity and maintainability.
+- Test and documentation coverage gaps.
+
+Suggested prompt template:
+
+```text
+Review the current changes against CODING_GUIDELINES.md.
+
+Scope:
+- Focus on Rust files and affected tests/docs.
+- Prioritize correctness, safety, and regression risks.
+
+Output:
+- Findings first, ordered by severity.
+- For each finding: file path, issue, and concrete fix suggestion.
+- Then assumptions/open questions.
+- Then a short summary.
+
+Validation:
+- Run cargo fmt --all
+- Run cargo clippy --all-targets --all-features -- -D warnings
+- Run cargo test
+```
+
 ### Building
 
 ```bash
