@@ -37,8 +37,11 @@
 - [x] Add integration tests proving profile-based configs and legacy non-profile configs both work
 
 #### Phase 4: Optional Enhancements
-- [ ] Add id-based merge for selected object lists (`devices.drives`, `devices.networks`, `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`)
-- [ ] Add append-unique behavior for option/feature lists (`system.cpu_features`, `system.machine_options`, `options.global_options`)
+- [x] Add first-slice id-based merge for `devices.drives` and `hostpci`
+- [x] Extend id-based merge to `devices.networks` and `usb_devices`
+- [x] Extend id-based merge to `scsi_controllers` and `xhci_controllers`
+- [x] Extend id-based merge to remaining object lists (`audio_devices`)
+- [x] Add append-unique behavior for option/feature lists (`system.cpu_features`, `system.machine_options`, `options.global_options`)
 - [ ] Consider supporting multiple profile search directories in priority order
 
 ## Completed Work (Consolidated) ✅

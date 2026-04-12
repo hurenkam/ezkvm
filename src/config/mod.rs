@@ -8,6 +8,7 @@ pub mod devices;
 pub mod validation;
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 
 const DEFAULT_CENTRAL_CONFIG_PATHS: &[&str] = &[
@@ -1046,11 +1047,44 @@ impl VmConfig {
     }
 
     fn merge_yaml_values(base: &mut serde_yaml::Value, overlay: serde_yaml::Value) {
+        Self::merge_yaml_values_at_path(base, overlay, &[]);
+    }
+
+    fn merge_yaml_values_at_path(
+        base: &mut serde_yaml::Value,
+        overlay: serde_yaml::Value,
+        path: &[String],
+    ) {
         match (base, overlay) {
             (serde_yaml::Value::Mapping(base_map), serde_yaml::Value::Mapping(overlay_map)) => {
                 for (key, overlay_value) in overlay_map {
+                    let key_name = match &key {
+                        serde_yaml::Value::String(name) => Some(name.clone()),
+                        _ => None,
+                    };
+
                     if let Some(base_value) = base_map.get_mut(&key) {
-                        Self::merge_yaml_values(base_value, overlay_value);
+                        let child_path = if let Some(name) = key_name {
+                            let mut p = path.to_vec();
+                            p.push(name);
+                            p
+                        } else {
+                            path.to_vec()
+                        };
+
+                        if Self::is_id_merge_list_path(&child_path)
+                            && matches!(base_value, serde_yaml::Value::Sequence(_))
+                            && matches!(overlay_value, serde_yaml::Value::Sequence(_))
+                        {
+                            Self::merge_sequence_of_mappings_by_id(base_value, overlay_value, &child_path);
+                        } else if Self::is_append_unique_list_path(&child_path)
+                            && matches!(base_value, serde_yaml::Value::Sequence(_))
+                            && matches!(overlay_value, serde_yaml::Value::Sequence(_))
+                        {
+                            Self::merge_sequence_append_unique(base_value, overlay_value, &child_path);
+                        } else {
+                            Self::merge_yaml_values_at_path(base_value, overlay_value, &child_path);
+                        }
                     } else {
                         base_map.insert(key, overlay_value);
                     }
@@ -1058,6 +1092,119 @@ impl VmConfig {
             }
             (base_value, overlay_value) => {
                 *base_value = overlay_value;
+            }
+        }
+    }
+
+    fn is_id_merge_list_path(path: &[String]) -> bool {
+        matches!(path, [one] if one == "hostpci")
+            || matches!(path, [first, second] if first == "devices" && second == "drives")
+            || matches!(path, [first, second] if first == "devices" && second == "networks")
+            || matches!(path, [one] if one == "usb_devices")
+            || matches!(path, [one] if one == "scsi_controllers")
+            || matches!(path, [one] if one == "xhci_controllers")
+            || matches!(path, [one] if one == "audio_devices")
+    }
+
+    fn is_append_unique_list_path(path: &[String]) -> bool {
+        matches!(path, [first, second] if first == "system" && second == "cpu_features")
+            || matches!(path, [first, second] if first == "system" && second == "machine_options")
+            || matches!(path, [first, second] if first == "options" && second == "global_options")
+    }
+
+    fn merge_sequence_of_mappings_by_id(
+        base: &mut serde_yaml::Value,
+        overlay: serde_yaml::Value,
+        path: &[String],
+    ) {
+        let (serde_yaml::Value::Sequence(base_seq), serde_yaml::Value::Sequence(mut overlay_seq)) =
+            (base, overlay)
+        else {
+            return;
+        };
+
+        if base_seq.iter().any(|item| Self::yaml_mapping_id(item).is_none())
+            || overlay_seq.iter().any(|item| Self::yaml_mapping_id(item).is_none())
+        {
+            *base_seq = overlay_seq;
+            return;
+        }
+
+        let mut index_by_id: HashMap<String, usize> = HashMap::new();
+        for (idx, item) in base_seq.iter().enumerate() {
+            let id = Self::yaml_mapping_id(item).unwrap();
+            index_by_id.insert(id, idx);
+        }
+
+        for overlay_item in overlay_seq.drain(..) {
+            let id = Self::yaml_mapping_id(&overlay_item).unwrap();
+
+            if let Some(base_idx) = index_by_id.get(&id).copied() {
+                if let Some(base_item) = base_seq.get_mut(base_idx) {
+                    Self::merge_yaml_values_at_path(base_item, overlay_item, path);
+                }
+            } else {
+                let next_idx = base_seq.len();
+                base_seq.push(overlay_item);
+                index_by_id.insert(id, next_idx);
+            }
+        }
+    }
+
+    fn yaml_mapping_id(value: &serde_yaml::Value) -> Option<String> {
+        let serde_yaml::Value::Mapping(map) = value else {
+            return None;
+        };
+        let id_key = serde_yaml::Value::String("id".to_string());
+        match map.get(&id_key) {
+            Some(serde_yaml::Value::String(id)) if !id.trim().is_empty() => Some(id.clone()),
+            _ => None,
+        }
+    }
+
+    fn yaml_mapping_name(value: &serde_yaml::Value) -> Option<String> {
+        let serde_yaml::Value::Mapping(map) = value else {
+            return None;
+        };
+        let name_key = serde_yaml::Value::String("name".to_string());
+        match map.get(&name_key) {
+            Some(serde_yaml::Value::String(name)) if !name.trim().is_empty() => Some(name.clone()),
+            _ => None,
+        }
+    }
+
+    fn merge_sequence_append_unique(
+        base: &mut serde_yaml::Value,
+        overlay: serde_yaml::Value,
+        _path: &[String],
+    ) {
+        let (serde_yaml::Value::Sequence(base_seq), serde_yaml::Value::Sequence(overlay_seq)) =
+            (base, overlay)
+        else {
+            return;
+        };
+
+        for overlay_item in overlay_seq {
+            let already_present = match &overlay_item {
+                serde_yaml::Value::String(s) => base_seq
+                    .iter()
+                    .any(|existing| matches!(existing, serde_yaml::Value::String(es) if es == s)),
+                serde_yaml::Value::Mapping(_) => {
+                    if let Some(overlay_name) = Self::yaml_mapping_name(&overlay_item) {
+                        base_seq.iter().any(|existing| {
+                            Self::yaml_mapping_name(existing)
+                                .map(|name| name == overlay_name)
+                                .unwrap_or(false)
+                        })
+                    } else {
+                        base_seq.iter().any(|existing| existing == &overlay_item)
+                    }
+                }
+                _ => base_seq.iter().any(|existing| existing == &overlay_item),
+            };
+
+            if !already_present {
+                base_seq.push(overlay_item);
             }
         }
     }
@@ -1188,7 +1335,7 @@ mod tests {
 
     #[test]
     fn test_central_config_load_honors_env_override() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let temp_path = std::env::temp_dir().join(format!(
             "ezkvm-central-config-{}-{}.yaml",
@@ -1228,7 +1375,7 @@ mod tests {
 
     #[test]
     fn test_vm_config_from_file_merges_profiles_from_profile_dir() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-merge");
         let profile_dir = root.join("profiles");
@@ -1306,7 +1453,7 @@ system:
 
     #[test]
     fn test_vm_config_from_file_errors_on_missing_profile_file() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-missing");
         let profile_dir = root.join("profiles");
@@ -1355,7 +1502,7 @@ system:
 
     #[test]
     fn test_vm_config_from_file_errors_on_non_mapping_profile_root() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-nonmap");
         let profile_dir = root.join("profiles");
@@ -1414,7 +1561,7 @@ system:
 
     #[test]
     fn test_vm_config_from_file_applies_profiles_in_listed_order() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-order");
         let profile_dir = root.join("profiles");
@@ -1480,7 +1627,7 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_deep_merges_nested_maps() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-deep-merge");
         let profile_dir = root.join("profiles");
@@ -1550,8 +1697,8 @@ profiles:
     }
 
     #[test]
-    fn test_vm_config_from_file_replaces_lists_in_mvp_merge() {
-        let _guard = env_lock().lock().unwrap();
+    fn test_vm_config_from_file_replaces_non_specialized_lists() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-list-replace");
         let profile_dir = root.join("profiles");
@@ -1566,19 +1713,19 @@ system:
   memory: 4096
   vcpus: 2
   cpu_model: "host"
-  cpu_features:
-    - name: "hv_relaxed"
-    - name: "hv_time"
+devices:
+  displays:
+    - type: "qxl"
 "#,
         )
         .unwrap();
 
         std::fs::write(
-            profile_dir.join("replace_features.yaml"),
+            profile_dir.join("replace_displays.yaml"),
             r#"
-system:
-  cpu_features:
-    - name: "kvm=off"
+devices:
+  displays:
+    - type: "cirrus"
 "#,
         )
         .unwrap();
@@ -1601,7 +1748,7 @@ name: "list-replace-test"
 backend: "qemu"
 profiles:
   - "base_system"
-  - "replace_features"
+  - "replace_displays"
 "#,
         )
         .unwrap();
@@ -1611,8 +1758,8 @@ profiles:
         }
 
         let config = VmConfig::from_file(&vm_config_path).unwrap();
-        assert_eq!(config.system.cpu_features.len(), 1);
-        assert_eq!(config.system.cpu_features[0].name, "kvm=off");
+        assert_eq!(config.devices.displays.len(), 1);
+        assert_eq!(config.devices.displays[0].r#type, "cirrus");
 
         unsafe {
             std::env::remove_var("EZKVM_CONFIG");
@@ -1622,7 +1769,7 @@ profiles:
 
     #[test]
     fn test_vm_config_from_file_vm_values_override_profile_values() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-vm-override");
         let profile_dir = root.join("profiles");
@@ -1682,7 +1829,7 @@ system:
 
     #[test]
     fn test_vm_config_from_file_still_runs_validation_after_profile_merge() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = unique_test_dir("ezkvm-profile-validation");
         let profile_dir = root.join("profiles");
@@ -1729,6 +1876,883 @@ profiles:
 
         let err = VmConfig::from_file(&vm_config_path).unwrap_err().to_string();
         assert!(err.contains("Unsupported architecture"));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_merges_hostpci_by_id() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-hostpci-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+hostpci:
+  - id: "hostpci0.0"
+    device: "0000:03:00.0"
+    bus: "ich9-pcie-port-1"
+    multifunction: true
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("gpu_overlay.yaml"),
+            r#"
+hostpci:
+  - id: "hostpci0.0"
+    addr: "0x0.0"
+  - id: "hostpci0.1"
+    device: "0000:03:00.1"
+    bus: "ich9-pcie-port-1"
+    addr: "0x0.1"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "hostpci-id-merge-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "gpu_overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.hostpci.len(), 2);
+
+        let gpu0 = config.hostpci.iter().find(|d| d.id == "hostpci0.0").unwrap();
+        assert_eq!(gpu0.device, "0000:03:00.0");
+        assert_eq!(gpu0.bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(gpu0.addr.as_deref(), Some("0x0.0"));
+        assert!(gpu0.multifunction);
+
+        let gpu1 = config.hostpci.iter().find(|d| d.id == "hostpci0.1").unwrap();
+        assert_eq!(gpu1.device, "0000:03:00.1");
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+        #[test]
+        fn test_vm_config_from_file_merges_devices_drives_by_id() {
+            let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+            let root = unique_test_dir("ezkvm-profile-drives-id-merge");
+            let profile_dir = root.join("profiles");
+            std::fs::create_dir_all(&profile_dir).unwrap();
+
+            std::fs::write(
+                profile_dir.join("base.yaml"),
+                r#"
+    system:
+      architecture: "x86_64"
+      machine: "q35"
+      memory: 4096
+      vcpus: 2
+      cpu_model: "host"
+    devices:
+      drives:
+        - id: "root"
+          path: "/tmp/root.qcow2"
+          interface: "virtio"
+          type: "disk"
+          format: "qcow2"
+    "#,
+            )
+            .unwrap();
+
+            std::fs::write(
+                profile_dir.join("drive_overlay.yaml"),
+                r#"
+    devices:
+      drives:
+        - id: "root"
+          cache: "none"
+          boot_index: 100
+        - id: "data"
+          path: "/tmp/data.raw"
+          interface: "scsi"
+          type: "disk"
+          format: "raw"
+          controller: "scsihw0"
+    "#,
+            )
+            .unwrap();
+
+            let central_config_path = root.join("ezkvm.yaml");
+            std::fs::write(
+                &central_config_path,
+                format!(
+                    "locations:\n  profile_dir: \"{}\"\n",
+                    profile_dir.display()
+                ),
+            )
+            .unwrap();
+
+            let vm_config_path = root.join("vm.yaml");
+            std::fs::write(
+                &vm_config_path,
+                r#"
+    name: "drive-id-merge-test"
+    backend: "qemu"
+    profiles:
+      - "base"
+      - "drive_overlay"
+    "#,
+            )
+            .unwrap();
+
+            unsafe {
+                std::env::set_var("EZKVM_CONFIG", &central_config_path);
+            }
+
+            let config = VmConfig::from_file(&vm_config_path).unwrap();
+            assert_eq!(config.devices.drives.len(), 2);
+
+            let root_drive = config.devices.drives.iter().find(|d| d.id == "root").unwrap();
+            assert_eq!(root_drive.path, "/tmp/root.qcow2");
+            assert_eq!(root_drive.cache.as_deref(), Some("none"));
+            assert_eq!(root_drive.boot_index, Some(100));
+
+            let data_drive = config.devices.drives.iter().find(|d| d.id == "data").unwrap();
+            assert_eq!(data_drive.interface, "scsi");
+            assert_eq!(data_drive.format, "raw");
+
+            unsafe {
+                std::env::remove_var("EZKVM_CONFIG");
+            }
+            let _ = std::fs::remove_dir_all(root);
+        }
+
+    #[test]
+    fn test_vm_config_from_file_merges_devices_networks_by_id() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-networks-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+devices:
+  networks:
+    - id: "net0"
+      model: "virtio-net-pci"
+      mode: "user"
+      mac: "52:54:00:12:34:56"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("network_overlay.yaml"),
+            r#"
+devices:
+  networks:
+    - id: "net0"
+      boot_index: 110
+      tx_queue_size: 256
+    - id: "net1"
+      model: "e1000"
+      mode: "user"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "network-id-merge-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "network_overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.devices.networks.len(), 2);
+
+        let net0 = config
+            .devices
+            .networks
+            .iter()
+            .find(|n| n.id == "net0")
+            .unwrap();
+        assert_eq!(net0.model, "virtio-net-pci");
+        assert_eq!(net0.mode, "user");
+        assert_eq!(net0.mac.as_deref(), Some("52:54:00:12:34:56"));
+        assert_eq!(net0.boot_index, Some(110));
+        assert_eq!(net0.tx_queue_size, Some(256));
+
+        let net1 = config
+            .devices
+            .networks
+            .iter()
+            .find(|n| n.id == "net1")
+            .unwrap();
+        assert_eq!(net1.model, "e1000");
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_merges_usb_devices_by_id() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-usb-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+usb_devices:
+  - id: "usb0"
+    hostbus: "1"
+    hostport: "2.2"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("usb_overlay.yaml"),
+            r#"
+usb_devices:
+  - id: "usb0"
+    bus: "xhci.0"
+    port: "1"
+  - id: "usb1"
+    hostbus: "1"
+    hostport: "2.3"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "usb-id-merge-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "usb_overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.usb_devices.len(), 2);
+
+        let usb0 = config.usb_devices.iter().find(|u| u.id == "usb0").unwrap();
+        assert_eq!(usb0.hostbus.as_deref(), Some("1"));
+        assert_eq!(usb0.hostport.as_deref(), Some("2.2"));
+        assert_eq!(usb0.bus.as_deref(), Some("xhci.0"));
+        assert_eq!(usb0.port.as_deref(), Some("1"));
+
+        let usb1 = config.usb_devices.iter().find(|u| u.id == "usb1").unwrap();
+        assert_eq!(usb1.hostport.as_deref(), Some("2.3"));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_merges_scsi_controllers_by_id() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-scsi-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("scsi_overlay.yaml"),
+            r#"
+scsi_controllers:
+  - id: "scsihw0"
+    bus: "pci.0"
+    addr: "0x5"
+  - id: "scsihw1"
+    type: "virtio-scsi-pci"
+    bus: "pci.0"
+    addr: "0x6"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "scsi-id-merge-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "scsi_overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.scsi_controllers.len(), 2);
+
+        let scsihw0 = config
+            .scsi_controllers
+            .iter()
+            .find(|c| c.id == "scsihw0")
+            .unwrap();
+        assert_eq!(scsihw0.r#type, "pvscsi");
+        assert_eq!(scsihw0.bus.as_deref(), Some("pci.0"));
+        assert_eq!(scsihw0.addr.as_deref(), Some("0x5"));
+
+        let scsihw1 = config
+            .scsi_controllers
+            .iter()
+            .find(|c| c.id == "scsihw1")
+            .unwrap();
+        assert_eq!(scsihw1.r#type, "virtio-scsi-pci");
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_merges_xhci_controllers_by_id() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-xhci-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+xhci_controllers:
+  - id: "xhci"
+    p2: 8
+    p3: 8
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("xhci_overlay.yaml"),
+            r#"
+xhci_controllers:
+  - id: "xhci"
+    bus: "pci.1"
+    addr: "0x1b"
+  - id: "xhci2"
+    p2: 4
+    p3: 4
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "xhci-id-merge-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "xhci_overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.xhci_controllers.len(), 2);
+
+        let xhci = config
+            .xhci_controllers
+            .iter()
+            .find(|c| c.id == "xhci")
+            .unwrap();
+        assert_eq!(xhci.p2, Some(8));
+        assert_eq!(xhci.p3, Some(8));
+        assert_eq!(xhci.bus.as_deref(), Some("pci.1"));
+        assert_eq!(xhci.addr.as_deref(), Some("0x1b"));
+
+        let xhci2 = config
+            .xhci_controllers
+            .iter()
+            .find(|c| c.id == "xhci2")
+            .unwrap();
+        assert_eq!(xhci2.p2, Some(4));
+        assert_eq!(xhci2.p3, Some(4));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_merges_audio_devices_by_id() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-audio-id-merge");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+spice:
+  enabled: true
+  audio: true
+audio_devices:
+  - type: "ich9-intel-hda"
+    id: "audiodev0"
+    bus: "pci.2"
+  - type: "hda-micro"
+    id: "audiodev0-codec0"
+    bus: "audiodev0.0"
+    cad: 0
+    audiodev: "spice-backend0"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("audio_overlay.yaml"),
+            r#"
+audio_devices:
+  - type: "ich9-intel-hda"
+    id: "audiodev0"
+    addr: "0xc"
+  - type: "hda-duplex"
+    id: "audiodev0-codec1"
+    bus: "audiodev0.0"
+    cad: 1
+    audiodev: "spice-backend0"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "audio-id-merge-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "audio_overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.audio_devices.len(), 3);
+
+        let hda = config
+            .audio_devices
+            .iter()
+            .find(|d| d.id == "audiodev0")
+            .unwrap();
+        assert_eq!(hda.r#type, "ich9-intel-hda");
+        assert_eq!(hda.bus.as_deref(), Some("pci.2"));
+        assert_eq!(hda.addr.as_deref(), Some("0xc"));
+
+        let codec0 = config
+            .audio_devices
+            .iter()
+            .find(|d| d.id == "audiodev0-codec0")
+            .unwrap();
+        assert_eq!(codec0.r#type, "hda-micro");
+
+        let codec1 = config
+            .audio_devices
+            .iter()
+            .find(|d| d.id == "audiodev0-codec1")
+            .unwrap();
+        assert_eq!(codec1.r#type, "hda-duplex");
+        assert_eq!(codec1.cad, Some(1));
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_appends_unique_cpu_features() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-cpu-features-append");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+  cpu_features:
+    - name: "hv_relaxed"
+    - name: "hv_time"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("overlay.yaml"),
+            r#"
+system:
+  cpu_features:
+    - name: "hv_time"
+    - name: "kvm=off"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "cpu-features-append-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        let feature_names: Vec<&str> = config
+            .system
+            .cpu_features
+            .iter()
+            .map(|f| f.name.as_str())
+            .collect();
+        assert_eq!(feature_names, vec!["hv_relaxed", "hv_time", "kvm=off"]);
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_appends_unique_machine_options() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-machine-options-append");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+  machine_options:
+    - "hpet=off"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("overlay.yaml"),
+            r#"
+system:
+  machine_options:
+    - "hpet=off"
+    - "smm=on"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "machine-options-append-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(config.system.machine_options, vec!["hpet=off", "smm=on"]);
+
+        unsafe {
+            std::env::remove_var("EZKVM_CONFIG");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn test_vm_config_from_file_appends_unique_global_options() {
+        let _guard = env_lock().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let root = unique_test_dir("ezkvm-profile-global-options-append");
+        let profile_dir = root.join("profiles");
+        std::fs::create_dir_all(&profile_dir).unwrap();
+
+        std::fs::write(
+            profile_dir.join("base.yaml"),
+            r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+options:
+  enable_kvm: true
+  daemonize: false
+  global_options:
+    - "kvm-pit.lost_tick_policy=discard"
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            profile_dir.join("overlay.yaml"),
+            r#"
+options:
+  global_options:
+    - "kvm-pit.lost_tick_policy=discard"
+    - "ICH9-LPC.disable_s3=1"
+"#,
+        )
+        .unwrap();
+
+        let central_config_path = root.join("ezkvm.yaml");
+        std::fs::write(
+            &central_config_path,
+            format!(
+                "locations:\n  profile_dir: \"{}\"\n",
+                profile_dir.display()
+            ),
+        )
+        .unwrap();
+
+        let vm_config_path = root.join("vm.yaml");
+        std::fs::write(
+            &vm_config_path,
+            r#"
+name: "global-options-append-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "overlay"
+"#,
+        )
+        .unwrap();
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_config_path);
+        }
+
+        let config = VmConfig::from_file(&vm_config_path).unwrap();
+        assert_eq!(
+            config.options.global_options,
+            vec![
+                "kvm-pit.lost_tick_policy=discard",
+                "ICH9-LPC.disable_s3=1"
+            ]
+        );
 
         unsafe {
             std::env::remove_var("EZKVM_CONFIG");
