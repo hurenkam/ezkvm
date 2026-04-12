@@ -25,16 +25,16 @@
 - [x] Return clear errors for unknown profile names, missing files, unreadable files, or non-map YAML roots
 
 #### Phase 2: Merge Semantics
-- [ ] Implement deterministic merge order: base -> profiles in listed order -> VM file
-- [ ] Implement scalar replace and deep map merge
-- [ ] Implement MVP list behavior as full replacement
-- [ ] Document merge precedence and list semantics in user docs
+- [x] Implement deterministic merge order: base -> profiles in listed order -> VM file
+- [x] Implement scalar replace and deep map merge
+- [x] Implement MVP list behavior as full replacement
+- [x] Document merge precedence and list semantics in user docs
 
 #### Phase 3: Validation, CLI Visibility, And Tests
-- [ ] Keep existing `VmConfig` validation unchanged after merge, adding only pre-deserialize profile resolution checks
-- [ ] Add `ezkvm config resolve <vm.yaml>` or `--show-resolved-config` to inspect final merged config
-- [ ] Add unit tests for profile load/merge order, VM override precedence, and error paths
-- [ ] Add integration tests proving profile-based configs and legacy non-profile configs both work
+- [x] Keep existing `VmConfig` validation unchanged after merge, adding only pre-deserialize profile resolution checks
+- [x] Add `ezkvm config resolve <vm.yaml>` or `--show-resolved-config` to inspect final merged config
+- [x] Add unit tests for profile load/merge order, VM override precedence, and error paths
+- [x] Add integration tests proving profile-based configs and legacy non-profile configs both work
 
 #### Phase 4: Optional Enhancements
 - [ ] Add id-based merge for selected object lists (`devices.drives`, `devices.networks`, `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`)

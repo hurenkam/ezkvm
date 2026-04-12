@@ -24,3 +24,7 @@ The following errors have been found while attempting to run ezkvm:
       C. Network connection is not possible, wakiza should appear at 192.168.191.101, however both ping and remote-desktop over rdp timeout.
 
       D. When a physical monitor is connected to the gpu output, it remains black, showing no boot screen.
+
+5. Swtpm still running after vm has been stopped.
+    When a vm started by ezkvm is stopped using 'ezkvm stop', the swtpm process belonging to it should also be stopped (currently that does not happen always)
+

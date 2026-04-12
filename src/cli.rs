@@ -82,6 +82,10 @@ pub enum Commands {
     Validate {
         /// Path to the YAML configuration file
         config: String,
+
+        /// Print the resolved config after profile merging
+        #[arg(long)]
+        show_resolved_config: bool,
     },
     
     /// Storage management commands
@@ -196,8 +200,8 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Commands::Console { config } => {
             handle_console(&config).await
         }
-        Commands::Validate { config } => {
-            handle_validate(&config).await
+        Commands::Validate { config, show_resolved_config } => {
+            handle_validate(&config, show_resolved_config).await
         }
         Commands::Storage(cmd) => {
             handle_storage(cmd).await
@@ -988,7 +992,7 @@ async fn handle_console(config_path: &str) -> Result<()> {
 }
 
 /// Handle validate command
-async fn handle_validate(config_path: &str) -> Result<()> {
+async fn handle_validate(config_path: &str, show_resolved_config: bool) -> Result<()> {
     println!("Validating configuration: {}", config_path);
     
     let config = crate::config::VmConfig::from_file(config_path)?;
@@ -997,6 +1001,12 @@ async fn handle_validate(config_path: &str) -> Result<()> {
     println!("Architecture: {}", config.system.architecture);
     println!("Memory: {} MiB", config.system.memory);
     println!("vCPUs: {}", config.system.vcpus);
+
+    if show_resolved_config {
+        println!("\nResolved configuration:");
+        let resolved_yaml = serde_yaml::to_string(&config)?;
+        print!("{}", resolved_yaml);
+    }
     
     Ok(())
 }

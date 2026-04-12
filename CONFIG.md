@@ -111,6 +111,42 @@ options:
 - **Allowed values**: `"qemu"` (currently the only supported backend)
 - **Example**: `"qemu"`
 
+### `profiles` (optional)
+- **Type**: Array of strings
+- **Description**: Ordered list of profile names to merge before applying the VM file values
+- **Default**: Empty
+- **Example**:
+
+```yaml
+profiles:
+  - "windows_11"
+  - "gpu_passthrough"
+```
+
+Profile files are loaded from:
+- `locations.profile_dir` in central config, when set
+- `/etc/ezkvm/profiles.d` when unset
+
+Name-to-file mapping:
+- `windows_11` -> `<profile_dir>/windows_11.yaml`
+- `gpu_passthrough` -> `<profile_dir>/gpu_passthrough.yaml`
+
+Profile files must use a YAML mapping/object at the root.
+
+### Profile Merge Semantics (MVP)
+
+Merge order is deterministic:
+1. Empty base object
+2. Profiles in the exact order listed in `profiles`
+3. VM config file values
+
+Conflict handling:
+- Scalars: replace
+- Maps: deep merge
+- Lists: replace entirely
+
+This means the VM file always has final precedence over profile content.
+
 ## System Configuration
 
 The `system` section defines the core virtual machine hardware specifications.
