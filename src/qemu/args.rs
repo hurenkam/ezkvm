@@ -122,36 +122,7 @@ impl QemuArgs {
         model: &str,
         external_swtpm: bool,
     ) -> Result<(), String> {
-        match backend {
-            "emulator" => {
-                // Add chardev for TPM emulator or external swtpm socket
-                let chardev_id = "tpmchar";
-                self.push_str("-chardev");
-                let chardev_spec = if external_swtpm {
-                    format!("socket,id={},path={}", chardev_id, socket_path)
-                } else {
-                    format!(
-                        "socket,id={},server=on,wait=off,path={}",
-                        chardev_id, socket_path
-                    )
-                };
-                self.push(chardev_spec);
-
-                // Add TPM device
-                self.push_str("-tpmdev");
-                self.push(format!("emulator,id=tpmdev,chardev={}", chardev_id));
-            }
-            "passthrough" => {
-                self.push_str("-tpmdev");
-                self.push("passthrough,id=tpmdev".to_string());
-            }
-            _ => {
-                return Err(format!(
-                    "Unsupported TPM backend: '{}'. Supported backends: 'emulator', 'passthrough'",
-                    backend
-                ));
-            }
-        }
+        add_tpm_backend_args(self, backend, socket_path, external_swtpm)?;
 
         // Add TPM device
         self.push_str("-device");
@@ -366,27 +337,15 @@ impl QemuArgs {
         attach_display_device: bool,
     ) {
         self.push_str("-spice");
-        let mut spice_spec = format!("port={},addr={}", port, addr);
-        if disable_ticketing {
-            spice_spec.push_str(",disable-ticketing=on");
-        }
-        self.push(spice_spec);
+        self.push(build_spice_server_spec(port, addr, disable_ticketing));
 
         if attach_display_device {
             self.push_str("-device");
             self.push("qxl-vga,id=video0".to_string());
         }
 
-        // Add vdagent channel for clipboard sharing
         if vdagent {
-            if !has_serial_controller {
-                self.push_str("-device");
-                self.push("virtio-serial-pci,id=virtio-serial0".to_string());
-            }
-            self.push_str("-chardev");
-            self.push("spicevmc,id=vdagent,name=vdagent".to_string());
-            self.push_str("-device");
-            self.push("virtserialport,chardev=vdagent,name=com.redhat.spice.0".to_string());
+            add_spice_vdagent_args(self, has_serial_controller);
         }
     }
 
@@ -821,6 +780,68 @@ fn normalize_usb_host_spec(host_spec: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some((hostbus, hostport))
+}
+
+fn add_tpm_backend_args(
+    args: &mut QemuArgs,
+    backend: &str,
+    socket_path: &str,
+    external_swtpm: bool,
+) -> Result<(), String> {
+    match backend {
+        "emulator" => {
+            let chardev_id = "tpmchar";
+            args.push_str("-chardev");
+            args.push(build_tpm_chardev_spec(
+                chardev_id,
+                socket_path,
+                external_swtpm,
+            ));
+            args.push_str("-tpmdev");
+            args.push(format!("emulator,id=tpmdev,chardev={}", chardev_id));
+            Ok(())
+        }
+        "passthrough" => {
+            args.push_str("-tpmdev");
+            args.push("passthrough,id=tpmdev".to_string());
+            Ok(())
+        }
+        _ => Err(format!(
+            "Unsupported TPM backend: '{}'. Supported backends: 'emulator', 'passthrough'",
+            backend
+        )),
+    }
+}
+
+fn build_tpm_chardev_spec(chardev_id: &str, socket_path: &str, external_swtpm: bool) -> String {
+    if external_swtpm {
+        format!("socket,id={},path={}", chardev_id, socket_path)
+    } else {
+        format!(
+            "socket,id={},server=on,wait=off,path={}",
+            chardev_id, socket_path
+        )
+    }
+}
+
+fn build_spice_server_spec(port: u16, addr: &str, disable_ticketing: bool) -> String {
+    let mut spice_spec = format!("port={},addr={}", port, addr);
+    if disable_ticketing {
+        spice_spec.push_str(",disable-ticketing=on");
+    }
+    spice_spec
+}
+
+fn add_spice_vdagent_args(args: &mut QemuArgs, has_serial_controller: bool) {
+    if !has_serial_controller {
+        args.push_str("-device");
+        args.push("virtio-serial-pci,id=virtio-serial0".to_string());
+    }
+
+    args.push_str("-chardev");
+    args.push("spicevmc,id=vdagent,name=vdagent".to_string());
+    args.push_str("-device");
+    args.push("virtserialport,chardev=vdagent,name=com.redhat.spice.0".to_string());
 }
 
 #[cfg(test)]

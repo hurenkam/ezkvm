@@ -16,11 +16,18 @@
 - [x] Group loader-family files into a `src/config/loader/` subdirectory and keep `mod.rs` as the family entrypoint
 
 #### Phase 2: Section 2 Threshold Remediation (Medium Priority)
-- [ ] Split large production files over 250 lines into concern-based modules: `src/cli/runtime.rs`, `src/qemu/args.rs`, `src/config/platform.rs`, `src/config/devices.rs`, `src/config/vm_schema.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`
-- [ ] Split large validation files over 250 lines into smaller validator modules: `src/config/validation/platform.rs`, `src/config/validation/devices.rs`
-- [ ] Reduce core long functions to <=35-line orchestration style by extracting helpers, starting with `build_command`, `handle_start`, `start_swtpm_if_configured`, `validate_drive_config`, `validate_audio_devices`, `handle_storage`, `build_boot_args`
-- [ ] Re-audit remaining production functions over 35 lines and extract focused helpers until no high-impact outliers remain
-- [ ] For structs intentionally kept over 35 lines, add short rationale comments; otherwise split into focused nested/config subtypes (`VmConfig`, `QemuArgs`, `DriveConfig`, `HypervConfig`, `BootConfig`)
+- [x] Re-baseline current Section 2 outliers and lock the target list in TODO (updated from latest line-count audit)
+- [ ] Split oversized production modules (>250 lines): `src/qemu/args.rs`, `src/cli/runtime/auxiliary.rs`, `src/cli.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/qemu/process.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`
+- [x] Split `src/cli/runtime.rs` into focused submodules (`src/cli/runtime/mod.rs`, `src/cli/runtime/start.rs`, `src/cli/runtime/ops.rs`, `src/cli/runtime/inspect.rs`, `src/cli/runtime/auxiliary.rs`)
+- [x] Split `src/qemu/command_builder.rs` into focused submodules (`src/qemu/command_builder/mod.rs` + `src/qemu/command_builder/composition.rs`) and move `build_command` to orchestration style
+- [ ] Split oversized validation modules (>250 lines): `src/config/validation/platform.rs`, `src/config/validation/devices.rs`
+- [ ] Split oversized test-support module in `src` (>250 lines): `src/config/tests.rs` (move helper fixtures/assertions into submodules)
+- [ ] Refactor long command-construction functions to orchestration style (<=35 lines where practical): `build_boot_args`, `build_option_args`, `add_usb_host`
+- [x] Refactor `build_command`, `add_tpm`, and `add_spice` to orchestration style with extracted helpers
+- [ ] Refactor long runtime command handlers to orchestration style (<=35 lines where practical): `handle_start`, `start_swtpm_if_configured`, `handle_storage`, and follow-on helpers in `src/cli/runtime/start.rs`, `src/cli/runtime/auxiliary.rs`, and `src/cli/commands.rs`
+- [ ] Refactor long validation paths to orchestration style (<=35 lines where practical): `validate_drive_config`, `validate_audio_devices`, plus other validator outliers found during implementation
+- [ ] Re-run function-length scan for `src/**` and create a short residual-outlier list directly in TODO before Phase 2 closeout
+- [ ] Struct-size follow-up: split or justify >35-line structs with concise comments (`VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`, `QemuArgs`)
 
 #### Phase 3: Tests, Verification, And Reporting
 - [ ] Keep test files maintainable by splitting oversized suites: `tests/config_tests.rs`, `tests/integration_tests.rs`, `src/config/tests.rs`
