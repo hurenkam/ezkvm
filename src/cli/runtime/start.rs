@@ -10,36 +10,15 @@ use std::process::Stdio;
 pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
 
-    let mut config = crate::config::VmConfig::from_file(config_path)?;
-    println!("✓ Configuration loaded and validated");
-
-    let central_config = crate::config::CentralConfig::load()?;
-    println!("✓ Central configuration loaded");
-
-    if !dry_run {
-        ensure_runtime_socket_dirs(&config, &central_config)?;
-        start_swtpm_if_configured(&config, &central_config)?;
-    }
+    let (mut config, central_config) = load_start_configs(config_path)?;
+    prepare_auxiliary_runtime(&config, &central_config, dry_run)?;
 
     let central_config_clone = central_config.clone();
     config.options.daemonize = daemon;
-
     crate::state::cache_config(&config.name, &config)?;
 
     let pid_file = crate::state::get_pid_file_at(&config.name, config.options.pid_file.as_deref())?;
-    let log_file = if daemon || config.options.log_dir.is_some() {
-        crate::state::cleanup_old_logs_at(
-            &config.name,
-            config.options.log_dir.as_deref(),
-            config.options.log_keep,
-        )?;
-        Some(crate::state::create_session_log_file(
-            &config.name,
-            config.options.log_dir.as_deref(),
-        )?)
-    } else {
-        None
-    };
+    let log_file = prepare_log_file(&config, daemon)?;
 
     let manager = crate::qemu::QemuManager::new(config, central_config);
     let args = manager.build_command()?;
@@ -79,6 +58,50 @@ pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool)
     }
 
     Ok(())
+}
+
+fn load_start_configs(
+    config_path: &str,
+) -> Result<(crate::config::VmConfig, crate::config::CentralConfig)> {
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded and validated");
+
+    let central_config = crate::config::CentralConfig::load()?;
+    println!("✓ Central configuration loaded");
+
+    Ok((config, central_config))
+}
+
+fn prepare_auxiliary_runtime(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    dry_run: bool,
+) -> Result<()> {
+    if dry_run {
+        return Ok(());
+    }
+
+    ensure_runtime_socket_dirs(config, central_config)?;
+    start_swtpm_if_configured(config, central_config)?;
+    Ok(())
+}
+
+fn prepare_log_file(
+    config: &crate::config::VmConfig,
+    daemon: bool,
+) -> Result<Option<std::path::PathBuf>> {
+    if !daemon && config.options.log_dir.is_none() {
+        return Ok(None);
+    }
+
+    crate::state::cleanup_old_logs_at(
+        &config.name,
+        config.options.log_dir.as_deref(),
+        config.options.log_keep,
+    )?;
+    let log_file =
+        crate::state::create_session_log_file(&config.name, config.options.log_dir.as_deref())?;
+    Ok(Some(log_file))
 }
 
 fn print_dry_run(

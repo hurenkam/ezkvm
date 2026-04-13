@@ -42,65 +42,93 @@ pub(crate) fn start_swtpm_if_configured(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
 ) -> Result<()> {
-    let tpm = match &config.tpm {
-        Some(tpm) if tpm.backend == "emulator" => tpm,
-        _ => return Ok(()),
+    let Some(tpm) = config.tpm.as_ref().filter(|tpm| tpm.backend == "emulator") else {
+        return Ok(());
     };
 
-    let swtpm_path = match &central_config.tools.swtpm {
-        Some(path) => path,
-        None => {
-            return Err(anyhow!(
-                "TPM emulator backend requires tools.swtpm to be configured in the central config"
-            ));
-        }
-    };
+    let swtpm_path = swtpm_path(central_config)?;
+    let startup = prepare_swtpm_startup(config, central_config, tpm)?;
+    let rendered_cmd = render_swtpm_command(&swtpm_path, &startup);
+    println!("Launching swtpm: {}", rendered_cmd.join(" "));
 
+    spawn_swtpm(&swtpm_path, &startup)?;
+
+    Ok(())
+}
+
+struct SwtpmStartup {
+    socket_path: String,
+    tpm_flag: &'static str,
+    tpmstate_arg: String,
+    ctrl_arg: String,
+    pid_arg: String,
+    log_arg: String,
+}
+
+fn swtpm_path(central_config: &crate::config::CentralConfig) -> Result<String> {
+    central_config.tools.swtpm.clone().ok_or_else(|| {
+        anyhow!("TPM emulator backend requires tools.swtpm to be configured in the central config")
+    })
+}
+
+fn prepare_swtpm_startup(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    tpm: &crate::config::TpmConfig,
+) -> Result<SwtpmStartup> {
     let run_dir = ensure_run_dir(central_config)?;
     let socket_path = resolve_tpm_socket_path(config, central_config);
     ensure_socket_parent_dir(&socket_path, "TPM socket")?;
+
     let pid_path = run_dir.join(format!("{}.swtpm.pid", config.name));
     let log_path = run_dir.join(format!("{}-swtpm.log", config.name));
-
     let tpmstate_arg = build_tpmstate_arg(tpm, &run_dir, true)?;
 
+    Ok(SwtpmStartup {
+        socket_path: socket_path.clone(),
+        tpm_flag: if tpm.version == "2.0" {
+            "--tpm2"
+        } else {
+            "--tpm"
+        },
+        tpmstate_arg,
+        ctrl_arg: format!("type=unixio,path={},mode=0600", socket_path),
+        pid_arg: format!("file={}", pid_path.display()),
+        log_arg: format!("file={},level=1", log_path.display()),
+    })
+}
+
+fn render_swtpm_command(swtpm_path: &str, startup: &SwtpmStartup) -> Vec<String> {
+    vec![
+        swtpm_path.to_string(),
+        "socket".to_string(),
+        startup.tpm_flag.to_string(),
+        "--tpmstate".to_string(),
+        startup.tpmstate_arg.clone(),
+        "--ctrl".to_string(),
+        startup.ctrl_arg.clone(),
+        "--pid".to_string(),
+        startup.pid_arg.clone(),
+        "--terminate".to_string(),
+        "--log".to_string(),
+        startup.log_arg.clone(),
+        "--daemon".to_string(),
+    ]
+}
+
+fn spawn_swtpm(swtpm_path: &str, startup: &SwtpmStartup) -> Result<()> {
     let mut cmd = Command::new(swtpm_path);
-    let mut rendered_cmd: Vec<String> = vec![swtpm_path.clone(), "socket".to_string()];
-
-    let tpm_flag = if tpm.version == "2.0" {
-        "--tpm2"
-    } else {
-        "--tpm"
-    };
-    let ctrl_arg = format!("type=unixio,path={},mode=0600", socket_path);
-    let pid_arg = format!("file={}", pid_path.display());
-    let log_arg = format!("file={},level=1", log_path.display());
-
-    rendered_cmd.push(tpm_flag.to_string());
-    rendered_cmd.push("--tpmstate".to_string());
-    rendered_cmd.push(tpmstate_arg.clone());
-    rendered_cmd.push("--ctrl".to_string());
-    rendered_cmd.push(ctrl_arg.clone());
-    rendered_cmd.push("--pid".to_string());
-    rendered_cmd.push(pid_arg.clone());
-    rendered_cmd.push("--terminate".to_string());
-    rendered_cmd.push("--log".to_string());
-    rendered_cmd.push(log_arg.clone());
-    rendered_cmd.push("--daemon".to_string());
-
-    println!("Launching swtpm: {}", rendered_cmd.join(" "));
-
     cmd.arg("socket")
-        .arg(tpm_flag)
+        .arg(startup.tpm_flag)
         .arg("--tpmstate")
-        .arg(tpmstate_arg)
+        .arg(&startup.tpmstate_arg)
         .arg("--ctrl")
-        .arg(ctrl_arg)
+        .arg(&startup.ctrl_arg)
         .arg("--pid")
-        .arg(pid_arg)
+        .arg(&startup.pid_arg)
         .arg("--terminate")
         .arg("--log")
-        .arg(log_arg)
+        .arg(&startup.log_arg)
         .arg("--daemon")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -111,10 +139,13 @@ pub(crate) fn start_swtpm_if_configured(
             "Warning: failed to start swtpm at '{}': {}",
             swtpm_path, err
         );
-    } else {
-        wait_for_unix_socket(&socket_path, Duration::from_secs(3), "swtpm socket")?;
-        println!("✓ Started swtpm emulator using socket {}", socket_path);
+        return Ok(());
     }
 
+    wait_for_unix_socket(&startup.socket_path, Duration::from_secs(3), "swtpm socket")?;
+    println!(
+        "✓ Started swtpm emulator using socket {}",
+        startup.socket_path
+    );
     Ok(())
 }

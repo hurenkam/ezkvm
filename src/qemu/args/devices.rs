@@ -112,26 +112,12 @@ impl QemuArgs {
         port: Option<&str>,
     ) {
         self.push_str("-device");
+
         let mut usb_spec = String::from("usb-host");
-
-        if let (Some(hostbus), Some(hostport)) = (hostbus, hostport) {
-            usb_spec.push_str(&format!(",hostbus={},hostport={}", hostbus, hostport));
-        } else if let Some((normalized_bus, normalized_port)) = normalize_usb_host_spec(host_spec) {
-            usb_spec.push_str(&format!(
-                ",hostbus={},hostport={}",
-                normalized_bus, normalized_port
-            ));
-        } else if !host_spec.trim().is_empty() {
-            usb_spec.push_str(&format!(",host={}", host_spec));
-        }
-
+        usb_spec.push_str(&build_usb_host_location(host_spec, hostbus, hostport));
         usb_spec.push_str(&format!(",id={}", id));
-        if let Some(bus) = bus {
-            usb_spec.push_str(&format!(",bus={}", bus));
-        }
-        if let Some(port) = port {
-            usb_spec.push_str(&format!(",port={}", port));
-        }
+        usb_spec.push_str(&build_usb_guest_placement(bus, port));
+
         self.push(usb_spec);
     }
 
@@ -232,4 +218,35 @@ fn normalize_usb_host_spec(host_spec: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some((hostbus, hostport))
+}
+
+fn build_usb_host_location(
+    host_spec: &str,
+    hostbus: Option<&str>,
+    hostport: Option<&str>,
+) -> String {
+    if let (Some(hostbus), Some(hostport)) = (hostbus, hostport) {
+        return format!(",hostbus={},hostport={}", hostbus, hostport);
+    }
+
+    if let Some((normalized_bus, normalized_port)) = normalize_usb_host_spec(host_spec) {
+        return format!(",hostbus={},hostport={}", normalized_bus, normalized_port);
+    }
+
+    if !host_spec.trim().is_empty() {
+        return format!(",host={}", host_spec);
+    }
+
+    String::new()
+}
+
+fn build_usb_guest_placement(bus: Option<&str>, port: Option<&str>) -> String {
+    let mut placement = String::new();
+    if let Some(bus) = bus {
+        placement.push_str(&format!(",bus={}", bus));
+    }
+    if let Some(port) = port {
+        placement.push_str(&format!(",port={}", port));
+    }
+    placement
 }

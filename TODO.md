@@ -24,10 +24,10 @@
 - [x] Split `src/config/validation/platform.rs` into focused submodules (`src/config/validation/platform/mod.rs`, `audio.rs`, `core.rs`, `usb.rs`, `devices.rs`, `helpers.rs`)
 - [x] Split `src/config/validation/devices.rs` into focused submodules (`src/config/validation/devices/mod.rs`, `drive.rs`, `network.rs`, `display.rs`, `serial.rs`)
 - [x] Split oversized test-support modules in `src` (>250 lines): `src/config/tests.rs`, `src/qemu/args/tests.rs`, `src/cli/tests.rs` (move helper fixtures/assertions into submodules)
-- [ ] Refactor long command-construction functions to orchestration style (<=35 lines where practical): `build_boot_args`, `build_option_args`, `add_usb_host`
+- [x] Refactor long command-construction functions to orchestration style (<=35 lines where practical): `build_boot_args`, `build_option_args`, `add_usb_host`
 - [x] Refactor `build_command`, `add_tpm`, and `add_spice` to orchestration style with extracted helpers
 - [x] Refactor validation paths `validate_drive_config` and `validate_audio_devices` to orchestration style with focused helpers
-- [ ] Refactor long runtime command handlers to orchestration style (<=35 lines where practical): `handle_start`, `start_swtpm_if_configured`, `handle_storage`, and follow-on helpers in `src/cli/runtime/start.rs`, `src/cli/runtime/auxiliary/swtpm/startup.rs`, and `src/cli/commands.rs`
+- [x] Refactor long runtime command handlers to orchestration style (<=35 lines where practical): `handle_start`, `start_swtpm_if_configured`, `handle_storage`, and follow-on helpers in `src/cli/runtime/start.rs`, `src/cli/runtime/auxiliary/swtpm/startup.rs`, and `src/cli/commands.rs`
 - [ ] Refactor long validation paths to orchestration style (<=35 lines where practical): remaining validator outliers found during implementation
 - [ ] Re-run function-length scan for `src/**` and create a short residual-outlier list directly in TODO before Phase 2 closeout
 - [ ] Struct-size follow-up: split or justify >35-line structs with concise comments (`VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`, `QemuArgs`)
