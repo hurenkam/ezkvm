@@ -4,6 +4,13 @@
 
 ### Profile System
 - [ ] Support multiple profile search directories in priority order
+- [ ] Split `devices.networks[].mode` into structured backend properties and keep a compatibility path for legacy string parsing
+- [ ] Introduce selector-based profile defaults for drives, networks, and other device families matched by interface/type/model/backend instead of `id`
+- [ ] Rework profile list behavior so concrete device instances append by declaration order while defaults come from policy rules rather than id-based patching
+- [ ] Add placement policies for `addr`, `scsi_id`, and similar counters with configurable start/step values and per-bus or per-controller scopes
+- [ ] Add collision detection and validation for explicit versus auto-assigned placement values
+- [ ] Document profile policy precedence, migration rules, and legacy compatibility behavior
+- [ ] Add unit and integration tests for selector defaults, structured network backends, auto-placement, and legacy compatibility
 
 ### Network Tooling
 - [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
