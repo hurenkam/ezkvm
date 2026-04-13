@@ -35,7 +35,7 @@ impl From<DeviceConfig> for QemuArgs {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{DisplayConfig, DriveConfig, NetworkConfig, SerialConfig};
+    use crate::config::{DeviceConfig, DisplayConfig, DriveConfig, NetworkConfig, SerialConfig};
     use crate::qemu::types::QemuArgs;
 
     #[test]
@@ -203,5 +203,60 @@ mod tests {
 
         let args = QemuArgs::from(serial).into_inner();
         assert_eq!(args, vec!["-serial", "tcp:127.0.0.1:4444,server,nowait"]);
+    }
+
+    #[test]
+    fn test_device_config_conversion_preserves_section_order() {
+        let config = DeviceConfig {
+            drives: vec![DriveConfig {
+                id: "root".to_string(),
+                path: "/images/root.qcow2".to_string(),
+                interface: "virtio".to_string(),
+                r#type: "disk".to_string(),
+                format: "qcow2".to_string(),
+                readonly: false,
+                discard: false,
+                ssd: false,
+                cache: None,
+                aio: None,
+                detect_zeroes: None,
+                controller: None,
+                boot_index: None,
+                scsi_id: None,
+                bus: None,
+                unit: None,
+            }],
+            networks: vec![NetworkConfig {
+                id: "net0".to_string(),
+                model: "virtio-net-pci".to_string(),
+                mode: "user".to_string(),
+                mac: Some("52:54:00:12:34:56".to_string()),
+                rx_queue_size: None,
+                tx_queue_size: None,
+                boot_index: None,
+                bus: None,
+                addr: None,
+            }],
+            displays: vec![DisplayConfig {
+                r#type: "qxl".to_string(),
+                vram: Some(64),
+            }],
+            serials: vec![SerialConfig {
+                r#type: "pty".to_string(),
+                port: None,
+                path: None,
+                host: None,
+                socket_port: None,
+                server: true,
+                wait: false,
+            }],
+        };
+
+        let args = QemuArgs::from(config).into_inner();
+        assert_eq!(args[0], "-drive");
+        assert_eq!(args[2], "-netdev");
+        assert_eq!(args[4], "-device");
+        assert_eq!(args[6], "-device");
+        assert_eq!(args[8], "-serial");
     }
 }
