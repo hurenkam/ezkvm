@@ -8,12 +8,12 @@
 ### Review Comments Remediation Plan (Open)
 
 #### Phase 1: Section 13 Structural Compliance (High Priority)
-- [ ] Split implementation out of `src/qemu/mod.rs` so `mod.rs` contains only module declarations and re-exports
-- [ ] Create focused QEMU modules for manager lifecycle and argument builders (for example `manager.rs`, `command_builder.rs`, `boot_args.rs`) and move logic from `src/qemu/mod.rs`
-- [ ] Move `impl From<DriveConfig>`, `impl From<NetworkConfig>`, `impl From<DisplayConfig>`, `impl From<AudioDeviceConfig>`, `impl From<InputDeviceConfig>`, and `impl From<HostPciConfig>` into the same file as their source struct definitions (currently in `src/config/vm_schema.rs`)
-- [ ] Move `impl From<SystemConfig>` into the same file as `SystemConfig` and keep source-type behavior co-located
+- [x] Split implementation out of `src/qemu/mod.rs` so `mod.rs` contains only module declarations and re-exports
+- [x] Create focused QEMU modules for manager lifecycle and argument builders (for example `manager.rs`, `command_builder.rs`, `boot_args.rs`) and move logic from `src/qemu/mod.rs`
+- [x] Move schema conversion impls into the same file as source struct definitions in `src/config/vm_schema.rs` (`From<DriveConfig>`, `From<NetworkConfig>`, `From<DisplayConfig>`, `From<SerialConfig>`)
+- [x] Move `impl From<SystemConfig>` into the same file as `SystemConfig` and keep source-type behavior co-located
 - [ ] Refactor config schema layout so large types and their impl blocks are co-located per type (especially `VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`)
-- [ ] Group loader-family files into a `src/config/loader/` subdirectory and keep `mod.rs` as the family entrypoint
+- [x] Group loader-family files into a `src/config/loader/` subdirectory and keep `mod.rs` as the family entrypoint
 
 #### Phase 2: Section 2 Threshold Remediation (Medium Priority)
 - [ ] Split large production files over 250 lines into concern-based modules: `src/cli/runtime.rs`, `src/qemu/args.rs`, `src/config/platform.rs`, `src/config/devices.rs`, `src/config/vm_schema.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`

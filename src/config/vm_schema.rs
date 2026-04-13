@@ -1,3 +1,4 @@
+use crate::qemu::types::QemuArgs;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -337,4 +338,269 @@ pub struct SerialConfig {
 
 fn default_true() -> bool {
     true
+}
+
+impl From<SystemConfig> for QemuArgs {
+    fn from(config: SystemConfig) -> Self {
+        let mut args = QemuArgs::new();
+
+        // Machine type
+        args.push_str("-machine");
+        let mut machine_spec = format!("type={}", config.machine);
+        for option in config.machine_options {
+            machine_spec.push(',');
+            machine_spec.push_str(&option);
+        }
+        args.push(machine_spec);
+
+        // CPU configuration
+        args.push_str("-cpu");
+        let mut cpu_spec = config.cpu_model.clone();
+        if !config.cpu_features.is_empty() {
+            let features: Vec<String> =
+                config.cpu_features.iter().map(|f| f.name.clone()).collect();
+            cpu_spec.push(',');
+            cpu_spec.push_str(&features.join(","));
+        }
+        args.push(cpu_spec);
+
+        // Memory
+        args.push_str("-m");
+        args.push(format!("{}M", config.memory));
+
+        // SMP (symmetric multiprocessing)
+        args.push_str("-smp");
+        args.push(format!("cpus={}", config.vcpus));
+
+        args
+    }
+}
+
+impl From<DriveConfig> for QemuArgs {
+    fn from(drive: DriveConfig) -> Self {
+        let mut args = QemuArgs::new();
+        let has_path = !drive.path.trim().is_empty();
+
+        let drive_node_id = format!("drive-{}", drive.id);
+        let needs_attached_device = drive.controller.is_some()
+            || drive.boot_index.is_some()
+            || drive.scsi_id.is_some()
+            || drive.bus.is_some()
+            || drive.unit.is_some()
+            || drive.interface == "ide";
+
+        args.push_str("-drive");
+
+        let mut drive_parts = Vec::new();
+        if has_path {
+            drive_parts.push(format!("file={}", drive.path));
+        }
+
+        if needs_attached_device {
+            drive_parts.push("if=none".to_string());
+            drive_parts.push(format!("id={}", drive_node_id));
+            if drive.r#type == "cdrom" {
+                drive_parts.push("media=cdrom".to_string());
+            }
+        } else {
+            drive_parts.push(format!("if={}", drive.interface));
+        }
+
+        if has_path {
+            drive_parts.push(format!("format={}", drive.format));
+        }
+
+        if drive.readonly {
+            drive_parts.push("readonly=on".to_string());
+        }
+
+        if has_path && drive.discard {
+            drive_parts.push("discard=unmap".to_string());
+        }
+
+        if has_path && drive.ssd {
+            drive_parts.push("ssd=on".to_string());
+        }
+
+        if has_path {
+            if let Some(cache) = drive.cache.as_ref() {
+                drive_parts.push(format!("cache={}", cache));
+            }
+
+            if let Some(aio) = drive.aio.as_ref() {
+                drive_parts.push(format!("aio={}", aio));
+            }
+
+            if let Some(detect_zeroes) = drive.detect_zeroes.as_ref() {
+                drive_parts.push(format!("detect-zeroes={}", detect_zeroes));
+            }
+        }
+
+        args.push(drive_parts.join(","));
+
+        if needs_attached_device {
+            args.push_str("-device");
+            let mut device_spec = match drive.interface.as_str() {
+                "scsi" => format!(
+                    "{},drive={},id={}",
+                    if drive.r#type == "cdrom" {
+                        "scsi-cd"
+                    } else {
+                        "scsi-hd"
+                    },
+                    drive_node_id,
+                    drive.id
+                ),
+                "ide" => format!(
+                    "{},drive={},id={}",
+                    if drive.r#type == "cdrom" {
+                        "ide-cd"
+                    } else {
+                        "ide-hd"
+                    },
+                    drive_node_id,
+                    drive.id
+                ),
+                "virtio" => format!("virtio-blk-pci,drive={},id={}", drive_node_id, drive.id),
+                "nvme" => format!("nvme,drive={},id={}", drive_node_id, drive.id),
+                _ => format!(
+                    "{},drive={},id={}",
+                    drive.interface, drive_node_id, drive.id
+                ),
+            };
+
+            let attachment_bus = drive.bus.clone().or_else(|| {
+                drive
+                    .controller
+                    .as_ref()
+                    .map(|controller| format!("{}.0", controller))
+            });
+            if let Some(bus) = attachment_bus {
+                device_spec.push_str(&format!(",bus={}", bus));
+            }
+
+            if let Some(unit) = drive.unit {
+                device_spec.push_str(&format!(",unit={}", unit));
+            }
+
+            if let Some(scsi_id) = drive.scsi_id {
+                device_spec.push_str(&format!(",scsi-id={}", scsi_id));
+            }
+
+            if let Some(boot_index) = drive.boot_index {
+                device_spec.push_str(&format!(",bootindex={}", boot_index));
+            }
+
+            args.push(device_spec);
+        }
+
+        args
+    }
+}
+
+impl From<NetworkConfig> for QemuArgs {
+    fn from(network: NetworkConfig) -> Self {
+        let mut args = QemuArgs::new();
+
+        args.push_str("-netdev");
+        let netdev_spec = match network.mode.as_str() {
+            "user" => format!("type=user,id={}", network.id),
+            _ => format!("type={},id={}", network.mode, network.id),
+        };
+        args.push(netdev_spec);
+
+        args.push_str("-device");
+        let mut device_spec = format!("{},netdev={}", network.model, network.id);
+
+        if let Some(mac) = network.mac {
+            device_spec.push_str(&format!(",mac={}", mac));
+        }
+
+        if let Some(bus) = network.bus {
+            device_spec.push_str(&format!(",bus={}", bus));
+        }
+
+        if let Some(addr) = network.addr {
+            device_spec.push_str(&format!(",addr={}", addr));
+        }
+
+        if let Some(rx_queue_size) = network.rx_queue_size {
+            device_spec.push_str(&format!(",rx_queue_size={}", rx_queue_size));
+        }
+
+        if let Some(tx_queue_size) = network.tx_queue_size {
+            device_spec.push_str(&format!(",tx_queue_size={}", tx_queue_size));
+        }
+
+        if let Some(boot_index) = network.boot_index {
+            device_spec.push_str(&format!(",bootindex={}", boot_index));
+        }
+
+        args.push(device_spec);
+        args
+    }
+}
+
+impl From<DisplayConfig> for QemuArgs {
+    fn from(display: DisplayConfig) -> Self {
+        let mut args = QemuArgs::new();
+
+        args.push_str("-device");
+        let mut device_spec = display.r#type.clone();
+
+        if let Some(vram) = display.vram {
+            match display.r#type.as_str() {
+                "qxl" => device_spec.push_str(&format!(",vram_size_mb={}", vram)),
+                "vmware-svga" => device_spec.push_str(&format!(",vgamem_mb={}", vram)),
+                _ => device_spec.push_str(&format!(",vram={}", vram * 1024 * 1024)),
+            }
+        }
+
+        args.push(device_spec);
+        args
+    }
+}
+
+impl From<SerialConfig> for QemuArgs {
+    fn from(serial: SerialConfig) -> Self {
+        let mut args = QemuArgs::new();
+
+        match serial.r#type.as_str() {
+            "pty" => {
+                args.push_str("-serial");
+                args.push("pty".to_string());
+            }
+            "stdio" => {
+                args.push_str("-serial");
+                args.push("stdio".to_string());
+            }
+            "file" => {
+                args.push_str("-serial");
+                args.push(format!(
+                    "file:{}",
+                    serial.path.unwrap_or_else(|| "/dev/null".to_string())
+                ));
+            }
+            "socket" => {
+                args.push_str("-serial");
+                let host = serial.host.unwrap_or_else(|| "127.0.0.1".to_string());
+                let port = serial.socket_port.unwrap_or(4444);
+                let mut spec = format!("tcp:{}:{}", host, port);
+                if serial.server {
+                    spec.push_str(",server");
+                }
+                if !serial.wait {
+                    spec.push_str(",nowait");
+                }
+                args.push(spec);
+            }
+            _ => {
+                // Default to pty
+                args.push_str("-serial");
+                args.push("pty".to_string());
+            }
+        }
+
+        args
+    }
 }

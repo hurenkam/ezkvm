@@ -7,8 +7,6 @@ mod central;
 pub mod devices;
 mod entrypoint;
 mod loader;
-mod loader_env;
-mod loader_merge;
 mod platform;
 pub mod system;
 pub mod validation;

@@ -1,8 +1,10 @@
 use super::{
-    CentralConfig, DEFAULT_CENTRAL_CONFIG_PATHS, DEFAULT_PROFILE_DIR, VmConfig, loader_env,
-    loader_merge, validation,
+    CentralConfig, DEFAULT_CENTRAL_CONFIG_PATHS, DEFAULT_PROFILE_DIR, VmConfig, validation,
 };
 use std::path::Path;
+
+mod env;
+mod merge;
 
 impl VmConfig {
     /// Load configuration from a YAML file
@@ -131,13 +133,13 @@ impl VmConfig {
     }
 
     fn merge_yaml_values(base: &mut serde_yaml::Value, overlay: serde_yaml::Value) {
-        loader_merge::merge_yaml_values(base, overlay);
+        merge::merge_yaml_values(base, overlay);
     }
 
     /// Substitute environment variables in configuration content
     /// Supports ${VAR_NAME} and $VAR_NAME syntax
     fn substitute_env_vars(content: &str) -> anyhow::Result<String> {
-        loader_env::substitute_env_vars(content)
+        env::substitute_env_vars(content)
     }
 
     /// Load configuration from a YAML string
