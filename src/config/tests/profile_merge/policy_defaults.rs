@@ -570,3 +570,110 @@ devices:
     }
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn test_vm_config_from_file_policy_precedence_and_explicit_override() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-policy-precedence");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+policies:
+  networks:
+    - match:
+        backend_type: "tap"
+      defaults:
+        model: "e1000"
+"#,
+    )
+    .unwrap();
+
+    std::fs::write(
+        profile_dir.join("overlay.yaml"),
+        r#"
+policies:
+  networks:
+    - match:
+        backend_type: "tap"
+      defaults:
+        model: "virtio-net-pci"
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "policy-precedence-test"
+backend: "qemu"
+profiles:
+  - "base"
+  - "overlay"
+policies:
+  networks:
+    - match:
+        backend_type: "tap"
+      defaults:
+        model: "e1000e"
+devices:
+  networks:
+    - id: "net0"
+      backend:
+        type: "tap"
+        ifname: "tap0"
+    - id: "net1"
+      backend:
+        type: "tap"
+        ifname: "tap1"
+      model: "rtl8139"
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let config = VmConfig::from_file(&vm_config_path).unwrap();
+
+    let net0 = config
+        .devices
+        .networks
+        .iter()
+        .find(|network| network.id == "net0")
+        .unwrap();
+    assert_eq!(net0.model, "e1000e");
+
+    let net1 = config
+        .devices
+        .networks
+        .iter()
+        .find(|network| network.id == "net1")
+        .unwrap();
+    assert_eq!(net1.model, "rtl8139");
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}

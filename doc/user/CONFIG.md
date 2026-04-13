@@ -153,8 +153,31 @@ Each policy entry has:
 Policy precedence:
 
 1. Explicit VM config values win.
-2. Later profiles win over earlier profiles.
-3. Earlier profile defaults fill gaps that remain.
+2. Later policies win over earlier policies when they target the same missing field.
+3. Later profiles contribute later policy entries, so they naturally take precedence.
+4. VM-level `policies` entries are evaluated last and therefore have highest policy precedence.
+
+Policy evaluation details:
+
+- `policies.drives` and `policies.networks` lists are append-merged across profiles and VM config in merge order.
+- During policy application, matching entries are evaluated in reverse list order.
+- Defaults are only copied into missing fields, so once a field is filled by a later policy, earlier policies do not overwrite it.
+- Placement rules (`scsi_id`, `addr`) for a matching item also use reverse-order matching, so the last matching placement rule is selected.
+- Collision checks run even when no `policies` section is defined, so explicit duplicate `drives[].scsi_id` and `networks[].addr` values are still rejected.
+
+Legacy compatibility behavior:
+
+- `devices.networks[].mode` remains supported for legacy configs.
+- Selector matching by `backend_type` works for both structured backend objects and legacy `mode` strings.
+- `devices.drives` and `devices.networks` are append-in-order lists (not `id`-patch lists). Use selector defaults and placement policies to avoid repeating shared fields.
+
+Migration guidance:
+
+1. Keep existing concrete device entries in declaration order.
+2. Move shared per-family defaults from repeated per-item fields into `policies.*[].defaults` using selectors.
+3. Replace manual placement bookkeeping (`addr`, `scsi_id`) with `policies.*[].placement` where deterministic auto-assignment is desired.
+4. Retain explicit per-device values where needed; these continue to override policy-provided defaults.
+5. If migrating from old id-based mental models for drives/networks, treat list entries as concrete instances and let policy rules provide reusable defaults.
 
 Example:
 
