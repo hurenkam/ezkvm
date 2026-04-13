@@ -172,3 +172,94 @@ scsi_controllers:
             && arg.contains("bootindex=102")
     }));
 }
+
+#[test]
+fn test_refactored_command_builder_uses_generated_drive_and_network_ids() {
+    let yaml = r#"
+name: "regression-generated-device-ids"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - path: "/var/lib/vm/scsi0.raw"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      discard: true
+      controller: "scsihw0"
+      scsi_id: 0
+      boot_index: 100
+  networks:
+    - model: "virtio-net-pci"
+      backend:
+        type: "user"
+      mac: "52:54:00:12:34:56"
+
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    let manager = QemuManager::new(config, CentralConfig::default());
+    let args = manager.build_command().unwrap().into_inner();
+
+    assert!(args.iter().any(|arg| {
+        arg.contains("file=/var/lib/vm/scsi0.raw")
+            && arg.contains("if=none")
+            && arg.contains("id=drive-scsi0")
+    }));
+    assert!(args.iter().any(|arg| {
+        arg.contains("scsi-hd,drive=drive-scsi0,id=scsi0") && arg.contains("bootindex=100")
+    }));
+    assert!(args.iter().any(|arg| arg == "type=user,id=net0"));
+    assert!(args.iter().any(|arg| {
+        arg.contains("virtio-net-pci,netdev=net0") && arg.contains("mac=52:54:00:12:34:56")
+    }));
+}
+
+#[test]
+fn test_refactored_command_builder_supports_cdrom_without_path_field() {
+    let yaml = r#"
+  name: "regression-empty-cdrom-path"
+  backend: "qemu"
+
+  system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory: 2048
+    vcpus: 2
+    cpu_model: "host"
+
+  devices:
+    drives:
+    - interface: "ide"
+      type: "cdrom"
+      format: "raw"
+      readonly: true
+      boot_index: 101
+  "#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    let manager = QemuManager::new(config, CentralConfig::default());
+    let args = manager.build_command().unwrap().into_inner();
+
+    assert!(args.iter().any(|arg| {
+        arg.contains("if=none")
+            && arg.contains("id=drive-ide0")
+            && arg.contains("media=cdrom")
+            && arg.contains("readonly=on")
+            && !arg.contains("file=")
+            && !arg.contains("format=")
+    }));
+    assert!(args.iter().any(|arg| {
+        arg.contains("ide-cd,drive=drive-ide0,id=ide0") && arg.contains("bootindex=101")
+    }));
+}

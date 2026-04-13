@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::Path;
 
 use super::super::{
@@ -144,9 +145,46 @@ impl VmConfig {
 
     fn deserialize_and_validate(mut merged_value: serde_yaml::Value) -> anyhow::Result<Self> {
         policies::apply_profile_policies(&mut merged_value)?;
-        let config: VmConfig = serde_yaml::from_value(merged_value)?;
+        let mut config: VmConfig = serde_yaml::from_value(merged_value)?;
+        config.assign_default_device_ids();
         validation::validate_config(&config)?;
         Ok(config)
+    }
+
+    fn assign_default_device_ids(&mut self) {
+        let mut reserved_drive_ids = self
+            .devices
+            .drives
+            .iter()
+            .filter_map(|drive| {
+                let id = drive.id.trim();
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
+            })
+            .collect::<HashSet<_>>();
+        for (index, drive) in self.devices.drives.iter_mut().enumerate() {
+            drive.assign_default_id(index, &mut reserved_drive_ids);
+        }
+
+        let mut reserved_network_ids = self
+            .devices
+            .networks
+            .iter()
+            .filter_map(|network| {
+                let id = network.id.trim();
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
+            })
+            .collect::<HashSet<_>>();
+        for (index, network) in self.devices.networks.iter_mut().enumerate() {
+            network.assign_default_id(index, &mut reserved_network_ids);
+        }
     }
 
     fn resolve_profile_dir() -> anyhow::Result<String> {
@@ -264,7 +302,8 @@ impl VmConfig {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(content: &str) -> anyhow::Result<Self> {
         let processed_content = Self::substitute_env_vars(content)?;
-        let config: VmConfig = serde_yaml::from_str(&processed_content)?;
+        let mut config: VmConfig = serde_yaml::from_str(&processed_content)?;
+        config.assign_default_device_ids();
 
         validation::validate_config(&config)?;
 

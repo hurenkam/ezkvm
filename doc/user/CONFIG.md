@@ -468,14 +468,16 @@ The `devices` section defines hardware devices attached to the VM.
 
 Each drive object supports:
 
-#### `id` (required)
+#### `id` (optional)
 - **Type**: String
 - **Description**: Unique identifier for the drive
+- **Default**: Generated as `{interface}{index}` when omitted, using the drive's position in `devices.drives`
 - **Example**: `"root"`
 
-#### `path` (required)
+#### `path` (optional for `cdrom`, required for `disk`)
 - **Type**: String
 - **Description**: Path to the disk image file
+- **Default**: Empty string for `cdrom` entries when omitted
 - **Example**: `"/var/lib/ezkvm/ubuntu.qcow2"`
 
 #### `interface` (required)
@@ -506,12 +508,15 @@ Each drive object supports:
 **Example**:
 ```yaml
 drives:
-  - id: "root"
-    path: "/var/lib/ezkvm/ubuntu.qcow2"
+  - path: "/var/lib/ezkvm/ubuntu.qcow2"
     interface: "virtio"
     type: "disk"
     format: "qcow2"
-  - id: "cdrom"
+  - interface: "ide"
+    type: "cdrom"
+    format: "raw"
+    readonly: true
+  - id: "cdrom-install"
     path: "/path/to/installer.iso"
     interface: "ide"
     type: "cdrom"
@@ -523,9 +528,10 @@ drives:
 
 Each network object supports:
 
-#### `id` (required)
+#### `id` (optional)
 - **Type**: String
 - **Description**: Unique identifier for the network device
+- **Default**: Generated as `net{index}` when omitted, using the device's position in `devices.networks`
 - **Example**: `"net0"`
 
 #### `model` (required)
@@ -568,8 +574,7 @@ Common backend fields:
 **Example**:
 ```yaml
 networks:
-  - id: "net0"
-    model: "virtio-net"
+  - model: "virtio-net"
     backend:
       type: "user"
     mac: "52:54:00:12:34:56"

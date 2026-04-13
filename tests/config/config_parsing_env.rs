@@ -123,6 +123,32 @@ devices:
 }
 
 #[test]
+fn test_omitted_cdrom_path_defaults_to_empty() {
+    let yaml = r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - interface: "ide"
+      type: "cdrom"
+      format: "raw"
+      readonly: true
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    assert_eq!(config.devices.drives[0].r#type, "cdrom");
+    assert_eq!(config.devices.drives[0].path, "");
+}
+
+#[test]
 fn test_empty_disk_path_is_rejected() {
     let yaml = r#"
 name: "test-vm"
@@ -216,6 +242,79 @@ devices:
     unsafe {
         std::env::remove_var("HOME");
     }
+}
+
+#[test]
+fn test_missing_drive_and_network_ids_are_generated() {
+    let yaml = r#"
+name: "generated-id-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - path: "/path/to/disk0.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+    - path: ""
+      interface: "ide"
+      type: "cdrom"
+      format: "raw"
+      readonly: true
+
+  networks:
+    - model: "virtio-net"
+      backend:
+        type: "user"
+    - id: "uplink0"
+      model: "e1000"
+      mode: "user"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+
+    assert_eq!(config.devices.drives[0].id, "virtio0");
+    assert_eq!(config.devices.drives[1].id, "ide1");
+    assert_eq!(config.devices.networks[0].id, "net0");
+    assert_eq!(config.devices.networks[1].id, "uplink0");
+}
+
+#[test]
+fn test_generated_device_ids_skip_explicit_id_collisions() {
+    let yaml = r#"
+name: "duplicate-generated-id-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+devices:
+  drives:
+    - id: "virtio1"
+      path: "/path/to/disk0.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+    - path: "/path/to/disk1.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    assert_eq!(config.devices.drives[0].id, "virtio1");
+    assert_eq!(config.devices.drives[1].id, "virtio2");
 }
 
 #[test]

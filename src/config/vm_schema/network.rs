@@ -2,6 +2,7 @@ use crate::qemu::types::QemuArgs;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct NetworkBackendConfig {
@@ -165,6 +166,7 @@ impl NetworkBackendConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
     /// Unique identifier for the network device
+    #[serde(default)]
     pub id: String,
 
     /// Network model (virtio-net, e1000, etc.)
@@ -199,6 +201,20 @@ pub struct NetworkConfig {
 }
 
 impl NetworkConfig {
+    pub fn assign_default_id(&mut self, index: usize, reserved_ids: &mut HashSet<String>) {
+        if self.id.trim().is_empty() {
+            let mut candidate_index = index;
+            loop {
+                let candidate = format!("net{}", candidate_index);
+                if reserved_ids.insert(candidate.clone()) {
+                    self.id = candidate;
+                    break;
+                }
+                candidate_index += 1;
+            }
+        }
+    }
+
     pub fn resolved_backend(&self) -> Result<NetworkBackendConfig> {
         let has_mode = !self.mode.trim().is_empty();
 

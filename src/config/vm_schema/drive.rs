@@ -1,5 +1,6 @@
 use crate::qemu::types::QemuArgs;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Drive configuration.
 /// Kept as one type because deserialization, validation rules, and `From<DriveConfig>`
@@ -7,9 +8,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriveConfig {
     /// Unique identifier for the drive
+    #[serde(default)]
     pub id: String,
 
-    /// Path to the disk image
+    /// Path to the disk image.
+    /// Defaults to an empty string so media-less cdrom definitions can omit it.
+    #[serde(default)]
     pub path: String,
 
     /// Interface type (virtio, scsi, ide, nvme)
@@ -56,6 +60,31 @@ pub struct DriveConfig {
 
     /// Unit number for IDE/SATA style drive placement
     pub unit: Option<u32>,
+}
+
+impl DriveConfig {
+    pub fn assign_default_id(&mut self, index: usize, reserved_ids: &mut HashSet<String>) {
+        if self.id.trim().is_empty() {
+            let mut candidate_index = index;
+            loop {
+                let candidate = self.generated_id(candidate_index);
+                if reserved_ids.insert(candidate.clone()) {
+                    self.id = candidate;
+                    break;
+                }
+                candidate_index += 1;
+            }
+        }
+    }
+
+    fn generated_id(&self, index: usize) -> String {
+        let prefix = self.interface.trim();
+        if prefix.is_empty() {
+            format!("drive{}", index)
+        } else {
+            format!("{}{}", prefix, index)
+        }
+    }
 }
 
 impl From<DriveConfig> for QemuArgs {

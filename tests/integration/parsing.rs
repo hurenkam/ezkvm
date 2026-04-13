@@ -112,6 +112,59 @@ devices:
 }
 
 #[test]
+fn test_missing_device_ids_are_generated_when_loading_from_file() {
+    let root = std::env::temp_dir().join(format!(
+        "ezkvm-integration-generated-ids-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&root).unwrap();
+
+    let temp_disk_path = root.join("generated-disk.qcow2");
+    let temp_config_path = root.join("generated_ids.yaml");
+    fs::write(&temp_disk_path, "").unwrap();
+
+    let config_content = format!(
+        r#"
+name: "generated-id-file-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  vcpus: 1
+  cpu_model: "host"
+
+devices:
+  drives:
+    - path: "{}"
+      interface: "scsi"
+      type: "disk"
+      format: "qcow2"
+
+  networks:
+    - model: "virtio-net"
+      backend:
+        type: "user"
+"#,
+        temp_disk_path.display()
+    );
+
+    fs::write(&temp_config_path, config_content).unwrap();
+
+    let config = VmConfig::from_file(&temp_config_path).unwrap();
+
+    assert_eq!(config.devices.drives[0].id, "scsi0");
+    assert_eq!(config.devices.networks[0].id, "net0");
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn test_config_validation() {
     let invalid_yaml = r#"
 name: "invalid-vm"
