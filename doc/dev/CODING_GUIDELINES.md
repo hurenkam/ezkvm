@@ -98,6 +98,7 @@ Before submitting a change, confirm:
 - Tests cover changed behavior and regressions.
 - Docs and examples are updated.
 - Changes are minimal and focused.
+- Production `mod.rs` files are wiring-only, with implementation bodies moved into focused sibling modules.
 
 ## 13. Additional Points of attention
 - keep mod.rs files clean, meaning they contain no struct, fn, or impl sections

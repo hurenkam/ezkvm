@@ -1,5 +1,5 @@
-use super::{QemuArgs, QemuManager};
 use crate::config::QmpSocketType;
+use crate::qemu::{QemuManager, types::QemuArgs};
 use anyhow::{Result, anyhow};
 
 impl QemuManager {
