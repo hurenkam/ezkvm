@@ -1,0 +1,45 @@
+system:
+  architecture: "x86_64"
+  machine: "pc-q35-8.1+pve0"
+  cpu_model: "host"
+  cpu_features:
+    - name: "hv_ipi"
+    - name: "hv_relaxed"
+    - name: "hv_reset"
+    - name: "hv_runtime"
+    - name: "hv_spinlocks=0x1fff"
+    - name: "hv_stimer"
+    - name: "hv_synic"
+    - name: "hv_time"
+    - name: "hv_vapic"
+    - name: "hv_vendor_id=proxmox"
+    - name: "hv_vpindex"
+    - name: "kvm=off"
+    - name: "+kvm_pv_eoi"
+    - name: "+kvm_pv_unhalt"
+
+boot:
+  firmware: "uefi"
+  uefi_code: "/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd"
+  uefi_vars_size: 540672
+  boot_order: []
+  menu: true
+  strict: true
+  reboot_timeout: 1000
+  splash: "/usr/share/qemu-server/bootsplash.jpg"
+  secure_boot: true
+
+options:
+  enable_kvm: true
+  daemonize: true
+  nodefaults: true
+  global_options:
+    - "kvm-pit.lost_tick_policy=discard"
+  rtc:
+    base: "localtime"
+    driftfix: "slew"
+
+tpm:
+  version: "2.0"
+  backend: "emulator"
+  model: "tpm-tis"
