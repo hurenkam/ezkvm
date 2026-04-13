@@ -139,7 +139,15 @@ mod tests {
         let network = NetworkConfig {
             id: "net0".to_string(),
             model: "virtio-net-pci".to_string(),
-            mode: "tap,ifname=tap0,script=no,downscript=no".to_string(),
+            mode: String::new(),
+            backend: Some(crate::config::NetworkBackendConfig {
+                backend_type: "tap".to_string(),
+                ifname: Some("tap0".to_string()),
+                script: Some("no".to_string()),
+                downscript: Some("no".to_string()),
+                vhost: Some(true),
+                ..Default::default()
+            }),
             mac: Some("52:54:00:12:34:56".to_string()),
             rx_queue_size: Some(1024),
             tx_queue_size: Some(256),
@@ -151,6 +159,11 @@ mod tests {
         let args = QemuArgs::from(network).into_inner();
         assert_eq!(args[0], "-netdev");
         assert!(args[1].contains("id=net0"));
+        assert!(args[1].contains("type=tap"));
+        assert!(args[1].contains("ifname=tap0"));
+        assert!(args[1].contains("script=no"));
+        assert!(args[1].contains("downscript=no"));
+        assert!(args[1].contains("vhost=on"));
         assert_eq!(args[2], "-device");
         assert!(args[3].contains("virtio-net-pci,netdev=net0"));
         assert!(args[3].contains(",mac=52:54:00:12:34:56"));
@@ -230,6 +243,7 @@ mod tests {
                 id: "net0".to_string(),
                 model: "virtio-net-pci".to_string(),
                 mode: "user".to_string(),
+                backend: None,
                 mac: Some("52:54:00:12:34:56".to_string()),
                 rx_queue_size: None,
                 tx_queue_size: None,

@@ -64,7 +64,7 @@ impl QemuCommandBuilder {
         }
 
         for network in &config.devices.networks {
-            builder = builder.network(&network.model, &network.mode, network.mac.as_deref());
+            builder.args.extend(QemuArgs::from(network.clone()));
         }
 
         for display in &config.devices.displays {

@@ -79,6 +79,7 @@ profiles:
         .unwrap();
     assert_eq!(net0.model, "virtio-net-pci");
     assert_eq!(net0.mode, "user");
+    assert!(net0.backend.is_none());
     assert_eq!(net0.mac.as_deref(), Some("52:54:00:12:34:56"));
     assert_eq!(net0.boot_index, Some(110));
     assert_eq!(net0.tx_queue_size, Some(256));

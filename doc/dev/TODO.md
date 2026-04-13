@@ -3,8 +3,7 @@
 ## Active Backlog
 
 ### Profile System
-- [ ] Support multiple profile search directories in priority order
-- [ ] Split `devices.networks[].mode` into structured backend properties and keep a compatibility path for legacy string parsing
+- [x] Split `devices.networks[].mode` into structured backend properties and keep a compatibility path for legacy string parsing
 - [ ] Introduce selector-based profile defaults for drives, networks, and other device families matched by interface/type/model/backend instead of `id`
 - [ ] Rework profile list behavior so concrete device instances append by declaration order while defaults come from policy rules rather than id-based patching
 - [ ] Add placement policies for `addr`, `scsi_id`, and similar counters with configurable start/step values and per-bus or per-controller scopes
@@ -12,14 +11,18 @@
 - [ ] Document profile policy precedence, migration rules, and legacy compatibility behavior
 - [ ] Add unit and integration tests for selector defaults, structured network backends, auto-placement, and legacy compatibility
 
+## Postponed Items
+
+### Profile System
+- [ ] Support multiple profile search directories in priority order
+
 ### Network Tooling
 - [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
 - [ ] Add tests for network statistics parsing so byte and packet counters are validated from sample command output
 - [ ] Remove the hard-coded `eth0` parent from `setup_network_isolation` in `src/network/firewall.rs` and make the uplink/interface configurable
 - [ ] Expand the CLI network commands beyond bridge creation so the existing network helper functionality is reachable from the CLI
 
-
-## Completed Snapshot
+## Completed Items Summary
 
 ### Architecture Conformance
 - [x] Converted targeted production `mod.rs` files to wiring-only module entrypoints

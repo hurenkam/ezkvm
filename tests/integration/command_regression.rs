@@ -131,7 +131,8 @@ devices:
   networks:
     - id: "net0"
       model: "virtio-net-pci"
-      mode: "user"
+      backend:
+        type: "user"
       mac: "52:54:00:12:34:56"
       rx_queue_size: 1024
       tx_queue_size: 256

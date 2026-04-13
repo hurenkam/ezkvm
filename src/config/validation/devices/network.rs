@@ -12,17 +12,17 @@ pub(super) fn validate_network_config(network: &NetworkConfig) -> Result<()> {
         ));
     }
 
-    let valid_mode_prefixes = ["user", "bridge", "socket", "tap"];
-    let mode_valid = valid_mode_prefixes
-        .iter()
-        .any(|prefix| network.mode.starts_with(prefix));
-    if !mode_valid {
+    let backend = network.resolved_backend()?;
+    let valid_backend_types = ["user", "bridge", "socket", "tap", "vhost-user"];
+    if !valid_backend_types.contains(&backend.backend_type.as_str()) {
         return Err(anyhow!(
-            "Unsupported network mode: {}. Must start with one of: {:?}",
-            network.mode,
-            valid_mode_prefixes
+            "Unsupported network backend type: {}. Supported: {:?}",
+            backend.backend_type,
+            valid_backend_types
         ));
     }
+
+    validate_backend_specific_fields(network, &backend)?;
 
     if let Some(mac) = &network.mac
         && !is_valid_mac_address(mac)
@@ -52,6 +52,76 @@ pub(super) fn validate_network_config(network: &NetworkConfig) -> Result<()> {
         && addr.trim().is_empty()
     {
         return Err(anyhow!("Network device address cannot be empty"));
+    }
+
+    Ok(())
+}
+
+fn validate_backend_specific_fields(
+    network: &NetworkConfig,
+    backend: &crate::config::NetworkBackendConfig,
+) -> Result<()> {
+    match backend.backend_type.as_str() {
+        "user" => {
+            if backend.ifname.is_some()
+                || backend.script.is_some()
+                || backend.downscript.is_some()
+                || backend.bridge.is_some()
+            {
+                return Err(anyhow!(
+                    "Network '{}' uses backend type 'user' but also sets tap/bridge-only backend fields",
+                    network.id
+                ));
+            }
+        }
+        "tap" => {
+            if let Some(ifname) = &backend.ifname
+                && ifname.trim().is_empty()
+            {
+                return Err(anyhow!(
+                    "Network '{}' tap ifname cannot be empty",
+                    network.id
+                ));
+            }
+        }
+        "bridge" => {
+            if let Some(bridge) = &backend.bridge
+                && bridge.trim().is_empty()
+            {
+                return Err(anyhow!(
+                    "Network '{}' bridge name cannot be empty",
+                    network.id
+                ));
+            }
+        }
+        "socket" | "vhost-user" => {
+            if let Some(listen) = &backend.listen
+                && listen.trim().is_empty()
+            {
+                return Err(anyhow!(
+                    "Network '{}' listen endpoint cannot be empty",
+                    network.id
+                ));
+            }
+            if let Some(connect) = &backend.connect
+                && connect.trim().is_empty()
+            {
+                return Err(anyhow!(
+                    "Network '{}' connect endpoint cannot be empty",
+                    network.id
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    if let Some(queues) = backend.queues
+        && queues == 0
+    {
+        return Err(anyhow!(
+            "Network '{}' backend queues must be greater than 0",
+            network.id
+        ));
     }
 
     Ok(())

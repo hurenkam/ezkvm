@@ -26,8 +26,8 @@ pub use platform::{
 pub use vm_options::{RtcConfig, VmOptions};
 #[allow(unused_imports)]
 pub use vm_schema::{
-    BootConfig, CpuFeature, DeviceConfig, DisplayConfig, DriveConfig, NetworkConfig, SerialConfig,
-    SystemConfig, VmConfig,
+    BootConfig, CpuFeature, DeviceConfig, DisplayConfig, DriveConfig, NetworkBackendConfig,
+    NetworkConfig, SerialConfig, SystemConfig, VmConfig,
 };
 
 pub(crate) use entrypoint::{DEFAULT_CENTRAL_CONFIG_PATHS, DEFAULT_PROFILE_DIR};

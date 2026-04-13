@@ -406,11 +406,28 @@ Each network object supports:
 - **Recommended**: `"virtio-net"` for modern VMs
 - **Example**: `"virtio-net"`
 
-#### `mode` (required)
+#### `backend` (recommended)
+- **Type**: Object
+- **Description**: Structured network backend configuration used to build the QEMU `-netdev` argument
+
+Common backend fields:
+
+- `backend.type` (required): Backend type such as `"user"`, `"tap"`, `"bridge"`, `"socket"`, or `"vhost-user"`
+- `backend.ifname` (optional): Host-side interface name for tap backends
+- `backend.bridge` (optional): Bridge name for bridge-oriented backends
+- `backend.script` (optional): Helper script path
+- `backend.downscript` (optional): Teardown helper script path
+- `backend.vhost` (optional): Enable or disable vhost acceleration
+- `backend.queues` (optional): Queue count for supported backends
+- `backend.hostfwd` (optional): List of user-mode `hostfwd` rules in native QEMU syntax
+- `backend.listen` (optional): Listen endpoint for socket-like backends
+- `backend.connect` (optional): Connect endpoint for socket-like backends
+
+#### `mode` (legacy compatibility)
 - **Type**: String
-- **Description**: Network backend mode
-- **Allowed values**: `"user"`, `"bridge"`, `"socket"`
-- **Example**: `"user"`
+- **Description**: Legacy compact network backend string. New configurations should prefer `backend`.
+- **Example**: `"user"` or `"tap,ifname=tap0,script=no,downscript=no,vhost=on"`
+- **Rule**: Set either `backend` or `mode`, not both.
 
 #### `mac` (optional)
 - **Type**: String
@@ -424,8 +441,18 @@ Each network object supports:
 networks:
   - id: "net0"
     model: "virtio-net"
-    mode: "user"
+    backend:
+      type: "user"
     mac: "52:54:00:12:34:56"
+```
+
+Legacy mode strings remain supported during migration:
+
+```yaml
+networks:
+  - id: "net0"
+    model: "virtio-net"
+    mode: "tap,ifname=tap0,script=no,downscript=no,vhost=on"
 ```
 
 ### Display Devices (`devices.displays`)

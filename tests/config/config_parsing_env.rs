@@ -52,6 +52,7 @@ devices:
     - id: "net0"
       model: "virtio-net"
       mode: "user"
+      backend: ~
       mac: "52:54:00:12:34:56"
       rx_queue_size: 1024
       tx_queue_size: 256
@@ -80,6 +81,7 @@ devices:
     let network = &config.devices.networks[0];
     assert_eq!(network.id, "net0");
     assert_eq!(network.model, "virtio-net");
+    assert!(network.backend.is_none());
     assert_eq!(network.mac.as_ref().unwrap(), "52:54:00:12:34:56");
     assert_eq!(network.rx_queue_size, Some(1024));
     assert_eq!(network.tx_queue_size, Some(256));

@@ -42,7 +42,8 @@ devices:
   networks:
     - id: "net0"
       model: "virtio-net"
-      mode: "user"
+      backend:
+        type: "user"
 
   displays:
     - type: "qxl"
@@ -64,8 +65,50 @@ options:
     assert_eq!(config.devices.drives.len(), 1);
     assert_eq!(config.devices.networks.len(), 1);
     assert_eq!(config.devices.displays.len(), 1);
+    assert_eq!(
+        config.devices.networks[0]
+            .backend
+            .as_ref()
+            .map(|backend| backend.backend_type.as_str()),
+        Some("user")
+    );
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn test_legacy_network_mode_remains_supported() {
+    let yaml = r#"
+name: "legacy-network-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 512
+  vcpus: 1
+  cpu_model: "host"
+
+devices:
+  networks:
+    - id: "net0"
+      model: "virtio-net-pci"
+      mode: "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    let network = &config.devices.networks[0];
+    assert_eq!(
+        network.mode,
+        "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+    );
+    assert!(network.backend.is_none());
+    let resolved = network.resolved_backend().unwrap();
+    assert_eq!(resolved.backend_type, "tap");
+    assert_eq!(resolved.ifname.as_deref(), Some("tap0"));
+    assert_eq!(resolved.script.as_deref(), Some("no"));
+    assert_eq!(resolved.downscript.as_deref(), Some("no"));
+    assert_eq!(resolved.vhost, Some(true));
 }
 
 #[test]
