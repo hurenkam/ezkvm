@@ -8,12 +8,6 @@
 ### Review Comments Remediation Plan (Remaining)
 - [ ] Refactor config schema layout so large types and their impl blocks are co-located per type (especially `VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`)
 
-### QMP Device Hotplug
-- [x] Replace the print-only helpers in `src/device.rs` with real QMP `device_add` and `device_del` flows for disks and network devices
-- [x] Stop using the unused `vm_pid` placeholder in hotplug helpers and resolve a real QMP socket or monitor endpoint from VM state/config
-- [x] Add command/response handling and error reporting for QMP hotplug failures instead of always printing success
-- [x] Add tests around QMP request generation and response parsing for hot-add/hot-remove paths
-
 ### Network Tooling Completion
 - [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
 - [ ] Add tests for network statistics parsing so byte and packet counters are validated from sample command output
@@ -84,3 +78,8 @@
 - [x] Section 13 cleanup substantially completed: `src/qemu/mod.rs` split, loader files grouped, and schema conversion impls co-located with source types where targeted
 - [x] Section 2 threshold remediation completed for the planned scope: oversized modules split, orchestration refactors applied, and large structs justified where kept intact
 - [x] Test-maintainability and parity follow-up completed: oversized suites split into focused modules, regression coverage added for command/config parity, and residual audit findings captured in `REVIEW_COMMENTS.md`
+
+### QMP Device Hotplug
+- [x] Implemented real QMP hotplug flows for disks and network devices (`device_add`, `device_del`, `blockdev-add`, `blockdev-del`, `netdev_add`, `netdev_del`)
+- [x] Replaced placeholder `vm_pid` usage with PID-based QMP socket resolution
+- [x] Added QMP command/response error handling and request/response parser tests
