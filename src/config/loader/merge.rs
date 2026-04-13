@@ -31,6 +31,11 @@ fn merge_yaml_values_at_path(
                         && matches!(overlay_value, serde_yaml::Value::Sequence(_))
                     {
                         merge_sequence_of_mappings_by_id(base_value, overlay_value, &child_path);
+                    } else if is_append_all_list_path(&child_path)
+                        && matches!(base_value, serde_yaml::Value::Sequence(_))
+                        && matches!(overlay_value, serde_yaml::Value::Sequence(_))
+                    {
+                        merge_sequence_append_all(base_value, overlay_value);
                     } else if is_append_unique_list_path(&child_path)
                         && matches!(base_value, serde_yaml::Value::Sequence(_))
                         && matches!(overlay_value, serde_yaml::Value::Sequence(_))
@@ -52,8 +57,6 @@ fn merge_yaml_values_at_path(
 
 fn is_id_merge_list_path(path: &[String]) -> bool {
     matches!(path, [one] if one == "hostpci")
-        || matches!(path, [first, second] if first == "devices" && second == "drives")
-        || matches!(path, [first, second] if first == "devices" && second == "networks")
         || matches!(path, [one] if one == "usb_devices")
         || matches!(path, [one] if one == "scsi_controllers")
         || matches!(path, [one] if one == "xhci_controllers")
@@ -64,6 +67,13 @@ fn is_append_unique_list_path(path: &[String]) -> bool {
     matches!(path, [first, second] if first == "system" && second == "cpu_features")
         || matches!(path, [first, second] if first == "system" && second == "machine_options")
         || matches!(path, [first, second] if first == "options" && second == "global_options")
+}
+
+fn is_append_all_list_path(path: &[String]) -> bool {
+    matches!(path, [first, second] if first == "devices" && second == "drives")
+        || matches!(path, [first, second] if first == "devices" && second == "networks")
+        || matches!(path, [first, second] if first == "policies" && second == "drives")
+        || matches!(path, [first, second] if first == "policies" && second == "networks")
 }
 
 fn merge_sequence_of_mappings_by_id(
@@ -159,4 +169,14 @@ fn merge_sequence_append_unique(base: &mut serde_yaml::Value, overlay: serde_yam
             base_seq.push(overlay_item);
         }
     }
+}
+
+fn merge_sequence_append_all(base: &mut serde_yaml::Value, overlay: serde_yaml::Value) {
+    let (serde_yaml::Value::Sequence(base_seq), serde_yaml::Value::Sequence(overlay_seq)) =
+        (base, overlay)
+    else {
+        return;
+    };
+
+    base_seq.extend(overlay_seq);
 }

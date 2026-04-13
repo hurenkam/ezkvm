@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn test_vm_config_from_file_merges_devices_networks_by_id() {
+fn test_vm_config_from_file_appends_devices_networks_in_order() {
     let _guard = env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -35,6 +35,8 @@ devices:
 devices:
   networks:
     - id: "net0"
+      model: "e1000"
+      mode: "user"
       boot_index: 110
       tx_queue_size: 256
     - id: "net1"
@@ -69,27 +71,24 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.devices.networks.len(), 2);
+    assert_eq!(config.devices.networks.len(), 3);
 
-    let net0 = config
-        .devices
-        .networks
-        .iter()
-        .find(|n| n.id == "net0")
-        .unwrap();
-    assert_eq!(net0.model, "virtio-net-pci");
-    assert_eq!(net0.mode, "user");
-    assert!(net0.backend.is_none());
-    assert_eq!(net0.mac.as_deref(), Some("52:54:00:12:34:56"));
-    assert_eq!(net0.boot_index, Some(110));
-    assert_eq!(net0.tx_queue_size, Some(256));
+    let base_net0 = &config.devices.networks[0];
+    assert_eq!(base_net0.id, "net0");
+    assert_eq!(base_net0.model, "virtio-net-pci");
+    assert_eq!(base_net0.mode, "user");
+    assert_eq!(base_net0.mac.as_deref(), Some("52:54:00:12:34:56"));
+    assert_eq!(base_net0.boot_index, None);
 
-    let net1 = config
-        .devices
-        .networks
-        .iter()
-        .find(|n| n.id == "net1")
-        .unwrap();
+    let overlay_net0 = &config.devices.networks[1];
+    assert_eq!(overlay_net0.id, "net0");
+    assert_eq!(overlay_net0.model, "e1000");
+    assert_eq!(overlay_net0.mode, "user");
+    assert_eq!(overlay_net0.boot_index, Some(110));
+    assert_eq!(overlay_net0.tx_queue_size, Some(256));
+
+    let net1 = &config.devices.networks[2];
+    assert_eq!(net1.id, "net1");
     assert_eq!(net1.model, "e1000");
 
     unsafe {

@@ -3,7 +3,7 @@ use std::path::Path;
 
 use super::super::{
     CentralConfig, DEFAULT_PROFILE_DIR,
-    loader::{env, merge},
+    loader::{env, merge, policies},
     validation,
 };
 
@@ -142,7 +142,8 @@ impl VmConfig {
         Ok(merged_value)
     }
 
-    fn deserialize_and_validate(merged_value: serde_yaml::Value) -> anyhow::Result<Self> {
+    fn deserialize_and_validate(mut merged_value: serde_yaml::Value) -> anyhow::Result<Self> {
+        policies::apply_profile_policies(&mut merged_value)?;
         let config: VmConfig = serde_yaml::from_value(merged_value)?;
         validation::validate_config(&config)?;
         Ok(config)

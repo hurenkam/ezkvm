@@ -4,8 +4,9 @@
 
 ### Profile System
 - [x] Split `devices.networks[].mode` into structured backend properties and keep a compatibility path for legacy string parsing
-- [ ] Introduce selector-based profile defaults for drives, networks, and other device families matched by interface/type/model/backend instead of `id`
-- [ ] Rework profile list behavior so concrete device instances append by declaration order while defaults come from policy rules rather than id-based patching
+- [x] Introduce selector-based profile defaults for drives and networks matched by interface/type/model/backend instead of `id`
+- [ ] Extend selector-based profile defaults to additional device families beyond drives and networks
+- [x] Rework profile list behavior so concrete device instances append by declaration order while defaults come from policy rules rather than id-based patching
 - [ ] Add placement policies for `addr`, `scsi_id`, and similar counters with configurable start/step values and per-bus or per-controller scopes
 - [ ] Add collision detection and validation for explicit versus auto-assigned placement values
 - [ ] Document profile policy precedence, migration rules, and legacy compatibility behavior

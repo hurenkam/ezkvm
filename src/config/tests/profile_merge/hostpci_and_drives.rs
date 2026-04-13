@@ -93,7 +93,7 @@ profiles:
 }
 
 #[test]
-fn test_vm_config_from_file_merges_devices_drives_by_id() {
+fn test_vm_config_from_file_appends_devices_drives_in_order() {
     let _guard = env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -135,6 +135,10 @@ devices:
 devices:
   drives:
     - id: "root"
+      path: "{}"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
       cache: "none"
       boot_index: 100
     - id: "data"
@@ -144,6 +148,7 @@ devices:
       format: "raw"
       controller: "scsihw0"
 "#,
+            root_disk.display(),
             data_disk.display()
         ),
     )
@@ -174,24 +179,21 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.devices.drives.len(), 2);
+    assert_eq!(config.devices.drives.len(), 3);
 
-    let root_drive = config
-        .devices
-        .drives
-        .iter()
-        .find(|d| d.id == "root")
-        .unwrap();
-    assert_eq!(root_drive.path, root_disk.to_str().unwrap());
-    assert_eq!(root_drive.cache.as_deref(), Some("none"));
-    assert_eq!(root_drive.boot_index, Some(100));
+    let base_root = &config.devices.drives[0];
+    assert_eq!(base_root.id, "root");
+    assert_eq!(base_root.path, root_disk.to_str().unwrap());
+    assert_eq!(base_root.cache, None);
 
-    let data_drive = config
-        .devices
-        .drives
-        .iter()
-        .find(|d| d.id == "data")
-        .unwrap();
+    let overlay_root = &config.devices.drives[1];
+    assert_eq!(overlay_root.id, "root");
+    assert_eq!(overlay_root.path, root_disk.to_str().unwrap());
+    assert_eq!(overlay_root.cache.as_deref(), Some("none"));
+    assert_eq!(overlay_root.boot_index, Some(100));
+
+    let data_drive = &config.devices.drives[2];
+    assert_eq!(data_drive.id, "data");
     assert_eq!(data_drive.interface, "scsi");
     assert_eq!(data_drive.format, "raw");
 

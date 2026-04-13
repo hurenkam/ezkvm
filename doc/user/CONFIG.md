@@ -133,6 +133,50 @@ Name-to-file mapping:
 
 Profile files must use a YAML mapping/object at the root.
 
+### `policies` (profile/defaults layer)
+
+- **Type**: Object
+- **Description**: Optional selector-based defaults layer applied after profile merge and before config validation
+- **Use case**: Let VM configs declare concrete drives and networks succinctly while profiles fill repetitive defaults by interface, type, model, or backend type
+
+Currently supported policy families:
+
+- `policies.drives`
+- `policies.networks`
+
+Each policy entry has:
+
+- `match`: selector fields used to decide whether the policy applies
+- `defaults`: fields copied into matching concrete items only when those fields are still missing
+
+Policy precedence:
+
+1. Explicit VM config values win.
+2. Later profiles win over earlier profiles.
+3. Earlier profile defaults fill gaps that remain.
+
+Example:
+
+```yaml
+policies:
+  drives:
+    - match:
+        interface: "scsi"
+        type: "disk"
+      defaults:
+        format: "raw"
+        cache: "none"
+        aio: "io_uring"
+
+  networks:
+    - match:
+        backend_type: "tap"
+      defaults:
+        model: "virtio-net-pci"
+        rx_queue_size: 1024
+        tx_queue_size: 256
+```
+
 ### Profile Merge Semantics
 
 Merge order is deterministic:
@@ -158,14 +202,20 @@ Maps use **deep merge** semantics:
 
 The merge strategy for lists depends on the path in the configuration:
 
-**ID-Based Merge** (for device and controller lists):
-- Used for: `devices.drives`, `devices.networks`, `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`
+**ID-Based Merge** (for controller and passthrough lists):
+- Used for: `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`
 - Matching: Items are matched by their `id` field
 - Behavior: 
   - Existing items with matching `id` are patched (deep merge of fields)
   - New items without `id` in base are appended
-  - Allows profiles to override specific drives/networks/devices while preserving others
-- Example: A profile can define a base set of drives, and the VM file can override specific drives by `id`
+  - Allows profiles to override specific controller/passthrough devices while preserving others
+
+**Append-In-Order Merge** (for concrete drives and networks):
+- Used for: `devices.drives`, `devices.networks`
+- Behavior:
+  - Lists are appended in profile/VM declaration order
+  - Entries are not patched by `id` during merge
+  - Defaults should be provided through selector policies under `policies.*`
 
 **Append-Unique Merge** (for feature and option lists):
 - Used for: `system.cpu_features`, `system.machine_options`, `options.global_options`
@@ -198,13 +248,13 @@ devices:
 
 ---
 
-# Second profile: gpu_passthrough.yaml
+# Second profile: storage_defaults.yaml
 system:
   cpu_features: ["vmx", "avx2"]  # Overlaps with base
   
 devices:
   drives:
-    - id: "boot"  # Patch: override path only
+    - id: "boot-alt"
       path: "/var/lib/custom-boot.qcow2"
 
 ---
@@ -215,7 +265,7 @@ system:
 
 devices:
   drives:
-    - id: "scratch"  # New drive, appended
+    - id: "scratch"
       path: "/var/lib/scratch.qcow2"
 
 ---
@@ -228,14 +278,31 @@ system:
 devices:
   drives:
     - id: "boot"  
-      path: "/var/lib/custom-boot.qcow2"  # VM override (patched by id)
+      path: "/var/lib/boot.qcow2"  # From base profile
     - id: "data"
-      path: "/var/lib/data.qcow2"  # From base (not in VM or later profiles)
+      path: "/var/lib/data.qcow2"  # From base profile
+    - id: "boot-alt"
+      path: "/var/lib/custom-boot.qcow2"  # Appended from second profile
     - id: "scratch"
-      path: "/var/lib/scratch.qcow2"  # New from VM (appended)
+      path: "/var/lib/scratch.qcow2"  # Appended from VM file
+
+policies:
+  drives:
+    - match:
+        interface: "scsi"
+        type: "disk"
+      defaults:
+        cache: "none"  # Applied to matching entries without explicit cache
 ```
 
 This means the VM file always has final precedence over profile content, and profiles can be combined in a composable way.
+
+**Append-In-Order Merge** (for selector policies):
+- Used for: `policies.drives`, `policies.networks`
+- Behavior:
+  - Policy lists from profiles are appended in profile order
+  - Policy application happens after merge and before config validation
+  - Later policies have higher default precedence because they are applied first when filling missing fields
 
 ## System Configuration
 
