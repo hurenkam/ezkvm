@@ -93,6 +93,8 @@ struct NetworkPolicyMatch {
 
 pub(crate) fn apply_profile_policies(root: &mut Value) -> Result<()> {
     let Some(policies_value) = remove_top_level_key(root, "policies")? else {
+        validate_drive_scsi_id_collisions(root)?;
+        validate_network_addr_collisions(root)?;
         return Ok(());
     };
 
@@ -103,6 +105,8 @@ pub(crate) fn apply_profile_policies(root: &mut Value) -> Result<()> {
     apply_network_policies(root, &policies.networks)?;
     apply_drive_placement_policies(root, &policies.drives)?;
     apply_network_placement_policies(root, &policies.networks)?;
+    validate_drive_scsi_id_collisions(root)?;
+    validate_network_addr_collisions(root)?;
     Ok(())
 }
 
@@ -402,6 +406,95 @@ fn parse_numeric_addr(value: &str) -> Result<u32> {
     trimmed
         .parse::<u32>()
         .map_err(|_| anyhow!("invalid numeric address '{}'", value))
+}
+
+fn validate_drive_scsi_id_collisions(root: &mut Value) -> Result<()> {
+    let Some(drives) = get_nested_sequence_mut(root, &["devices", "drives"])? else {
+        return Ok(());
+    };
+
+    let mut seen_by_scope: HashMap<String, HashMap<u32, String>> = HashMap::new();
+
+    for drive in drives {
+        let Value::Mapping(drive_map) = drive else {
+            continue;
+        };
+
+        let Some(scsi_id) = get_u32_field(drive_map, "scsi_id") else {
+            continue;
+        };
+
+        let drive_id = get_string_field(drive_map, "id").unwrap_or_else(|| "<unknown>".to_string());
+        let scope = if let Some(controller) = get_string_field(drive_map, "controller") {
+            format!("controller:{}", controller)
+        } else {
+            "global".to_string()
+        };
+
+        let by_value = seen_by_scope.entry(scope.clone()).or_default();
+        if let Some(previous_id) = by_value.get(&scsi_id) {
+            return Err(anyhow!(
+                "Duplicate drive scsi_id {} in scope '{}': '{}' conflicts with '{}'",
+                scsi_id,
+                scope,
+                drive_id,
+                previous_id
+            ));
+        }
+
+        by_value.insert(scsi_id, drive_id);
+    }
+
+    Ok(())
+}
+
+fn validate_network_addr_collisions(root: &mut Value) -> Result<()> {
+    let Some(networks) = get_nested_sequence_mut(root, &["devices", "networks"])? else {
+        return Ok(());
+    };
+
+    let mut seen_by_scope: HashMap<String, HashMap<String, String>> = HashMap::new();
+
+    for network in networks {
+        let Value::Mapping(network_map) = network else {
+            continue;
+        };
+
+        let Some(addr_raw) = get_string_field(network_map, "addr") else {
+            continue;
+        };
+
+        let network_id =
+            get_string_field(network_map, "id").unwrap_or_else(|| "<unknown>".to_string());
+        let scope = if let Some(bus) = get_string_field(network_map, "bus") {
+            format!("bus:{}", bus)
+        } else {
+            "global".to_string()
+        };
+
+        let normalized_addr = normalize_addr_for_collision(&addr_raw);
+        let by_value = seen_by_scope.entry(scope.clone()).or_default();
+        if let Some(previous_id) = by_value.get(&normalized_addr) {
+            return Err(anyhow!(
+                "Duplicate network addr {} in scope '{}': '{}' conflicts with '{}'",
+                normalized_addr,
+                scope,
+                network_id,
+                previous_id
+            ));
+        }
+
+        by_value.insert(normalized_addr, network_id);
+    }
+
+    Ok(())
+}
+
+fn normalize_addr_for_collision(addr: &str) -> String {
+    match parse_numeric_addr(addr) {
+        Ok(value) => format!("0x{:x}", value),
+        Err(_) => addr.trim().to_string(),
+    }
 }
 
 fn get_nested_sequence_mut<'a>(

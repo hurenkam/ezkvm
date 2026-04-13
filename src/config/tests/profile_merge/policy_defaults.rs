@@ -426,3 +426,147 @@ devices:
     }
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn test_vm_config_from_file_rejects_duplicate_drive_scsi_id_in_same_scope() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-profile-drive-scsi-collision");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "drive-scsi-collision-test"
+backend: "qemu"
+profiles:
+  - "base"
+devices:
+  drives:
+    - id: "scsi0"
+      path: "/tmp/scsi0.raw"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      controller: "scsihw0"
+      scsi_id: 0
+    - id: "scsi1"
+      path: "/tmp/scsi1.raw"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      controller: "scsihw0"
+      scsi_id: 0
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let err = VmConfig::from_file(&vm_config_path).unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("Duplicate drive scsi_id 0 in scope 'controller:scsihw0'")
+    );
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn test_vm_config_from_file_rejects_duplicate_network_addr_in_same_bus_scope() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-profile-network-addr-collision");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "network-addr-collision-test"
+backend: "qemu"
+profiles:
+  - "base"
+devices:
+  networks:
+    - id: "net0"
+      model: "virtio-net-pci"
+      mode: "user"
+      bus: "pci.0"
+      addr: "0x12"
+    - id: "net1"
+      model: "virtio-net-pci"
+      mode: "user"
+      bus: "pci.0"
+      addr: "18"
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let err = VmConfig::from_file(&vm_config_path).unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("Duplicate network addr 0x12 in scope 'bus:pci.0'")
+    );
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
