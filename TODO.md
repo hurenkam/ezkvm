@@ -18,22 +18,24 @@
 #### Phase 2: Section 2 Threshold Remediation (Medium Priority)
 - [x] Re-baseline current Section 2 outliers and lock the target list in TODO (updated from latest line-count audit)
 - [x] Split `src/qemu/args.rs` into focused submodules (`src/qemu/args/mod.rs`, `basic.rs`, `storage.rs`, `devices.rs`, `display.rs`, `system.rs`, `tests.rs`)
-- [ ] Split oversized production modules (>250 lines): `src/cli/runtime/auxiliary/swtpm.rs`, `src/cli.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/qemu/process.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`
-- [x] Split `src/cli/runtime.rs` into focused submodules (`src/cli/runtime/mod.rs`, `src/cli/runtime/start.rs`, `src/cli/runtime/ops.rs`, `src/cli/runtime/inspect.rs`, `src/cli/runtime/auxiliary/mod.rs`, `src/cli/runtime/auxiliary/launch.rs`, `src/cli/runtime/auxiliary/swtpm.rs`)
+- [x] Split oversized production modules (>250 lines): `src/cli/runtime/auxiliary/swtpm.rs`, `src/cli.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/qemu/process.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs` into focused submodules/directories (`src/cli/runtime/auxiliary/swtpm/`, `src/cli/`, `src/config/platform/`, `src/config/vm_schema/`, `src/qemu/process/`, `src/network/`, `src/storage/`, `src/state/`)
+- [x] Split `src/cli/runtime.rs` into focused submodules (`src/cli/runtime/mod.rs`, `src/cli/runtime/start.rs`, `src/cli/runtime/ops.rs`, `src/cli/runtime/inspect.rs`, `src/cli/runtime/auxiliary/mod.rs`, `src/cli/runtime/auxiliary/launch.rs`, `src/cli/runtime/auxiliary/swtpm/`)
 - [x] Split `src/qemu/command_builder.rs` into focused submodules (`src/qemu/command_builder/mod.rs` + `src/qemu/command_builder/composition.rs`) and move `build_command` to orchestration style
-- [ ] Split oversized validation modules (>250 lines): `src/config/validation/platform.rs`, `src/config/validation/devices.rs`
-- [ ] Split oversized test-support module in `src` (>250 lines): `src/config/tests.rs` (move helper fixtures/assertions into submodules)
+- [x] Split `src/config/validation/platform.rs` into focused submodules (`src/config/validation/platform/mod.rs`, `audio.rs`, `core.rs`, `usb.rs`, `devices.rs`, `helpers.rs`)
+- [x] Split `src/config/validation/devices.rs` into focused submodules (`src/config/validation/devices/mod.rs`, `drive.rs`, `network.rs`, `display.rs`, `serial.rs`)
+- [ ] Split oversized test-support modules in `src` (>250 lines): `src/config/tests.rs`, `src/qemu/args/tests.rs`, `src/cli/tests.rs` (move helper fixtures/assertions into submodules)
 - [ ] Refactor long command-construction functions to orchestration style (<=35 lines where practical): `build_boot_args`, `build_option_args`, `add_usb_host`
 - [x] Refactor `build_command`, `add_tpm`, and `add_spice` to orchestration style with extracted helpers
-- [ ] Refactor long runtime command handlers to orchestration style (<=35 lines where practical): `handle_start`, `start_swtpm_if_configured`, `handle_storage`, and follow-on helpers in `src/cli/runtime/start.rs`, `src/cli/runtime/auxiliary.rs`, and `src/cli/commands.rs`
-- [ ] Refactor long validation paths to orchestration style (<=35 lines where practical): `validate_drive_config`, `validate_audio_devices`, plus other validator outliers found during implementation
+- [x] Refactor validation paths `validate_drive_config` and `validate_audio_devices` to orchestration style with focused helpers
+- [ ] Refactor long runtime command handlers to orchestration style (<=35 lines where practical): `handle_start`, `start_swtpm_if_configured`, `handle_storage`, and follow-on helpers in `src/cli/runtime/start.rs`, `src/cli/runtime/auxiliary/swtpm/startup.rs`, and `src/cli/commands.rs`
+- [ ] Refactor long validation paths to orchestration style (<=35 lines where practical): remaining validator outliers found during implementation
 - [ ] Re-run function-length scan for `src/**` and create a short residual-outlier list directly in TODO before Phase 2 closeout
 - [ ] Struct-size follow-up: split or justify >35-line structs with concise comments (`VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`, `QemuArgs`)
 
 #### Phase 3: Tests, Verification, And Reporting
 - [ ] Keep test files maintainable by splitting oversized suites: `tests/config_tests.rs`, `tests/integration_tests.rs`, `src/config/tests.rs`
 - [ ] Add/adjust regression tests around refactored QEMU command building and config conversion behavior to preserve output parity
-- [ ] Run and keep green: `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --quiet`
+- [x] Run and keep green: `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --quiet`
 - [ ] Re-run Section 2 and Section 13 audit across all Rust files and update `REVIEW_COMMENTS.md` with residual items only
 
 ### QMP Device Hotplug
@@ -43,9 +45,9 @@
 - [ ] Add tests around QMP request generation and response parsing for hot-add/hot-remove paths
 
 ### Network Tooling Completion
-- [ ] Replace the placeholder `get_network_stats` implementation in `src/network.rs` with real parsing of `ip -s link show` output
+- [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
 - [ ] Add tests for network statistics parsing so byte and packet counters are validated from sample command output
-- [ ] Remove the hard-coded `eth0` parent from `setup_network_isolation` and make the uplink/interface configurable
+- [ ] Remove the hard-coded `eth0` parent from `setup_network_isolation` in `src/network/firewall.rs` and make the uplink/interface configurable
 - [ ] Expand the CLI network commands beyond bridge creation so the existing network helper functionality is reachable from the CLI
 
 

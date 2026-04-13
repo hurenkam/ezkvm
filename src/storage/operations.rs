@@ -1,28 +1,9 @@
-//! Storage management for VMs
-//!
-//! Handles QCOW2 image creation, snapshots, and disk operations.
-
-#![allow(dead_code)]
-
 use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Default directory for VM disk images
-pub fn get_storage_dir() -> Result<PathBuf> {
-    let data_home = if let Ok(xdg_data) = std::env::var("XDG_DATA_HOME") {
-        PathBuf::from(xdg_data)
-    } else {
-        let home =
-            std::env::var("HOME").map_err(|_| anyhow!("HOME environment variable not set"))?;
-        PathBuf::from(home).join(".local/share")
-    };
-
-    let storage_dir = data_home.join("ezkvm/disks");
-    fs::create_dir_all(&storage_dir)?;
-    Ok(storage_dir)
-}
+use super::{DiskInfo, get_storage_dir};
 
 /// Create a QCOW2 disk image
 pub fn create_qcow2(name: &str, size_gb: u32, backing_file: Option<&str>) -> Result<PathBuf> {
@@ -106,15 +87,6 @@ pub fn get_disk_info(disk_path: &Path) -> Result<DiskInfo> {
         actual_size_mb: actual_size as u32,
         path: disk_path.to_path_buf(),
     })
-}
-
-/// Disk information
-#[derive(Debug, Clone)]
-pub struct DiskInfo {
-    pub format: String,
-    pub size_gb: u32,
-    pub actual_size_mb: u32,
-    pub path: PathBuf,
 }
 
 /// Create a snapshot of a disk image
@@ -269,22 +241,4 @@ pub fn convert_disk(source: &Path, dest: &Path, format: &str) -> Result<()> {
 
     println!("✓ Converted disk from qcow2 to {} format", format);
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_storage_dir_creation() {
-        let storage_dir = get_storage_dir();
-        assert!(storage_dir.is_ok());
-        assert!(storage_dir.unwrap().exists());
-    }
-
-    #[test]
-    fn test_list_disks() {
-        let disks = list_disks();
-        assert!(disks.is_ok());
-    }
 }
