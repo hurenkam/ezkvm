@@ -23,7 +23,7 @@
 - [x] Split `src/qemu/command_builder.rs` into focused submodules (`src/qemu/command_builder/mod.rs` + `src/qemu/command_builder/composition.rs`) and move `build_command` to orchestration style
 - [x] Split `src/config/validation/platform.rs` into focused submodules (`src/config/validation/platform/mod.rs`, `audio.rs`, `core.rs`, `usb.rs`, `devices.rs`, `helpers.rs`)
 - [x] Split `src/config/validation/devices.rs` into focused submodules (`src/config/validation/devices/mod.rs`, `drive.rs`, `network.rs`, `display.rs`, `serial.rs`)
-- [ ] Split oversized test-support modules in `src` (>250 lines): `src/config/tests.rs`, `src/qemu/args/tests.rs`, `src/cli/tests.rs` (move helper fixtures/assertions into submodules)
+- [x] Split oversized test-support modules in `src` (>250 lines): `src/config/tests.rs`, `src/qemu/args/tests.rs`, `src/cli/tests.rs` (move helper fixtures/assertions into submodules)
 - [ ] Refactor long command-construction functions to orchestration style (<=35 lines where practical): `build_boot_args`, `build_option_args`, `add_usb_host`
 - [x] Refactor `build_command`, `add_tpm`, and `add_spice` to orchestration style with extracted helpers
 - [x] Refactor validation paths `validate_drive_config` and `validate_audio_devices` to orchestration style with focused helpers
