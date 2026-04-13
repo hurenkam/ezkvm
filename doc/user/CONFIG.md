@@ -414,8 +414,7 @@ The `system` section defines the core virtual machine hardware specifications.
   - `"qemu64"` - Basic x86_64 emulation
   - `"cortex-a72"` - ARM Cortex-A72 (for aarch64)
 - **Example**: `"host"`
-```
-```yaml
+
 ### `system.cpu_features` (optional)
 - **Type**: Array of objects
 - **Description**: CPU feature flags to enable/disable
@@ -424,8 +423,6 @@ The `system` section defines the core virtual machine hardware specifications.
 Each feature object has:
 - `name` (string): Feature specification (e.g., `"+vmx"`, `"-avx"`)
 
-```
-```yaml
 ```yaml
 cpu_features:
   - name: "+vmx"    # Enable Intel VT-x
@@ -433,9 +430,6 @@ cpu_features:
 ```
 
 ## Boot Configuration
-
-```
-**Result after merge:**
 
 ### `boot.firmware` (optional)
 - **Type**: String
@@ -450,7 +444,6 @@ cpu_features:
 - **Allowed values**: `"disk"`, `"cdrom"`, `"network"`
 - **Default**: QEMU default order
 - **Example**: `["disk", "cdrom"]`
-This means the VM file always has final precedence over profile content, and profiles can be combined in a composable way.
 
 ### `boot.kernel` (optional)
 - **Type**: String

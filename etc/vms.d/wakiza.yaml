@@ -10,8 +10,12 @@ profiles:
   - "gpu_passthrough"
   - "storage_network_defaults"
 
-system: { memory: 16384, vcpus: 8 }
-boot: { uefi_vars: "/dev/vm1/vm-108-efidisk" }
+system: 
+  memory: 16384
+  vcpus: 8
+  
+boot: 
+  uefi_vars: "/dev/vm1/vm-108-efidisk"
 
 devices:
   drives:
@@ -21,10 +25,20 @@ devices:
   networks:
     - { id: "net0", backend: { type: "tap", ifname: "tap108i0" }, mac: "BC:24:11:3A:21:B7", boot_index: 102 }
 
-tpm: { state_path: "/var/run/qemu-server/108.swtpm", state_backend_uri: "file:///dev/vm1/vm-108-tpmstate" }
-guest_agent: { socket_path: "/var/run/qemu-server/108.qga" }
-smbios: { uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7", vm_generation_id: "c13b46f3-9743-49f0-92e8-297b9feac497" }
-qmp: { enabled: true, socket_path: "/var/run/qemu-server/108.qmp" }
+tpm:
+  state_path: "/var/run/qemu-server/108.swtpm"
+  state_backend_uri: "file:///dev/vm1/vm-108-tpmstate"
+
+guest_agent: 
+  socket_path: "/var/run/qemu-server/108.qga"
+
+smbios: 
+  uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
+  vm_generation_id: "c13b46f3-9743-49f0-92e8-297b9feac497"
+
+qmp: 
+  enabled: true
+  socket_path: "/var/run/qemu-server/108.qmp"
 
 options:
   pid_file: "/tmp/ezkvm/wakiza.pid"
