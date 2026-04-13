@@ -8,6 +8,13 @@
 ### Review Comments Remediation Plan (Remaining)
 - [ ] Refactor config schema layout so large types and their impl blocks are co-located per type (especially `VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`)
 
+### Architecture Conformance (mod.rs Wiring-Only)
+- [ ] Move implementation bodies out of `src/qemu/command_builder/mod.rs` into focused submodules and keep `mod.rs` as exports/wiring only
+- [ ] Move implementation bodies out of `src/config/loader/mod.rs` into focused submodules and keep `mod.rs` as exports/wiring only
+- [ ] Move implementation bodies out of `src/cli/mod.rs` into focused submodules and keep `mod.rs` as exports/wiring only
+- [ ] Move implementation bodies out of `src/config/validation/devices/mod.rs` into focused submodules and keep `mod.rs` as exports/wiring only
+- [ ] Add a lightweight architecture check (script or review checklist item) to flag production `mod.rs` files that define non-test `fn/struct/enum/impl`
+
 ### Network Tooling Completion
 - [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
 - [ ] Add tests for network statistics parsing so byte and packet counters are validated from sample command output
