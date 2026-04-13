@@ -104,3 +104,9 @@ Before submitting a change, confirm:
 - when several files (>=3) in a directory have a similar function, different from other files in that directory, group them in a new subdirectory
 - keep "impl From<A> for B" in the same file as the "struct A" and "impl A" sections
 - keep large structs (>35 lines, or structs that have one or more impl or impl <trait> sections) together with their impl and related impl <trait> sections together in a single file per type
+- adhere to SOLID principles:
+  - Single responsibility principle
+  - Open / Closed principle
+  - Liskov substitution principle
+  - Interface segregation principle
+  - Dependency inversion principle

@@ -17,8 +17,9 @@
 
 #### Phase 2: Section 2 Threshold Remediation (Medium Priority)
 - [x] Re-baseline current Section 2 outliers and lock the target list in TODO (updated from latest line-count audit)
-- [ ] Split oversized production modules (>250 lines): `src/qemu/args.rs`, `src/cli/runtime/auxiliary.rs`, `src/cli.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/qemu/process.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`
-- [x] Split `src/cli/runtime.rs` into focused submodules (`src/cli/runtime/mod.rs`, `src/cli/runtime/start.rs`, `src/cli/runtime/ops.rs`, `src/cli/runtime/inspect.rs`, `src/cli/runtime/auxiliary.rs`)
+- [x] Split `src/qemu/args.rs` into focused submodules (`src/qemu/args/mod.rs`, `basic.rs`, `storage.rs`, `devices.rs`, `display.rs`, `system.rs`, `tests.rs`)
+- [ ] Split oversized production modules (>250 lines): `src/cli/runtime/auxiliary/swtpm.rs`, `src/cli.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/qemu/process.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`
+- [x] Split `src/cli/runtime.rs` into focused submodules (`src/cli/runtime/mod.rs`, `src/cli/runtime/start.rs`, `src/cli/runtime/ops.rs`, `src/cli/runtime/inspect.rs`, `src/cli/runtime/auxiliary/mod.rs`, `src/cli/runtime/auxiliary/launch.rs`, `src/cli/runtime/auxiliary/swtpm.rs`)
 - [x] Split `src/qemu/command_builder.rs` into focused submodules (`src/qemu/command_builder/mod.rs` + `src/qemu/command_builder/composition.rs`) and move `build_command` to orchestration style
 - [ ] Split oversized validation modules (>250 lines): `src/config/validation/platform.rs`, `src/config/validation/devices.rs`
 - [ ] Split oversized test-support module in `src` (>250 lines): `src/config/tests.rs` (move helper fixtures/assertions into submodules)
