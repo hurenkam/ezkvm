@@ -10,7 +10,7 @@
 - [x] Add placement policies for `addr`, `scsi_id`, and similar counters with configurable start/step values and per-bus or per-controller scopes
 - [x] Add collision detection and validation for explicit versus auto-assigned placement values
 - [x] Document profile policy precedence, migration rules, and legacy compatibility behavior
-- [ ] Add unit and integration tests for selector defaults, structured network backends, auto-placement, and legacy compatibility
+- [x] Add unit and integration tests for selector defaults, structured network backends, auto-placement, and legacy compatibility
 
 ## Postponed Items
 
