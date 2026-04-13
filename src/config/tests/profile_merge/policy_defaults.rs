@@ -213,3 +213,216 @@ devices:
     }
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn test_vm_config_from_file_applies_drive_scsi_id_placement_policy() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-profile-drive-placement");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+policies:
+  drives:
+    - match:
+        interface: "scsi"
+        type: "disk"
+        controller: "scsihw0"
+      placement:
+        scsi_id:
+          scope: "controller"
+          start: 0
+          step: 1
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "drive-placement-test"
+backend: "qemu"
+profiles:
+  - "base"
+devices:
+  drives:
+    - id: "scsi0"
+      path: "/tmp/scsi0.raw"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      controller: "scsihw0"
+    - id: "scsi1"
+      path: "/tmp/scsi1.raw"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      controller: "scsihw0"
+      scsi_id: 3
+    - id: "scsi2"
+      path: "/tmp/scsi2.raw"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      controller: "scsihw0"
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let config = VmConfig::from_file(&vm_config_path).unwrap();
+
+    let scsi0 = config
+        .devices
+        .drives
+        .iter()
+        .find(|drive| drive.id == "scsi0")
+        .unwrap();
+    assert_eq!(scsi0.scsi_id, Some(0));
+
+    let scsi1 = config
+        .devices
+        .drives
+        .iter()
+        .find(|drive| drive.id == "scsi1")
+        .unwrap();
+    assert_eq!(scsi1.scsi_id, Some(3));
+
+    let scsi2 = config
+        .devices
+        .drives
+        .iter()
+        .find(|drive| drive.id == "scsi2")
+        .unwrap();
+    assert_eq!(scsi2.scsi_id, Some(1));
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn test_vm_config_from_file_applies_network_addr_placement_policy() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-profile-network-placement");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+policies:
+  networks:
+    - match:
+        model: "virtio-net-pci"
+      placement:
+        addr:
+          scope: "bus"
+          bus: "pci.0"
+          start: "0x12"
+          step: 1
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "network-placement-test"
+backend: "qemu"
+profiles:
+  - "base"
+devices:
+  networks:
+    - id: "net0"
+      model: "virtio-net-pci"
+      mode: "user"
+      bus: "pci.0"
+    - id: "net1"
+      model: "virtio-net-pci"
+      mode: "user"
+      bus: "pci.0"
+      addr: "0x14"
+    - id: "net2"
+      model: "virtio-net-pci"
+      mode: "user"
+      bus: "pci.0"
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let config = VmConfig::from_file(&vm_config_path).unwrap();
+
+    let net0 = config
+        .devices
+        .networks
+        .iter()
+        .find(|network| network.id == "net0")
+        .unwrap();
+    assert_eq!(net0.addr.as_deref(), Some("0x12"));
+
+    let net1 = config
+        .devices
+        .networks
+        .iter()
+        .find(|network| network.id == "net1")
+        .unwrap();
+    assert_eq!(net1.addr.as_deref(), Some("0x14"));
+
+    let net2 = config
+        .devices
+        .networks
+        .iter()
+        .find(|network| network.id == "net2")
+        .unwrap();
+    assert_eq!(net2.addr.as_deref(), Some("0x13"));
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}

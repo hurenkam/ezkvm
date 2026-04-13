@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use serde_yaml::{Mapping, Value};
+use std::collections::{BTreeSet, HashMap};
 
 use crate::config::NetworkBackendConfig;
 
@@ -20,6 +21,25 @@ struct DrivePolicy {
 
     #[serde(default)]
     defaults: Mapping,
+
+    #[serde(default)]
+    placement: DrivePlacementPolicy,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+struct DrivePlacementPolicy {
+    #[serde(default)]
+    scsi_id: Option<ScsiIdPlacementConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ScsiIdPlacementConfig {
+    scope: String,
+    start: u32,
+    #[serde(default = "default_step")]
+    step: u32,
+    #[serde(default)]
+    controller: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -41,6 +61,25 @@ struct NetworkPolicy {
 
     #[serde(default)]
     defaults: Mapping,
+
+    #[serde(default)]
+    placement: NetworkPlacementPolicy,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+struct NetworkPlacementPolicy {
+    #[serde(default)]
+    addr: Option<AddrPlacementConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct AddrPlacementConfig {
+    scope: String,
+    start: String,
+    #[serde(default = "default_step")]
+    step: u32,
+    #[serde(default)]
+    bus: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -62,7 +101,13 @@ pub(crate) fn apply_profile_policies(root: &mut Value) -> Result<()> {
 
     apply_drive_policies(root, &policies.drives)?;
     apply_network_policies(root, &policies.networks)?;
+    apply_drive_placement_policies(root, &policies.drives)?;
+    apply_network_placement_policies(root, &policies.networks)?;
     Ok(())
+}
+
+fn default_step() -> u32 {
+    1
 }
 
 fn remove_top_level_key(root: &mut Value, key: &str) -> Result<Option<Value>> {
@@ -113,6 +158,250 @@ fn apply_network_policies(root: &mut Value, policies: &[NetworkPolicy]) -> Resul
     }
 
     Ok(())
+}
+
+fn apply_drive_placement_policies(root: &mut Value, policies: &[DrivePolicy]) -> Result<()> {
+    let Some(drives) = get_nested_sequence_mut(root, &["devices", "drives"])? else {
+        return Ok(());
+    };
+
+    let snapshot = drives.clone();
+    let mut used_by_scope: HashMap<String, BTreeSet<u32>> = HashMap::new();
+
+    for drive in drives {
+        let Value::Mapping(drive_map) = drive else {
+            continue;
+        };
+
+        if drive_map.contains_key(Value::String("scsi_id".to_string())) {
+            continue;
+        }
+
+        let Some(placement) = policies.iter().rev().find_map(|policy| {
+            if drive_matches_policy(drive_map, &policy.selector) {
+                policy.placement.scsi_id.as_ref()
+            } else {
+                None
+            }
+        }) else {
+            continue;
+        };
+
+        let scope_key = resolve_scsi_scope_key(drive_map, placement)?;
+
+        if placement.step == 0 {
+            return Err(anyhow!(
+                "policies.drives[].placement.scsi_id.step must be greater than 0"
+            ));
+        }
+
+        let used = used_by_scope
+            .entry(scope_key.clone())
+            .or_insert_with(|| collect_used_scsi_ids(&snapshot, &scope_key));
+
+        let mut candidate = placement.start;
+        while used.contains(&candidate) {
+            candidate = candidate.saturating_add(placement.step);
+        }
+
+        if candidate > 255 {
+            return Err(anyhow!(
+                "No free scsi_id available for scope '{}' within 0..=255",
+                scope_key
+            ));
+        }
+
+        drive_map.insert(
+            Value::String("scsi_id".to_string()),
+            Value::Number((candidate as u64).into()),
+        );
+        used.insert(candidate);
+    }
+
+    Ok(())
+}
+
+fn apply_network_placement_policies(root: &mut Value, policies: &[NetworkPolicy]) -> Result<()> {
+    let Some(networks) = get_nested_sequence_mut(root, &["devices", "networks"])? else {
+        return Ok(());
+    };
+
+    let snapshot = networks.clone();
+    let mut used_by_scope: HashMap<String, BTreeSet<u32>> = HashMap::new();
+
+    for network in networks {
+        let Value::Mapping(network_map) = network else {
+            continue;
+        };
+
+        if network_map.contains_key(Value::String("addr".to_string())) {
+            continue;
+        }
+
+        let Some(placement) = policies.iter().rev().find_map(|policy| {
+            if network_matches_policy(network_map, &policy.selector) {
+                policy.placement.addr.as_ref()
+            } else {
+                None
+            }
+        }) else {
+            continue;
+        };
+
+        if placement.step == 0 {
+            return Err(anyhow!(
+                "policies.networks[].placement.addr.step must be greater than 0"
+            ));
+        }
+
+        let start = parse_numeric_addr(&placement.start)
+            .with_context(|| format!("Invalid policies.networks[].placement.addr.start '{}': expected decimal or 0x-prefixed hex", placement.start))?;
+
+        let scope_key = resolve_addr_scope_key(network_map, placement)?;
+        let used = used_by_scope
+            .entry(scope_key.clone())
+            .or_insert_with(|| collect_used_addrs(&snapshot, &scope_key));
+
+        let mut candidate = start;
+        while used.contains(&candidate) {
+            candidate = candidate.saturating_add(placement.step);
+        }
+
+        network_map.insert(
+            Value::String("addr".to_string()),
+            Value::String(format!("0x{:x}", candidate)),
+        );
+        used.insert(candidate);
+    }
+
+    Ok(())
+}
+
+fn resolve_scsi_scope_key(
+    drive_map: &Mapping,
+    placement: &ScsiIdPlacementConfig,
+) -> Result<String> {
+    match placement.scope.as_str() {
+        "global" => Ok("scsi:global".to_string()),
+        "controller" => {
+            let controller = placement
+                .controller
+                .clone()
+                .or_else(|| get_string_field(drive_map, "controller"))
+                .ok_or_else(|| anyhow!("scsi_id placement scope 'controller' requires drive.controller or placement.controller"))?;
+            Ok(format!("scsi:controller:{}", controller))
+        }
+        other => Err(anyhow!(
+            "Unsupported scsi_id placement scope '{}': supported scopes are 'controller' and 'global'",
+            other
+        )),
+    }
+}
+
+fn resolve_addr_scope_key(
+    network_map: &Mapping,
+    placement: &AddrPlacementConfig,
+) -> Result<String> {
+    match placement.scope.as_str() {
+        "global" => Ok("addr:global".to_string()),
+        "bus" => {
+            let bus = placement
+                .bus
+                .clone()
+                .or_else(|| get_string_field(network_map, "bus"))
+                .ok_or_else(|| {
+                    anyhow!("addr placement scope 'bus' requires network.bus or placement.bus")
+                })?;
+            Ok(format!("addr:bus:{}", bus))
+        }
+        other => Err(anyhow!(
+            "Unsupported addr placement scope '{}': supported scopes are 'bus' and 'global'",
+            other
+        )),
+    }
+}
+
+fn collect_used_scsi_ids(snapshot: &[Value], scope_key: &str) -> BTreeSet<u32> {
+    let mut used = BTreeSet::new();
+
+    for drive in snapshot {
+        let Value::Mapping(drive_map) = drive else {
+            continue;
+        };
+
+        let Some(scsi_id) = get_u32_field(drive_map, "scsi_id") else {
+            continue;
+        };
+
+        let current_scope = if let Some(controller) = get_string_field(drive_map, "controller") {
+            format!("scsi:controller:{}", controller)
+        } else {
+            "scsi:global".to_string()
+        };
+
+        if current_scope == scope_key || scope_key == "scsi:global" {
+            used.insert(scsi_id);
+        }
+    }
+
+    used
+}
+
+fn collect_used_addrs(snapshot: &[Value], scope_key: &str) -> BTreeSet<u32> {
+    let mut used = BTreeSet::new();
+
+    for network in snapshot {
+        let Value::Mapping(network_map) = network else {
+            continue;
+        };
+
+        let Some(addr) = get_string_field(network_map, "addr") else {
+            continue;
+        };
+
+        let Ok(addr_num) = parse_numeric_addr(&addr) else {
+            continue;
+        };
+
+        let current_scope = if let Some(bus) = get_string_field(network_map, "bus") {
+            format!("addr:bus:{}", bus)
+        } else {
+            "addr:global".to_string()
+        };
+
+        if current_scope == scope_key || scope_key == "addr:global" {
+            used.insert(addr_num);
+        }
+    }
+
+    used
+}
+
+fn get_string_field(map: &Mapping, field: &str) -> Option<String> {
+    map.get(Value::String(field.to_string()))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+}
+
+fn get_u32_field(map: &Mapping, field: &str) -> Option<u32> {
+    map.get(Value::String(field.to_string()))
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+}
+
+fn parse_numeric_addr(value: &str) -> Result<u32> {
+    let trimmed = value.trim();
+    if let Some(hex) = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+    {
+        return u32::from_str_radix(hex, 16)
+            .map_err(|_| anyhow!("invalid hexadecimal address '{}'", value));
+    }
+
+    trimmed
+        .parse::<u32>()
+        .map_err(|_| anyhow!("invalid numeric address '{}'", value))
 }
 
 fn get_nested_sequence_mut<'a>(

@@ -148,6 +148,7 @@ Each policy entry has:
 
 - `match`: selector fields used to decide whether the policy applies
 - `defaults`: fields copied into matching concrete items only when those fields are still missing
+- `placement`: optional auto-assignment rules for placement-style fields (supported: `drives.scsi_id`, `networks.addr`)
 
 Policy precedence:
 
@@ -175,7 +176,29 @@ policies:
         model: "virtio-net-pci"
         rx_queue_size: 1024
         tx_queue_size: 256
+
+    - match:
+        model: "virtio-net-pci"
+      placement:
+        addr:
+          scope: "bus"
+          bus: "pci.0"
+          start: "0x12"
+          step: 1
 ```
+
+Placement policy notes:
+
+- Drive placement currently supports `policies.drives[].placement.scsi_id`:
+  - `scope`: `controller` or `global`
+  - `start`: integer start value
+  - `step`: optional integer increment (default `1`)
+  - `controller`: optional fixed controller for `controller` scope (otherwise uses concrete drive `controller`)
+- Network placement currently supports `policies.networks[].placement.addr`:
+  - `scope`: `bus` or `global`
+  - `start`: decimal or `0x`-prefixed hexadecimal start value
+  - `step`: optional integer increment (default `1`)
+  - `bus`: optional fixed bus for `bus` scope (otherwise uses concrete network `bus`)
 
 ### Profile Merge Semantics
 

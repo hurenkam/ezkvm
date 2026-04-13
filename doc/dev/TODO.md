@@ -7,7 +7,7 @@
 - [x] Introduce selector-based profile defaults for drives and networks matched by interface/type/model/backend instead of `id`
 - [ ] Extend selector-based profile defaults to additional device families beyond drives and networks
 - [x] Rework profile list behavior so concrete device instances append by declaration order while defaults come from policy rules rather than id-based patching
-- [ ] Add placement policies for `addr`, `scsi_id`, and similar counters with configurable start/step values and per-bus or per-controller scopes
+- [x] Add placement policies for `addr`, `scsi_id`, and similar counters with configurable start/step values and per-bus or per-controller scopes
 - [ ] Add collision detection and validation for explicit versus auto-assigned placement values
 - [ ] Document profile policy precedence, migration rules, and legacy compatibility behavior
 - [ ] Add unit and integration tests for selector defaults, structured network backends, auto-placement, and legacy compatibility
