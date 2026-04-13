@@ -26,7 +26,7 @@
 - [x] Re-run full `cargo test` after lint/format remediations and keep suite green
 
 #### Phase D: Module Refactor Program
-- [ ] Split `src/config/mod.rs` into focused modules (schema types, profile loading/merge, env substitution, entrypoint wiring) — in progress (`src/config/loader.rs`, `src/config/central.rs`, `src/config/vm_options.rs`, and `src/config/platform.rs` extracted)
+- [x] Split `src/config/mod.rs` into focused modules (schema types, profile loading/merge, env substitution, entrypoint wiring) — complete (`src/config/loader.rs` orchestrator with `src/config/loader_env.rs` and `src/config/loader_merge.rs`, plus `src/config/central.rs`, `src/config/vm_options.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/config/entrypoint.rs`, and `src/config/tests.rs` extracted)
 - [x] Split `src/config/validation.rs` into domain validators (system, boot, devices, vm options) with small function surfaces
 - [x] Split `src/cli.rs` command handlers into submodules by command group while keeping top-level dispatch minimal
 - [x] Review `src/qemu/builder.rs` usage and either integrate it as the command-building path or remove/deprecate it

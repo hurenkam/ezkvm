@@ -15,9 +15,9 @@
 - Place tests close to the code they verify when practical.
 
 Recommended thresholds:
-- Struct length target: under 35 lines when possible.
-- Function length target: under 35 lines when possible.
-- File length target: under 250 lines when possible.
+- Struct length target: under 35 lines when possible. If not possible, document in comments the reason.
+- Function length target: under 35 lines when possible. If not possible, document in comments the reason.
+- File length target: under 250 lines when possible. If not possible, document in comments the reason.
 - Public function complexity: prefer simple control flow and explicit branches.
 
 ## 3. Naming and API Design
@@ -102,4 +102,5 @@ Before submitting a change, confirm:
 ## 13. Additional Points of attention
 - keep mod.rs files clean, meaning they contain no struct, fn, or impl sections
 - when several files (>=3) in a directory have a similar function, different from other files in that directory, group them in a new subdirectory
+- keep "impl From<A> for B" in the same file as the "struct A" and "impl A" sections
 - keep large structs (>35 lines, or structs that have one or more impl or impl <trait> sections) together with their impl and related impl <trait> sections together in a single file per type
