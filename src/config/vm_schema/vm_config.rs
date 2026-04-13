@@ -10,10 +10,26 @@ use super::super::{
 
 use super::super::{
     AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig,
-    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig, QmpConfig, ScsiControllerConfig,
+    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig, ScsiControllerConfig,
     SmbiosConfig, SpiceConfig, TpmConfig, UsbDeviceConfig, VmOptions, XhciControllerConfig,
 };
 use super::{BootConfig, DeviceConfig, SystemConfig};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ControllersConfig {
+    #[serde(default)]
+    pub scsi: Vec<ScsiControllerConfig>,
+    #[serde(default)]
+    pub xhci: Vec<XhciControllerConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HostConfig {
+    #[serde(default)]
+    pub pci: Vec<HostPciConfig>,
+    #[serde(default)]
+    pub usb: Vec<UsbDeviceConfig>,
+}
 
 /// Main configuration structure for a virtual machine.
 /// Intentionally kept as one aggregate root to preserve a stable YAML contract and
@@ -34,73 +50,25 @@ pub struct VmConfig {
     /// System configuration (CPU, memory, etc.)
     pub system: SystemConfig,
 
-    /// Boot configuration
-    #[serde(default)]
-    pub boot: BootConfig,
-
     /// Device configuration
     #[serde(default)]
     pub devices: DeviceConfig,
 
-    /// TPM configuration
+    /// Canonical controller configuration.
     #[serde(default)]
-    pub tpm: Option<TpmConfig>,
+    pub controllers: ControllersConfig,
 
-    /// Guest agent configuration
+    /// Canonical host passthrough configuration.
     #[serde(default)]
-    pub guest_agent: Option<GuestAgentConfig>,
-
-    /// Memory ballooning configuration
-    #[serde(default)]
-    pub ballooning: Option<BallooningConfig>,
-
-    /// Hardware passthrough configuration
-    #[serde(default)]
-    pub hostpci: Vec<HostPciConfig>,
-
-    /// USB device passthrough configuration
-    #[serde(default)]
-    pub usb_devices: Vec<UsbDeviceConfig>,
-
-    /// XHCI controller configuration
-    #[serde(default)]
-    pub xhci_controllers: Vec<XhciControllerConfig>,
+    pub host: HostConfig,
 
     /// SPICE display configuration
     #[serde(default)]
     pub spice: Option<SpiceConfig>,
 
-    /// Audio devices backed by the selected audio backend
-    #[serde(default)]
-    pub audio_devices: Vec<AudioDeviceConfig>,
-
-    /// Explicit input devices
-    #[serde(default)]
-    pub input_devices: Vec<InputDeviceConfig>,
-
-    /// Looking Glass shared memory configuration
-    #[serde(default)]
-    pub ivshmem: Option<IvshmemConfig>,
-
-    /// SCSI controller configuration
-    #[serde(default)]
-    pub scsi_controllers: Vec<ScsiControllerConfig>,
-
     /// iSCSI storage configuration
     #[serde(default)]
     pub iscsi_disks: Vec<IscsiDiskConfig>,
-
-    /// QMP monitoring configuration
-    #[serde(default)]
-    pub qmp: Option<QmpConfig>,
-
-    /// SMBIOS system information configuration
-    #[serde(default)]
-    pub smbios: Option<SmbiosConfig>,
-
-    /// Legacy top-level NUMA topology configuration (migrated to system.cpu.numa).
-    #[serde(rename = "numa", default)]
-    legacy_numa: Vec<NumaConfig>,
 
     /// Hyper-V enlightenments configuration
     #[serde(default)]
@@ -122,55 +90,55 @@ impl VmConfig {
     }
 
     pub fn system_boot(&self) -> &BootConfig {
-        &self.boot
+        &self.system.boot
     }
 
     pub fn system_tpm(&self) -> Option<&TpmConfig> {
-        self.tpm.as_ref()
+        self.system.tpm.as_ref()
     }
 
     pub fn system_smbios(&self) -> Option<&SmbiosConfig> {
-        self.smbios.as_ref()
+        self.system.smbios.as_ref()
     }
 
     pub fn system_memory_ballooning(&self) -> Option<&BallooningConfig> {
-        self.ballooning.as_ref()
+        self.system.memory.ballooning.as_ref()
     }
 
     pub fn system_memory_ivshmem(&self) -> Option<&IvshmemConfig> {
-        self.ivshmem.as_ref()
+        self.system.memory.ivshmem.as_ref()
     }
 
     pub fn options_guest_agent(&self) -> Option<&GuestAgentConfig> {
-        self.guest_agent.as_ref()
+        self.options.guest_agent.as_ref()
     }
 
     pub fn options_qmp(&self) -> Option<&QmpConfig> {
-        self.qmp.as_ref()
+        self.options.qmp.as_ref()
     }
 
     pub fn controllers_scsi(&self) -> &[ScsiControllerConfig] {
-        &self.scsi_controllers
+        &self.controllers.scsi
     }
 
     pub fn controllers_xhci(&self) -> &[XhciControllerConfig] {
-        &self.xhci_controllers
+        &self.controllers.xhci
     }
 
     pub fn host_pci(&self) -> &[HostPciConfig] {
-        &self.hostpci
+        &self.host.pci
     }
 
     pub fn host_usb(&self) -> &[UsbDeviceConfig] {
-        &self.usb_devices
+        &self.host.usb
     }
 
     pub fn devices_input(&self) -> &[InputDeviceConfig] {
-        &self.input_devices
+        &self.devices.input
     }
 
     pub fn devices_audio(&self) -> &[AudioDeviceConfig] {
-        &self.audio_devices
+        &self.devices.audio
     }
 
     fn load_vm_value_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<serde_yaml::Value> {
@@ -196,224 +164,11 @@ impl VmConfig {
     }
 
     fn deserialize_and_validate(mut merged_value: serde_yaml::Value) -> anyhow::Result<Self> {
-        Self::normalize_schema_value(&mut merged_value)?;
         policies::apply_profile_policies(&mut merged_value)?;
         let mut config: VmConfig = serde_yaml::from_value(merged_value)?;
-        config.normalize_legacy_layout();
         config.assign_default_device_ids();
         validation::validate_config(&config)?;
         Ok(config)
-    }
-
-    fn normalize_schema_value(root: &mut serde_yaml::Value) -> anyhow::Result<()> {
-        let serde_yaml::Value::Mapping(root_map) = root else {
-            return Err(anyhow::anyhow!(
-                "VM config must be a YAML mapping/object at the root"
-            ));
-        };
-
-        Self::ensure_mapping_or_absent(root_map, &["system", "boot"], "system.boot")?;
-        Self::ensure_mapping_or_absent(root_map, &["system", "tpm"], "system.tpm")?;
-        Self::ensure_mapping_or_absent(root_map, &["system", "smbios"], "system.smbios")?;
-        Self::ensure_mapping_or_absent(
-            root_map,
-            &["options", "guest_agent"],
-            "options.guest_agent",
-        )?;
-        Self::ensure_mapping_or_absent(root_map, &["options", "qmp"], "options.qmp")?;
-
-        Self::ensure_sequence_or_absent(root_map, &["controllers", "scsi"], "controllers.scsi")?;
-        Self::ensure_sequence_or_absent(root_map, &["controllers", "xhci"], "controllers.xhci")?;
-        Self::ensure_sequence_or_absent(root_map, &["host", "pci"], "host.pci")?;
-        Self::ensure_sequence_or_absent(root_map, &["host", "usb"], "host.usb")?;
-        Self::ensure_sequence_or_absent(root_map, &["devices", "input"], "devices.input")?;
-        Self::ensure_sequence_or_absent(root_map, &["devices", "audio"], "devices.audio")?;
-
-        // Target-path scalar/object aliases override legacy fields.
-        Self::map_nested_to_top_level(root_map, &["system", "boot"], "boot");
-        Self::map_nested_to_top_level(root_map, &["system", "tpm"], "tpm");
-        Self::map_nested_to_top_level(root_map, &["system", "smbios"], "smbios");
-        Self::map_nested_to_top_level(root_map, &["options", "guest_agent"], "guest_agent");
-        Self::map_nested_to_top_level(root_map, &["options", "qmp"], "qmp");
-
-        // system.memory object migration support:
-        // - system.memory.size -> system.memory scalar
-        // - system.memory.ballooning -> top-level ballooning
-        // - system.memory.ivshmem -> top-level ivshmem
-        if let Some(memory_value) = Self::get_nested_cloned(root_map, &["system", "memory"]) {
-            match memory_value {
-                serde_yaml::Value::Mapping(memory_map) => {
-                    let size_key = serde_yaml::Value::String("size".to_string());
-                    let Some(size) = memory_map.get(size_key) else {
-                        return Err(anyhow::anyhow!("system.memory object must include 'size'"));
-                    };
-                    Self::set_nested_value(root_map, &["system", "memory"], size.clone());
-
-                    if let Some(ballooning) =
-                        memory_map.get(serde_yaml::Value::String("ballooning".to_string()))
-                    {
-                        root_map.insert(
-                            serde_yaml::Value::String("ballooning".to_string()),
-                            ballooning.clone(),
-                        );
-                    }
-                    if let Some(ivshmem) =
-                        memory_map.get(serde_yaml::Value::String("ivshmem".to_string()))
-                    {
-                        root_map.insert(
-                            serde_yaml::Value::String("ivshmem".to_string()),
-                            ivshmem.clone(),
-                        );
-                    }
-                }
-                serde_yaml::Value::Number(_) => {}
-                serde_yaml::Value::Null => {}
-                _ => {
-                    return Err(anyhow::anyhow!(
-                        "system.memory must be an integer MiB value or an object with 'size'"
-                    ));
-                }
-            }
-        }
-
-        // For moved list fields, canonical legacy field receives legacy + target entries.
-        Self::merge_moved_list(root_map, "scsi_controllers", &["controllers", "scsi"]);
-        Self::merge_moved_list(root_map, "xhci_controllers", &["controllers", "xhci"]);
-        Self::merge_moved_list(root_map, "hostpci", &["host", "pci"]);
-        Self::merge_moved_list(root_map, "usb_devices", &["host", "usb"]);
-        Self::merge_moved_list(root_map, "input_devices", &["devices", "input"]);
-        Self::merge_moved_list(root_map, "audio_devices", &["devices", "audio"]);
-
-        Ok(())
-    }
-
-    fn ensure_mapping_or_absent(
-        root_map: &serde_yaml::Mapping,
-        path: &[&str],
-        path_label: &str,
-    ) -> anyhow::Result<()> {
-        if let Some(value) = Self::get_nested_cloned(root_map, path)
-            && !matches!(
-                value,
-                serde_yaml::Value::Mapping(_) | serde_yaml::Value::Null
-            )
-        {
-            return Err(anyhow::anyhow!("{} must be an object", path_label));
-        }
-        Ok(())
-    }
-
-    fn ensure_sequence_or_absent(
-        root_map: &serde_yaml::Mapping,
-        path: &[&str],
-        path_label: &str,
-    ) -> anyhow::Result<()> {
-        if let Some(value) = Self::get_nested_cloned(root_map, path)
-            && !matches!(
-                value,
-                serde_yaml::Value::Sequence(_) | serde_yaml::Value::Null
-            )
-        {
-            return Err(anyhow::anyhow!("{} must be a list", path_label));
-        }
-        Ok(())
-    }
-
-    fn map_nested_to_top_level(
-        root_map: &mut serde_yaml::Mapping,
-        nested_path: &[&str],
-        top_level_key: &str,
-    ) {
-        if let Some(value) = Self::get_nested_cloned(root_map, nested_path) {
-            root_map.insert(serde_yaml::Value::String(top_level_key.to_string()), value);
-        }
-    }
-
-    fn merge_moved_list(
-        root_map: &mut serde_yaml::Mapping,
-        legacy_key: &str,
-        target_path: &[&str],
-    ) {
-        let legacy_entries = match root_map.get(serde_yaml::Value::String(legacy_key.to_string())) {
-            Some(serde_yaml::Value::Sequence(items)) => items.clone(),
-            _ => Vec::new(),
-        };
-
-        let target_entries = match Self::get_nested_cloned(root_map, target_path) {
-            Some(serde_yaml::Value::Sequence(items)) => items,
-            _ => Vec::new(),
-        };
-
-        if legacy_entries.is_empty() && target_entries.is_empty() {
-            return;
-        }
-
-        let mut merged = Vec::with_capacity(legacy_entries.len() + target_entries.len());
-        merged.extend(legacy_entries);
-        merged.extend(target_entries);
-        root_map.insert(
-            serde_yaml::Value::String(legacy_key.to_string()),
-            serde_yaml::Value::Sequence(merged),
-        );
-    }
-
-    fn get_nested_cloned(
-        root_map: &serde_yaml::Mapping,
-        path: &[&str],
-    ) -> Option<serde_yaml::Value> {
-        let mut current = serde_yaml::Value::Mapping(root_map.clone());
-
-        for key in path {
-            let serde_yaml::Value::Mapping(map) = current else {
-                return None;
-            };
-            let key_value = serde_yaml::Value::String((*key).to_string());
-            current = map.get(&key_value)?.clone();
-        }
-
-        Some(current)
-    }
-
-    fn set_nested_value(
-        root_map: &mut serde_yaml::Mapping,
-        path: &[&str],
-        value: serde_yaml::Value,
-    ) {
-        if path.is_empty() {
-            return;
-        }
-
-        if path.len() == 1 {
-            root_map.insert(serde_yaml::Value::String(path[0].to_string()), value);
-            return;
-        }
-
-        let mut current = root_map;
-        for key in &path[..path.len() - 1] {
-            let key_value = serde_yaml::Value::String((*key).to_string());
-            let entry = current
-                .entry(key_value)
-                .or_insert_with(|| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
-
-            if !matches!(entry, serde_yaml::Value::Mapping(_)) {
-                *entry = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
-            }
-
-            let serde_yaml::Value::Mapping(map) = entry else {
-                return;
-            };
-            current = map;
-        }
-
-        current.insert(
-            serde_yaml::Value::String(path[path.len() - 1].to_string()),
-            value,
-        );
-    }
-
-    fn normalize_legacy_layout(&mut self) {
-        let legacy_numa = std::mem::take(&mut self.legacy_numa);
-        self.system.normalize_cpu_fields(legacy_numa);
     }
 
     fn assign_default_device_ids(&mut self) {
@@ -569,9 +324,8 @@ impl VmConfig {
         let processed_content = Self::substitute_env_vars(content)?;
         let mut vm_value: serde_yaml::Value = serde_yaml::from_str(&processed_content)?;
         Self::ensure_yaml_mapping_root(&vm_value, "VM config")?;
-        Self::normalize_schema_value(&mut vm_value)?;
+        policies::apply_profile_policies(&mut vm_value)?;
         let mut config: VmConfig = serde_yaml::from_value(vm_value)?;
-        config.normalize_legacy_layout();
         config.assign_default_device_ids();
 
         validation::validate_config(&config)?;

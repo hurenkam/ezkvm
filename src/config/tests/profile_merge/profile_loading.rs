@@ -16,11 +16,13 @@ fn test_vm_config_from_file_merges_profiles_from_profile_dir() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-boot:
-  firmware: "uefi"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "uefi"
 "#,
     )
     .unwrap();
@@ -51,8 +53,10 @@ profiles:
   - "windows_11"
   - "gpu_passthrough"
 system:
-  memory: 8192
-  vcpus: 8
+  memory:
+    size: 8192
+  cpu:
+    vcpus: 8
 "#,
     )
     .unwrap();
@@ -66,9 +70,9 @@ system:
     assert_eq!(config.backend, "qemu");
     assert_eq!(config.system.architecture, "x86_64");
     assert_eq!(config.system.machine, "q35");
-    assert_eq!(config.system.cpu_model, "host");
-    assert_eq!(config.system.memory, 8192);
-    assert_eq!(config.system.vcpus, 8);
+    assert_eq!(config.system.cpu.model, "host");
+    assert_eq!(config.system.memory.size, 8192);
+    assert_eq!(config.system.cpu.vcpus, 8);
     assert!(config.devices.displays.is_empty());
 
     unsafe {
@@ -105,9 +109,11 @@ profiles:
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();

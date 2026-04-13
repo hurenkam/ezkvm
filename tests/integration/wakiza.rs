@@ -10,8 +10,8 @@ fn test_wakiza_matches_key_proxmox_fragments() {
         .drives
         .iter()
         .any(|drive| drive.r#type == "cdrom");
-    let has_passthrough = config.hostpci.iter().any(|d| d.id.starts_with("hostpci0"));
-    let has_usb = !config.usb_devices.is_empty();
+    let has_passthrough = config.host.pci.iter().any(|d| d.id.starts_with("hostpci0"));
+    let has_usb = !config.host.usb.is_empty();
     let manager = QemuManager::new(config, CentralConfig::default());
     let args = manager.build_command().unwrap();
     let generated = format!(

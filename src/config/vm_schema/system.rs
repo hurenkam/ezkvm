@@ -1,7 +1,8 @@
 use crate::qemu::types::QemuArgs;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
-use super::super::NumaConfig;
+use super::super::{BallooningConfig, IvshmemConfig, NumaConfig, SmbiosConfig, TpmConfig};
+use super::BootConfig;
 
 /// System-level configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,24 +17,24 @@ pub struct SystemConfig {
     #[serde(default)]
     pub machine_options: Vec<String>,
 
-    /// Memory in MiB
-    pub memory: u32,
+    /// Canonical memory configuration.
+    pub memory: MemoryConfig,
 
     /// Canonical CPU configuration.
     #[serde(default)]
     pub cpu: CpuConfig,
 
-    /// Legacy number of virtual CPUs (kept for compatibility input).
+    /// Canonical boot configuration.
     #[serde(default)]
-    pub vcpus: u32,
+    pub boot: BootConfig,
 
-    /// Legacy CPU model (kept for compatibility input).
+    /// Canonical TPM configuration.
     #[serde(default)]
-    pub cpu_model: String,
+    pub tpm: Option<TpmConfig>,
 
-    /// Legacy CPU-specific features (kept for compatibility input).
-    #[serde(default, deserialize_with = "deserialize_cpu_feature_list")]
-    pub cpu_features: Vec<String>,
+    /// Canonical SMBIOS configuration.
+    #[serde(default)]
+    pub smbios: Option<SmbiosConfig>,
 
     /// Optional QEMU config file(s) to load via -readconfig.
     /// Use this to supply machine topology files such as
@@ -41,6 +42,20 @@ pub struct SystemConfig {
     /// PCI/PCIe bridge buses (pci.0, pci.1, ich9-pcie-port-*, etc.)
     #[serde(default)]
     pub readconfig: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryConfig {
+    /// Memory in MiB.
+    pub size: u32,
+
+    /// Optional canonical memory ballooning configuration.
+    #[serde(default)]
+    pub ballooning: Option<BallooningConfig>,
+
+    /// Optional canonical ivshmem configuration.
+    #[serde(default)]
+    pub ivshmem: Option<IvshmemConfig>,
 }
 
 /// Canonical CPU configuration nested under `system.cpu`.
@@ -55,56 +70,12 @@ pub struct CpuConfig {
     pub vcpus: u32,
 
     /// CPU-specific features
-    #[serde(default, deserialize_with = "deserialize_cpu_feature_list")]
+    #[serde(default)]
     pub features: Vec<String>,
 
     /// NUMA topology configuration
     #[serde(default)]
     pub numa: Vec<NumaConfig>,
-}
-
-impl SystemConfig {
-    pub fn normalize_cpu_fields(&mut self, legacy_numa: Vec<NumaConfig>) {
-        // Canonical system.cpu wins whenever present.
-        if self.cpu.model.trim().is_empty() {
-            self.cpu.model = self.cpu_model.trim().to_string();
-        }
-        if self.cpu.vcpus == 0 {
-            self.cpu.vcpus = self.vcpus;
-        }
-        if self.cpu.features.is_empty() {
-            self.cpu.features = self.cpu_features.clone();
-        }
-        if self.cpu.numa.is_empty() {
-            self.cpu.numa = legacy_numa;
-        }
-
-        // Mirror canonical values back to legacy fields for compatibility callers.
-        self.cpu_model = self.cpu.model.clone();
-        self.vcpus = self.cpu.vcpus;
-        self.cpu_features = self.cpu.features.clone();
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum CpuFeatureEntry {
-    Name(String),
-    Named { name: String },
-}
-
-fn deserialize_cpu_feature_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let entries = Vec::<CpuFeatureEntry>::deserialize(deserializer)?;
-    Ok(entries
-        .into_iter()
-        .map(|entry| match entry {
-            CpuFeatureEntry::Name(value) => value,
-            CpuFeatureEntry::Named { name } => name,
-        })
-        .collect())
 }
 
 impl From<SystemConfig> for QemuArgs {
@@ -131,7 +102,7 @@ impl From<SystemConfig> for QemuArgs {
 
         // Memory
         args.push_str("-m");
-        args.push(format!("{}M", config.memory));
+        args.push(format!("{}M", config.memory.size));
 
         // SMP (symmetric multiprocessing)
         args.push_str("-smp");

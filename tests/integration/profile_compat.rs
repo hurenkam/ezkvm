@@ -22,11 +22,13 @@ fn test_profile_based_config_file_parsing() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-boot:
-  firmware: "uefi"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "uefi"
 "#,
     )
     .unwrap();
@@ -47,7 +49,8 @@ backend: "qemu"
 profiles:
   - "windows_11"
 system:
-  memory: 8192
+  memory:
+    size: 8192
 "#,
     )
     .unwrap();
@@ -62,8 +65,8 @@ system:
 
     assert_eq!(config.name, "integration-profile-vm");
     assert_eq!(config.system.architecture, "x86_64");
-    assert_eq!(config.system.memory, 8192);
-    assert_eq!(config.boot.firmware.as_deref(), Some("uefi"));
+    assert_eq!(config.system.memory.size, 8192);
+    assert_eq!(config.system.boot.firmware.as_deref(), Some("uefi"));
 
     let _ = fs::remove_dir_all(root);
 }
@@ -79,15 +82,17 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 "#;
 
     let config = VmConfig::from_str(legacy_yaml).unwrap();
     assert_eq!(config.name, "legacy-vm");
     assert!(config.profiles.is_empty());
-    assert_eq!(config.system.memory, 2048);
+    assert_eq!(config.system.memory.size, 2048);
 }
 
 #[test]
@@ -112,9 +117,11 @@ fn test_profile_policies_apply_to_legacy_network_mode_with_auto_placement() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   networks:
     - match:
@@ -150,10 +157,20 @@ profiles:
 devices:
   networks:
     - id: "net0"
-      mode: "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+      backend:
+        type: "tap"
+        ifname: "tap0"
+        script: "no"
+        downscript: "no"
+        vhost: true
       bus: "pci.0"
     - id: "net1"
-      mode: "tap,ifname=tap1,script=no,downscript=no,vhost=on"
+      backend:
+        type: "tap"
+        ifname: "tap1"
+        script: "no"
+        downscript: "no"
+        vhost: true
       bus: "pci.0"
       addr: "0x14"
 "#,
@@ -173,8 +190,8 @@ devices:
     assert_eq!(net0.rx_queue_size, Some(1024));
     assert_eq!(net0.addr.as_deref(), Some("0x12"));
     assert_eq!(
-        net0.mode,
-        "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+        net0.backend.as_ref().map(|b| b.backend_type.as_str()),
+        Some("tap")
     );
 
     let net1 = &config.devices.networks[1];
@@ -205,9 +222,11 @@ fn test_profile_policies_apply_to_additional_device_families() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   displays:
     - match:
@@ -242,9 +261,10 @@ profiles:
 devices:
   displays:
     - type: "qxl"
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
 "#,
     )
     .unwrap();
@@ -258,8 +278,8 @@ scsi_controllers:
     }
 
     assert_eq!(config.devices.displays[0].vram, Some(64));
-    assert_eq!(config.scsi_controllers[0].bus.as_deref(), Some("pci.0"));
-    assert_eq!(config.scsi_controllers[0].addr.as_deref(), Some("0x5"));
+    assert_eq!(config.controllers.scsi[0].bus.as_deref(), Some("pci.0"));
+    assert_eq!(config.controllers.scsi[0].addr.as_deref(), Some("0x5"));
 
     let _ = fs::remove_dir_all(root);
 }

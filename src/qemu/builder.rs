@@ -42,7 +42,7 @@ impl QemuCommandBuilder {
         builder = builder
             .machine(&config.system.machine)
             .cpu(&config.system.cpu.model)
-            .memory(config.system.memory)
+            .memory(config.system.memory.size)
             .smp(config.system.cpu.vcpus);
 
         // Add CPU features
@@ -72,19 +72,19 @@ impl QemuCommandBuilder {
         }
 
         // Add boot configuration
-        if !config.boot.boot_order.is_empty() {
-            builder = builder.boot_order(&config.boot.boot_order);
+        if !config.system.boot.boot_order.is_empty() {
+            builder = builder.boot_order(&config.system.boot.boot_order);
         }
 
-        if let Some(kernel) = &config.boot.kernel {
+        if let Some(kernel) = &config.system.boot.kernel {
             builder = builder.kernel(kernel);
         }
 
-        if let Some(initrd) = &config.boot.initrd {
+        if let Some(initrd) = &config.system.boot.initrd {
             builder = builder.initrd(initrd);
         }
 
-        if let Some(cmdline) = &config.boot.cmdline {
+        if let Some(cmdline) = &config.system.boot.cmdline {
             builder = builder.append(cmdline);
         }
 

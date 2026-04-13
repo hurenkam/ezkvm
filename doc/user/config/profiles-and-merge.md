@@ -39,16 +39,14 @@ Each entry supports:
 
 Path-aware list behavior:
 
-- id-merge lists: `hostpci`, `usb_devices`, `scsi_controllers`, `xhci_controllers`, `audio_devices`
+- id-merge lists: `host.pci`, `host.usb`, `controllers.scsi`, `controllers.xhci`, `devices.audio`
 - append-all lists: `devices.drives`, `devices.networks`, and `policies.*` families
-- append-unique lists: `system.cpu.features` (and legacy `system.cpu_features`), `system.machine_options`, `options.global_options`
+- append-unique lists: `system.cpu.features`, `system.machine_options`, `options.global_options`
 - all others: replace
 
 ## Notes
 
-- `devices.networks[].mode` is accepted during migration and normalized before validation.
-- Prefer structured `devices.networks[].backend` for new config.
-- For networks, define either `backend` or legacy `mode`, not both.
+- Configure networks with `devices.networks[].backend`.
 
 ## See also
 

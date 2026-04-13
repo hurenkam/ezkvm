@@ -13,7 +13,6 @@ Override path with `EZKVM_CONFIG`.
 tools:
   swtpm: "/usr/bin/swtpm"
   remote_viewer: "/usr/bin/remote-viewer"
-  looking_glass: "/usr/bin/looking-glass-client"
 
 locations:
   run_dir: "/var/run/ezkvm"
@@ -21,19 +20,15 @@ locations:
   vm_dir: "/etc/ezkvm/vms"
   template_dir: "/etc/ezkvm/templates"
   profile_dir: "/etc/ezkvm/profiles.d"
-
-looking_glass:
-  full_screen: true
-  size: "1707x1067"
-  grab_keyboard: true
-  escape_key: "KEY_F12"
 ```
 
 ## Runtime Usage
 
 - `tools.swtpm` + `system.tpm.backend: emulator`: ezkvm can launch swtpm.
 - `tools.remote_viewer` + `spice.enabled`: ezkvm can launch remote-viewer.
-- `tools.looking_glass` + `system.memory.ivshmem.enabled`: ezkvm can launch looking-glass-client.
+- `options.looking_glass.program` + `system.memory.ivshmem.enabled`: ezkvm can launch looking-glass-client.
+
+Looking Glass client settings should be defined in VM/profile config under `options.looking_glass` so profile-specific behavior stays with the profile.
 
 ## Practical Defaults
 

@@ -16,9 +16,11 @@ fn test_vm_config_from_file_vm_values_override_profile_values() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();
@@ -39,8 +41,10 @@ backend: "qemu"
 profiles:
   - "defaults"
 system:
-  memory: 12288
-  vcpus: 6
+  memory:
+    size: 12288
+  cpu:
+    vcpus: 6
 "#,
     )
     .unwrap();
@@ -50,8 +54,8 @@ system:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.system.memory, 12288);
-    assert_eq!(config.system.vcpus, 6);
+    assert_eq!(config.system.memory.size, 12288);
+    assert_eq!(config.system.cpu.vcpus, 6);
 
     unsafe {
         std::env::remove_var("EZKVM_CONFIG");
@@ -75,9 +79,11 @@ fn test_vm_config_from_file_still_runs_validation_after_profile_merge() {
 system:
   architecture: "invalid_arch"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();

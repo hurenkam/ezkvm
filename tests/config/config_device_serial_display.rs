@@ -9,10 +9,17 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 4
-  cpu_model: "host"
-
+  memory:
+    size: 4096
+    ballooning:
+      enabled: true
+      model: "virtio-balloon-pci"
+      id: "balloon0"
+      bus: "pci.0"
+      addr: "0x3"
+  cpu:
+    vcpus: 4
+    model: "host"
 devices:
   drives:
     - id: "scsi0"
@@ -33,24 +40,21 @@ devices:
       unit: 0
       boot_index: 101
 
-guest_agent:
-  enabled: true
-  socket_path: "/var/run/qemu-server/108.qga"
-  bus: "pci.0"
-  addr: "0x8"
-
-ballooning:
-  enabled: true
-  model: "virtio-balloon-pci"
-  id: "balloon0"
-  bus: "pci.0"
-  addr: "0x3"
-
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
+options:
+  enable_kvm: true
+  daemonize: false
+  guest_agent:
+    enabled: true
+    socket_path: "/var/run/qemu-server/108.qga"
     bus: "pci.0"
-    addr: "0x5"
+    addr: "0x8"
+
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
+      bus: "pci.0"
+      addr: "0x5"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
@@ -59,14 +63,21 @@ scsi_controllers:
     assert_eq!(config.devices.drives[1].bus.as_deref(), Some("ide.1"));
     assert_eq!(config.devices.drives[1].unit, Some(0));
     assert_eq!(
-        config.guest_agent.as_ref().unwrap().bus.as_deref(),
+        config.options.guest_agent.as_ref().unwrap().bus.as_deref(),
         Some("pci.0")
     );
     assert_eq!(
-        config.ballooning.as_ref().unwrap().addr.as_deref(),
+        config
+            .system
+            .memory
+            .ballooning
+            .as_ref()
+            .unwrap()
+            .addr
+            .as_deref(),
         Some("0x3")
     );
-    assert_eq!(config.scsi_controllers[0].addr.as_deref(), Some("0x5"));
+    assert_eq!(config.controllers.scsi[0].addr.as_deref(), Some("0x5"));
 }
 
 #[test]
@@ -78,10 +89,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 1
-  cpu_model: "host"
-
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
 devices:
   serials:
     - type: "file"
@@ -112,10 +124,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 1
-  cpu_model: "host"
-
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
 devices:
   serials:
     - type: "file"
@@ -140,10 +153,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 1
-  cpu_model: "host"
-
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
 devices:
   serials:
     - type: "socket"
@@ -169,10 +183,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 1
-  cpu_model: "host"
-
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
 devices:
   displays:
     - type: "cirrus"

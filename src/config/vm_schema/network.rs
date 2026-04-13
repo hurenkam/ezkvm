@@ -60,55 +60,6 @@ pub struct NetworkBackendConfig {
 }
 
 impl NetworkBackendConfig {
-    pub fn from_legacy_mode(mode: &str) -> Result<Self> {
-        let mut parts = mode.split(',');
-        let Some(backend_type) = parts.next().map(str::trim).filter(|part| !part.is_empty()) else {
-            return Err(anyhow!("Network mode cannot be empty"));
-        };
-
-        let mut backend = NetworkBackendConfig {
-            backend_type: backend_type.to_string(),
-            ..Default::default()
-        };
-
-        for segment in parts {
-            let trimmed = segment.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-
-            let Some((key, value)) = trimmed.split_once('=') else {
-                backend.extra.insert(trimmed.to_string(), String::new());
-                continue;
-            };
-
-            match key {
-                "ifname" => backend.ifname = Some(value.to_string()),
-                "bridge" | "br" => backend.bridge = Some(value.to_string()),
-                "script" => backend.script = Some(value.to_string()),
-                "downscript" => backend.downscript = Some(value.to_string()),
-                "helper" => backend.helper = Some(value.to_string()),
-                "listen" => backend.listen = Some(value.to_string()),
-                "connect" => backend.connect = Some(value.to_string()),
-                "fd" => backend.fd = Some(value.to_string()),
-                "queues" => {
-                    backend.queues = Some(value.parse().map_err(|_| {
-                        anyhow!("Invalid network queues value '{}': expected integer", value)
-                    })?)
-                }
-                "vhost" => {
-                    backend.vhost = Some(parse_on_off_bool("vhost", value)?);
-                }
-                "hostfwd" => backend.hostfwd.push(value.to_string()),
-                _ => {
-                    backend.extra.insert(key.to_string(), value.to_string());
-                }
-            }
-        }
-
-        Ok(backend)
-    }
-
     pub fn to_netdev_spec(&self, id: &str) -> String {
         let mut parts = vec![format!("type={}", self.backend_type), format!("id={}", id)];
 
@@ -172,11 +123,6 @@ pub struct NetworkConfig {
     /// Network model (virtio-net, e1000, etc.)
     pub model: String,
 
-    /// Legacy network backend string.
-    /// Prefer `backend` for new configurations.
-    #[serde(default)]
-    pub mode: String,
-
     /// Structured network backend configuration.
     #[serde(default)]
     pub backend: Option<NetworkBackendConfig>,
@@ -216,19 +162,9 @@ impl NetworkConfig {
     }
 
     pub fn resolved_backend(&self) -> Result<NetworkBackendConfig> {
-        let has_mode = !self.mode.trim().is_empty();
-
-        match (&self.backend, has_mode) {
-            (Some(_), true) => Err(anyhow!(
-                "Network '{}' cannot specify both 'backend' and legacy 'mode'",
-                self.id
-            )),
-            (Some(backend), false) => Ok(backend.clone()),
-            (None, true) => NetworkBackendConfig::from_legacy_mode(&self.mode),
-            (None, false) => Err(anyhow!(
-                "Network '{}' must define either 'backend' or legacy 'mode'",
-                self.id
-            )),
+        match &self.backend {
+            Some(backend) => Ok(backend.clone()),
+            None => Err(anyhow!("Network '{}' must define 'backend'", self.id)),
         }
     }
 }
@@ -238,13 +174,10 @@ impl From<NetworkConfig> for QemuArgs {
         let mut args = QemuArgs::new();
 
         args.push_str("-netdev");
-        let netdev_spec = match network.backend.as_ref() {
-            Some(backend) => backend.to_netdev_spec(&network.id),
-            None => match network.mode.as_str() {
-                "user" => format!("type=user,id={}", network.id),
-                _ => format!("type={},id={}", network.mode, network.id),
-            },
-        };
+        let netdev_spec = network
+            .resolved_backend()
+            .map(|backend| backend.to_netdev_spec(&network.id))
+            .unwrap_or_else(|_| format!("type=user,id={}", network.id));
         args.push(netdev_spec);
 
         args.push_str("-device");
@@ -276,17 +209,5 @@ impl From<NetworkConfig> for QemuArgs {
 
         args.push(device_spec);
         args
-    }
-}
-
-fn parse_on_off_bool(field_name: &str, value: &str) -> Result<bool> {
-    match value {
-        "on" | "true" => Ok(true),
-        "off" | "false" => Ok(false),
-        _ => Err(anyhow!(
-            "Invalid value '{}' for {}: expected on/off or true/false",
-            value,
-            field_name
-        )),
     }
 }

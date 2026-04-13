@@ -11,7 +11,7 @@ pub(crate) fn ensure_runtime_socket_dirs(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
 ) -> Result<()> {
-    if let Some(tpm) = &config.tpm
+    if let Some(tpm) = config.system_tpm()
         && tpm.backend == "emulator"
     {
         ensure_socket_parent_dir(
@@ -20,14 +20,14 @@ pub(crate) fn ensure_runtime_socket_dirs(
         )?;
     }
 
-    if let Some(guest_agent) = &config.guest_agent
+    if let Some(guest_agent) = config.options_guest_agent()
         && guest_agent.enabled
         && let Some(socket_path) = guest_agent.socket_path.as_deref()
     {
         ensure_socket_parent_dir(socket_path, "guest agent socket")?;
     }
 
-    if let Some(qmp) = &config.qmp
+    if let Some(qmp) = config.options_qmp()
         && qmp.enabled
         && let crate::config::QmpSocketType::Unix = qmp.socket_type
         && let Some(socket_path) = qmp.socket_path.as_deref()
@@ -42,7 +42,7 @@ pub(crate) fn start_swtpm_if_configured(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
 ) -> Result<()> {
-    let Some(tpm) = config.tpm.as_ref().filter(|tpm| tpm.backend == "emulator") else {
+    let Some(tpm) = config.system_tpm().filter(|tpm| tpm.backend == "emulator") else {
         return Ok(());
     };
 

@@ -56,16 +56,15 @@ fn merge_yaml_values_at_path(
 }
 
 fn is_id_merge_list_path(path: &[String]) -> bool {
-    matches!(path, [one] if one == "hostpci")
-        || matches!(path, [one] if one == "usb_devices")
-        || matches!(path, [one] if one == "scsi_controllers")
-        || matches!(path, [one] if one == "xhci_controllers")
-        || matches!(path, [one] if one == "audio_devices")
+    matches!(path, [first, second] if first == "host" && second == "pci")
+        || matches!(path, [first, second] if first == "host" && second == "usb")
+        || matches!(path, [first, second] if first == "controllers" && second == "scsi")
+        || matches!(path, [first, second] if first == "controllers" && second == "xhci")
+        || matches!(path, [first, second] if first == "devices" && second == "audio")
 }
 
 fn is_append_unique_list_path(path: &[String]) -> bool {
-    matches!(path, [first, second] if first == "system" && second == "cpu_features")
-        || matches!(path, [first, second, third] if first == "system" && second == "cpu" && third == "features")
+    matches!(path, [first, second, third] if first == "system" && second == "cpu" && third == "features")
         || matches!(path, [first, second] if first == "system" && second == "machine_options")
         || matches!(path, [first, second] if first == "options" && second == "global_options")
 }

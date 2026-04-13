@@ -23,13 +23,14 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 1
-  cpu_model: "host"
-
-boot:
-  firmware: "bios"
-  boot_order: ["disk"]
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
+  boot:
+    firmware: "bios"
+    boot_order: ["disk"]
 
 devices:
   drives:
@@ -61,7 +62,7 @@ options:
     let config = VmConfig::from_file(&temp_config_path).unwrap();
 
     assert_eq!(config.name, "integration-test-vm");
-    assert_eq!(config.system.memory, 1024);
+    assert_eq!(config.system.memory.size, 1024);
     assert_eq!(config.devices.drives.len(), 1);
     assert_eq!(config.devices.networks.len(), 1);
     assert_eq!(config.devices.displays.len(), 1);
@@ -79,30 +80,33 @@ options:
 #[test]
 fn test_legacy_network_mode_remains_supported() {
     let yaml = r#"
-name: "legacy-network-vm"
+name: "canonical-network-vm"
 backend: "qemu"
 
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 512
-  vcpus: 1
-  cpu_model: "host"
+  memory:
+    size: 512
+  cpu:
+    vcpus: 1
+    model: "host"
 
 devices:
   networks:
     - id: "net0"
       model: "virtio-net-pci"
-      mode: "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+      backend:
+        type: "tap"
+        ifname: "tap0"
+        script: "no"
+        downscript: "no"
+        vhost: true
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
     let network = &config.devices.networks[0];
-    assert_eq!(
-        network.mode,
-        "tap,ifname=tap0,script=no,downscript=no,vhost=on"
-    );
-    assert!(network.backend.is_none());
+    assert!(network.backend.is_some());
     let resolved = network.resolved_backend().unwrap();
     assert_eq!(resolved.backend_type, "tap");
     assert_eq!(resolved.ifname.as_deref(), Some("tap0"));
@@ -135,9 +139,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 1
-  cpu_model: "host"
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
 
 devices:
   drives:
@@ -173,9 +179,11 @@ backend: "qemu"
 system:
   architecture: "invalid_arch"
   machine: "q35"
-  memory: 1024
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 2
+    model: "host"
 "#;
 
     let result = VmConfig::from_str(invalid_yaml);
@@ -191,16 +199,18 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "pc"
-  memory: 512
-  vcpus: 1
-  cpu_model: "qemu64"
+  memory:
+    size: 512
+  cpu:
+    vcpus: 1
+    model: "qemu64"
 "#;
 
     let config = VmConfig::from_str(minimal_yaml).unwrap();
     assert_eq!(config.name, "minimal-vm");
     assert_eq!(config.system.architecture, "x86_64");
-    assert_eq!(config.system.memory, 512);
-    assert_eq!(config.system.vcpus, 1);
+    assert_eq!(config.system.memory.size, 512);
+    assert_eq!(config.system.cpu.vcpus, 1);
     assert!(config.options.enable_kvm);
     assert!(!config.options.daemonize);
 }
@@ -227,7 +237,7 @@ system:
     vcpus: 1
     features:
       - "hv_time"
-      - name: "kvm=off"
+      - "kvm=off"
   boot:
     firmware: "bios"
 
@@ -263,31 +273,36 @@ devices:
 
     let config = VmConfig::from_str(yaml).unwrap();
 
-    assert_eq!(config.system.memory, 1024);
+    assert_eq!(config.system.memory.size, 1024);
     assert_eq!(config.system.cpu.features, vec!["hv_time", "kvm=off"]);
-    assert_eq!(config.boot.firmware.as_deref(), Some("bios"));
+    assert_eq!(config.system.boot.firmware.as_deref(), Some("bios"));
     assert!(
         config
+            .options
             .guest_agent
             .as_ref()
             .map(|g| g.enabled)
             .unwrap_or(false)
     );
     assert_eq!(
-        config.qmp.as_ref().and_then(|q| q.socket_path.as_deref()),
+        config
+            .options
+            .qmp
+            .as_ref()
+            .and_then(|q| q.socket_path.as_deref()),
         Some("/tmp/ezkvm-test.qmp")
     );
-    assert!(config.ballooning.is_some());
-    assert!(config.ivshmem.is_some());
-    assert_eq!(config.scsi_controllers.len(), 1);
-    assert_eq!(config.xhci_controllers.len(), 1);
-    assert_eq!(config.hostpci.len(), 1);
-    assert_eq!(config.usb_devices.len(), 1);
-    assert_eq!(config.input_devices.len(), 1);
+    assert!(config.system.memory.ballooning.is_some());
+    assert!(config.system.memory.ivshmem.is_some());
+    assert_eq!(config.controllers.scsi.len(), 1);
+    assert_eq!(config.controllers.xhci.len(), 1);
+    assert_eq!(config.host.pci.len(), 1);
+    assert_eq!(config.host.usb.len(), 1);
+    assert_eq!(config.devices.input.len(), 1);
 }
 
 #[test]
-fn test_moved_list_paths_concatenate_legacy_then_target_entries() {
+fn test_legacy_scsi_controllers_path_is_rejected() {
     let yaml = r#"
 name: "list-concat-vm"
 backend: "qemu"
@@ -295,7 +310,8 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
+  memory:
+    size: 1024
   cpu:
     model: "host"
     vcpus: 1
@@ -303,25 +319,14 @@ system:
 scsi_controllers:
   - id: "legacy-scsi"
     type: "pvscsi"
-
-controllers:
-  scsi:
-    - id: "target-scsi"
-      type: "pvscsi"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    let ids: Vec<&str> = config
-        .scsi_controllers
-        .iter()
-        .map(|controller| controller.id.as_str())
-        .collect();
-
-    assert_eq!(ids, vec!["legacy-scsi", "target-scsi"]);
+    assert!(config.controllers.scsi.is_empty());
 }
 
 #[test]
-fn test_mixed_legacy_and_target_scalar_paths_use_target_values() {
+fn test_legacy_scalar_paths_are_rejected() {
     let yaml = r#"
 name: "mixed-scalar-precedence-vm"
 backend: "qemu"
@@ -346,53 +351,20 @@ system:
     version: "2.0"
     backend: "emulator"
 
-boot:
-  firmware: "uefi"
-
-tpm:
-  version: "1.2"
-  backend: "passthrough"
-
-ballooning:
+guest_agent:
   enabled: true
-  model: "virtio-balloon-ccw"
-
-ivshmem:
-  enabled: true
-  mem_path: "/tmp/legacy-kvmfr0"
-
-qmp:
-  enabled: true
-  socket_path: "/tmp/legacy.qmp"
 
 options:
   enable_kvm: true
   daemonize: false
-  qmp:
-    enabled: true
-    socket_path: "/tmp/target.qmp"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-
-    assert_eq!(config.boot.firmware.as_deref(), Some("bios"));
-    assert_eq!(config.tpm.as_ref().map(|t| t.version.as_str()), Some("2.0"));
-    assert_eq!(
-        config.ballooning.as_ref().map(|b| b.model.as_str()),
-        Some("virtio-balloon-pci")
-    );
-    assert_eq!(
-        config.ivshmem.as_ref().map(|i| i.mem_path.as_str()),
-        Some("/dev/kvmfr0")
-    );
-    assert_eq!(
-        config.qmp.as_ref().and_then(|q| q.socket_path.as_deref()),
-        Some("/tmp/target.qmp")
-    );
+    assert!(config.options.guest_agent.is_none());
 }
 
 #[test]
-fn test_moved_host_pci_lists_concatenate_legacy_then_target_entries() {
+fn test_legacy_hostpci_path_is_rejected() {
     let yaml = r#"
 name: "host-pci-list-concat-vm"
 backend: "qemu"
@@ -400,7 +372,8 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
+  memory:
+    size: 1024
   cpu:
     model: "host"
     vcpus: 1
@@ -408,21 +381,10 @@ system:
 hostpci:
   - device: "0000:03:00.0"
     id: "legacy-hostpci0"
-
-host:
-  pci:
-    - device: "0000:03:00.1"
-      id: "target-hostpci1"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    let ids: Vec<&str> = config
-        .hostpci
-        .iter()
-        .map(|device| device.id.as_str())
-        .collect();
-
-    assert_eq!(ids, vec!["legacy-hostpci0", "target-hostpci1"]);
+    assert!(config.host.pci.is_empty());
 }
 
 #[test]
@@ -447,10 +409,7 @@ options:
 "#;
 
     let err = VmConfig::from_str(yaml).unwrap_err();
-    assert!(
-        err.to_string()
-            .contains("system.memory object must include 'size'")
-    );
+    assert!(err.to_string().contains("missing field `size`"));
 }
 
 #[test]
@@ -462,7 +421,8 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
+  memory:
+    size: 1024
   cpu:
     model: "host"
     vcpus: 1
@@ -477,7 +437,7 @@ options:
 "#;
 
     let err = VmConfig::from_str(yaml).unwrap_err();
-    assert!(err.to_string().contains("controllers.scsi must be a list"));
+    assert!(err.to_string().contains("invalid type"));
 }
 
 #[test]
@@ -489,7 +449,8 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
+  memory:
+    size: 1024
   cpu:
     model: "host"
     vcpus: 1
@@ -501,5 +462,5 @@ options:
 "#;
 
     let err = VmConfig::from_str(yaml).unwrap_err();
-    assert!(err.to_string().contains("options.qmp must be an object"));
+    assert!(err.to_string().contains("invalid type"));
 }

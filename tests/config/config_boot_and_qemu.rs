@@ -9,25 +9,29 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-boot:
-  firmware: "uefi"
-  boot_order: ["disk", "cdrom"]
-  kernel: "/boot/vmlinuz"
-  initrd: "/boot/initrd.img"
-  cmdline: "console=ttyS0 root=/dev/vda1"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "uefi"
+    boot_order: ["disk", "cdrom"]
+    kernel: "/boot/vmlinuz"
+    initrd: "/boot/initrd.img"
+    cmdline: "console=ttyS0 root=/dev/vda1"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.boot.firmware.as_ref().unwrap(), "uefi");
-    assert_eq!(config.boot.boot_order, vec!["disk", "cdrom"]);
-    assert_eq!(config.boot.kernel.as_ref().unwrap(), "/boot/vmlinuz");
-    assert_eq!(config.boot.initrd.as_ref().unwrap(), "/boot/initrd.img");
+    assert_eq!(config.system.boot.firmware.as_ref().unwrap(), "uefi");
+    assert_eq!(config.system.boot.boot_order, vec!["disk", "cdrom"]);
+    assert_eq!(config.system.boot.kernel.as_ref().unwrap(), "/boot/vmlinuz");
     assert_eq!(
-        config.boot.cmdline.as_ref().unwrap(),
+        config.system.boot.initrd.as_ref().unwrap(),
+        "/boot/initrd.img"
+    );
+    assert_eq!(
+        config.system.boot.cmdline.as_ref().unwrap(),
         "console=ttyS0 root=/dev/vda1"
     );
 }
@@ -41,10 +45,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 options:
   enable_kvm: false
   daemonize: true
@@ -76,16 +81,17 @@ system:
   machine: "pc-q35-8.1+pve0"
   machine_options:
     - "hpet=off"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-boot:
-  boot_order: ["disk", "network"]
-  menu: true
-  strict: true
-  reboot_timeout: 1000
-  splash: "/usr/share/qemu-server/bootsplash.jpg"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    boot_order: ["disk", "network"]
+    menu: true
+    strict: true
+    reboot_timeout: 1000
+    splash: "/usr/share/qemu-server/bootsplash.jpg"
 
 options:
   enable_kvm: true
@@ -107,12 +113,12 @@ options:
     let config = VmConfig::from_str(&yaml).unwrap();
     assert_eq!(config.system.machine, "pc-q35-8.1+pve0");
     assert_eq!(config.system.machine_options, vec!["hpet=off"]);
-    assert_eq!(config.boot.boot_order, vec!["disk", "network"]);
-    assert!(config.boot.menu);
-    assert!(config.boot.strict);
-    assert_eq!(config.boot.reboot_timeout, Some(1000));
+    assert_eq!(config.system.boot.boot_order, vec!["disk", "network"]);
+    assert!(config.system.boot.menu);
+    assert!(config.system.boot.strict);
+    assert_eq!(config.system.boot.reboot_timeout, Some(1000));
     assert_eq!(
-        config.boot.splash.as_deref(),
+        config.system.boot.splash.as_deref(),
         Some("/usr/share/qemu-server/bootsplash.jpg")
     );
     assert!(config.options.nodefaults);
@@ -143,10 +149,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 iscsi_disks:
   - id: "iscsi0"
     portal: "10.0.0.1:3260"
@@ -176,28 +183,30 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 4
-  cpu_model: "host"
-
-hostpci:
-  - device: "0000:03:00.0"
-    id: "hostpci0.0"
-    pcie: true
-    x_vga: true
-    bus: "ich9-pcie-port-1"
-    addr: "0x0.0"
-    multifunction: true
-  - device: "0000:03:00.1"
-    id: "hostpci0.1"
-    pcie: true
-    bus: "ich9-pcie-port-1"
-    addr: "0x0.1"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 4
+    model: "host"
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: "hostpci0.0"
+      pcie: true
+      x_vga: true
+      bus: "ich9-pcie-port-1"
+      addr: "0x0.0"
+      multifunction: true
+    - device: "0000:03:00.1"
+      id: "hostpci0.1"
+      pcie: true
+      bus: "ich9-pcie-port-1"
+      addr: "0x0.1"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.hostpci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
-    assert_eq!(config.hostpci[0].addr.as_deref(), Some("0x0.0"));
-    assert!(config.hostpci[0].multifunction);
-    assert_eq!(config.hostpci[1].addr.as_deref(), Some("0x0.1"));
+    assert_eq!(config.host.pci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
+    assert_eq!(config.host.pci[0].addr.as_deref(), Some("0x0.0"));
+    assert!(config.host.pci[0].multifunction);
+    assert_eq!(config.host.pci[1].addr.as_deref(), Some("0x0.1"));
 }

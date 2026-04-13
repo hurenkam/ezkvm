@@ -64,7 +64,7 @@ fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
 
 fn has_primary_passthrough_gpu(config: &crate::config::VmConfig) -> bool {
     config
-        .hostpci
+        .host_pci()
         .iter()
         .any(|device| device.x_vga || device.id.starts_with("hostpci0"))
 }
@@ -106,12 +106,22 @@ pub(crate) fn build_looking_glass_launch(
         return Ok(None);
     }
 
-    let ivshmem = match &config.ivshmem {
+    let ivshmem = match config.system_memory_ivshmem() {
         Some(ivshmem) if ivshmem.enabled => ivshmem,
         _ => return Ok(None),
     };
 
-    let looking_glass_path = match &central_config.tools.looking_glass {
+    let looking_glass_options = config
+        .options
+        .looking_glass
+        .as_ref()
+        .unwrap_or(&central_config.looking_glass);
+
+    let looking_glass_path = match looking_glass_options
+        .program
+        .as_ref()
+        .or(central_config.tools.looking_glass.as_ref())
+    {
         Some(path) if !path.trim().is_empty() => path,
         Some(_) => return Err(anyhow!("Looking Glass client path is empty")),
         None => return Ok(None),
@@ -119,21 +129,21 @@ pub(crate) fn build_looking_glass_launch(
 
     let mut args = vec![format!("app:shmFile={}", ivshmem.mem_path)];
 
-    if let Some(full_screen) = central_config.looking_glass.full_screen {
+    if let Some(full_screen) = looking_glass_options.full_screen {
         args.push(format!("win:fullScreen={}", full_screen));
     }
 
-    if let Some(size) = central_config.looking_glass.size.as_deref()
+    if let Some(size) = looking_glass_options.size.as_deref()
         && !size.trim().is_empty()
     {
         args.push(format!("win:size={}", size));
     }
 
-    if let Some(grab_keyboard) = central_config.looking_glass.grab_keyboard {
+    if let Some(grab_keyboard) = looking_glass_options.grab_keyboard {
         args.push(format!("input:grabKeyboard={}", grab_keyboard));
     }
 
-    if let Some(escape_key) = central_config.looking_glass.escape_key.as_deref()
+    if let Some(escape_key) = looking_glass_options.escape_key.as_deref()
         && !escape_key.trim().is_empty()
     {
         args.push(format!("input:escapeKey={}", escape_key));
@@ -208,10 +218,10 @@ pub(crate) fn spawn_looking_glass(
         return Ok(());
     };
 
-    if !Path::new(&config.ivshmem.as_ref().unwrap().mem_path).exists() {
+    if !Path::new(&config.system_memory_ivshmem().unwrap().mem_path).exists() {
         return Err(anyhow!(
             "Looking Glass shared memory path '{}' does not exist",
-            config.ivshmem.as_ref().unwrap().mem_path
+            config.system_memory_ivshmem().unwrap().mem_path
         ));
     }
 

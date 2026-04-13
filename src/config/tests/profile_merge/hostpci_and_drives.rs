@@ -16,14 +16,17 @@ fn test_vm_config_from_file_merges_hostpci_by_id() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-hostpci:
-  - id: "hostpci0.0"
-    device: "0000:03:00.0"
-    bus: "ich9-pcie-port-1"
-    multifunction: true
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+host:
+  pci:
+    - id: "hostpci0.0"
+      device: "0000:03:00.0"
+      bus: "ich9-pcie-port-1"
+      multifunction: true
 "#,
     )
     .unwrap();
@@ -31,13 +34,14 @@ hostpci:
     std::fs::write(
         profile_dir.join("gpu_overlay.yaml"),
         r#"
-hostpci:
-  - id: "hostpci0.0"
-    addr: "0x0.0"
-  - id: "hostpci0.1"
-    device: "0000:03:00.1"
-    bus: "ich9-pcie-port-1"
-    addr: "0x0.1"
+host:
+  pci:
+    - id: "hostpci0.0"
+      addr: "0x0.0"
+    - id: "hostpci0.1"
+      device: "0000:03:00.1"
+      bus: "ich9-pcie-port-1"
+      addr: "0x0.1"
 "#,
     )
     .unwrap();
@@ -67,10 +71,11 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.hostpci.len(), 2);
+    assert_eq!(config.host.pci.len(), 2);
 
     let gpu0 = config
-        .hostpci
+        .host
+        .pci
         .iter()
         .find(|d| d.id == "hostpci0.0")
         .unwrap();
@@ -80,7 +85,8 @@ profiles:
     assert!(gpu0.multifunction);
 
     let gpu1 = config
-        .hostpci
+        .host
+        .pci
         .iter()
         .find(|d| d.id == "hostpci0.1")
         .unwrap();
@@ -112,9 +118,11 @@ fn test_vm_config_from_file_appends_devices_drives_in_order() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "root"

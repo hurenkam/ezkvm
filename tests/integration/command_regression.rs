@@ -17,25 +17,25 @@ system:
   machine: "q35"
   machine_options:
     - "hpet=off"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-boot:
-  firmware: "uefi"
-  boot_order: ["disk", "cdrom", "network"]
-  menu: true
-  strict: true
-  reboot_timeout: 1000
-  splash: "/bootsplash.jpg"
-  kernel: "/boot/vmlinuz"
-  initrd: "/boot/initrd.img"
-  cmdline: "console=ttyS0"
-
-tpm:
-  version: "2.0"
-  backend: "emulator"
-  model: "tpm-crb"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "uefi"
+    boot_order: ["disk", "cdrom", "network"]
+    menu: true
+    strict: true
+    reboot_timeout: 1000
+    splash: "/bootsplash.jpg"
+    kernel: "/boot/vmlinuz"
+    initrd: "/boot/initrd.img"
+    cmdline: "console=ttyS0"
+  tpm:
+    version: "2.0"
+    backend: "emulator"
+    model: "tpm-crb"
 
 spice:
   enabled: true
@@ -45,14 +45,15 @@ spice:
   audio: true
   vdagent: true
 
-audio_devices:
-  - type: "ich9-intel-hda"
-    id: "audiodev0"
-  - type: "hda-duplex"
-    id: "audiocodec0"
-    bus: "audiodev0.0"
-    cad: 1
-    audiodev: "spice-backend0"
+devices:
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+    - type: "hda-duplex"
+      id: "audiocodec0"
+      bus: "audiodev0.0"
+      cad: 1
+      audiodev: "spice-backend0"
 
 options:
   enable_kvm: true
@@ -113,10 +114,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "scsi0"
@@ -140,9 +142,10 @@ devices:
       bus: "pci.0"
       addr: "0x12"
 
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
@@ -182,10 +185,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - path: "/var/lib/vm/scsi0.raw"
@@ -202,9 +206,10 @@ devices:
         type: "user"
       mac: "52:54:00:12:34:56"
 
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
@@ -234,10 +239,11 @@ fn test_refactored_command_builder_supports_cdrom_without_path_field() {
   system:
     architecture: "x86_64"
     machine: "q35"
-    memory: 2048
-    vcpus: 2
-    cpu_model: "host"
-
+    memory:
+      size: 2048
+    cpu:
+      vcpus: 2
+      model: "host"
   devices:
     drives:
     - interface: "ide"
@@ -273,58 +279,31 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-boot:
-  firmware: "bios"
-
-tpm:
-  version: "2.0"
-  backend: "emulator"
-  model: "tpm-tis"
-  state_path: "/tmp/schema-parity.swtpm"
-
-guest_agent:
-  enabled: true
-  socket_path: "/tmp/schema-parity.qga"
-
-ballooning:
-  enabled: true
-  model: "virtio-balloon-pci"
-  free_page_reporting: true
-
-ivshmem:
-  enabled: true
-  size: 128
-  vectors: 1
-  id: "ivshmem0"
-  bus: "pcie.0"
-  mem_path: "/dev/kvmfr0"
-
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
-
-xhci_controllers:
-  - id: "xhci0"
-
-hostpci:
-  - device: "0000:03:00.0"
-    id: "hostpci0"
-
-usb_devices:
-  - id: "usb0"
-    hostbus: "1"
-    hostport: "2.1"
-
-input_devices:
-  - type: "virtio-mouse"
-
-audio_devices:
-  - type: "ich9-intel-hda"
-    id: "audiodev0"
+  memory:
+    size: 2048
+    ballooning:
+      enabled: true
+      model: "virtio-balloon-pci"
+      free_page_reporting: true
+    ivshmem:
+      enabled: true
+      size: 128
+      vectors: 1
+      id: "ivshmem0"
+      bus: "pcie.0"
+      mem_path: "/dev/kvmfr0"
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "bios"
+  tpm:
+    version: "2.0"
+    backend: "emulator"
+    model: "tpm-tis"
+    state_path: "/tmp/schema-parity.swtpm"
+  smbios:
+    uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
 
 spice:
   enabled: true
@@ -334,16 +313,38 @@ spice:
   audio: true
   vdagent: false
 
-qmp:
-  enabled: true
-  socket_path: "/tmp/schema-parity.qmp"
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
+  xhci:
+    - id: "xhci0"
 
-smbios:
-  uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: "hostpci0"
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.1"
+
+devices:
+  input:
+    - type: "virtio-mouse"
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
 
 options:
   enable_kvm: true
   daemonize: false
+  guest_agent:
+    enabled: true
+    socket_path: "/tmp/schema-parity.qga"
+  qmp:
+    enabled: true
+    socket_path: "/tmp/schema-parity.qmp"
 "#;
 
     let target_yaml = r#"

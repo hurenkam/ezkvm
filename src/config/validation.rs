@@ -47,31 +47,31 @@ fn validate_backend(config: &VmConfig) -> Result<()> {
 
 fn validate_core_sections(config: &VmConfig) -> Result<()> {
     validate_system_config(&config.system)?;
-    validate_boot_config(&config.boot)?;
+    validate_boot_config(&config.system.boot)?;
     validate_device_config(&config.devices)?;
     Ok(())
 }
 
 fn validate_optional_platform_sections(config: &VmConfig) -> Result<()> {
-    if let Some(tpm) = &config.tpm {
+    if let Some(tpm) = &config.system.tpm {
         validate_tpm_config(tpm)?;
     }
-    if let Some(guest_agent) = &config.guest_agent {
+    if let Some(guest_agent) = &config.options.guest_agent {
         validate_guest_agent_config(guest_agent)?;
     }
-    if let Some(ballooning) = &config.ballooning {
+    if let Some(ballooning) = &config.system.memory.ballooning {
         validate_ballooning_config(ballooning)?;
     }
     if let Some(spice) = &config.spice {
         validate_spice_config(spice)?;
     }
-    if let Some(ivshmem) = &config.ivshmem {
+    if let Some(ivshmem) = &config.system.memory.ivshmem {
         validate_ivshmem_config(ivshmem)?;
     }
-    if let Some(qmp) = &config.qmp {
+    if let Some(qmp) = &config.options.qmp {
         validate_qmp_config(qmp)?;
     }
-    if let Some(smbios) = &config.smbios {
+    if let Some(smbios) = &config.system.smbios {
         validate_smbios_config(smbios)?;
     }
     if let Some(hyperv) = &config.hyperv {
@@ -81,18 +81,18 @@ fn validate_optional_platform_sections(config: &VmConfig) -> Result<()> {
 }
 
 fn validate_collections(config: &VmConfig) -> Result<()> {
-    for hostpci in &config.hostpci {
+    for hostpci in &config.host.pci {
         validate_hostpci_config(hostpci)?;
     }
-    for usb_device in &config.usb_devices {
+    for usb_device in &config.host.usb {
         validate_usb_device_config(usb_device)?;
     }
-    for xhci_controller in &config.xhci_controllers {
+    for xhci_controller in &config.controllers.xhci {
         validate_xhci_controller_config(xhci_controller)?;
     }
-    validate_audio_devices(&config.audio_devices, config.spice.as_ref())?;
-    validate_input_devices(&config.input_devices)?;
-    for scsi_controller in &config.scsi_controllers {
+    validate_audio_devices(&config.devices.audio, config.spice.as_ref())?;
+    validate_input_devices(&config.devices.input)?;
+    for scsi_controller in &config.controllers.scsi {
         validate_scsi_controller_config(scsi_controller)?;
     }
     for iscsi_disk in &config.iscsi_disks {

@@ -9,20 +9,21 @@ backend: "qemu"
 system:
     architecture: "x86_64"
     machine: "q35"
-    memory: 1024
-    vcpus: 1
-    cpu_model: "host"
-
-hostpci:
-    - device: "0000:03:00.0"
-      id: "hostpci0"
-      x_vga: true
-
-ivshmem:
-    enabled: true
-    size: 128
-    id: "ivshmem0"
-    mem_path: "/dev/kvmfr0"
+    memory:
+        size: 1024
+        ivshmem:
+            enabled: true
+            size: 128
+            id: "ivshmem0"
+            mem_path: "/dev/kvmfr0"
+    cpu:
+        vcpus: 1
+        model: "host"
+host:
+    pci:
+        - device: "0000:03:00.0"
+          id: "hostpci0"
+          x_vga: true
 
 spice:
     enabled: true

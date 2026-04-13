@@ -139,7 +139,6 @@ mod tests {
         let network = NetworkConfig {
             id: "net0".to_string(),
             model: "virtio-net-pci".to_string(),
-            mode: String::new(),
             backend: Some(crate::config::NetworkBackendConfig {
                 backend_type: "tap".to_string(),
                 ifname: Some("tap0".to_string()),
@@ -242,8 +241,10 @@ mod tests {
             networks: vec![NetworkConfig {
                 id: "net0".to_string(),
                 model: "virtio-net-pci".to_string(),
-                mode: "user".to_string(),
-                backend: None,
+                backend: Some(crate::config::NetworkBackendConfig {
+                    backend_type: "user".to_string(),
+                    ..Default::default()
+                }),
                 mac: Some("52:54:00:12:34:56".to_string()),
                 rx_queue_size: None,
                 tx_queue_size: None,
@@ -264,6 +265,8 @@ mod tests {
                 server: true,
                 wait: false,
             }],
+            input: vec![],
+            audio: vec![],
         };
 
         let args = QemuArgs::from(config).into_inner();

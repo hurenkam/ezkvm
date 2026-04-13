@@ -51,6 +51,9 @@ pub struct LocationsConfig {
 /// Looking Glass client options
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LookingGlassOptions {
+    /// Path to looking-glass-client executable (VM/profile-level preferred).
+    pub program: Option<String>,
+
     /// Launch the client in fullscreen mode.
     pub full_screen: Option<bool>,
 

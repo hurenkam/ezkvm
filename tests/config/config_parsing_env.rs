@@ -9,9 +9,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 2
+    model: "host"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
@@ -19,9 +21,9 @@ system:
     assert_eq!(config.backend, "qemu");
     assert_eq!(config.system.architecture, "x86_64");
     assert_eq!(config.system.machine, "q35");
-    assert_eq!(config.system.memory, 1024);
-    assert_eq!(config.system.vcpus, 2);
-    assert_eq!(config.system.cpu_model, "host");
+    assert_eq!(config.system.memory.size, 1024);
+    assert_eq!(config.system.cpu.vcpus, 2);
+    assert_eq!(config.system.cpu.model, "host");
 }
 
 #[test]
@@ -33,10 +35,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "root"
@@ -51,8 +54,8 @@ devices:
   networks:
     - id: "net0"
       model: "virtio-net"
-      mode: "user"
-      backend: ~
+      backend:
+        type: "user"
       mac: "52:54:00:12:34:56"
       rx_queue_size: 1024
       tx_queue_size: 256
@@ -81,7 +84,10 @@ devices:
     let network = &config.devices.networks[0];
     assert_eq!(network.id, "net0");
     assert_eq!(network.model, "virtio-net");
-    assert!(network.backend.is_none());
+    assert_eq!(
+        network.backend.as_ref().map(|b| b.backend_type.as_str()),
+        Some("user")
+    );
     assert_eq!(network.mac.as_ref().unwrap(), "52:54:00:12:34:56");
     assert_eq!(network.rx_queue_size, Some(1024));
     assert_eq!(network.tx_queue_size, Some(256));
@@ -103,10 +109,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "ide2"
@@ -131,10 +138,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - interface: "ide"
@@ -157,10 +165,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "disk0"
@@ -193,14 +202,16 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: ${TEST_MEMORY}
-  vcpus: ${TEST_CPUS}
-  cpu_model: "host"
+  memory:
+    size: ${TEST_MEMORY}
+  cpu:
+    vcpus: ${TEST_CPUS}
+    model: "host"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.system.memory, 4096);
-    assert_eq!(config.system.vcpus, 4);
+    assert_eq!(config.system.memory.size, 4096);
+    assert_eq!(config.system.cpu.vcpus, 4);
 
     unsafe {
         std::env::remove_var("TEST_MEMORY");
@@ -223,10 +234,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "root"
@@ -253,10 +265,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - path: "/path/to/disk0.qcow2"
@@ -275,7 +288,8 @@ devices:
         type: "user"
     - id: "uplink0"
       model: "e1000"
-      mode: "user"
+      backend:
+        type: "user"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
@@ -295,10 +309,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   drives:
     - id: "virtio1"
@@ -326,9 +341,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: ${MISSING_VAR}
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: ${MISSING_VAR}
+  cpu:
+    vcpus: 2
+    model: "host"
 "#;
 
     let result = VmConfig::from_str(yaml);
@@ -360,19 +377,17 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 1024
-  vcpus: 2
-  cpu_model: "host"
-  cpu_features:
-    - name: "legacy_feature"
+  memory:
+    size: 1024
   cpu:
-    model: "host"
     vcpus: 2
+    model: "host"
     features:
       - "target_feature"
+  cpu_features:
+    - "legacy_feature"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
     assert_eq!(config.system.cpu.features, vec!["target_feature"]);
-    assert_eq!(config.system.cpu_features, vec!["target_feature"]);
 }

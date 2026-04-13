@@ -16,12 +16,14 @@ fn test_vm_config_from_file_appends_unique_cpu_features() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-  cpu_features:
-        - name: "hv_relaxed"
-        - name: "hv_time"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+    features:
+      - "hv_relaxed"
+      - "hv_time"
 "#,
     )
     .unwrap();
@@ -30,9 +32,10 @@ system:
         profile_dir.join("overlay.yaml"),
         r#"
 system:
-  cpu_features:
-        - name: "hv_time"
-        - name: "kvm=off"
+    cpu:
+        features:
+            - "hv_time"
+            - "kvm=off"
 "#,
     )
     .unwrap();
@@ -64,7 +67,8 @@ profiles:
     let config = VmConfig::from_file(&vm_config_path).unwrap();
     let feature_names: Vec<&str> = config
         .system
-        .cpu_features
+        .cpu
+        .features
         .iter()
         .map(String::as_str)
         .collect();
@@ -92,13 +96,14 @@ fn test_vm_config_from_file_appends_unique_nested_cpu_features() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
+  memory:
+    size: 4096
   cpu:
     model: "host"
     vcpus: 2
     features:
-            - "hv_relaxed"
-            - "hv_time"
+      - "hv_relaxed"
+      - "hv_time"
 "#,
     )
     .unwrap();
@@ -107,8 +112,8 @@ system:
         profile_dir.join("overlay.yaml"),
         r#"
 system:
-  cpu:
-    features:
+    cpu:
+        features:
             - "hv_time"
             - "kvm=off"
 "#,
@@ -173,9 +178,11 @@ fn test_vm_config_from_file_appends_unique_machine_options() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
   machine_options:
         - "hpet=off"
 "#,
@@ -242,9 +249,11 @@ fn test_vm_config_from_file_appends_unique_global_options() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 options:
   enable_kvm: true
   daemonize: false

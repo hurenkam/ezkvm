@@ -4,21 +4,22 @@ use super::{base_config, runtime};
 fn test_tpm_emulator_requires_swtpm_tool() {
     let config = crate::config::VmConfig::from_str(
         r#"
-                    name: "test-vm"
-                    backend: "qemu"
+name: "test-vm"
+backend: "qemu"
 
-                    system:
-                        architecture: "x86_64"
-                        machine: "q35"
-                        memory: 1024
-                        vcpus: 1
-                        cpu_model: "host"
-
-                    tpm:
-                        version: "2.0"
-                        backend: "emulator"
-                        model: "tpm-tis"
-                    "#,
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory:
+        size: 1024
+    cpu:
+        vcpus: 1
+        model: "host"
+    tpm:
+        version: "2.0"
+        backend: "emulator"
+        model: "tpm-tis"
+"#,
     )
     .unwrap();
 

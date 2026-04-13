@@ -16,13 +16,16 @@ fn test_vm_config_from_file_merges_usb_devices_by_id() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-usb_devices:
-  - id: "usb0"
-    hostbus: "1"
-    hostport: "2.2"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+host:
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.2"
 "#,
     )
     .unwrap();
@@ -30,13 +33,14 @@ usb_devices:
     std::fs::write(
         profile_dir.join("usb_overlay.yaml"),
         r#"
-usb_devices:
-  - id: "usb0"
-    bus: "xhci.0"
-    port: "1"
-  - id: "usb1"
-    hostbus: "1"
-    hostport: "2.3"
+host:
+  usb:
+    - id: "usb0"
+      bus: "xhci.0"
+      port: "1"
+    - id: "usb1"
+      hostbus: "1"
+      hostport: "2.3"
 "#,
     )
     .unwrap();
@@ -66,15 +70,15 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.usb_devices.len(), 2);
+    assert_eq!(config.host.usb.len(), 2);
 
-    let usb0 = config.usb_devices.iter().find(|u| u.id == "usb0").unwrap();
+    let usb0 = config.host.usb.iter().find(|u| u.id == "usb0").unwrap();
     assert_eq!(usb0.hostbus.as_deref(), Some("1"));
     assert_eq!(usb0.hostport.as_deref(), Some("2.2"));
     assert_eq!(usb0.bus.as_deref(), Some("xhci.0"));
     assert_eq!(usb0.port.as_deref(), Some("1"));
 
-    let usb1 = config.usb_devices.iter().find(|u| u.id == "usb1").unwrap();
+    let usb1 = config.host.usb.iter().find(|u| u.id == "usb1").unwrap();
     assert_eq!(usb1.hostport.as_deref(), Some("2.3"));
 
     unsafe {
@@ -99,12 +103,15 @@ fn test_vm_config_from_file_merges_scsi_controllers_by_id() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
 "#,
     )
     .unwrap();
@@ -112,14 +119,15 @@ scsi_controllers:
     std::fs::write(
         profile_dir.join("scsi_overlay.yaml"),
         r#"
-scsi_controllers:
-  - id: "scsihw0"
-    bus: "pci.0"
-    addr: "0x5"
-  - id: "scsihw1"
-    type: "virtio-scsi-pci"
-    bus: "pci.0"
-    addr: "0x6"
+controllers:
+  scsi:
+    - id: "scsihw0"
+      bus: "pci.0"
+      addr: "0x5"
+    - id: "scsihw1"
+      type: "virtio-scsi-pci"
+      bus: "pci.0"
+      addr: "0x6"
 "#,
     )
     .unwrap();
@@ -149,10 +157,11 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.scsi_controllers.len(), 2);
+    assert_eq!(config.controllers.scsi.len(), 2);
 
     let scsihw0 = config
-        .scsi_controllers
+        .controllers
+        .scsi
         .iter()
         .find(|c| c.id == "scsihw0")
         .unwrap();
@@ -161,7 +170,8 @@ profiles:
     assert_eq!(scsihw0.addr.as_deref(), Some("0x5"));
 
     let scsihw1 = config
-        .scsi_controllers
+        .controllers
+        .scsi
         .iter()
         .find(|c| c.id == "scsihw1")
         .unwrap();

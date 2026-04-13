@@ -3,8 +3,6 @@ use serde::Deserialize;
 use serde_yaml::{Mapping, Value};
 use std::collections::{BTreeSet, HashMap};
 
-use crate::config::NetworkBackendConfig;
-
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ProfilePolicies {
     #[serde(default)]
@@ -138,11 +136,11 @@ pub(crate) fn apply_profile_policies(root: &mut Value) -> Result<()> {
     apply_network_policies(root, &policies.networks)?;
     apply_mapping_list_policies(root, &["devices", "displays"], &policies.displays)?;
     apply_mapping_list_policies(root, &["devices", "serials"], &policies.serials)?;
-    apply_mapping_list_policies(root, &["hostpci"], &policies.hostpci)?;
-    apply_mapping_list_policies(root, &["usb_devices"], &policies.usb_devices)?;
-    apply_mapping_list_policies(root, &["xhci_controllers"], &policies.xhci_controllers)?;
-    apply_mapping_list_policies(root, &["audio_devices"], &policies.audio_devices)?;
-    apply_mapping_list_policies(root, &["scsi_controllers"], &policies.scsi_controllers)?;
+    apply_mapping_list_policies(root, &["host", "pci"], &policies.hostpci)?;
+    apply_mapping_list_policies(root, &["host", "usb"], &policies.usb_devices)?;
+    apply_mapping_list_policies(root, &["controllers", "xhci"], &policies.xhci_controllers)?;
+    apply_mapping_list_policies(root, &["devices", "audio"], &policies.audio_devices)?;
+    apply_mapping_list_policies(root, &["controllers", "scsi"], &policies.scsi_controllers)?;
     apply_mapping_list_policies(root, &["iscsi_disks"], &policies.iscsi_disks)?;
     apply_drive_placement_policies(root, &policies.drives)?;
     apply_network_placement_policies(root, &policies.networks)?;
@@ -646,11 +644,7 @@ fn extract_network_backend_type(network_map: &Mapping) -> Option<String> {
         return Some(backend_type.clone());
     }
 
-    let mode_key = Value::String("mode".to_string());
-    let mode = network_map.get(&mode_key).and_then(Value::as_str)?;
-    NetworkBackendConfig::from_legacy_mode(mode)
-        .ok()
-        .map(|backend| backend.backend_type)
+    None
 }
 
 fn merge_missing_mapping(target: &mut Mapping, defaults: &Mapping) {

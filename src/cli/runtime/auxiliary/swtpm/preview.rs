@@ -7,7 +7,7 @@ pub(crate) fn build_swtpm_launch_preview(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
 ) -> Result<Option<String>> {
-    let tpm = match &config.tpm {
+    let tpm = match config.system_tpm() {
         Some(tpm) if tpm.backend == "emulator" => tpm,
         _ => return Ok(None),
     };

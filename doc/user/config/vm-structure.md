@@ -57,35 +57,9 @@ Preferred canonical locations:
 - `devices.input`
 - `devices.audio`
 
-## Legacy Compatibility
+## Canonical-Only Schema
 
-Legacy keys are accepted and normalized.
-
-- Scalar/object conflicts: canonical path wins.
-- Moved list conflicts: merged as legacy entries first, then canonical entries.
-
-Use canonical keys for all new configs.
-
-Legacy to canonical examples:
-
-- `boot` -> `system.boot`
-- `tpm` -> `system.tpm`
-- `smbios` -> `system.smbios`
-- `guest_agent` -> `options.guest_agent`
-- `qmp` -> `options.qmp`
-- `system.vcpus` -> `system.cpu.vcpus`
-- `system.cpu_model` -> `system.cpu.model`
-- `system.cpu_features` -> `system.cpu.features`
-- `numa` -> `system.cpu.numa`
-- `system.memory` -> `system.memory.size`
-- `ballooning` -> `system.memory.ballooning`
-- `ivshmem` -> `system.memory.ivshmem`
-- `scsi_controllers` -> `controllers.scsi`
-- `xhci_controllers` -> `controllers.xhci`
-- `hostpci` -> `host.pci`
-- `usb_devices` -> `host.usb`
-- `input_devices` -> `devices.input`
-- `audio_devices` -> `devices.audio`
+Use canonical keys only. Legacy aliases and legacy top-level moved sections are not part of the supported user schema.
 
 ## See also
 

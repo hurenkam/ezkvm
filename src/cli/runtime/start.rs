@@ -144,10 +144,10 @@ fn print_dry_run(
                 "Auxiliary launch (Looking Glass): {}",
                 format_auxiliary_launch(&launch)
             );
-            if !Path::new(&manager.config().ivshmem.as_ref().unwrap().mem_path).exists() {
+            if !Path::new(&manager.config().system_memory_ivshmem().unwrap().mem_path).exists() {
                 println!(
                     "Looking Glass note: shared memory path '{}' does not exist on this host",
-                    manager.config().ivshmem.as_ref().unwrap().mem_path
+                    manager.config().system_memory_ivshmem().unwrap().mem_path
                 );
             }
         }

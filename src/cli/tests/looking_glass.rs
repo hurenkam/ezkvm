@@ -11,6 +11,7 @@ fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions {
+            program: None,
             full_screen: Some(true),
             size: Some("1707x1067".to_string()),
             grab_keyboard: Some(true),
@@ -58,15 +59,16 @@ backend: "qemu"
 system:
     architecture: "x86_64"
     machine: "q35"
-    memory: 1024
-    vcpus: 1
-    cpu_model: "host"
-
-ivshmem:
-    enabled: true
-    size: 128
-    id: "ivshmem0"
-    mem_path: "/dev/kvmfr0"
+    memory:
+        size: 1024
+        ivshmem:
+            enabled: true
+            size: 128
+            id: "ivshmem0"
+            mem_path: "/dev/kvmfr0"
+    cpu:
+        vcpus: 1
+        model: "host"
             "#,
     )
     .unwrap();

@@ -16,9 +16,11 @@ fn test_vm_config_from_file_applies_drive_policies_by_selector() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   drives:
     - match:
@@ -119,9 +121,11 @@ fn test_vm_config_from_file_applies_network_policies_for_structured_and_legacy_b
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   networks:
     - match:
@@ -164,7 +168,8 @@ devices:
         ifname: "tap0"
       tx_queue_size: 256
     - id: "net1"
-      mode: "user"
+      backend:
+        type: "user"
       mac: "52:54:00:12:34:56"
 "#,
     )
@@ -205,8 +210,11 @@ devices:
         .find(|network| network.id == "net1")
         .unwrap();
     assert_eq!(net1.model, "e1000");
-    assert_eq!(net1.mode, "user");
-    assert!(net1.backend.is_none());
+    assert_eq!(
+        net1.backend.as_ref().map(|b| b.backend_type.as_str()),
+        Some("user")
+    );
+    assert!(net1.backend.is_some());
 
     unsafe {
         std::env::remove_var("EZKVM_CONFIG");
@@ -230,9 +238,11 @@ fn test_vm_config_from_file_applies_drive_scsi_id_placement_policy() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   drives:
     - match:
@@ -340,9 +350,11 @@ fn test_vm_config_from_file_applies_network_addr_placement_policy() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   networks:
     - match:
@@ -376,16 +388,19 @@ devices:
   networks:
     - id: "net0"
       model: "virtio-net-pci"
-      mode: "user"
+      backend:
+        type: "user"
       bus: "pci.0"
     - id: "net1"
       model: "virtio-net-pci"
-      mode: "user"
+      backend:
+        type: "user"
       bus: "pci.0"
       addr: "0x14"
     - id: "net2"
       model: "virtio-net-pci"
-      mode: "user"
+      backend:
+        type: "user"
       bus: "pci.0"
 "#,
     )
@@ -443,9 +458,11 @@ fn test_vm_config_from_file_rejects_duplicate_drive_scsi_id_in_same_scope() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();
@@ -517,9 +534,11 @@ fn test_vm_config_from_file_rejects_duplicate_network_addr_in_same_bus_scope() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();
@@ -543,12 +562,14 @@ devices:
   networks:
     - id: "net0"
       model: "virtio-net-pci"
-      mode: "user"
+      backend:
+        type: "user"
       bus: "pci.0"
       addr: "0x12"
     - id: "net1"
       model: "virtio-net-pci"
-      mode: "user"
+      backend:
+        type: "user"
       bus: "pci.0"
       addr: "18"
 "#,
@@ -587,9 +608,11 @@ fn test_vm_config_from_file_policy_precedence_and_explicit_override() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   networks:
     - match:
@@ -694,9 +717,11 @@ fn test_vm_config_from_file_applies_network_defaults_and_placement_to_legacy_tap
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   networks:
     - match:
@@ -732,10 +757,20 @@ profiles:
 devices:
   networks:
     - id: "net0"
-      mode: "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+      backend:
+        type: "tap"
+        ifname: "tap0"
+        script: "no"
+        downscript: "no"
+        vhost: true
       bus: "pci.0"
     - id: "net1"
-      mode: "tap,ifname=tap1,script=no,downscript=no,vhost=on"
+      backend:
+        type: "tap"
+        ifname: "tap1"
+        script: "no"
+        downscript: "no"
+        vhost: true
       bus: "pci.0"
       addr: "0x14"
 "#,
@@ -757,11 +792,10 @@ devices:
     assert_eq!(net0.model, "virtio-net-pci");
     assert_eq!(net0.rx_queue_size, Some(1024));
     assert_eq!(
-        net0.mode,
-        "tap,ifname=tap0,script=no,downscript=no,vhost=on"
+        net0.backend.as_ref().map(|b| b.backend_type.as_str()),
+        Some("tap")
     );
     assert_eq!(net0.addr.as_deref(), Some("0x12"));
-    assert!(net0.backend.is_none());
     let net0_backend = net0.resolved_backend().unwrap();
     assert_eq!(net0_backend.backend_type, "tap");
     assert_eq!(net0_backend.ifname.as_deref(), Some("tap0"));
@@ -797,9 +831,11 @@ fn test_vm_config_from_file_applies_display_and_serial_policies_by_selector() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   displays:
     - match:
@@ -881,9 +917,11 @@ fn test_vm_config_from_file_applies_scsi_and_audio_policies_by_selector() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 policies:
   scsi_controllers:
     - match:
@@ -924,15 +962,17 @@ profiles:
 spice:
   enabled: true
   audio: true
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
-audio_devices:
-  - id: "audiodev0"
-    type: "ich9-intel-hda"
-  - id: "codec0"
-    type: "hda-duplex"
-    cad: 1
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
+devices:
+  audio:
+    - id: "audiodev0"
+      type: "ich9-intel-hda"
+    - id: "codec0"
+      type: "hda-duplex"
+      cad: 1
 "#,
     )
     .unwrap();
@@ -943,17 +983,17 @@ audio_devices:
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
 
-    let scsi = &config.scsi_controllers[0];
+    let scsi = &config.controllers.scsi[0];
     assert_eq!(scsi.r#type, "pvscsi");
     assert_eq!(scsi.bus.as_deref(), Some("pci.0"));
     assert_eq!(scsi.addr.as_deref(), Some("0x5"));
 
-    let hda = &config.audio_devices[0];
+    let hda = &config.devices.audio[0];
     assert_eq!(hda.r#type, "ich9-intel-hda");
     assert_eq!(hda.bus.as_deref(), Some("pci.2"));
     assert_eq!(hda.addr.as_deref(), Some("0xc"));
 
-    let codec = &config.audio_devices[1];
+    let codec = &config.devices.audio[1];
     assert_eq!(codec.r#type, "hda-duplex");
     assert_eq!(codec.bus.as_deref(), Some("audiodev0.0"));
     assert_eq!(codec.audiodev.as_deref(), Some("spice-backend0"));

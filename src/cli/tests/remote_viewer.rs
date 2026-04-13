@@ -10,14 +10,16 @@ fn test_remote_viewer_is_suppressed_for_primary_passthrough_gpu() {
         system:
           architecture: "x86_64"
           machine: "q35"
-          memory: 1024
-          vcpus: 1
-          cpu_model: "host"
-
-        hostpci:
-          - device: "0000:03:00.0"
-            id: "hostpci0"
-            x_vga: true
+          memory:
+            size: 1024
+          cpu:
+            vcpus: 1
+            model: "host"
+        host:
+          pci:
+            - device: "0000:03:00.0"
+              id: "hostpci0"
+              x_vga: true
 
         spice:
           enabled: true
@@ -50,13 +52,15 @@ fn test_remote_viewer_is_suppressed_for_hostpci0_without_x_vga() {
         system:
           architecture: "x86_64"
           machine: "q35"
-          memory: 1024
-          vcpus: 1
-          cpu_model: "host"
-
-        hostpci:
-          - device: "0000:03:00.0"
-            id: "hostpci0.0"
+          memory:
+            size: 1024
+          cpu:
+            vcpus: 1
+            model: "host"
+        host:
+          pci:
+            - device: "0000:03:00.0"
+              id: "hostpci0.0"
 
         spice:
           enabled: true

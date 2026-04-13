@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::config::{GuestAgentConfig, LookingGlassOptions, QmpConfig};
+
 /// Additional VM options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VmOptions {
@@ -32,6 +34,18 @@ pub struct VmOptions {
 
     /// Path to UEFI variables file
     pub uefi_vars: Option<String>,
+
+    /// Canonical guest agent configuration.
+    #[serde(default)]
+    pub guest_agent: Option<GuestAgentConfig>,
+
+    /// Canonical QMP monitoring configuration.
+    #[serde(default)]
+    pub qmp: Option<QmpConfig>,
+
+    /// Looking Glass client launch options (VM/profile-level override).
+    #[serde(default)]
+    pub looking_glass: Option<LookingGlassOptions>,
 }
 
 impl Default for VmOptions {
@@ -46,6 +60,9 @@ impl Default for VmOptions {
             log_dir: None,
             log_keep: None,
             uefi_vars: None,
+            guest_agent: None,
+            qmp: None,
+            looking_glass: None,
         }
     }
 }

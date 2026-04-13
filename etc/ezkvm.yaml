@@ -2,7 +2,6 @@ tools:
   qemu: "/usr/bin/qemu-system-x86_64"
   swtpm: "/usr/bin/swtpm"
   remote_viewer: "/usr/bin/remote-viewer"
-  looking_glass: "/usr/local/bin/looking-glass-client"
 
 locations:
   vms_dir: "/etc/ezkvm/vms.d"
@@ -14,8 +13,3 @@ locations:
   socket_dir: "/var/run/ezkvm/sockets"
   log_dir: "/var/log/ezkvm"
 
-looking_glass:
-  full_screen: true
-  size: "1707x1067"
-  grab_keyboard: true
-  escape_key: "KEY_F12"

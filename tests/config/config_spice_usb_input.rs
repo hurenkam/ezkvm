@@ -9,10 +9,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 4
-  cpu_model: "host"
-
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 4
+    model: "host"
 spice:
   enabled: true
   port: 5903
@@ -20,31 +21,32 @@ spice:
   disable_ticketing: true
   audio: true
 
-audio_devices:
-  - type: "ich9-intel-hda"
-    id: "audiodev0"
-    bus: "pci.2"
-    addr: "0xc"
-  - type: "hda-micro"
-    id: "audiodev0-codec0"
-    bus: "audiodev0.0"
-    cad: 0
-    audiodev: "spice-backend0"
-  - type: "hda-duplex"
-    id: "audiodev0-codec1"
-    bus: "audiodev0.0"
-    cad: 1
-    audiodev: "spice-backend0"
+devices:
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+      bus: "pci.2"
+      addr: "0xc"
+    - type: "hda-micro"
+      id: "audiodev0-codec0"
+      bus: "audiodev0.0"
+      cad: 0
+      audiodev: "spice-backend0"
+    - type: "hda-duplex"
+      id: "audiodev0-codec1"
+      bus: "audiodev0.0"
+      cad: 1
+      audiodev: "spice-backend0"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.audio_devices.len(), 3);
-    assert_eq!(config.audio_devices[0].r#type, "ich9-intel-hda");
-    assert_eq!(config.audio_devices[0].bus.as_deref(), Some("pci.2"));
-    assert_eq!(config.audio_devices[0].addr.as_deref(), Some("0xc"));
-    assert_eq!(config.audio_devices[1].cad, Some(0));
+    assert_eq!(config.devices.audio.len(), 3);
+    assert_eq!(config.devices.audio[0].r#type, "ich9-intel-hda");
+    assert_eq!(config.devices.audio[0].bus.as_deref(), Some("pci.2"));
+    assert_eq!(config.devices.audio[0].addr.as_deref(), Some("0xc"));
+    assert_eq!(config.devices.audio[1].cad, Some(0));
     assert_eq!(
-        config.audio_devices[1].audiodev.as_deref(),
+        config.devices.audio[1].audiodev.as_deref(),
         Some("spice-backend0")
     );
 }
@@ -58,10 +60,11 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 4
-  cpu_model: "host"
-
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 4
+    model: "host"
 spice:
   enabled: true
   audio: true
@@ -86,23 +89,25 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
 spice:
   enabled: true
   vdagent: true
 
-input_devices:
-  - type: "virtio-mouse"
-  - type: "virtio-keyboard"
+devices:
+  input:
+    - type: "virtio-mouse"
+    - type: "virtio-keyboard"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.input_devices.len(), 2);
-    assert_eq!(config.input_devices[0].r#type, "virtio-mouse");
-    assert_eq!(config.input_devices[1].r#type, "virtio-keyboard");
+    assert_eq!(config.devices.input.len(), 2);
+    assert_eq!(config.devices.input[0].r#type, "virtio-mouse");
+    assert_eq!(config.devices.input[1].r#type, "virtio-keyboard");
 }
 
 #[test]
@@ -114,13 +119,15 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-input_devices:
-  - type: "virtio-mouse"
-  - type: "virtio-mouse"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+devices:
+  input:
+    - type: "virtio-mouse"
+    - type: "virtio-mouse"
 "#;
 
     let result = VmConfig::from_str(yaml);
@@ -142,21 +149,22 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-ivshmem:
-  enabled: true
-  size: 128
-  vectors: 1
-  id: "ivshmem0"
-  bus: "pcie.0"
-  mem_path: "/dev/kvmfr0"
+  memory:
+    size: 2048
+    ivshmem:
+      enabled: true
+      size: 128
+      vectors: 1
+      id: "ivshmem0"
+      bus: "pcie.0"
+      mem_path: "/dev/kvmfr0"
+  cpu:
+    vcpus: 2
+    model: "host"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    let ivshmem = config.ivshmem.as_ref().unwrap();
+    let ivshmem = config.system.memory.ivshmem.as_ref().unwrap();
     assert_eq!(ivshmem.id, "ivshmem0");
     assert_eq!(ivshmem.bus.as_deref(), Some("pcie.0"));
     assert_eq!(ivshmem.mem_path, "/dev/kvmfr0");
@@ -171,13 +179,14 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-ivshmem:
-  enabled: true
-  mem_path: "dev/kvmfr0"
+  memory:
+    size: 2048
+    ivshmem:
+      enabled: true
+      mem_path: "dev/kvmfr0"
+  cpu:
+    vcpus: 2
+    model: "host"
 "#;
 
     let result = VmConfig::from_str(yaml);
@@ -199,33 +208,36 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+controllers:
+  xhci:
+    - id: "xhci"
+      p2: 15
+      p3: 15
+      bus: "pci.1"
+      addr: "0x1b"
 
-xhci_controllers:
-  - id: "xhci"
-    p2: 15
-    p3: 15
-    bus: "pci.1"
-    addr: "0x1b"
-
-usb_devices:
-  - id: "usb0"
-    hostbus: "1"
-    hostport: "2.2"
-    bus: "xhci.0"
-    port: "1"
+host:
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.2"
+      bus: "xhci.0"
+      port: "1"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.xhci_controllers.len(), 1);
-    assert_eq!(config.xhci_controllers[0].p2, Some(15));
-    assert_eq!(config.xhci_controllers[0].p3, Some(15));
-    assert_eq!(config.xhci_controllers[0].bus.as_deref(), Some("pci.1"));
-    assert_eq!(config.xhci_controllers[0].addr.as_deref(), Some("0x1b"));
-    assert_eq!(config.usb_devices[0].hostbus.as_deref(), Some("1"));
-    assert_eq!(config.usb_devices[0].hostport.as_deref(), Some("2.2"));
+    assert_eq!(config.controllers.xhci.len(), 1);
+    assert_eq!(config.controllers.xhci[0].p2, Some(15));
+    assert_eq!(config.controllers.xhci[0].p3, Some(15));
+    assert_eq!(config.controllers.xhci[0].bus.as_deref(), Some("pci.1"));
+    assert_eq!(config.controllers.xhci[0].addr.as_deref(), Some("0x1b"));
+    assert_eq!(config.host.usb[0].hostbus.as_deref(), Some("1"));
+    assert_eq!(config.host.usb[0].hostport.as_deref(), Some("2.2"));
 }
 
 #[test]
@@ -237,15 +249,17 @@ backend: "qemu"
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-
-usb_devices:
-  - id: "usb0"
-    host: "1-2.2"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+host:
+  usb:
+    - id: "usb0"
+      host: "1-2.2"
 "#;
 
     let config = VmConfig::from_str(yaml).unwrap();
-    assert_eq!(config.usb_devices[0].host, "1-2.2");
+    assert_eq!(config.host.usb[0].host, "1-2.2");
 }

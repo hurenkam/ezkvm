@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::super::{AudioDeviceConfig, InputDeviceConfig};
 use super::{DisplayConfig, DriveConfig, NetworkConfig, SerialConfig};
 
 /// Device configuration
@@ -20,4 +21,12 @@ pub struct DeviceConfig {
     /// Serial devices
     #[serde(default)]
     pub serials: Vec<SerialConfig>,
+
+    /// Explicit input devices
+    #[serde(default)]
+    pub input: Vec<InputDeviceConfig>,
+
+    /// Audio devices backed by the selected audio backend
+    #[serde(default)]
+    pub audio: Vec<AudioDeviceConfig>,
 }

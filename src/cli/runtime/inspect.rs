@@ -13,7 +13,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
         match crate::qemu::process::find_qemu_processes(vm_name) {
             Ok(pids) if pids.contains(&pid) => {
                 println!("Status: Running (PID: {})", pid);
-                println!("Memory: {} MiB", config.system.memory);
+                println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
                 return Ok(());
             }
@@ -27,7 +27,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
         Ok(is_running) => {
             if is_running {
                 println!("Status: Running");
-                println!("Memory: {} MiB", config.system.memory);
+                println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
             } else {
                 println!("Status: Not running");
@@ -90,7 +90,7 @@ pub(crate) async fn handle_validate(config_path: &str, show_resolved_config: boo
     println!("✓ Configuration is valid");
     println!("VM Name: {}", config.name);
     println!("Architecture: {}", config.system.architecture);
-    println!("Memory: {} MiB", config.system.memory);
+    println!("Memory: {} MiB", config.system.memory.size);
     println!("vCPUs: {}", config.system.cpu.vcpus);
 
     if show_resolved_config {

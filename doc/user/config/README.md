@@ -32,9 +32,7 @@ Use canonical paths for new configs:
 - `devices.input`
 - `devices.audio`
 
-Legacy aliases are accepted during migration and normalized before validation.
-If both legacy and canonical scalar/object paths are present, canonical values win.
-For moved list families, final order is legacy entries first, then canonical entries.
+Use canonical paths only.
 
 ## See also
 

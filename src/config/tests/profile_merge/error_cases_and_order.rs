@@ -38,9 +38,11 @@ profiles:
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();
@@ -76,9 +78,11 @@ fn test_vm_config_from_file_applies_profiles_in_listed_order() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 "#,
     )
     .unwrap();

@@ -37,3 +37,11 @@ spice:
   audio: true
   vdagent: true
 
+options:
+  looking_glass:
+    program: "/usr/local/bin/looking-glass-client"
+    full_screen: true
+    size: "1707x1067"
+    grab_keyboard: true
+    escape_key: "KEY_F12"
+

@@ -16,12 +16,14 @@ fn test_vm_config_from_file_deep_merges_nested_maps() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-boot:
-  firmware: "uefi"
-  menu: true
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "uefi"
+    menu: true
 "#,
     )
     .unwrap();
@@ -29,8 +31,9 @@ boot:
     std::fs::write(
         profile_dir.join("secure_boot.yaml"),
         r#"
-boot:
-  secure_boot: true
+system:
+  boot:
+    secure_boot: true
 "#,
     )
     .unwrap();
@@ -60,9 +63,9 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.boot.firmware.as_deref(), Some("uefi"));
-    assert!(config.boot.menu);
-    assert!(config.boot.secure_boot);
+    assert_eq!(config.system.boot.firmware.as_deref(), Some("uefi"));
+    assert!(config.system.boot.menu);
+    assert!(config.system.boot.secure_boot);
 
     unsafe {
         std::env::remove_var("EZKVM_CONFIG");
@@ -86,9 +89,11 @@ fn test_vm_config_from_file_replaces_non_specialized_lists() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 devices:
   displays:
         - type: "qxl"
@@ -141,7 +146,7 @@ profiles:
 }
 
 #[test]
-fn test_vm_config_from_file_mixed_legacy_and_target_paths_merge_with_expected_precedence() {
+fn test_vm_config_from_file_uses_canonical_target_paths() {
     let _guard = env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -156,15 +161,21 @@ fn test_vm_config_from_file_mixed_legacy_and_target_paths_merge_with_expected_pr
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 2048
-  vcpus: 2
-  cpu_model: "host"
-qmp:
-  enabled: true
-  socket_path: "/tmp/legacy.qmp"
-scsi_controllers:
-  - id: "legacy-scsi"
-    type: "pvscsi"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+options:
+  enable_kvm: true
+  daemonize: false
+  qmp:
+    enabled: true
+    socket_path: "/tmp/base.qmp"
+controllers:
+  scsi:
+    - id: "base-scsi"
+      type: "pvscsi"
 "#,
     )
     .unwrap();
@@ -206,15 +217,20 @@ controllers:
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
     assert_eq!(
-        config.qmp.as_ref().and_then(|q| q.socket_path.as_deref()),
+        config
+            .options
+            .qmp
+            .as_ref()
+            .and_then(|q| q.socket_path.as_deref()),
         Some("/tmp/target.qmp")
     );
     let controller_ids: Vec<&str> = config
-        .scsi_controllers
+        .controllers
+        .scsi
         .iter()
         .map(|controller| controller.id.as_str())
         .collect();
-    assert_eq!(controller_ids, vec!["legacy-scsi", "target-scsi"]);
+    assert_eq!(controller_ids, vec!["base-scsi", "target-scsi"]);
 
     unsafe {
         std::env::remove_var("EZKVM_CONFIG");

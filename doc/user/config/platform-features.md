@@ -15,6 +15,14 @@ Other fields:
 - `pid_file`, `log_dir`, `log_keep`
 - `uefi_vars` (options-level field exists; boot flow uses `system.boot.uefi_vars`)
 
+## options.looking_glass
+
+- `program` (path to looking-glass-client)
+- `full_screen`
+- `size` (`WIDTHxHEIGHT`)
+- `grab_keyboard`
+- `escape_key`
+
 ## options.guest_agent (canonical)
 
 - `enabled` (default true)
@@ -22,15 +30,11 @@ Other fields:
 - `freeze_cpu` (default false)
 - optional placement: `bus`, `addr`
 
-Legacy alias accepted during migration: top-level `guest_agent`.
-
 ## options.qmp (canonical)
 
 - `enabled` (default true)
 - `socket_path` (optional absolute path)
 - `socket_type` (`unix` default, `tcp`)
-
-Legacy alias accepted during migration: top-level `qmp`.
 
 ## spice (top-level)
 
@@ -54,8 +58,6 @@ Feature flags for Windows optimization:
 - `model` (virtio-balloon-pci or virtio-balloon-ccw)
 - optional `id`, `bus`, `addr`
 
-Legacy alias accepted during migration: top-level `ballooning`.
-
 ## system.memory.ivshmem (canonical)
 
 - `enabled` (default true)
@@ -65,16 +67,12 @@ Legacy alias accepted during migration: top-level `ballooning`.
 - optional `bus`
 - `mem_path` (default /dev/kvmfr0)
 
-Legacy alias accepted during migration: top-level `ivshmem`.
-
 ## system.cpu.numa (canonical)
 
 NUMA node entries:
 
 - `id`, `memory`, `cpus`
 - optional `host_node`
-
-Legacy alias accepted during migration: top-level `numa`.
 
 ## See also
 

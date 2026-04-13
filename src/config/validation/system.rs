@@ -12,10 +12,10 @@ pub(crate) fn validate_system_config(system: &SystemConfig) -> Result<()> {
         ));
     }
 
-    if system.memory < 128 {
+    if system.memory.size < 128 {
         return Err(anyhow!("Memory must be at least 128 MiB"));
     }
-    if system.memory > 1024 * 1024 {
+    if system.memory.size > 1024 * 1024 {
         return Err(anyhow!("Memory cannot exceed 1 TiB"));
     }
 

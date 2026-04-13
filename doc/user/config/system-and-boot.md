@@ -6,8 +6,8 @@
 
 - `system.architecture` (x86_64, aarch64, x86, ppc64, riscv64)
 - `system.machine`
-- CPU via canonical `system.cpu.*` (or legacy aliases)
-- memory via canonical `system.memory.size` (legacy scalar `system.memory` is accepted)
+- CPU via `system.cpu.*`
+- memory via `system.memory.size`
 
 ### CPU
 
@@ -24,23 +24,7 @@ system:
     numa: []
 ```
 
-Legacy aliases accepted during migration:
-
-- `system.cpu_model`
-- `system.vcpus`
-- `system.cpu_features` (string entries or `{ name: "..." }`)
-- top-level `numa`
-
 ### Memory
-
-Accepted forms:
-
-```yaml
-system:
-  memory: 4096
-```
-
-or
 
 ```yaml
 system:
@@ -55,7 +39,6 @@ system:
 Rules:
 
 - `system.memory` object must include `size`.
-- scalar/object conflicts resolve to canonical object `size` value.
 
 ## system.boot
 
@@ -79,14 +62,6 @@ Rules:
 Optional fields:
 
 - `manufacturer`, `product`, `version`, `serial`, `uuid`, `sku`, `family`, `vm_generation_id`
-
-## Legacy Shortcut Support
-
-These are accepted during migration:
-
-- top-level `boot`, `tpm`, `smbios`
-
-They normalize to `system.boot`, `system.tpm`, and `system.smbios` before validation.
 
 ## See also
 

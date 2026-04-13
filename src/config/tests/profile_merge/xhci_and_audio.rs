@@ -16,13 +16,16 @@ fn test_vm_config_from_file_merges_xhci_controllers_by_id() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
-xhci_controllers:
-  - id: "xhci"
-    p2: 8
-    p3: 8
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+controllers:
+  xhci:
+    - id: "xhci"
+      p2: 8
+      p3: 8
 "#,
     )
     .unwrap();
@@ -30,13 +33,14 @@ xhci_controllers:
     std::fs::write(
         profile_dir.join("xhci_overlay.yaml"),
         r#"
-xhci_controllers:
-  - id: "xhci"
-    bus: "pci.1"
-    addr: "0x1b"
-  - id: "xhci2"
-    p2: 4
-    p3: 4
+controllers:
+  xhci:
+    - id: "xhci"
+      bus: "pci.1"
+      addr: "0x1b"
+    - id: "xhci2"
+      p2: 4
+      p3: 4
 "#,
     )
     .unwrap();
@@ -66,10 +70,11 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.xhci_controllers.len(), 2);
+    assert_eq!(config.controllers.xhci.len(), 2);
 
     let xhci = config
-        .xhci_controllers
+        .controllers
+        .xhci
         .iter()
         .find(|c| c.id == "xhci")
         .unwrap();
@@ -79,7 +84,8 @@ profiles:
     assert_eq!(xhci.addr.as_deref(), Some("0x1b"));
 
     let xhci2 = config
-        .xhci_controllers
+        .controllers
+        .xhci
         .iter()
         .find(|c| c.id == "xhci2")
         .unwrap();
@@ -108,21 +114,24 @@ fn test_vm_config_from_file_merges_audio_devices_by_id() {
 system:
   architecture: "x86_64"
   machine: "q35"
-  memory: 4096
-  vcpus: 2
-  cpu_model: "host"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
 spice:
   enabled: true
   audio: true
-audio_devices:
-  - type: "ich9-intel-hda"
-    id: "audiodev0"
-    bus: "pci.2"
-  - type: "hda-micro"
-    id: "audiodev0-codec0"
-    bus: "audiodev0.0"
-    cad: 0
-    audiodev: "spice-backend0"
+devices:
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+      bus: "pci.2"
+    - type: "hda-micro"
+      id: "audiodev0-codec0"
+      bus: "audiodev0.0"
+      cad: 0
+      audiodev: "spice-backend0"
 "#,
     )
     .unwrap();
@@ -130,15 +139,16 @@ audio_devices:
     std::fs::write(
         profile_dir.join("audio_overlay.yaml"),
         r#"
-audio_devices:
-  - type: "ich9-intel-hda"
-    id: "audiodev0"
-    addr: "0xc"
-  - type: "hda-duplex"
-    id: "audiodev0-codec1"
-    bus: "audiodev0.0"
-    cad: 1
-    audiodev: "spice-backend0"
+devices:
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+      addr: "0xc"
+    - type: "hda-duplex"
+      id: "audiodev0-codec1"
+      bus: "audiodev0.0"
+      cad: 1
+      audiodev: "spice-backend0"
 "#,
     )
     .unwrap();
@@ -168,10 +178,11 @@ profiles:
     }
 
     let config = VmConfig::from_file(&vm_config_path).unwrap();
-    assert_eq!(config.audio_devices.len(), 3);
+    assert_eq!(config.devices.audio.len(), 3);
 
     let hda = config
-        .audio_devices
+        .devices
+        .audio
         .iter()
         .find(|d| d.id == "audiodev0")
         .unwrap();
@@ -180,14 +191,16 @@ profiles:
     assert_eq!(hda.addr.as_deref(), Some("0xc"));
 
     let codec0 = config
-        .audio_devices
+        .devices
+        .audio
         .iter()
         .find(|d| d.id == "audiodev0-codec0")
         .unwrap();
     assert_eq!(codec0.r#type, "hda-micro");
 
     let codec1 = config
-        .audio_devices
+        .devices
+        .audio
         .iter()
         .find(|d| d.id == "audiodev0-codec1")
         .unwrap();

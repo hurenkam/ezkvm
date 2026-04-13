@@ -74,7 +74,7 @@ pub(super) fn resolve_tpm_socket_path(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
 ) -> String {
-    if let Some(tpm) = &config.tpm
+    if let Some(tpm) = config.system_tpm()
         && let Some(state_path) = &tpm.state_path
     {
         return state_path.clone();
