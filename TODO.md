@@ -5,31 +5,28 @@
 ### Profile System Delivery
 - [ ] Support multiple profile search directories in priority order
 
-### Review Concerns Remediation Plan
+### Review Comments Remediation Plan (Open)
 
-#### Phase A: Correctness And Safety
-- [x] Rework VM process discovery/stop/kill in `src/qemu/process.rs` to avoid regex pattern ambiguity and prefer exact process targeting
-- [x] Add targeted tests for VM stop/kill process selection, including overlapping names and unsafe-character name cases
-- [x] Harden `setup_network_isolation` in `src/network.rs` to ignore only the explicit "already exists" case and error on other failures
-- [x] Replace production-path `unwrap` usage in `src/storage.rs` path handling with fallible error propagation and contextual `anyhow` errors
-- [x] Replace fragile IOMMU detection shell-grep logic in `src/device.rs` with robust lowercase token checks and non-panicking flow
-- [x] Prepare proposal for changing `add_tpm` panic behavior in `src/qemu/args.rs` to `Result` (signature changed, all integrated, tests updated)
+#### Phase 1: Section 13 Structural Compliance (High Priority)
+- [ ] Split implementation out of `src/qemu/mod.rs` so `mod.rs` contains only module declarations and re-exports
+- [ ] Create focused QEMU modules for manager lifecycle and argument builders (for example `manager.rs`, `command_builder.rs`, `boot_args.rs`) and move logic from `src/qemu/mod.rs`
+- [ ] Move `impl From<DriveConfig>`, `impl From<NetworkConfig>`, `impl From<DisplayConfig>`, `impl From<AudioDeviceConfig>`, `impl From<InputDeviceConfig>`, and `impl From<HostPciConfig>` into the same file as their source struct definitions (currently in `src/config/vm_schema.rs`)
+- [ ] Move `impl From<SystemConfig>` into the same file as `SystemConfig` and keep source-type behavior co-located
+- [ ] Refactor config schema layout so large types and their impl blocks are co-located per type (especially `VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`)
+- [ ] Group loader-family files into a `src/config/loader/` subdirectory and keep `mod.rs` as the family entrypoint
 
-#### Phase B: Documentation And Test Hygiene
-- [x] Update `CONFIG.md` to reflect current profile merge behavior exactly (id-based list merges, append-unique list merges, and list-replace fallback paths)
-- [x] Replace fixed `/tmp` test artifacts with unique temporary paths in integration/config tests
-- [x] Apply consistent environment-variable locking strategy across tests that mutate process environment
+#### Phase 2: Section 2 Threshold Remediation (Medium Priority)
+- [ ] Split large production files over 250 lines into concern-based modules: `src/cli/runtime.rs`, `src/qemu/args.rs`, `src/config/platform.rs`, `src/config/devices.rs`, `src/config/vm_schema.rs`, `src/network.rs`, `src/storage.rs`, `src/state.rs`
+- [ ] Split large validation files over 250 lines into smaller validator modules: `src/config/validation/platform.rs`, `src/config/validation/devices.rs`
+- [ ] Reduce core long functions to <=35-line orchestration style by extracting helpers, starting with `build_command`, `handle_start`, `start_swtpm_if_configured`, `validate_drive_config`, `validate_audio_devices`, `handle_storage`, `build_boot_args`
+- [ ] Re-audit remaining production functions over 35 lines and extract focused helpers until no high-impact outliers remain
+- [ ] For structs intentionally kept over 35 lines, add short rationale comments; otherwise split into focused nested/config subtypes (`VmConfig`, `QemuArgs`, `DriveConfig`, `HypervConfig`, `BootConfig`)
 
-#### Phase C: Quality Gate Cleanup
-- [x] Make `cargo fmt --all --check` pass across repository
-- [x] Reduce and resolve current `cargo clippy --all-targets --all-features -- -D warnings` failures in staged batches
-- [x] Re-run full `cargo test` after lint/format remediations and keep suite green
-
-#### Phase D: Module Refactor Program
-- [x] Split `src/config/mod.rs` into focused modules (schema types, profile loading/merge, env substitution, entrypoint wiring) — complete (`src/config/loader.rs` orchestrator with `src/config/loader_env.rs` and `src/config/loader_merge.rs`, plus `src/config/central.rs`, `src/config/vm_options.rs`, `src/config/platform.rs`, `src/config/vm_schema.rs`, `src/config/entrypoint.rs`, and `src/config/tests.rs` extracted)
-- [x] Split `src/config/validation.rs` into domain validators (system, boot, devices, vm options) with small function surfaces
-- [x] Split `src/cli.rs` command handlers into submodules by command group while keeping top-level dispatch minimal
-- [x] Review `src/qemu/builder.rs` usage and either integrate it as the command-building path or remove/deprecate it
+#### Phase 3: Tests, Verification, And Reporting
+- [ ] Keep test files maintainable by splitting oversized suites: `tests/config_tests.rs`, `tests/integration_tests.rs`, `src/config/tests.rs`
+- [ ] Add/adjust regression tests around refactored QEMU command building and config conversion behavior to preserve output parity
+- [ ] Run and keep green: `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --quiet`
+- [ ] Re-run Section 2 and Section 13 audit across all Rust files and update `REVIEW_COMMENTS.md` with residual items only
 
 ### QMP Device Hotplug
 - [ ] Replace the print-only helpers in `src/device.rs` with real QMP `device_add` and `device_del` flows for disks and network devices
@@ -98,3 +95,9 @@
 - [x] Append-unique list merges for `system.cpu_features`, `system.machine_options`, `options.global_options`
 - [x] Validation/UX additions: `validate --show-resolved-config`
 - [x] Unit and integration coverage for profile loading, precedence, error handling, and compatibility
+
+### Review Concerns Remediation (Phases A-D)
+- [x] Correctness and safety hardening completed across process control, network isolation handling, storage error propagation, IOMMU detection robustness, and TPM error flow
+- [x] Documentation and test hygiene updates completed (`CONFIG.md` sync, tmp artifact isolation, environment mutation locking)
+- [x] Quality gates stabilized (`cargo fmt --all --check`, strict clippy, full test suite)
+- [x] Major modularization completed for config and CLI surfaces, including split validators and config loader helper modules
