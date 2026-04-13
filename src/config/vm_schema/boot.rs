@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-/// Boot configuration
+/// Boot configuration.
+/// Kept as a single schema type because these fields map directly to one YAML section
+/// and are consumed together when emitting boot-related QEMU arguments.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BootConfig {
     /// Firmware type (uefi, bios, or ovmf)

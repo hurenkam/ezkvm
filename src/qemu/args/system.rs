@@ -55,35 +55,8 @@ impl QemuArgs {
         sku: Option<&str>,
         family: Option<&str>,
     ) {
-        let mut smbios_spec = "type=1".to_string();
-
-        if let Some(manufacturer) = manufacturer {
-            smbios_spec.push_str(&format!(",manufacturer={}", manufacturer));
-        }
-
-        if let Some(product) = product {
-            smbios_spec.push_str(&format!(",product={}", product));
-        }
-
-        if let Some(version) = version {
-            smbios_spec.push_str(&format!(",version={}", version));
-        }
-
-        if let Some(serial) = serial {
-            smbios_spec.push_str(&format!(",serial={}", serial));
-        }
-
-        if let Some(uuid) = uuid {
-            smbios_spec.push_str(&format!(",uuid={}", uuid));
-        }
-
-        if let Some(sku) = sku {
-            smbios_spec.push_str(&format!(",sku={}", sku));
-        }
-
-        if let Some(family) = family {
-            smbios_spec.push_str(&format!(",family={}", family));
-        }
+        let smbios_spec =
+            build_smbios_spec(manufacturer, product, version, serial, uuid, sku, family);
 
         self.push_str("-smbios");
         self.push(smbios_spec);
@@ -135,51 +108,103 @@ impl QemuArgs {
         ipi: bool,
         spinlock_retry: Option<u32>,
     ) {
-        // Add Hyper-V CPU features
+        self.add_hyperv_base_profile(relaxed);
+        self.add_hyperv_flag_features(
+            vapic,
+            time,
+            crash,
+            reset,
+            frequencies,
+            reenlightenment,
+            tlbflush,
+            ipi,
+        );
+        self.add_hyperv_optional_features(vendor_id, spinlock_retry);
+    }
+}
+
+fn build_smbios_spec(
+    manufacturer: Option<&str>,
+    product: Option<&str>,
+    version: Option<&str>,
+    serial: Option<&str>,
+    uuid: Option<&str>,
+    sku: Option<&str>,
+    family: Option<&str>,
+) -> String {
+    let mut smbios_spec = "type=1".to_string();
+    push_smbios_field(&mut smbios_spec, "manufacturer", manufacturer);
+    push_smbios_field(&mut smbios_spec, "product", product);
+    push_smbios_field(&mut smbios_spec, "version", version);
+    push_smbios_field(&mut smbios_spec, "serial", serial);
+    push_smbios_field(&mut smbios_spec, "uuid", uuid);
+    push_smbios_field(&mut smbios_spec, "sku", sku);
+    push_smbios_field(&mut smbios_spec, "family", family);
+    smbios_spec
+}
+
+fn push_smbios_field(spec: &mut String, key: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        spec.push_str(&format!(",{}={}", key, value));
+    }
+}
+
+impl QemuArgs {
+    fn add_hyperv_base_profile(&mut self, relaxed: bool) {
         if relaxed {
             self.push_str("-cpu");
             self.push_str(
                 "host,+hypervisor,+invtsc,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time",
             );
         }
+    }
 
-        // Add individual Hyper-V features
+    #[allow(clippy::too_many_arguments)]
+    fn add_hyperv_flag_features(
+        &mut self,
+        vapic: bool,
+        time: bool,
+        crash: bool,
+        reset: bool,
+        frequencies: bool,
+        reenlightenment: bool,
+        tlbflush: bool,
+        ipi: bool,
+    ) {
         if vapic {
             self.add_cpu_feature("+hv_vapic");
         }
-
         if time {
             self.add_cpu_feature("+hv_time");
         }
-
         if crash {
             self.add_cpu_feature("+hv_crash");
         }
-
         if reset {
             self.add_cpu_feature("+hv_reset");
         }
-
-        if let Some(vendor_id) = vendor_id {
-            self.add_cpu_feature(&format!("+hv_vendor_id={}", vendor_id));
-        }
-
         if frequencies {
             self.add_cpu_feature("+hv_frequencies");
         }
-
         if reenlightenment {
             self.add_cpu_feature("+hv_reenlightenment");
         }
-
         if tlbflush {
             self.add_cpu_feature("+hv_tlbflush");
         }
-
         if ipi {
             self.add_cpu_feature("+hv_ipi");
         }
+    }
 
+    fn add_hyperv_optional_features(
+        &mut self,
+        vendor_id: Option<&str>,
+        spinlock_retry: Option<u32>,
+    ) {
+        if let Some(vendor_id) = vendor_id {
+            self.add_cpu_feature(&format!("+hv_vendor_id={}", vendor_id));
+        }
         if let Some(retry) = spinlock_retry {
             self.add_cpu_feature(&format!("+hv_spinlocks=0x{:x}", retry));
         }

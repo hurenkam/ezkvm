@@ -9,26 +9,38 @@ mod merge;
 impl VmConfig {
     /// Load configuration from a YAML file
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let vm_value = Self::load_vm_value_from_file(path)?;
+        let profile_names = Self::extract_profile_names(&vm_value)?;
+        let profile_dir = Self::resolve_profile_dir()?;
+        let merged_value = Self::build_merged_vm_value(vm_value, &profile_dir, &profile_names)?;
+        Self::deserialize_and_validate(merged_value)
+    }
+
+    fn load_vm_value_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<serde_yaml::Value> {
         let content = std::fs::read_to_string(path)?;
         let processed_content = Self::substitute_env_vars(&content)?;
         let vm_value: serde_yaml::Value = serde_yaml::from_str(&processed_content)?;
         Self::ensure_yaml_mapping_root(&vm_value, "VM config")?;
+        Ok(vm_value)
+    }
 
-        let profile_names = Self::extract_profile_names(&vm_value)?;
-        let profile_dir = Self::resolve_profile_dir()?;
-
+    fn build_merged_vm_value(
+        vm_value: serde_yaml::Value,
+        profile_dir: &str,
+        profile_names: &[String],
+    ) -> anyhow::Result<serde_yaml::Value> {
         let mut merged_value = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
-        for profile_name in &profile_names {
-            let profile_value = Self::load_profile_value(&profile_dir, profile_name)?;
+        for profile_name in profile_names {
+            let profile_value = Self::load_profile_value(profile_dir, profile_name)?;
             Self::merge_yaml_values(&mut merged_value, profile_value);
         }
         Self::merge_yaml_values(&mut merged_value, vm_value);
+        Ok(merged_value)
+    }
 
+    fn deserialize_and_validate(merged_value: serde_yaml::Value) -> anyhow::Result<Self> {
         let config: VmConfig = serde_yaml::from_value(merged_value)?;
-
-        // Validate the configuration
         validation::validate_config(&config)?;
-
         Ok(config)
     }
 

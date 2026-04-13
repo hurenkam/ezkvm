@@ -27,7 +27,19 @@ impl QemuManager {
     pub(super) fn add_devices_and_boot_args(&self, args: &mut QemuArgs) -> Result<()> {
         args.extend(QemuArgs::from(self.config.devices.clone()));
         args.extend(self.build_boot_args());
+        self.add_tpm_args(args)?;
+        self.add_guest_agent_args(args);
+        self.add_balloon_args(args);
+        self.add_hostpci_args(args);
+        self.add_usb_args(args);
+        self.add_spice_and_audio_args(args);
+        self.add_input_device_args(args);
+        self.add_ivshmem_args(args);
+        self.add_iscsi_disk_args(args);
+        Ok(())
+    }
 
+    fn add_tpm_args(&self, args: &mut QemuArgs) -> Result<()> {
         if let Some(tpm) = &self.config.tpm {
             let socket_path = self.resolve_tpm_socket_path();
             let external_swtpm = self.uses_external_swtpm();
@@ -40,7 +52,10 @@ impl QemuManager {
             )
             .map_err(|e| anyhow!("Failed to configure TPM: {}", e))?;
         }
+        Ok(())
+    }
 
+    fn add_guest_agent_args(&self, args: &mut QemuArgs) {
         if let Some(guest_agent) = &self.config.guest_agent
             && guest_agent.enabled
         {
@@ -51,7 +66,9 @@ impl QemuManager {
                 guest_agent.addr.as_deref(),
             );
         }
+    }
 
+    fn add_balloon_args(&self, args: &mut QemuArgs) {
         if let Some(ballooning) = &self.config.ballooning
             && ballooning.enabled
         {
@@ -63,7 +80,9 @@ impl QemuManager {
                 ballooning.addr.as_deref(),
             );
         }
+    }
 
+    fn add_hostpci_args(&self, args: &mut QemuArgs) {
         for hostpci in &self.config.hostpci {
             args.add_vfio_pci(
                 &hostpci.device,
@@ -76,14 +95,15 @@ impl QemuManager {
                 hostpci.romfile.as_deref(),
             );
         }
+    }
 
-        self.add_usb_args(args);
-        self.add_spice_and_audio_args(args);
-
+    fn add_input_device_args(&self, args: &mut QemuArgs) {
         for input_device in &self.config.input_devices {
             args.add_input_device(&input_device.r#type);
         }
+    }
 
+    fn add_ivshmem_args(&self, args: &mut QemuArgs) {
         if let Some(ivshmem) = &self.config.ivshmem
             && ivshmem.enabled
         {
@@ -95,7 +115,9 @@ impl QemuManager {
                 &ivshmem.mem_path,
             );
         }
+    }
 
+    fn add_iscsi_disk_args(&self, args: &mut QemuArgs) {
         for iscsi_disk in &self.config.iscsi_disks {
             args.add_iscsi_disk(
                 &iscsi_disk.id,
@@ -108,8 +130,6 @@ impl QemuManager {
                 iscsi_disk.controller.as_deref(),
             );
         }
-
-        Ok(())
     }
 
     pub(super) fn add_platform_args(&self, args: &mut QemuArgs) -> Result<()> {

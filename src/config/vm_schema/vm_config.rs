@@ -7,7 +7,9 @@ use super::super::{
 };
 use super::{BootConfig, DeviceConfig, SystemConfig};
 
-/// Main configuration structure for a virtual machine
+/// Main configuration structure for a virtual machine.
+/// Intentionally kept as one aggregate root to preserve a stable YAML contract and
+/// explicit ownership of all top-level VM sections in one place.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VmConfig {
     /// Name of the virtual machine

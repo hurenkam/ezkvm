@@ -5,7 +5,8 @@
 /// A newtype wrapper around `Vec<String>` for QEMU command-line arguments.
 ///
 /// This provides type safety and prevents accidentally mixing QEMU args
-/// with other string vectors.
+/// with other string vectors. The API surface is intentionally co-located with
+/// this type to keep argument construction semantics centralized.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct QemuArgs(Vec<String>);
 

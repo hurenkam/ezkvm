@@ -1,7 +1,9 @@
 use crate::qemu::types::QemuArgs;
 use serde::{Deserialize, Serialize};
 
-/// Drive configuration
+/// Drive configuration.
+/// Kept as one type because deserialization, validation rules, and `From<DriveConfig>`
+/// argument emission are tightly coupled and should evolve together.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriveConfig {
     /// Unique identifier for the drive

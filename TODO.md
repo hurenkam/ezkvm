@@ -28,9 +28,11 @@
 - [x] Refactor `build_command`, `add_tpm`, and `add_spice` to orchestration style with extracted helpers
 - [x] Refactor validation paths `validate_drive_config` and `validate_audio_devices` to orchestration style with focused helpers
 - [x] Refactor long runtime command handlers to orchestration style (<=35 lines where practical): `handle_start`, `start_swtpm_if_configured`, `handle_storage`, and follow-on helpers in `src/cli/runtime/start.rs`, `src/cli/runtime/auxiliary/swtpm/startup.rs`, and `src/cli/commands.rs`
-- [ ] Refactor long validation paths to orchestration style (<=35 lines where practical): remaining validator outliers found during implementation
-- [ ] Re-run function-length scan for `src/**` and create a short residual-outlier list directly in TODO before Phase 2 closeout
-- [ ] Struct-size follow-up: split or justify >35-line structs with concise comments (`VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`, `QemuArgs`)
+- [x] Refactor long validation paths to orchestration style (<=35 lines where practical): remaining validator outliers found during implementation
+- [x] Re-run function-length scan for `src/**` and create a short residual-outlier list directly in TODO before Phase 2 closeout
+	Residual function-length outliers (current shortlist):
+	- none currently from the shortlist (all identified function-length outliers refactored to orchestration style)
+- [x] Struct-size follow-up: split or justify >35-line structs with concise comments (`VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`, `QemuArgs`)
 
 #### Phase 3: Tests, Verification, And Reporting
 - [ ] Keep test files maintainable by splitting oversized suites: `tests/config_tests.rs`, `tests/integration_tests.rs`, `src/config/tests.rs`

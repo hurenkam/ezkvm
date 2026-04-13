@@ -4,7 +4,9 @@ fn default_true() -> bool {
     true
 }
 
-/// Hyper-V enlightenments configuration
+/// Hyper-V enlightenments configuration.
+/// Kept as a single type because feature flags are serialized/deserialized together and
+/// map directly to one cohesive QEMU Hyper-V feature block.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HypervConfig {
     /// Enable Hyper-V enlightenments
