@@ -24,7 +24,8 @@ devices:
   networks:
     - id: "net0"
       model: "virtio-net"
-      mode: "user"
+      backend:
+        type: "user"
       mac: "52:54:00:12:34:56"
 
 options:

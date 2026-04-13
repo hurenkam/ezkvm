@@ -1,43 +1,45 @@
-devices:
+policies:
   drives:
-    - id: "scsi0"
-      interface: "scsi"
-      type: "disk"
-      format: "raw"
-      readonly: false
-      discard: true
-      cache: "none"
-      aio: "io_uring"
-      detect_zeroes: "unmap"
-      controller: "scsihw0"
-      scsi_id: 0
-      boot_index: 100
-    - id: "scsi1"
-      interface: "scsi"
-      type: "disk"
-      format: "raw"
-      readonly: false
-      discard: true
-      cache: "none"
-      aio: "io_uring"
-      detect_zeroes: "unmap"
-      controller: "scsihw0"
-      scsi_id: 1
-    - id: "ide2"
-      interface: "ide"
-      type: "cdrom"
-      format: "raw"
-      readonly: true
-      aio: "io_uring"
-      bus: "ide.1"
-      unit: 0
-      boot_index: 101
+    - match:
+        interface: "scsi"
+        type: "disk"
+      defaults:
+        format: "raw"
+        discard: true
+        cache: "none"
+        aio: "io_uring"
+        detect_zeroes: "unmap"
+        controller: "scsihw0"
+      placement:
+        scsi_id:
+          scope: "controller"
+          start: 0
+          step: 1
+    - match:
+        interface: "ide"
+        type: "cdrom"
+      defaults:
+        format: "raw"
+        readonly: true
+        aio: "io_uring"
+        bus: "ide.1"
+        unit: 0
 
   networks:
-    - id: "net0"
-      model: "virtio-net-pci"
-      rx_queue_size: 1024
-      tx_queue_size: 256
-      boot_index: 102
-      bus: "pci.0"
-      addr: "0x12"
+    - match:
+        backend_type: "tap"
+      defaults:
+        model: "virtio-net-pci"
+        rx_queue_size: 1024
+        tx_queue_size: 256
+        bus: "pci.0"
+        backend:
+          script: "/usr/libexec/qemu-server/pve-bridge"
+          downscript: "/usr/libexec/qemu-server/pve-bridgedown"
+          vhost: true
+      placement:
+        addr:
+          scope: "bus"
+          bus: "pci.0"
+          start: "0x12"
+          step: 1

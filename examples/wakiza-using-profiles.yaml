@@ -20,18 +20,29 @@ boot:
 devices:
   drives:
     - id: "scsi0"
+      interface: "scsi"
+      type: "disk"
       path: "/dev/vm1/vm-108-boot"
+      boot_index: 100
 
     - id: "scsi1"
+      interface: "scsi"
+      type: "disk"
       path: "/dev/vm1/vm-108-tmp"
 
     - id: "ide2"
+      interface: "ide"
+      type: "cdrom"
       path: ""  # Empty for CDROM
+      boot_index: 101
 
   networks:
     - id: "net0"
-      mode: "tap,ifname=tap108i0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on"
+      backend:
+        type: "tap"
+        ifname: "tap108i0"
       mac: "BC:24:11:3A:21:B7"
+      boot_index: 102
 
 # TPM configuration
 tpm:
