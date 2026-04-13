@@ -1,4 +1,3 @@
 mod central_config;
-mod env;
-mod merge;
-mod vm_config;
+pub(crate) mod env;
+pub(crate) mod merge;

@@ -5,9 +5,6 @@
 ### Profile System
 - [ ] Support multiple profile search directories in priority order
 
-### Config Schema Co-location
-- [ ] Refactor config schema layout so large types and their impl blocks are co-located per type (especially `VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`)
-
 ### Network Tooling
 - [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
 - [ ] Add tests for network statistics parsing so byte and packet counters are validated from sample command output
@@ -21,6 +18,7 @@
 - [x] Converted targeted production `mod.rs` files to wiring-only module entrypoints
 - [x] Extracted moved implementations into focused sibling modules
 - [x] Added explicit `mod.rs` wiring-only checklist guidance in `doc/dev/CODING_GUIDELINES.md`
+- [x] Co-located config schema types with their impl blocks for `VmConfig`, `BootConfig`, `DriveConfig`, and `HypervConfig`
 
 ### Platform And Feature Delivery
 - [x] Core VM platform, CLI lifecycle commands, and QEMU command generation
