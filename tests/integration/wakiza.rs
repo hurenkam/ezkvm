@@ -4,11 +4,7 @@ use super::*;
 fn test_wakiza_matches_key_proxmox_fragments() {
     let _guard = env_lock().lock().unwrap();
 
-    unsafe {
-        std::env::set_var("EZKVM_CONFIG", "examples/ezkvm-profiles.yaml");
-    }
-
-    let config = VmConfig::from_file("examples/wakiza.yaml").unwrap();
+    let config = VmConfig::from_file("input/wakiza/wakiza.yaml").unwrap();
     let has_cdrom = config
         .devices
         .drives
@@ -195,8 +191,4 @@ fn test_wakiza_matches_key_proxmox_fragments() {
         virtio_serial_controller_count, 1,
         "Expected a single virtio-serial-pci controller in generated command\n{generated}"
     );
-
-    unsafe {
-        std::env::remove_var("EZKVM_CONFIG");
-    }
 }

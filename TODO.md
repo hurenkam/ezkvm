@@ -9,10 +9,10 @@
 - [ ] Refactor config schema layout so large types and their impl blocks are co-located per type (especially `VmConfig`, `BootConfig`, `DriveConfig`, `HypervConfig`)
 
 ### QMP Device Hotplug
-- [ ] Replace the print-only helpers in `src/device.rs` with real QMP `device_add` and `device_del` flows for disks and network devices
-- [ ] Stop using the unused `vm_pid` placeholder in hotplug helpers and resolve a real QMP socket or monitor endpoint from VM state/config
-- [ ] Add command/response handling and error reporting for QMP hotplug failures instead of always printing success
-- [ ] Add tests around QMP request generation and response parsing for hot-add/hot-remove paths
+- [x] Replace the print-only helpers in `src/device.rs` with real QMP `device_add` and `device_del` flows for disks and network devices
+- [x] Stop using the unused `vm_pid` placeholder in hotplug helpers and resolve a real QMP socket or monitor endpoint from VM state/config
+- [x] Add command/response handling and error reporting for QMP hotplug failures instead of always printing success
+- [x] Add tests around QMP request generation and response parsing for hot-add/hot-remove paths
 
 ### Network Tooling Completion
 - [ ] Replace the placeholder `get_network_stats` implementation in `src/network/stats.rs` with real parsing of `ip -s link show` output
