@@ -141,6 +141,8 @@ See the `examples/` directory for complete configuration examples:
 
 ezkvm follows a modular architecture with clear separation of concerns:
 
+For repository architecture standards and packaging/layering guidance, see [ARCHITECTURE_GUIDELINES.md](ARCHITECTURE_GUIDELINES.md).
+
 - **config/**: YAML parsing, validation, and configuration structures
 - **qemu/**: QEMU command generation and process management
 - **cli/**: Command-line interface and command dispatch

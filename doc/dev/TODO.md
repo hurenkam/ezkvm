@@ -72,7 +72,7 @@
 
 ### Review Concerns Remediation
 - [x] Correctness and safety hardening completed across process control, network isolation handling, storage error propagation, IOMMU detection robustness, and TPM error flow
-- [x] Documentation and test hygiene updates completed (`CONFIG.md` sync, tmp artifact isolation, environment mutation locking)
+- [x] Documentation and test hygiene updates completed (`doc/user/CONFIG.md` sync, tmp artifact isolation, environment mutation locking)
 - [x] Quality gates stabilized (`cargo fmt --all --check`, strict clippy, full test suite)
 - [x] Major modularization completed for config and CLI surfaces, including split validators and config loader helper modules
 - [x] Section 13 cleanup substantially completed: `src/qemu/mod.rs` split, loader files grouped, and schema conversion impls co-located with source types where targeted

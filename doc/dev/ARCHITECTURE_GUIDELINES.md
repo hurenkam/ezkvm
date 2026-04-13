@@ -1,0 +1,141 @@
+# Architecture Guidelines
+
+This document defines architecture best practices for this repository. It complements `doc/dev/CODING_GUIDELINES.md` by describing how to organize code and components at the system level.
+
+## 1. Code Architecture
+
+### Goal
+Keep the codebase discoverable, modular, and testable by using a predictable filesystem layout and consistent placement of source, tests, and documentation.
+
+### Canonical Layout
+
+```text
+.
+├── src/
+│   ├── main.rs                 # binary entrypoint
+│   ├── lib.rs                  # crate root and module exports
+│   ├── cli/                    # CLI parsing and command handlers
+│   ├── config/                 # schema, loading, merge, validation
+│   ├── qemu/                   # command construction and process control
+│   ├── network/                # network helpers and tooling
+│   ├── storage/                # storage operations and helpers
+│   ├── state/                  # runtime state, pid/log paths, cache
+│   └── device.rs               # hotplug and passthrough helpers
+├── tests/
+│   ├── integration_tests.rs    # integration test entrypoint
+│   ├── integration/            # integration test modules
+│   ├── config_tests.rs         # config test entrypoint
+│   └── config/                 # config-focused test modules
+├── examples/                   # runnable and documented sample configs
+├── etc/                        # environment-specific config artifacts
+├── input/                      # fixtures and external reference inputs
+├── notes/                      # design notes and planning docs
+├── README.md                   # project overview and usage
+├── doc/
+│   ├── user/CONFIG.md          # user-facing config contract
+│   └── dev/
+│       ├── CODING_GUIDELINES.md
+│       └── ARCHITECTURE_GUIDELINES.md
+```
+
+### Placement Rules
+- Put production Rust code under `src/` only.
+- Keep module entrypoints (`mod.rs` where used) as wiring-only files.
+- Place integration tests in `tests/` with one entrypoint per test family and module files in subdirectories.
+- Keep long-term reference docs in root or `notes/`; keep generated, obsolete, or temporary artifacts out of primary docs paths.
+- Place user-consumable examples in `examples/`; place external comparison fixtures under `input/`.
+
+### Naming and File Granularity
+- Use domain-based module names (`config`, `qemu`, `state`) over technical names (`utils`, `helpers`) when possible.
+- Prefer focused files with one primary responsibility.
+- Split files that become hard to navigate; use orchestrator modules to compose focused submodules.
+
+### Test Location Strategy
+- Unit tests live next to source modules when they verify local behavior.
+- Integration tests live under `tests/` when they validate cross-component behavior.
+- Use fixture files for parity tests rather than embedding large command strings inline.
+
+## 2. System Architecture
+
+### Goal
+Use a modular architecture with loose interfaces and explicit data contracts so that core behavior can evolve without tight coupling.
+
+### Recommended Pattern
+Use a layered modular monolith pattern with ports-and-adapters influence:
+- Core/domain modules express VM configuration, validation, and command intent.
+- Adapter modules implement host interactions (QEMU process, filesystem, network tools, QMP socket I/O).
+- CLI is an application boundary that translates user intent into domain operations.
+
+### Component Model
+- `cli`: command parsing and orchestration entrypoint.
+- `config`: schema types, loading, profile merge, and validation.
+- `qemu`: command building and process lifecycle management.
+- `device`: runtime hotplug/passthrough orchestration (QMP-based operations).
+- `storage`: disk and snapshot operations.
+- `network`: bridge/firewall/stats tooling.
+- `state`: runtime metadata and path conventions.
+
+### Interaction Principles
+- Prefer unidirectional flow:
+  - `cli` -> `config` -> `qemu`/`device`/`storage`/`network` -> OS/QEMU.
+- Keep interfaces coarse enough to be stable, but explicit enough to validate inputs.
+- Use typed config structs and strongly typed helper functions instead of map-like dynamic passing.
+- Return explicit `Result` values with actionable context at component boundaries.
+
+### Loose Interface Rules
+- Do not let low-level adapters call upward into CLI or command parser modules.
+- Keep serialization/deserialization concerns inside config boundary modules.
+- Isolate side effects (process execution, socket I/O, file mutation) behind narrow function interfaces.
+- For protocol adapters (for example QMP), centralize framing, handshake, and error parsing in one client abstraction.
+
+### Reliability Patterns
+- Apply fail-fast validation before runtime execution.
+- Use deterministic command generation for regression comparability.
+- Handle external command/protocol errors as structured failures, not best-effort logs.
+
+## 3. Layering / Packaging
+
+### Goal
+Group similar components into clear architectural layers to reduce dependency cycles and improve evolvability.
+
+### Layer Model
+1. Interface Layer:
+- `cli`
+- Responsibility: parse input, invoke use-cases, present results.
+
+2. Application/Use-Case Layer:
+- command handlers, runtime orchestration modules
+- Responsibility: coordinate workflows across components.
+
+3. Domain Layer:
+- config schema, validation rules, command intent structures
+- Responsibility: core business rules and invariants.
+
+4. Infrastructure/Adapter Layer:
+- process execution, filesystem I/O, network tooling commands, QMP transport
+- Responsibility: interact with external systems.
+
+### Dependency Direction
+- Interface -> Application -> Domain -> Infrastructure abstractions.
+- Infrastructure depends on domain data contracts, not on CLI details.
+- Avoid cross-layer shortcuts that bypass validation or orchestrator logic.
+
+### Packaging Guidelines
+- Package by bounded context first (`config`, `qemu`, `network`, `storage`) rather than technical role.
+- Inside a context, split by concern:
+  - schema types
+  - validation
+  - loading/merge
+  - execution/adapters
+- Keep test packages aligned with production contexts (`tests/config`, `tests/integration`).
+
+### Architectural Guardrails
+- No cyclic module dependencies.
+- Keep public API surface minimal; prefer `pub(crate)` by default.
+- Keep adapter-specific details out of domain models where possible.
+- Document any intentional architecture exceptions near the affected module.
+
+### Evolution Guidance
+- For new capabilities, add or extend a context module before creating global utility modules.
+- For larger features, create a thin orchestrator function and push detailed logic into focused helpers.
+- Update this document when introducing new top-level components or changing layer boundaries.
