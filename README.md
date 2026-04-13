@@ -141,7 +141,7 @@ See the `examples/` directory for complete configuration examples:
 
 ezkvm follows a modular architecture with clear separation of concerns:
 
-For repository architecture standards and packaging/layering guidance, see [ARCHITECTURE_GUIDELINES.md](ARCHITECTURE_GUIDELINES.md).
+For repository architecture standards and packaging/layering guidance, see [doc/dev/ARCHITECTURE_GUIDELINES.md](doc/dev/ARCHITECTURE_GUIDELINES.md).
 
 - **config/**: YAML parsing, validation, and configuration structures
 - **qemu/**: QEMU command generation and process management
@@ -185,7 +185,7 @@ For repository architecture standards and packaging/layering guidance, see [ARCH
 
 ## Rust Guidelines Monitor Agent
 
-Use the repository coding standard in [CODING_GUIDELINES.md](CODING_GUIDELINES.md) together with the review agent in [.github/rust-guidelines-monitor.agent.md](.github/rust-guidelines-monitor.agent.md).
+Use the repository coding standard in [doc/dev/CODING_GUIDELINES.md](doc/dev/CODING_GUIDELINES.md) together with the review agent in [.github/rust-guidelines-monitor.agent.md](.github/rust-guidelines-monitor.agent.md).
 
 When to run it:
 - Before opening or merging a pull request.
@@ -202,7 +202,7 @@ What to ask it to review:
 Suggested prompt template:
 
 ```text
-Review the current changes against CODING_GUIDELINES.md.
+Review the current changes against doc/dev/CODING_GUIDELINES.md.
 
 Scope:
 - Focus on Rust files and affected tests/docs.
