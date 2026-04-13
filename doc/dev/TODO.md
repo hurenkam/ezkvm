@@ -12,7 +12,7 @@
 - [x] Update QEMU argument composition to read from the new normalized schema paths only (`system.*`, `options.*`, `controllers.*`, `host.*`, `devices.input`, `devices.audio`, `system.memory.*`)
 - [x] Add unit tests for parsing, merge behavior, list append semantics, and precedence across legacy vs new schema layouts
 - [x] Add integration tests for command regression parity and mixed legacy/new config compatibility across all moved sections
-- [x] Update `doc/user/CONFIG.md` and migration notes to reflect new hierarchy and legacy compatibility behavior
+- [x] Update `doc/user/config/README.md` and migration notes to reflect new hierarchy and legacy compatibility behavior
 - [x] Update all files under `examples/` to the new schema layout (`system.boot`, `system.tpm`, `system.smbios`, `system.cpu`, `system.memory.size`, `system.memory.ballooning`, `system.memory.ivshmem`, `options.guest_agent`, `options.qmp`, `controllers.scsi`, `controllers.xhci`, `host.pci`, `host.usb`, `devices.input`, `devices.audio`)
 - [x] Update packaged files under `etc/` (including profile files) to the new schema layout and verify they remain policy-compatible and profile-merge-safe
 - [x] Run full validation gates (`cargo fmt --all --check`, strict clippy, full tests) and perform a final guideline audit on changed files
