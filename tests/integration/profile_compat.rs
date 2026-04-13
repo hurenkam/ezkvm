@@ -182,3 +182,84 @@ devices:
 
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn test_profile_policies_apply_to_additional_device_families() {
+    let _guard = env_lock().lock().unwrap();
+
+    let root = std::env::temp_dir().join(format!(
+        "ezkvm-integration-profile-extra-families-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&root).unwrap();
+
+    let profile_dir = root.join("profiles");
+    fs::create_dir_all(&profile_dir).unwrap();
+    fs::write(
+        profile_dir.join("device_defaults.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+policies:
+  displays:
+    - match:
+        type: "qxl"
+      defaults:
+        vram: 64
+  scsi_controllers:
+    - match:
+        type: "pvscsi"
+      defaults:
+        bus: "pci.0"
+        addr: "0x5"
+"#,
+    )
+    .unwrap();
+
+    let central_path = root.join("ezkvm.yaml");
+    fs::write(
+        &central_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_path = root.join("vm.yaml");
+    fs::write(
+        &vm_path,
+        r#"
+name: "integration-extra-families-vm"
+backend: "qemu"
+profiles:
+  - "device_defaults"
+devices:
+  displays:
+    - type: "qxl"
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_path);
+    }
+    let config = VmConfig::from_file(&vm_path).unwrap();
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+
+    assert_eq!(config.devices.displays[0].vram, Some(64));
+    assert_eq!(config.scsi_controllers[0].bus.as_deref(), Some("pci.0"));
+    assert_eq!(config.scsi_controllers[0].addr.as_deref(), Some("0x5"));
+
+    let _ = fs::remove_dir_all(root);
+}

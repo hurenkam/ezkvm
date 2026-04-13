@@ -12,6 +12,39 @@ struct ProfilePolicies {
 
     #[serde(default)]
     networks: Vec<NetworkPolicy>,
+
+    #[serde(default)]
+    displays: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    serials: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    hostpci: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    usb_devices: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    xhci_controllers: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    audio_devices: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    scsi_controllers: Vec<GenericPolicy>,
+
+    #[serde(default)]
+    iscsi_disks: Vec<GenericPolicy>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GenericPolicy {
+    #[serde(default, rename = "match")]
+    selector: Mapping,
+
+    #[serde(default)]
+    defaults: Mapping,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -103,6 +136,14 @@ pub(crate) fn apply_profile_policies(root: &mut Value) -> Result<()> {
 
     apply_drive_policies(root, &policies.drives)?;
     apply_network_policies(root, &policies.networks)?;
+    apply_mapping_list_policies(root, &["devices", "displays"], &policies.displays)?;
+    apply_mapping_list_policies(root, &["devices", "serials"], &policies.serials)?;
+    apply_mapping_list_policies(root, &["hostpci"], &policies.hostpci)?;
+    apply_mapping_list_policies(root, &["usb_devices"], &policies.usb_devices)?;
+    apply_mapping_list_policies(root, &["xhci_controllers"], &policies.xhci_controllers)?;
+    apply_mapping_list_policies(root, &["audio_devices"], &policies.audio_devices)?;
+    apply_mapping_list_policies(root, &["scsi_controllers"], &policies.scsi_controllers)?;
+    apply_mapping_list_policies(root, &["iscsi_disks"], &policies.iscsi_disks)?;
     apply_drive_placement_policies(root, &policies.drives)?;
     apply_network_placement_policies(root, &policies.networks)?;
     validate_drive_scsi_id_collisions(root)?;
@@ -157,6 +198,34 @@ fn apply_network_policies(root: &mut Value, policies: &[NetworkPolicy]) -> Resul
         for policy in policies.iter().rev() {
             if network_matches_policy(network_map, &policy.selector) {
                 merge_missing_mapping(network_map, &policy.defaults);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn apply_mapping_list_policies(
+    root: &mut Value,
+    path: &[&str],
+    policies: &[GenericPolicy],
+) -> Result<()> {
+    if policies.is_empty() {
+        return Ok(());
+    }
+
+    let Some(items) = get_nested_sequence_mut(root, path)? else {
+        return Ok(());
+    };
+
+    for item in items {
+        let Value::Mapping(item_map) = item else {
+            continue;
+        };
+
+        for policy in policies.iter().rev() {
+            if mapping_matches_selector(item_map, &policy.selector) {
+                merge_missing_mapping(item_map, &policy.defaults);
             }
         }
     }
@@ -534,6 +603,24 @@ fn network_matches_policy(network_map: &Mapping, selector: &NetworkPolicyMatch) 
             extract_network_backend_type(network_map).as_deref(),
             selector.backend_type.as_deref(),
         )
+}
+
+fn mapping_matches_selector(item_map: &Mapping, selector: &Mapping) -> bool {
+    selector.iter().all(|(key, expected)| {
+        item_map
+            .get(key)
+            .map(|actual| value_matches_selector(actual, expected))
+            .unwrap_or(false)
+    })
+}
+
+fn value_matches_selector(actual: &Value, expected: &Value) -> bool {
+    match (actual, expected) {
+        (Value::Mapping(actual_map), Value::Mapping(expected_map)) => {
+            mapping_matches_selector(actual_map, expected_map)
+        }
+        _ => actual == expected,
+    }
 }
 
 fn string_selector_matches(map: &Mapping, field: &str, expected: Option<&str>) -> bool {

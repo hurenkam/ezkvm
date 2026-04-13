@@ -74,6 +74,14 @@ fn is_append_all_list_path(path: &[String]) -> bool {
         || matches!(path, [first, second] if first == "devices" && second == "networks")
         || matches!(path, [first, second] if first == "policies" && second == "drives")
         || matches!(path, [first, second] if first == "policies" && second == "networks")
+        || matches!(path, [first, second] if first == "policies" && second == "displays")
+        || matches!(path, [first, second] if first == "policies" && second == "serials")
+        || matches!(path, [first, second] if first == "policies" && second == "hostpci")
+        || matches!(path, [first, second] if first == "policies" && second == "usb_devices")
+        || matches!(path, [first, second] if first == "policies" && second == "xhci_controllers")
+        || matches!(path, [first, second] if first == "policies" && second == "audio_devices")
+        || matches!(path, [first, second] if first == "policies" && second == "scsi_controllers")
+        || matches!(path, [first, second] if first == "policies" && second == "iscsi_disks")
 }
 
 fn merge_sequence_of_mappings_by_id(

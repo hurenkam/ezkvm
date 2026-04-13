@@ -780,3 +780,187 @@ devices:
     }
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn test_vm_config_from_file_applies_display_and_serial_policies_by_selector() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-profile-display-serial-policies");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+policies:
+  displays:
+    - match:
+        type: "qxl"
+      defaults:
+        vram: 128
+  serials:
+    - match:
+        type: "socket"
+      defaults:
+        host: "127.0.0.1"
+        socket_port: 4444
+        server: true
+        wait: false
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "display-serial-policy-test"
+backend: "qemu"
+profiles:
+  - "base"
+devices:
+  displays:
+    - type: "qxl"
+  serials:
+    - type: "socket"
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let config = VmConfig::from_file(&vm_config_path).unwrap();
+
+    let display = &config.devices.displays[0];
+    assert_eq!(display.r#type, "qxl");
+    assert_eq!(display.vram, Some(128));
+
+    let serial = &config.devices.serials[0];
+    assert_eq!(serial.r#type, "socket");
+    assert_eq!(serial.host.as_deref(), Some("127.0.0.1"));
+    assert_eq!(serial.socket_port, Some(4444));
+    assert!(serial.server);
+    assert!(!serial.wait);
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn test_vm_config_from_file_applies_scsi_and_audio_policies_by_selector() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let root = unique_test_dir("ezkvm-profile-scsi-audio-policies");
+    let profile_dir = root.join("profiles");
+    std::fs::create_dir_all(&profile_dir).unwrap();
+
+    std::fs::write(
+        profile_dir.join("base.yaml"),
+        r#"
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 4096
+  vcpus: 2
+  cpu_model: "host"
+policies:
+  scsi_controllers:
+    - match:
+        type: "pvscsi"
+      defaults:
+        bus: "pci.0"
+        addr: "0x5"
+  audio_devices:
+    - match:
+        type: "ich9-intel-hda"
+      defaults:
+        bus: "pci.2"
+        addr: "0xc"
+    - match:
+        type: "hda-duplex"
+      defaults:
+        bus: "audiodev0.0"
+        audiodev: "spice-backend0"
+"#,
+    )
+    .unwrap();
+
+    let central_config_path = root.join("ezkvm.yaml");
+    std::fs::write(
+        &central_config_path,
+        format!("locations:\n  profile_dir: \"{}\"\n", profile_dir.display()),
+    )
+    .unwrap();
+
+    let vm_config_path = root.join("vm.yaml");
+    std::fs::write(
+        &vm_config_path,
+        r#"
+name: "scsi-audio-policy-test"
+backend: "qemu"
+profiles:
+  - "base"
+spice:
+  enabled: true
+  audio: true
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+audio_devices:
+  - id: "audiodev0"
+    type: "ich9-intel-hda"
+  - id: "codec0"
+    type: "hda-duplex"
+    cad: 1
+"#,
+    )
+    .unwrap();
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_config_path);
+    }
+
+    let config = VmConfig::from_file(&vm_config_path).unwrap();
+
+    let scsi = &config.scsi_controllers[0];
+    assert_eq!(scsi.r#type, "pvscsi");
+    assert_eq!(scsi.bus.as_deref(), Some("pci.0"));
+    assert_eq!(scsi.addr.as_deref(), Some("0x5"));
+
+    let hda = &config.audio_devices[0];
+    assert_eq!(hda.r#type, "ich9-intel-hda");
+    assert_eq!(hda.bus.as_deref(), Some("pci.2"));
+    assert_eq!(hda.addr.as_deref(), Some("0xc"));
+
+    let codec = &config.audio_devices[1];
+    assert_eq!(codec.r#type, "hda-duplex");
+    assert_eq!(codec.bus.as_deref(), Some("audiodev0.0"));
+    assert_eq!(codec.audiodev.as_deref(), Some("spice-backend0"));
+    assert_eq!(codec.cad, Some(1));
+
+    unsafe {
+        std::env::remove_var("EZKVM_CONFIG");
+    }
+    let _ = std::fs::remove_dir_all(root);
+}

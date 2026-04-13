@@ -143,12 +143,26 @@ Currently supported policy families:
 
 - `policies.drives`
 - `policies.networks`
+- `policies.displays`
+- `policies.serials`
+- `policies.hostpci`
+- `policies.usb_devices`
+- `policies.xhci_controllers`
+- `policies.audio_devices`
+- `policies.scsi_controllers`
+- `policies.iscsi_disks`
 
 Each policy entry has:
 
 - `match`: selector fields used to decide whether the policy applies
 - `defaults`: fields copied into matching concrete items only when those fields are still missing
 - `placement`: optional auto-assignment rules for placement-style fields (supported: `drives.scsi_id`, `networks.addr`)
+
+Selector behavior:
+
+- `drives` use dedicated selectors: `interface`, `type`, and optional `controller`.
+- `networks` use dedicated selectors: `model` and `backend_type`.
+- Other supported policy families use exact YAML field matching from their `match` mapping. This allows selectors such as `type`, `bus`, `controller`, `pcie`, `x_vga`, `hostbus`, or other scalar fields already present on that family.
 
 Policy precedence:
 
@@ -159,11 +173,12 @@ Policy precedence:
 
 Policy evaluation details:
 
-- `policies.drives` and `policies.networks` lists are append-merged across profiles and VM config in merge order.
+- All supported `policies.*` lists are append-merged across profiles and VM config in merge order.
 - During policy application, matching entries are evaluated in reverse list order.
 - Defaults are only copied into missing fields, so once a field is filled by a later policy, earlier policies do not overwrite it.
 - Placement rules (`scsi_id`, `addr`) for a matching item also use reverse-order matching, so the last matching placement rule is selected.
 - Collision checks run even when no `policies` section is defined, so explicit duplicate `drives[].scsi_id` and `networks[].addr` values are still rejected.
+- The additional families listed above currently support selector defaults only; placement automation remains implemented for drives and networks.
 
 Legacy compatibility behavior:
 
@@ -178,6 +193,7 @@ Migration guidance:
 3. Replace manual placement bookkeeping (`addr`, `scsi_id`) with `policies.*[].placement` where deterministic auto-assignment is desired.
 4. Retain explicit per-device values where needed; these continue to override policy-provided defaults.
 5. If migrating from old id-based mental models for drives/networks, treat list entries as concrete instances and let policy rules provide reusable defaults.
+6. The same pattern now works for other list-based device families such as displays, serials, SCSI controllers, audio devices, USB passthrough, XHCI controllers, host PCI passthrough, and iSCSI disks.
 
 Example:
 
@@ -199,6 +215,13 @@ policies:
         model: "virtio-net-pci"
         rx_queue_size: 1024
         tx_queue_size: 256
+
+  scsi_controllers:
+    - match:
+        type: "pvscsi"
+      defaults:
+        bus: "pci.0"
+        addr: "0x5"
 
     - match:
         model: "virtio-net-pci"
