@@ -12,7 +12,7 @@ pub(crate) async fn handle_create(config_path: &str, validate_only: bool) -> Res
     println!("  Architecture: {}", config.system.architecture);
     println!("  Machine: {}", config.system.machine);
     println!("  Memory: {} MiB", config.system.memory);
-    println!("  vCPUs: {}", config.system.vcpus);
+    println!("  vCPUs: {}", config.system.cpu.vcpus);
     println!("  Devices:");
     println!("    Drives: {}", config.devices.drives.len());
     println!("    Networks: {}", config.devices.networks.len());

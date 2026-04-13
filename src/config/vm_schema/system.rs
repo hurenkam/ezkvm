@@ -1,5 +1,7 @@
 use crate::qemu::types::QemuArgs;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use super::super::NumaConfig;
 
 /// System-level configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,15 +19,21 @@ pub struct SystemConfig {
     /// Memory in MiB
     pub memory: u32,
 
-    /// Number of virtual CPUs
+    /// Canonical CPU configuration.
+    #[serde(default)]
+    pub cpu: CpuConfig,
+
+    /// Legacy number of virtual CPUs (kept for compatibility input).
+    #[serde(default)]
     pub vcpus: u32,
 
-    /// CPU model to emulate
+    /// Legacy CPU model (kept for compatibility input).
+    #[serde(default)]
     pub cpu_model: String,
 
-    /// CPU-specific features
-    #[serde(default)]
-    pub cpu_features: Vec<CpuFeature>,
+    /// Legacy CPU-specific features (kept for compatibility input).
+    #[serde(default, deserialize_with = "deserialize_cpu_feature_list")]
+    pub cpu_features: Vec<String>,
 
     /// Optional QEMU config file(s) to load via -readconfig.
     /// Use this to supply machine topology files such as
@@ -35,11 +43,68 @@ pub struct SystemConfig {
     pub readconfig: Vec<String>,
 }
 
-/// CPU feature configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CpuFeature {
-    /// Feature name (e.g., "+vmx", "-avx")
-    pub name: String,
+/// Canonical CPU configuration nested under `system.cpu`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CpuConfig {
+    /// CPU model to emulate
+    #[serde(default)]
+    pub model: String,
+
+    /// Number of virtual CPUs
+    #[serde(default)]
+    pub vcpus: u32,
+
+    /// CPU-specific features
+    #[serde(default, deserialize_with = "deserialize_cpu_feature_list")]
+    pub features: Vec<String>,
+
+    /// NUMA topology configuration
+    #[serde(default)]
+    pub numa: Vec<NumaConfig>,
+}
+
+impl SystemConfig {
+    pub fn normalize_cpu_fields(&mut self, legacy_numa: Vec<NumaConfig>) {
+        // Canonical system.cpu wins whenever present.
+        if self.cpu.model.trim().is_empty() {
+            self.cpu.model = self.cpu_model.trim().to_string();
+        }
+        if self.cpu.vcpus == 0 {
+            self.cpu.vcpus = self.vcpus;
+        }
+        if self.cpu.features.is_empty() {
+            self.cpu.features = self.cpu_features.clone();
+        }
+        if self.cpu.numa.is_empty() {
+            self.cpu.numa = legacy_numa;
+        }
+
+        // Mirror canonical values back to legacy fields for compatibility callers.
+        self.cpu_model = self.cpu.model.clone();
+        self.vcpus = self.cpu.vcpus;
+        self.cpu_features = self.cpu.features.clone();
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum CpuFeatureEntry {
+    Name(String),
+    Named { name: String },
+}
+
+fn deserialize_cpu_feature_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let entries = Vec::<CpuFeatureEntry>::deserialize(deserializer)?;
+    Ok(entries
+        .into_iter()
+        .map(|entry| match entry {
+            CpuFeatureEntry::Name(value) => value,
+            CpuFeatureEntry::Named { name } => name,
+        })
+        .collect())
 }
 
 impl From<SystemConfig> for QemuArgs {
@@ -57,12 +122,10 @@ impl From<SystemConfig> for QemuArgs {
 
         // CPU configuration
         args.push_str("-cpu");
-        let mut cpu_spec = config.cpu_model.clone();
-        if !config.cpu_features.is_empty() {
-            let features: Vec<String> =
-                config.cpu_features.iter().map(|f| f.name.clone()).collect();
+        let mut cpu_spec = config.cpu.model.clone();
+        if !config.cpu.features.is_empty() {
             cpu_spec.push(',');
-            cpu_spec.push_str(&features.join(","));
+            cpu_spec.push_str(&config.cpu.features.join(","));
         }
         args.push(cpu_spec);
 
@@ -72,7 +135,7 @@ impl From<SystemConfig> for QemuArgs {
 
         // SMP (symmetric multiprocessing)
         args.push_str("-smp");
-        args.push(format!("cpus={}", config.vcpus));
+        args.push(format!("cpus={}", config.cpu.vcpus));
 
         args
     }

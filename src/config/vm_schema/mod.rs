@@ -13,5 +13,5 @@ pub use display::DisplayConfig;
 pub use drive::DriveConfig;
 pub use network::{NetworkBackendConfig, NetworkConfig};
 pub use serial::SerialConfig;
-pub use system::{CpuFeature, SystemConfig};
+pub use system::{CpuConfig, SystemConfig};
 pub use vm_config::VmConfig;

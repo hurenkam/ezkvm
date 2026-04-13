@@ -41,13 +41,13 @@ impl QemuCommandBuilder {
         // Add system configuration
         builder = builder
             .machine(&config.system.machine)
-            .cpu(&config.system.cpu_model)
+            .cpu(&config.system.cpu.model)
             .memory(config.system.memory)
-            .smp(config.system.vcpus);
+            .smp(config.system.cpu.vcpus);
 
         // Add CPU features
-        for feature in &config.system.cpu_features {
-            builder = builder.cpu_feature(&feature.name);
+        for feature in &config.system.cpu.features {
+            builder = builder.cpu_feature(feature);
         }
 
         // Add devices

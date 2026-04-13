@@ -88,15 +88,106 @@ backend: "qemu"
 system:
   # System configuration (required)
 
-boot:
-  # Boot configuration (optional)
+controllers:
+  # Controller lists (optional)
+
+host:
+  # Host passthrough lists (optional)
 
 devices:
-  # Device configuration (optional)
+  # Device groups (optional)
 
 options:
-  # Additional options (optional)
+  # Runtime options + guest agent + qmp (optional)
 ```
+
+## Canonical Hierarchy (Preferred)
+
+Use the canonical hierarchy below for new configurations:
+
+- `system.boot`, `system.tpm`, `system.smbios`
+- `system.cpu.model`, `system.cpu.vcpus`, `system.cpu.features`, `system.cpu.numa`
+- `system.memory.size`, `system.memory.ballooning`, `system.memory.ivshmem`
+- `options.guest_agent`, `options.qmp`
+- `controllers.scsi`, `controllers.xhci`
+- `host.pci`, `host.usb`
+- `devices.input`, `devices.audio`
+
+Canonical example:
+
+```yaml
+name: "my-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  cpu:
+    model: "host"
+    vcpus: 4
+    features: ["hv_time", "+kvm_pv_unhalt"]
+  memory:
+    size: 8192
+    ballooning:
+      enabled: true
+    ivshmem:
+      enabled: false
+  boot:
+    firmware: "uefi"
+
+controllers:
+  scsi: []
+  xhci: []
+
+host:
+  pci: []
+  usb: []
+
+devices:
+  drives: []
+  networks: []
+  displays: []
+  serials: []
+  input: []
+  audio: []
+
+options:
+  enable_kvm: true
+  daemonize: false
+  guest_agent:
+    enabled: true
+  qmp:
+    enabled: true
+```
+
+## Migration Compatibility Notes
+
+Legacy layouts remain supported during migration and are normalized before validation.
+
+- If both legacy and canonical scalar/object paths are present, canonical values win.
+- For moved list families, values are concatenated as `legacy entries` then `canonical entries`.
+- `system.cpu.features` accepts both canonical string entries and legacy object entries with `name`.
+
+Legacy to canonical mapping:
+
+- `boot` -> `system.boot`
+- `tpm` -> `system.tpm`
+- `smbios` -> `system.smbios`
+- `guest_agent` -> `options.guest_agent`
+- `qmp` -> `options.qmp`
+- `system.vcpus` -> `system.cpu.vcpus`
+- `system.cpu_model` -> `system.cpu.model`
+- `system.cpu_features` -> `system.cpu.features`
+- `numa` -> `system.cpu.numa`
+- `system.memory` -> `system.memory.size`
+- `ballooning` -> `system.memory.ballooning`
+- `ivshmem` -> `system.memory.ivshmem`
+- `scsi_controllers` -> `controllers.scsi`
+- `xhci_controllers` -> `controllers.xhci`
+- `hostpci` -> `host.pci`
+- `usb_devices` -> `host.usb`
+- `input_devices` -> `devices.input`
+- `audio_devices` -> `devices.audio`
 
 ## Top-Level Fields
 
@@ -287,7 +378,7 @@ The merge strategy for lists depends on the path in the configuration:
   - Defaults should be provided through selector policies under `policies.*`
 
 **Append-Unique Merge** (for feature and option lists):
-- Used for: `system.cpu_features`, `system.machine_options`, `options.global_options`
+- Used for: `system.cpu.features` (and legacy `system.cpu_features`), `system.machine_options`, `options.global_options`
 - Matching: Items are matched by value (or by `name` field for mappings)
 - Behavior:
   - Duplicates are removed (preserving order)
@@ -305,7 +396,8 @@ The merge strategy for lists depends on the path in the configuration:
 ```yaml
 # Base profile: windows_11_base.yaml
 system:
-  cpu_features: ["vmx", "sse4.1"]
+  cpu:
+    features: ["vmx", "sse4.1"]
   machine_options: ["smm=on"]
 
 devices:
@@ -319,7 +411,8 @@ devices:
 
 # Second profile: storage_defaults.yaml
 system:
-  cpu_features: ["vmx", "avx2"]  # Overlaps with base
+  cpu:
+    features: ["vmx", "avx2"]  # Overlaps with base
   
 devices:
   drives:
@@ -330,7 +423,8 @@ devices:
 
 # VM file: my-vm.yaml
 system:
-  cpu_features: ["sse4.1"]  # Should preserve "vmx", "avx2" from profiles via append-unique
+  cpu:
+    features: ["sse4.1"]  # Should preserve "vmx", "avx2" from profiles via append-unique
 
 devices:
   drives:
@@ -341,7 +435,8 @@ devices:
 
 # Result after merge:
 system:
-  cpu_features: ["vmx", "sse4.1", "avx2"]  # Append-unique deduplicates and combines
+  cpu:
+    features: ["vmx", "sse4.1", "avx2"]  # Append-unique deduplicates and combines
   machine_options: ["smm=on"]  # From first profile
 
 devices:
@@ -393,20 +488,15 @@ The `system` section defines the core virtual machine hardware specifications.
 - **Example**: `"q35"`
 
 ### `system.memory` (required)
-- **Type**: Integer
-- **Description**: RAM size in MiB (Mebibytes)
+- **Type**: Integer or object
+- **Description**: RAM configuration in MiB (Mebibytes)
 - **Minimum**: 128 MiB
 - **Maximum**: 1 TiB (1048576 MiB)
-- **Example**: `2048` (2 GiB)
+- **Examples**:
+  - `2048`
+  - `{ size: 2048, ballooning: {...}, ivshmem: {...} }`
 
-### `system.vcpus` (required)
-- **Type**: Integer
-- **Description**: Number of virtual CPU cores
-- **Minimum**: 1
-- **Maximum**: 1024
-- **Example**: `2`
-
-### `system.cpu_model` (required)
+### `system.cpu.model` (required)
 - **Type**: String
 - **Description**: CPU model to emulate
 - **Common values**:
@@ -415,19 +505,29 @@ The `system` section defines the core virtual machine hardware specifications.
   - `"cortex-a72"` - ARM Cortex-A72 (for aarch64)
 - **Example**: `"host"`
 
-### `system.cpu_features` (optional)
-- **Type**: Array of objects
+### `system.cpu.vcpus` (required)
+- **Type**: Integer
+- **Description**: Number of virtual CPU cores
+- **Minimum**: 1
+- **Maximum**: 1024
+- **Example**: `2`
+
+### `system.cpu.features` (optional)
+- **Type**: Array of strings
 - **Description**: CPU feature flags to enable/disable
 - **Default**: Empty array
 
-Each feature object has:
-- `name` (string): Feature specification (e.g., `"+vmx"`, `"-avx"`)
-
 ```yaml
-cpu_features:
-  - name: "+vmx"    # Enable Intel VT-x
-  - name: "-avx"    # Disable AVX instructions
+cpu:
+  features:
+    - "+vmx"    # Enable Intel VT-x
+    - "-avx"    # Disable AVX instructions
 ```
+
+Legacy compatibility aliases:
+- `system.vcpus` -> `system.cpu.vcpus`
+- `system.cpu_model` -> `system.cpu.model`
+- `system.cpu_features` -> `system.cpu.features`
 
 ## Boot Configuration
 

@@ -26,7 +26,7 @@ pub use platform::{
 pub use vm_options::{RtcConfig, VmOptions};
 #[allow(unused_imports)]
 pub use vm_schema::{
-    BootConfig, CpuFeature, DeviceConfig, DisplayConfig, DriveConfig, NetworkBackendConfig,
+    BootConfig, CpuConfig, DeviceConfig, DisplayConfig, DriveConfig, NetworkBackendConfig,
     NetworkConfig, SerialConfig, SystemConfig, VmConfig,
 };
 

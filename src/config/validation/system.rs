@@ -19,15 +19,19 @@ pub(crate) fn validate_system_config(system: &SystemConfig) -> Result<()> {
         return Err(anyhow!("Memory cannot exceed 1 TiB"));
     }
 
-    if system.vcpus == 0 {
+    if system.cpu.vcpus == 0 {
         return Err(anyhow!("Must have at least 1 vCPU"));
     }
-    if system.vcpus > 1024 {
+    if system.cpu.vcpus > 1024 {
         return Err(anyhow!("Cannot have more than 1024 vCPUs"));
     }
 
-    for feature in &system.cpu_features {
-        if feature.name.trim().is_empty() {
+    if system.cpu.model.trim().is_empty() {
+        return Err(anyhow!("CPU model cannot be empty"));
+    }
+
+    for feature in &system.cpu.features {
+        if feature.trim().is_empty() {
             return Err(anyhow!("CPU feature name cannot be empty"));
         }
     }

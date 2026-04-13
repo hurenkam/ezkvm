@@ -13,7 +13,7 @@ impl QemuManager {
     }
 
     fn add_boot_menu_args(&self, args: &mut QemuArgs) {
-        let boot = &self.config.boot;
+        let boot = self.config.system_boot();
         if boot.boot_order.is_empty()
             && !boot.menu
             && !boot.strict
@@ -28,7 +28,7 @@ impl QemuManager {
     }
 
     fn build_boot_option_value(&self) -> String {
-        let boot = &self.config.boot;
+        let boot = self.config.system_boot();
         let mut parts = Vec::new();
 
         if !boot.boot_order.is_empty() {
@@ -56,22 +56,22 @@ impl QemuManager {
     }
 
     fn add_kernel_boot_args(&self, args: &mut QemuArgs) {
-        if let Some(kernel) = &self.config.boot.kernel {
+        if let Some(kernel) = &self.config.system_boot().kernel {
             args.push_str("-kernel");
             args.push(kernel.clone());
         }
-        if let Some(initrd) = &self.config.boot.initrd {
+        if let Some(initrd) = &self.config.system_boot().initrd {
             args.push_str("-initrd");
             args.push(initrd.clone());
         }
-        if let Some(cmdline) = &self.config.boot.cmdline {
+        if let Some(cmdline) = &self.config.system_boot().cmdline {
             args.push_str("-append");
             args.push(cmdline.clone());
         }
     }
 
     fn add_uefi_args(&self, args: &mut QemuArgs) {
-        let Some(firmware) = &self.config.boot.firmware else {
+        let Some(firmware) = &self.config.system_boot().firmware else {
             return;
         };
         if firmware != "uefi" && firmware != "ovmf" {
@@ -81,14 +81,14 @@ impl QemuManager {
         let code_path = self.resolve_uefi_code_path();
         args.add_uefi(
             code_path.as_deref(),
-            self.config.boot.uefi_vars.as_deref(),
-            self.config.boot.uefi_vars_size,
-            self.config.boot.secure_boot,
+            self.config.system_boot().uefi_vars.as_deref(),
+            self.config.system_boot().uefi_vars_size,
+            self.config.system_boot().secure_boot,
         );
     }
 
     fn resolve_uefi_code_path(&self) -> Option<String> {
-        self.config.boot.uefi_code.clone().or_else(|| {
+        self.config.system_boot().uefi_code.clone().or_else(|| {
             self.central_config
                 .locations
                 .ovmf_dir

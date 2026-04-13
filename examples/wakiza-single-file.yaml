@@ -11,38 +11,62 @@ system:
     - "hpet=off"
   readconfig:
     - "/usr/share/qemu-server/pve-q35-4.0.cfg"
-
-  memory: 16384          # 16 GiB
-  vcpus: 8
-  cpu_model: "host"
-  cpu_features:
-    - name: "hv_ipi"
-    - name: "hv_relaxed"
-    - name: "hv_reset"
-    - name: "hv_runtime"
-    - name: "hv_spinlocks=0x1fff"
-    - name: "hv_stimer"
-    - name: "hv_synic"
-    - name: "hv_time"
-    - name: "hv_vapic"
-    - name: "hv_vendor_id=proxmox"
-    - name: "hv_vpindex"
-    - name: "kvm=off"
-    - name: "+kvm_pv_eoi"
-    - name: "+kvm_pv_unhalt"
-
-boot:
-  firmware: "uefi"
-  boot_order: []
-  menu: true
-  strict: true
-  reboot_timeout: 1000
-  splash: "/usr/share/qemu-server/bootsplash.jpg"
-  uefi_code: "/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd"
-  uefi_vars: "/dev/vm1/vm-108-efidisk"
-  uefi_vars_size: 540672
-  #uefi_vars: "/tmp/wakiza_vars_test.fd"
-  secure_boot: true
+  memory:
+    size: 16384          # 16 GiB
+    ballooning:
+      enabled: true
+      free_page_reporting: true
+      model: "virtio-balloon-pci"
+      id: "balloon0"
+      bus: "pci.0"
+      addr: "0x3"
+    ivshmem:
+      enabled: true
+      size: 128
+      vectors: 1
+      id: "ivshmem0"
+      bus: "pcie.0"
+      mem_path: "/dev/kvmfr0"
+  cpu:
+    vcpus: 8
+    model: "host"
+    features:
+      - "hv_ipi"
+      - "hv_relaxed"
+      - "hv_reset"
+      - "hv_runtime"
+      - "hv_spinlocks=0x1fff"
+      - "hv_stimer"
+      - "hv_synic"
+      - "hv_time"
+      - "hv_vapic"
+      - "hv_vendor_id=proxmox"
+      - "hv_vpindex"
+      - "kvm=off"
+      - "+kvm_pv_eoi"
+      - "+kvm_pv_unhalt"
+  boot:
+    firmware: "uefi"
+    boot_order: []
+    menu: true
+    strict: true
+    reboot_timeout: 1000
+    splash: "/usr/share/qemu-server/bootsplash.jpg"
+    uefi_code: "/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd"
+    uefi_vars: "/dev/vm1/vm-108-efidisk"
+    uefi_vars_size: 540672
+    #uefi_vars: "/tmp/wakiza_vars_test.fd"
+    secure_boot: true
+  tpm:
+    version: "2.0"
+    backend: "emulator"
+    model: "tpm-tis"
+    state_path: "/var/run/qemu-server/108.swtpm"
+    state_backend_uri: "file:///dev/vm1/vm-108-tpmstate"
+    # state_dir: "/mnt/tpmstate"  # optional fallback
+  smbios:
+    uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
+    vm_generation_id: "c13b46f3-9743-49f0-92e8-297b9feac497"
 
 policies:
   drives:
@@ -122,75 +146,57 @@ devices:
   serials:
     - type: "pty"
       port: 0
+  input:
+    - type: "virtio-mouse"
+    - type: "virtio-keyboard"
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+      bus: "pci.2"
+      addr: "0xc"
+    - type: "hda-micro"
+      id: "audiodev0-codec0"
+      bus: "audiodev0.0"
+      cad: 0
+      audiodev: "spice-backend0"
+    - type: "hda-duplex"
+      id: "audiodev0-codec1"
+      bus: "audiodev0.0"
+      cad: 1
+      audiodev: "spice-backend0"
 
-# Explicit SPICE input devices
-input_devices:
-  - type: "virtio-mouse"
-  - type: "virtio-keyboard"
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: "hostpci0.0"
+      pcie: true
+      bus: "ich9-pcie-port-1"
+      addr: "0x0.0"
+      multifunction: true
+    - device: "0000:03:00.1"
+      id: "hostpci0.1"
+      pcie: true
+      bus: "ich9-pcie-port-1"
+      addr: "0x0.1"
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.2"
+      bus: "xhci.0"
+      port: "1"
 
-# TPM configuration
-tpm:
-  version: "2.0"
-  backend: "emulator"
-  model: "tpm-tis"
-  state_path: "/var/run/qemu-server/108.swtpm"
-  state_backend_uri: "file:///dev/vm1/vm-108-tpmstate"
-  # state_dir: "/mnt/tpmstate"  # optional fallback
-
-# Guest agent
-guest_agent:
-  enabled: true
-  socket_path: "/var/run/qemu-server/108.qga"
-  bus: "pci.0"
-  addr: "0x8"
-
-# Memory ballooning
-ballooning:
-  enabled: true
-  free_page_reporting: true
-  model: "virtio-balloon-pci"
-  id: "balloon0"
-  bus: "pci.0"
-  addr: "0x3"
-
-# Hardware passthrough for GPU
-hostpci:
-  - device: "0000:03:00.0"
-    id: "hostpci0.0"
-    pcie: true
-    bus: "ich9-pcie-port-1"
-    addr: "0x0.0"
-    multifunction: true
-  - device: "0000:03:00.1"
-    id: "hostpci0.1"
-    pcie: true
-    bus: "ich9-pcie-port-1"
-    addr: "0x0.1"
-
-
-# XHCI controller and USB host device
-xhci_controllers:
-  - id: "xhci"
-    p2: 15
-    p3: 15
-    bus: "pci.1"
-    addr: "0x1b"
-
-usb_devices:
-  - id: "usb0"
-    hostbus: "1"
-    hostport: "2.2"
-    bus: "xhci.0"
-    port: "1"
-
-## XHCI controller is not a SCSI controller; only pvscsi is listed here.
-
-# SCSI controllers
-scsi_controllers:
-  - id: "scsihw0"
-    type: "pvscsi"
-    bus: "pci.0"
-    addr: "0x5"
+controllers:
+  xhci:
+    - id: "xhci"
+      p2: 15
+      p3: 15
+      bus: "pci.1"
+      addr: "0x1b"
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
+      bus: "pci.0"
+      addr: "0x5"
 
 # SPICE display server
 spice:
@@ -201,28 +207,18 @@ spice:
   audio: true
   vdagent: true
 
-ivshmem:
-  enabled: true
-  size: 128
-  vectors: 1
-  id: "ivshmem0"
-  bus: "pcie.0"
-  mem_path: "/dev/kvmfr0"
-
-# SMBIOS system information
-smbios:
-  uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
-  vm_generation_id: "c13b46f3-9743-49f0-92e8-297b9feac497"
-
-# QMP monitoring
-qmp:
-  enabled: true
-  socket_path: "/var/run/qemu-server/108.qmp"
-
 options:
   enable_kvm: true
   daemonize: true
   nodefaults: true
+  guest_agent:
+    enabled: true
+    socket_path: "/var/run/qemu-server/108.qga"
+    bus: "pci.0"
+    addr: "0x8"
+  qmp:
+    enabled: true
+    socket_path: "/var/run/qemu-server/108.qmp"
   pid_file: "/tmp/ezkvm/wakiza.pid"
   log_dir: "/tmp/ezkvm/logs"
   log_keep: 5
@@ -232,20 +228,4 @@ options:
     base: "localtime"
     driftfix: "slew"
 
-# SPICE-backed audio devices
-audio_devices:
-  - type: "ich9-intel-hda"
-    id: "audiodev0"
-    bus: "pci.2"
-    addr: "0xc"
-  - type: "hda-micro"
-    id: "audiodev0-codec0"
-    bus: "audiodev0.0"
-    cad: 0
-    audiodev: "spice-backend0"
-  - type: "hda-duplex"
-    id: "audiodev0-codec1"
-    bus: "audiodev0.0"
-    cad: 1
-    audiodev: "spice-backend0"
   

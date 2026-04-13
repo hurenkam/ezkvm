@@ -27,8 +27,7 @@ impl QemuManager {
 
     pub(super) fn uses_external_swtpm(&self) -> bool {
         self.config
-            .tpm
-            .as_ref()
+            .system_tpm()
             .map(|tpm| tpm.backend == "emulator")
             .unwrap_or(false)
             && self.central_config.tools.swtpm.is_some()
@@ -36,13 +35,13 @@ impl QemuManager {
 
     pub(super) fn has_primary_passthrough_gpu(&self) -> bool {
         self.config
-            .hostpci
+            .host_pci()
             .iter()
             .any(|device| device.x_vga || device.id.starts_with("hostpci0"))
     }
 
     pub(super) fn resolve_tpm_socket_path(&self) -> String {
-        if let Some(tpm) = &self.config.tpm
+        if let Some(tpm) = self.config.system_tpm()
             && let Some(state_path) = &tpm.state_path
         {
             return state_path.clone();

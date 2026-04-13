@@ -2,8 +2,8 @@ use crate::qemu::{QemuManager, types::QemuArgs};
 
 impl QemuManager {
     pub(super) fn add_usb_args(&self, args: &mut QemuArgs) {
-        if !self.config.xhci_controllers.is_empty() {
-            for xhci_controller in &self.config.xhci_controllers {
+        if !self.config.controllers_xhci().is_empty() {
+            for xhci_controller in self.config.controllers_xhci() {
                 args.add_xhci_controller(
                     &xhci_controller.id,
                     xhci_controller.p2,
@@ -12,11 +12,11 @@ impl QemuManager {
                     xhci_controller.addr.as_deref(),
                 );
             }
-        } else if !self.config.usb_devices.is_empty() {
+        } else if !self.config.host_usb().is_empty() {
             args.add_xhci_controller("xhci", None, None, None, None);
         }
 
-        for usb_device in &self.config.usb_devices {
+        for usb_device in self.config.host_usb() {
             args.add_usb_host(
                 &usb_device.host,
                 usb_device.hostbus.as_deref(),
@@ -34,8 +34,7 @@ impl QemuManager {
         {
             let has_serial_controller = self
                 .config
-                .guest_agent
-                .as_ref()
+                .options_guest_agent()
                 .map(|guest_agent| guest_agent.enabled)
                 .unwrap_or(false);
             let attach_display_device = !self.has_primary_passthrough_gpu();
@@ -51,7 +50,7 @@ impl QemuManager {
             if spice.audio {
                 let mut emitted_backends: Vec<&str> = Vec::new();
 
-                for audio_device in &self.config.audio_devices {
+                for audio_device in self.config.devices_audio() {
                     if let Some(audiodev) = audio_device.audiodev.as_deref()
                         && !emitted_backends.contains(&audiodev)
                     {
@@ -60,7 +59,7 @@ impl QemuManager {
                     }
                 }
 
-                for audio_device in &self.config.audio_devices {
+                for audio_device in self.config.devices_audio() {
                     args.add_audio_device(
                         &audio_device.r#type,
                         &audio_device.id,

@@ -65,6 +65,7 @@ fn is_id_merge_list_path(path: &[String]) -> bool {
 
 fn is_append_unique_list_path(path: &[String]) -> bool {
     matches!(path, [first, second] if first == "system" && second == "cpu_features")
+        || matches!(path, [first, second, third] if first == "system" && second == "cpu" && third == "features")
         || matches!(path, [first, second] if first == "system" && second == "machine_options")
         || matches!(path, [first, second] if first == "options" && second == "global_options")
 }

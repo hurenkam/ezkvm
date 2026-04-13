@@ -204,3 +204,302 @@ system:
     assert!(config.options.enable_kvm);
     assert!(!config.options.daemonize);
 }
+
+#[test]
+fn test_new_schema_paths_are_normalized_before_validation() {
+    let yaml = r#"
+name: "normalized-schema-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+    ballooning:
+      enabled: true
+      model: "virtio-balloon-pci"
+    ivshmem:
+      enabled: true
+      mem_path: "/dev/kvmfr0"
+  cpu:
+    model: "host"
+    vcpus: 1
+    features:
+      - "hv_time"
+      - name: "kvm=off"
+  boot:
+    firmware: "bios"
+
+options:
+  enable_kvm: true
+  daemonize: false
+  guest_agent:
+    enabled: true
+  qmp:
+    enabled: true
+    socket_path: "/tmp/ezkvm-test.qmp"
+
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
+  xhci:
+    - id: "xhci0"
+
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: "hostpci0"
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.1"
+
+devices:
+  input:
+    - type: "virtio-mouse"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+
+    assert_eq!(config.system.memory, 1024);
+    assert_eq!(config.system.cpu.features, vec!["hv_time", "kvm=off"]);
+    assert_eq!(config.boot.firmware.as_deref(), Some("bios"));
+    assert!(
+        config
+            .guest_agent
+            .as_ref()
+            .map(|g| g.enabled)
+            .unwrap_or(false)
+    );
+    assert_eq!(
+        config.qmp.as_ref().and_then(|q| q.socket_path.as_deref()),
+        Some("/tmp/ezkvm-test.qmp")
+    );
+    assert!(config.ballooning.is_some());
+    assert!(config.ivshmem.is_some());
+    assert_eq!(config.scsi_controllers.len(), 1);
+    assert_eq!(config.xhci_controllers.len(), 1);
+    assert_eq!(config.hostpci.len(), 1);
+    assert_eq!(config.usb_devices.len(), 1);
+    assert_eq!(config.input_devices.len(), 1);
+}
+
+#[test]
+fn test_moved_list_paths_concatenate_legacy_then_target_entries() {
+    let yaml = r#"
+name: "list-concat-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  cpu:
+    model: "host"
+    vcpus: 1
+
+scsi_controllers:
+  - id: "legacy-scsi"
+    type: "pvscsi"
+
+controllers:
+  scsi:
+    - id: "target-scsi"
+      type: "pvscsi"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    let ids: Vec<&str> = config
+        .scsi_controllers
+        .iter()
+        .map(|controller| controller.id.as_str())
+        .collect();
+
+    assert_eq!(ids, vec!["legacy-scsi", "target-scsi"]);
+}
+
+#[test]
+fn test_mixed_legacy_and_target_scalar_paths_use_target_values() {
+    let yaml = r#"
+name: "mixed-scalar-precedence-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+    ballooning:
+      enabled: true
+      model: "virtio-balloon-pci"
+    ivshmem:
+      enabled: true
+      mem_path: "/dev/kvmfr0"
+  cpu:
+    model: "host"
+    vcpus: 1
+  boot:
+    firmware: "bios"
+  tpm:
+    version: "2.0"
+    backend: "emulator"
+
+boot:
+  firmware: "uefi"
+
+tpm:
+  version: "1.2"
+  backend: "passthrough"
+
+ballooning:
+  enabled: true
+  model: "virtio-balloon-ccw"
+
+ivshmem:
+  enabled: true
+  mem_path: "/tmp/legacy-kvmfr0"
+
+qmp:
+  enabled: true
+  socket_path: "/tmp/legacy.qmp"
+
+options:
+  enable_kvm: true
+  daemonize: false
+  qmp:
+    enabled: true
+    socket_path: "/tmp/target.qmp"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+
+    assert_eq!(config.boot.firmware.as_deref(), Some("bios"));
+    assert_eq!(config.tpm.as_ref().map(|t| t.version.as_str()), Some("2.0"));
+    assert_eq!(
+        config.ballooning.as_ref().map(|b| b.model.as_str()),
+        Some("virtio-balloon-pci")
+    );
+    assert_eq!(
+        config.ivshmem.as_ref().map(|i| i.mem_path.as_str()),
+        Some("/dev/kvmfr0")
+    );
+    assert_eq!(
+        config.qmp.as_ref().and_then(|q| q.socket_path.as_deref()),
+        Some("/tmp/target.qmp")
+    );
+}
+
+#[test]
+fn test_moved_host_pci_lists_concatenate_legacy_then_target_entries() {
+    let yaml = r#"
+name: "host-pci-list-concat-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  cpu:
+    model: "host"
+    vcpus: 1
+
+hostpci:
+  - device: "0000:03:00.0"
+    id: "legacy-hostpci0"
+
+host:
+  pci:
+    - device: "0000:03:00.1"
+      id: "target-hostpci1"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    let ids: Vec<&str> = config
+        .hostpci
+        .iter()
+        .map(|device| device.id.as_str())
+        .collect();
+
+    assert_eq!(ids, vec!["legacy-hostpci0", "target-hostpci1"]);
+}
+
+#[test]
+fn test_system_memory_object_requires_size_field() {
+    let yaml = r#"
+name: "invalid-memory-object-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    ballooning:
+      enabled: true
+  cpu:
+    model: "host"
+    vcpus: 1
+
+options:
+  enable_kvm: true
+  daemonize: false
+"#;
+
+    let err = VmConfig::from_str(yaml).unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("system.memory object must include 'size'")
+    );
+}
+
+#[test]
+fn test_new_list_paths_require_sequence_type() {
+    let yaml = r#"
+name: "invalid-controllers-scsi-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  cpu:
+    model: "host"
+    vcpus: 1
+
+controllers:
+  scsi:
+    id: "not-a-list"
+
+options:
+  enable_kvm: true
+  daemonize: false
+"#;
+
+    let err = VmConfig::from_str(yaml).unwrap_err();
+    assert!(err.to_string().contains("controllers.scsi must be a list"));
+}
+
+#[test]
+fn test_new_object_paths_require_mapping_type() {
+    let yaml = r#"
+name: "invalid-options-qmp-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  cpu:
+    model: "host"
+    vcpus: 1
+
+options:
+  enable_kvm: true
+  daemonize: false
+  qmp: true
+"#;
+
+    let err = VmConfig::from_str(yaml).unwrap_err();
+    assert!(err.to_string().contains("options.qmp must be an object"));
+}

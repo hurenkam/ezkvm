@@ -12,7 +12,7 @@ impl QemuManager {
             args.push(path.clone());
         }
 
-        for scsi_controller in &self.config.scsi_controllers {
+        for scsi_controller in self.config.controllers_scsi() {
             args.add_scsi_controller(
                 &scsi_controller.id,
                 &scsi_controller.r#type,
@@ -40,7 +40,7 @@ impl QemuManager {
     }
 
     fn add_tpm_args(&self, args: &mut QemuArgs) -> Result<()> {
-        if let Some(tpm) = &self.config.tpm {
+        if let Some(tpm) = self.config.system_tpm() {
             let socket_path = self.resolve_tpm_socket_path();
             let external_swtpm = self.uses_external_swtpm();
             args.add_tpm(
@@ -56,7 +56,7 @@ impl QemuManager {
     }
 
     fn add_guest_agent_args(&self, args: &mut QemuArgs) {
-        if let Some(guest_agent) = &self.config.guest_agent
+        if let Some(guest_agent) = self.config.options_guest_agent()
             && guest_agent.enabled
         {
             args.add_guest_agent(
@@ -69,7 +69,7 @@ impl QemuManager {
     }
 
     fn add_balloon_args(&self, args: &mut QemuArgs) {
-        if let Some(ballooning) = &self.config.ballooning
+        if let Some(ballooning) = self.config.system_memory_ballooning()
             && ballooning.enabled
         {
             args.add_balloon(
@@ -83,7 +83,7 @@ impl QemuManager {
     }
 
     fn add_hostpci_args(&self, args: &mut QemuArgs) {
-        for hostpci in &self.config.hostpci {
+        for hostpci in self.config.host_pci() {
             args.add_vfio_pci(
                 &hostpci.device,
                 &hostpci.id,
@@ -98,13 +98,13 @@ impl QemuManager {
     }
 
     fn add_input_device_args(&self, args: &mut QemuArgs) {
-        for input_device in &self.config.input_devices {
+        for input_device in self.config.devices_input() {
             args.add_input_device(&input_device.r#type);
         }
     }
 
     fn add_ivshmem_args(&self, args: &mut QemuArgs) {
-        if let Some(ivshmem) = &self.config.ivshmem
+        if let Some(ivshmem) = self.config.system_memory_ivshmem()
             && ivshmem.enabled
         {
             args.add_ivshmem(
@@ -133,7 +133,7 @@ impl QemuManager {
     }
 
     pub(super) fn add_platform_args(&self, args: &mut QemuArgs) -> Result<()> {
-        for numa in &self.config.numa {
+        for numa in &self.config.system.cpu.numa {
             args.add_numa_node(numa.id, numa.memory, &numa.cpus, numa.host_node);
         }
 
@@ -159,7 +159,7 @@ impl QemuManager {
     }
 
     pub(super) fn add_monitoring_and_identity_args(&self, args: &mut QemuArgs) {
-        if let Some(qmp) = &self.config.qmp
+        if let Some(qmp) = self.config.options_qmp()
             && qmp.enabled
         {
             let socket_type = match qmp.socket_type {
@@ -169,7 +169,7 @@ impl QemuManager {
             args.add_qmp(qmp.socket_path.as_deref(), socket_type);
         }
 
-        if let Some(smbios) = &self.config.smbios {
+        if let Some(smbios) = self.config.system_smbios() {
             args.add_smbios(
                 smbios.manufacturer.as_deref(),
                 smbios.product.as_deref(),

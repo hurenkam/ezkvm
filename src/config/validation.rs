@@ -98,7 +98,7 @@ fn validate_collections(config: &VmConfig) -> Result<()> {
     for iscsi_disk in &config.iscsi_disks {
         validate_iscsi_disk_config(iscsi_disk)?;
     }
-    for numa in &config.numa {
+    for numa in &config.system.cpu.numa {
         validate_numa_config(numa)?;
     }
     Ok(())

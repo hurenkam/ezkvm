@@ -5,12 +5,12 @@ system:
   architecture: "x86_64"
   machine: "q35"
   memory: ${TEST_MEMORY}
-  vcpus: 2
-  cpu_model: "host"
-
-boot:
-  firmware: "uefi"
-  boot_order: ["disk", "cdrom"]
+  cpu:
+    vcpus: 2
+    model: "host"
+  boot:
+    firmware: "uefi"
+    boot_order: ["disk", "cdrom"]
 
 devices:
   drives:

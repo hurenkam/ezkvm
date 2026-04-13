@@ -5,12 +5,12 @@ system:
   architecture: "x86_64"
   machine: "q35"
   memory: 512          # Small memory for testing
-  vcpus: 1
-  cpu_model: "host"
-
-boot:
-  firmware: "bios"     # Use BIOS instead of UEFI for simplicity
-  boot_order: ["cdrom"]
+  cpu:
+    vcpus: 1
+    model: "host"
+  boot:
+    firmware: "bios"     # Use BIOS instead of UEFI for simplicity
+    boot_order: ["cdrom"]
 
 devices:
   # No drives needed for basic test

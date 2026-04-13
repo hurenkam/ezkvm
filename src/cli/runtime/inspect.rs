@@ -14,7 +14,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
             Ok(pids) if pids.contains(&pid) => {
                 println!("Status: Running (PID: {})", pid);
                 println!("Memory: {} MiB", config.system.memory);
-                println!("vCPUs: {}", config.system.vcpus);
+                println!("vCPUs: {}", config.system.cpu.vcpus);
                 return Ok(());
             }
             _ => {
@@ -28,7 +28,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
             if is_running {
                 println!("Status: Running");
                 println!("Memory: {} MiB", config.system.memory);
-                println!("vCPUs: {}", config.system.vcpus);
+                println!("vCPUs: {}", config.system.cpu.vcpus);
             } else {
                 println!("Status: Not running");
             }
@@ -91,7 +91,7 @@ pub(crate) async fn handle_validate(config_path: &str, show_resolved_config: boo
     println!("VM Name: {}", config.name);
     println!("Architecture: {}", config.system.architecture);
     println!("Memory: {} MiB", config.system.memory);
-    println!("vCPUs: {}", config.system.vcpus);
+    println!("vCPUs: {}", config.system.cpu.vcpus);
 
     if show_resolved_config {
         println!("\nResolved configuration:");

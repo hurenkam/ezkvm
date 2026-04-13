@@ -350,3 +350,29 @@ system:
     let result = VmConfig::from_str(yaml);
     assert!(result.is_err());
 }
+
+#[test]
+fn test_canonical_cpu_features_override_legacy_cpu_features_when_both_present() {
+    let yaml = r#"
+name: "cpu-feature-precedence-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 1024
+  vcpus: 2
+  cpu_model: "host"
+  cpu_features:
+    - name: "legacy_feature"
+  cpu:
+    model: "host"
+    vcpus: 2
+    features:
+      - "target_feature"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    assert_eq!(config.system.cpu.features, vec!["target_feature"]);
+    assert_eq!(config.system.cpu_features, vec!["target_feature"]);
+}

@@ -263,3 +263,175 @@ fn test_refactored_command_builder_supports_cdrom_without_path_field() {
         arg.contains("ide-cd,drive=drive-ide0,id=ide0") && arg.contains("bootindex=101")
     }));
 }
+
+#[test]
+fn test_legacy_and_target_layouts_generate_equal_commands_for_moved_sections() {
+    let legacy_yaml = r#"
+name: "schema-parity-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory: 2048
+  vcpus: 2
+  cpu_model: "host"
+
+boot:
+  firmware: "bios"
+
+tpm:
+  version: "2.0"
+  backend: "emulator"
+  model: "tpm-tis"
+  state_path: "/tmp/schema-parity.swtpm"
+
+guest_agent:
+  enabled: true
+  socket_path: "/tmp/schema-parity.qga"
+
+ballooning:
+  enabled: true
+  model: "virtio-balloon-pci"
+  free_page_reporting: true
+
+ivshmem:
+  enabled: true
+  size: 128
+  vectors: 1
+  id: "ivshmem0"
+  bus: "pcie.0"
+  mem_path: "/dev/kvmfr0"
+
+scsi_controllers:
+  - id: "scsihw0"
+    type: "pvscsi"
+
+xhci_controllers:
+  - id: "xhci0"
+
+hostpci:
+  - device: "0000:03:00.0"
+    id: "hostpci0"
+
+usb_devices:
+  - id: "usb0"
+    hostbus: "1"
+    hostport: "2.1"
+
+input_devices:
+  - type: "virtio-mouse"
+
+audio_devices:
+  - type: "ich9-intel-hda"
+    id: "audiodev0"
+
+spice:
+  enabled: true
+  port: 5903
+  addr: "127.0.0.1"
+  disable_ticketing: true
+  audio: true
+  vdagent: false
+
+qmp:
+  enabled: true
+  socket_path: "/tmp/schema-parity.qmp"
+
+smbios:
+  uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
+
+options:
+  enable_kvm: true
+  daemonize: false
+"#;
+
+    let target_yaml = r#"
+name: "schema-parity-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 2048
+    ballooning:
+      enabled: true
+      model: "virtio-balloon-pci"
+      free_page_reporting: true
+    ivshmem:
+      enabled: true
+      size: 128
+      vectors: 1
+      id: "ivshmem0"
+      bus: "pcie.0"
+      mem_path: "/dev/kvmfr0"
+  cpu:
+    model: "host"
+    vcpus: 2
+  boot:
+    firmware: "bios"
+  tpm:
+    version: "2.0"
+    backend: "emulator"
+    model: "tpm-tis"
+    state_path: "/tmp/schema-parity.swtpm"
+  smbios:
+    uuid: "04d064c3-66a1-4aa7-9589-f8b3ecf91cd7"
+
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "pvscsi"
+  xhci:
+    - id: "xhci0"
+
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: "hostpci0"
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.1"
+
+devices:
+  input:
+    - type: "virtio-mouse"
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+
+spice:
+  enabled: true
+  port: 5903
+  addr: "127.0.0.1"
+  disable_ticketing: true
+  audio: true
+  vdagent: false
+
+options:
+  enable_kvm: true
+  daemonize: false
+  guest_agent:
+    enabled: true
+    socket_path: "/tmp/schema-parity.qga"
+  qmp:
+    enabled: true
+    socket_path: "/tmp/schema-parity.qmp"
+"#;
+
+    let legacy_config = VmConfig::from_str(legacy_yaml).unwrap();
+    let target_config = VmConfig::from_str(target_yaml).unwrap();
+
+    let legacy_args = QemuManager::new(legacy_config, CentralConfig::default())
+        .build_command()
+        .unwrap()
+        .into_inner();
+    let target_args = QemuManager::new(target_config, CentralConfig::default())
+        .build_command()
+        .unwrap()
+        .into_inner();
+
+    assert_eq!(legacy_args, target_args);
+}
