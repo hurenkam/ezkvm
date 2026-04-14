@@ -7,6 +7,7 @@ use cpu::Cpu;
 use derive_getters::Getters;
 use memory::Memory;
 use numa::{NumaDistance, NumaNode};
+use serial::Serial;
 use serde::Deserialize;
 use tpm::Tpm;
 use virtio_rng::VirtioRng;
@@ -17,6 +18,7 @@ mod chipset;
 mod cpu;
 mod memory;
 mod numa;
+mod serial;
 mod tpm;
 mod virtio_rng;
 
@@ -41,6 +43,10 @@ pub struct System {
     numa_distances: Vec<NumaDistance>,
     #[serde(default)]
     virtio_rng: Option<VirtioRng>,
+    #[serde(default)]
+    serial: Option<Serial>,
+    #[serde(default)]
+    vmgenid: Option<String>,
 }
 
 impl System {
@@ -61,6 +67,8 @@ impl System {
             numa_nodes: vec![],
             numa_distances: vec![],
             virtio_rng: None,
+            serial: None,
+            vmgenid: None,
         }
     }
 }
@@ -70,7 +78,23 @@ impl QemuDevice for System {
         let mut result = vec![];
         result.extend(self.chipset.get_qemu_args(0));
         result.extend(self.bios.get_qemu_args(0));
-        result.extend(self.memory.get_qemu_args(0));
+
+        // When hugepages and NUMA nodes are both active, use per-node
+        // memory-backend-file objects instead of the flat -mem-path args.
+        let use_numa_backends = self.memory.has_hugepages() && !self.numa_nodes.is_empty();
+        if use_numa_backends {
+            let mem_path = self.memory.resolved_mem_path().unwrap_or("/dev/hugepages");
+            result.push(self.memory.get_size_arg());
+            for (i, node) in self.numa_nodes.iter().enumerate() {
+                result.extend(node.get_qemu_args_with_memdev(i, mem_path));
+            }
+        } else {
+            result.extend(self.memory.get_qemu_args(0));
+            for node in &self.numa_nodes {
+                result.extend(node.get_qemu_args(0));
+            }
+        }
+
         result.extend(self.cpu.get_qemu_args(0));
         result.extend(self.tpm.get_qemu_args(0));
         if let Some(applesmc) = &self.applesmc {
@@ -79,8 +103,11 @@ impl QemuDevice for System {
         if let Some(rng) = &self.virtio_rng {
             result.extend(rng.get_qemu_args(0));
         }
-        for node in &self.numa_nodes {
-            result.extend(node.get_qemu_args(0));
+        if let Some(serial) = &self.serial {
+            result.extend(serial.get_qemu_args(0));
+        }
+        if let Some(ref vmgenid) = self.vmgenid {
+            result.push(format!("-device vmgenid,guid={}", vmgenid));
         }
         for dist in &self.numa_distances {
             result.extend(dist.get_qemu_args(0));
@@ -211,5 +238,73 @@ mod tests {
                 .get_qemu_args(0)
                 .contains(&"-device isa-applesmc,osk=my-osk-key".to_string())
         );
+    }
+
+    #[test]
+    fn test_hugepages_with_numa_nodes_uses_memory_backends() {
+        let system: System = serde_yaml::from_str(
+            r#"
+              memory:
+                max: 32768
+                hugepages: true
+                mem_path: /run/hugepages/kvm/1048576kB
+              numa_nodes:
+                - nodeid: 0
+                  cpus: "0-11"
+                  mem: 32768
+              "#,
+        )
+        .unwrap();
+
+        let args = system.get_qemu_args(0);
+        // Should emit -m but NOT flat -mem-path/-mem-prealloc
+        assert!(args.iter().any(|a| a == "-m 32768"));
+        assert!(!args.iter().any(|a| a.starts_with("-mem-path")));
+        assert!(!args.iter().any(|a| a == "-mem-prealloc"));
+        // Should emit the memory-backend-file object
+        assert!(args.iter().any(|a| a.contains("memory-backend-file") && a.contains("id=ram-node0") && a.contains("size=32768M") && a.contains("mem-path=/run/hugepages/kvm/1048576kB")));
+        // Should emit -numa node with memdev= not mem=
+        assert!(args.iter().any(|a| a.contains("-numa node") && a.contains("memdev=ram-node0")));
+        assert!(!args.iter().any(|a| a.contains("mem=32768M")));
+    }
+
+    #[test]
+    fn test_hugepages_without_numa_nodes_uses_flat_args() {
+        let system: System = serde_yaml::from_str(
+            r#"
+              memory:
+                max: 32768
+                hugepages: true
+                mem_path: /run/hugepages/kvm/1048576kB
+              "#,
+        )
+        .unwrap();
+
+        let args = system.get_qemu_args(0);
+        assert!(args.iter().any(|a| a == "-m 32768"));
+        assert!(args.iter().any(|a| a.starts_with("-mem-path")));
+        assert!(args.iter().any(|a| a == "-mem-prealloc"));
+        assert!(!args.iter().any(|a| a.contains("memory-backend-file")));
+    }
+
+    #[test]
+    fn test_vmgenid_emits_device_arg() {
+        let system: System = serde_yaml::from_str(
+            r#"
+              vmgenid: b42d5b83-fee2-47dc-98a8-7856b18542ec
+              "#,
+        )
+        .unwrap();
+
+        let args = system.get_qemu_args(0);
+        assert!(args.contains(&"-device vmgenid,guid=b42d5b83-fee2-47dc-98a8-7856b18542ec".to_string()));
+    }
+
+    #[test]
+    fn test_vmgenid_absent_when_not_configured() {
+        let system: System = serde_yaml::from_str(r#""#).unwrap();
+
+        let args = system.get_qemu_args(0);
+        assert!(!args.iter().any(|a| a.starts_with("-device vmgenid")));
     }
 }

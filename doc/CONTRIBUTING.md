@@ -1,4 +1,4 @@
-## Contributing ##
+## Contributing
 
 As of now I'm the only active user (that I'm aware of) of this tool, and
 so development is very much aimed at the features that i use myself on a
@@ -10,7 +10,7 @@ terms. When you use it, you may run into missing features, or perhaps discover
 bugs or other problems. Please report these in the issues list.
 It would be even better if you can attach a patch that addresses the issue.
 
-### Creating an issue ###
+### Creating an issue
 
 For evaluating an issue, it is often essential to put some basic info
 to aid triage:
@@ -23,14 +23,14 @@ to aid triage:
    are passing hardware to the VM.
 4) The ezkvm config file that you use to startup the vm
 
-### Providing a patch ###
+### Providing a patch
 
 Please have your patch refer to an issue which it intends to address,
 create an issue if one does not exist yet.
 Chop big changes into smaller (non breaking) changesets such that they each
 address a small aspect. That makes the changes easier to review.
 
-### Note: ###
+### Note:
 
 Unless explicitly mentioned otherwise, I will assume that any contribution
 follows the same licensing terms as the existing code. Also I will assume

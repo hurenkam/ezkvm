@@ -182,6 +182,30 @@ pub fn map_to_ezkvm_yaml_with_storage(
         system.insert(s("virtio_rng"), Value::Mapping(rng_map));
     }
 
+    if let Some(serial_map) = map_serial(
+        proxmox,
+        &name,
+        &mut mapped_keys,
+        &mut skipped_keys,
+        &mut warnings,
+    ) {
+        system.insert(s("serial"), Value::Mapping(serial_map));
+    }
+
+    if let Some(numa_nodes) = map_numa_nodes(
+        proxmox,
+        &mut mapped_keys,
+        &mut skipped_keys,
+        &mut warnings,
+    ) {
+        system.insert(s("numa_nodes"), Value::Sequence(numa_nodes));
+    }
+
+    if let Some(vmgenid) = proxmox.scalars.get("vmgenid") {
+        system.insert(s("vmgenid"), s(vmgenid));
+        mapped_keys.push("vmgenid".to_string());
+    }
+
     if !system.is_empty() {
         root.insert(s("system"), Value::Mapping(system));
     }
@@ -757,9 +781,16 @@ fn map_host(
 
                     mapped_keys.push(item.key.clone());
                     usb_items.push(Value::Mapping(map));
+                } else if let Some((vendor_id, product_id)) = host.split_once(':') {
+                    let mut map = Mapping::new();
+                    map.insert(s("vendor_id"), s(vendor_id));
+                    map.insert(s("product_id"), s(product_id));
+
+                    mapped_keys.push(item.key.clone());
+                    usb_items.push(Value::Mapping(map));
                 } else {
                     warnings.push(format!(
-                        "usb '{}' host format '{}' not recognized, expected <bus>-<port>",
+                        "usb '{}' host format '{}' not recognized, expected <bus>-<port> or <vendorid>:<productid>",
                         item.key, host
                     ));
                 }
@@ -1196,11 +1227,20 @@ fn map_display(
         "virtio" | "virtio-vga" | "virtio-gl" | "vmware" | "vmware-svga" | "qxl" | "qxl2"
         | "qxl3" | "qxl4" | "std" | "cirrus" => {
             display.insert(s("type"), s("remote-viewer"));
+            let tablet_enabled = proxmox
+                .scalars
+                .get("tablet")
+                .and_then(|raw| parse_boolish(raw))
+                .unwrap_or(true);
+            display.insert(s("usb_tablet"), Value::Bool(tablet_enabled));
             warnings.push(format!(
                 "display inferred as remote-viewer from Proxmox vga '{}'; importer defaults this path to SPICE",
                 vga_model(vga)
             ));
             mapped_keys.push("display".to_string());
+            if proxmox.scalars.contains_key("tablet") {
+                mapped_keys.push("tablet".to_string());
+            }
             Some(display)
         }
         "none" | "serial0" => {
@@ -1210,6 +1250,107 @@ fn map_display(
         }
         _ => None,
     }
+}
+
+fn map_serial(
+    proxmox: &ProxmoxVmConfig,
+    vm_name: &str,
+    mapped_keys: &mut Vec<String>,
+    skipped_keys: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) -> Option<Mapping> {
+    let serial0 = proxmox.scalars.get("serial0")?;
+
+    if serial0 != "socket" {
+        warnings.push(format!(
+            "serial0 option '{}' is not yet mapped; expected 'socket'",
+            serial0
+        ));
+        skipped_keys.push("serial0".to_string());
+        return None;
+    }
+
+    let path = infer_vmid(proxmox)
+        .map(|vmid| format!("/var/run/qemu-server/{}.serial0", vmid))
+        .unwrap_or_else(|| format!("/var/ezkvm/{}.serial0", vm_name));
+
+    let mut serial = Mapping::new();
+    serial.insert(s("type"), s("socket"));
+    serial.insert(s("path"), s(&path));
+    mapped_keys.push("serial0".to_string());
+    Some(serial)
+}
+
+fn map_numa_nodes(
+    proxmox: &ProxmoxVmConfig,
+    mapped_keys: &mut Vec<String>,
+    skipped_keys: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) -> Option<Vec<Value>> {
+    // Only generate NUMA nodes when `numa: 1` and hugepages are both active.
+    let numa_enabled = proxmox.scalars.get("numa").and_then(|v| parse_boolish(v))
+        .or_else(|| proxmox.scalars.get("numa").and_then(|v| v.parse::<u64>().ok().map(|n| n > 0)));
+    let numa_enabled = numa_enabled?;
+    mapped_keys.push("numa".to_string());
+    if !numa_enabled {
+        return None;
+    }
+
+    let hugepages_raw = match proxmox.scalars.get("hugepages") {
+        Some(v) => v,
+        None => return None,
+    };
+    let hugepages_enabled = parse_boolish(hugepages_raw)
+        .or_else(|| hugepages_raw.parse::<u64>().ok().map(|v| v > 0))
+        .unwrap_or(false);
+    if !hugepages_enabled {
+        return None;
+    }
+
+    let total_memory = proxmox
+        .scalars
+        .get("memory")
+        .and_then(|m| m.parse::<u32>().ok())
+        .unwrap_or(0);
+    let sockets = proxmox
+        .scalars
+        .get("sockets")
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(1);
+    let cores = proxmox
+        .scalars
+        .get("cores")
+        .and_then(|c| c.parse::<u32>().ok())
+        .unwrap_or(1);
+
+    if sockets == 0 || cores == 0 {
+        warnings.push("numa: unable to derive node topology (sockets or cores is 0)".to_string());
+        skipped_keys.push("numa".to_string());
+        return None;
+    }
+
+    let cpus_per_socket = cores;
+    let mem_per_node = total_memory / sockets;
+    let mut nodes = vec![];
+
+    for socket in 0..sockets {
+        let cpu_start = socket * cpus_per_socket;
+        let cpu_end = cpu_start + cpus_per_socket - 1;
+        let cpus_str = if cpu_start == cpu_end {
+            cpu_start.to_string()
+        } else {
+            format!("{}-{}", cpu_start, cpu_end)
+        };
+
+        let mut node = Mapping::new();
+        node.insert(s("nodeid"), Value::Number((socket as u64).into()));
+        node.insert(s("cpus"), s(&cpus_str));
+        node.insert(s("mem"), Value::Number((mem_per_node as u64).into()));
+        nodes.push(Value::Mapping(node));
+    }
+
+    mapped_keys.push("numa".to_string());
+    Some(nodes)
 }
 
 fn map_spice(
@@ -1556,6 +1697,45 @@ mod tests {
         assert!(result.skipped_keys.contains(&"rng0.period".to_string()));
         assert!(result.yaml.contains("- -name"));
         assert!(result.yaml.contains("- desktop vm"));
+        assert!(result.yaml.contains("usb_tablet: true"));
+    }
+
+    #[test]
+    fn test_map_serial0_socket_to_system_serial() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: serial-vm
+            serial0: socket
+            scsi0: vm0:vm-301-disk-0
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        assert!(result.yaml.contains("serial: { type: socket"));
+        assert!(result
+            .yaml
+            .contains("path: /var/run/qemu-server/301.serial0"));
+        assert!(result.mapped_keys.contains(&"serial0".to_string()));
+    }
+
+    #[test]
+    fn test_map_tablet_zero_disables_usb_tablet() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: tablet-off-vm
+            vga: virtio-gl
+            tablet: 0
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+
+        assert!(result.yaml.contains("display:"));
+        assert!(result.yaml.contains("usb_tablet: false"));
+        assert!(result.mapped_keys.contains(&"tablet".to_string()));
     }
 
     #[test]
@@ -1583,6 +1763,28 @@ mod tests {
         assert!(result.yaml.contains("port: '2'") || result.yaml.contains("port: \"2\"") || result.yaml.contains("port: 2"));
         assert!(result.yaml.contains("usb:"));
         assert!(!result.yaml.contains("host:\n  pci:"));
+    }
+
+    #[test]
+    fn test_map_usb_vendor_product_format() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: usb-vendor-vm
+            usb0: host=0451:16a0
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        let parsed: Config = serde_yaml::from_str(&result.yaml).unwrap();
+
+        assert_eq!(parsed.general().name(), "usb-vendor-vm");
+        assert!(result.yaml.contains("vendor_id:"));
+        assert!(result.yaml.contains("product_id:"));
+        assert!(result.yaml.contains("0451"));
+        assert!(result.yaml.contains("16a0"));
+        assert!(result.mapped_keys.contains(&"usb0".to_string()));
+        assert!(result.warnings.is_empty());
     }
 
     #[test]
@@ -1850,4 +2052,90 @@ mod tests {
             .yaml
             .contains("file: /var/lib/vz/images/100/vm-100-disk-0.qcow2"));
     }
+
+    #[test]
+    fn test_map_numa_with_hugepages_generates_numa_nodes() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: numa-vm
+            numa: 1
+            hugepages: 1024
+            memory: 32768
+            sockets: 1
+            cores: 12
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        let parsed: Config = serde_yaml::from_str(&result.yaml).unwrap();
+
+        assert_eq!(parsed.general().name(), "numa-vm");
+        assert!(result.yaml.contains("numa_nodes:"), "expected numa_nodes in yaml");
+        assert!(result.yaml.contains("nodeid:"), "expected nodeid field");
+        assert!(result.yaml.contains("cpus:"), "expected cpus field");
+        assert!(result.yaml.contains("mem:"), "expected mem field");
+        assert!(result.mapped_keys.contains(&"numa".to_string()));
+        assert!(result.warnings.is_empty(), "unexpected warnings: {:?}", result.warnings);
+    }
+
+    #[test]
+    fn test_map_numa_without_hugepages_does_not_generate_numa_nodes() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: no-numa-vm
+            numa: 1
+            memory: 32768
+            sockets: 1
+            cores: 12
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        assert!(!result.yaml.contains("numa_nodes:"), "unexpected numa_nodes in yaml");
+        assert!(result.mapped_keys.contains(&"numa".to_string()));
+    }
+
+    #[test]
+    fn test_map_numa_with_two_sockets_splits_cpus() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: dual-socket-vm
+            numa: 1
+            hugepages: 1024
+            memory: 32768
+            sockets: 2
+            cores: 6
+            cpu: host
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        assert!(result.yaml.contains("numa_nodes:"));
+        // Node 0: cpus 0-5, Node 1: cpus 6-11
+        assert!(result.yaml.contains("0-5") || result.yaml.contains("\"0-5\""), "expected node 0 cpu range");
+        assert!(result.yaml.contains("6-11") || result.yaml.contains("\"6-11\""), "expected node 1 cpu range");
+    }
+
+    #[test]
+    fn test_map_vmgenid_from_proxmox() {
+        let proxmox = parse_proxmox_config(
+            r#"
+            name: vmgenid-vm
+            vmgenid: b42d5b83-fee2-47dc-98a8-7856b18542ec
+            "#,
+        )
+        .unwrap();
+
+        let result = map_to_ezkvm_yaml(&proxmox, None).unwrap();
+        let parsed: Config = serde_yaml::from_str(&result.yaml).unwrap();
+
+        assert_eq!(parsed.general().name(), "vmgenid-vm");
+        assert!(result.yaml.contains("vmgenid:"));
+        assert!(result.yaml.contains("b42d5b83-fee2-47dc-98a8-7856b18542ec"));
+        assert!(result.mapped_keys.contains(&"vmgenid".to_string()));
+    }
 }
+

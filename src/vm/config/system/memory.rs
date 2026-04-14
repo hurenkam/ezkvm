@@ -29,6 +29,29 @@ impl Memory {
             mem_path: None,
         }
     }
+
+    /// True when hugepages backing is enabled.
+    pub fn has_hugepages(&self) -> bool {
+        self.hugepages == Some(true)
+    }
+
+    /// The resolved backing path: explicit `mem_path` wins, otherwise
+    /// `/dev/hugepages` when `hugepages: true`.
+    pub fn resolved_mem_path(&self) -> Option<&str> {
+        self.mem_path.as_deref().or_else(|| {
+            if self.hugepages == Some(true) {
+                Some("/dev/hugepages")
+            } else {
+                None
+            }
+        })
+    }
+
+    /// The QEMU `-m` argument only, without any backing-file args.
+    /// Used when NUMA memory backends take over from the flat memory args.
+    pub fn get_size_arg(&self) -> String {
+        format!("-m {}", self.max)
+    }
 }
 
 impl Default for Memory {

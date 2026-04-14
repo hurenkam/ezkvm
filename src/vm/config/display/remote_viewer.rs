@@ -19,6 +19,8 @@ pub struct RemoteViewer {
     auto_resize: bool,
     #[serde(default)]
     full_screen: bool,
+    #[serde(default)]
+    usb_tablet: bool,
     #[allow(unused)]
     render_node: Option<String>, // cursor
                                  // hotkeys
@@ -78,7 +80,11 @@ impl RemoteViewer {
 
 impl QemuDevice for RemoteViewer {
     fn get_qemu_args(&self, _index: usize) -> Vec<String> {
-        vec!["--display egl-headless,gl=core".to_string()]
+        let mut args = vec!["--display egl-headless,gl=core".to_string()];
+        if self.usb_tablet {
+            args.push("-device usb-tablet".to_string());
+        }
+        args
     }
 
     fn post_start(&self, config: &Config) {
@@ -101,6 +107,7 @@ mod tests {
         let display = RemoteViewer {
             auto_resize: true,
             full_screen: true,
+            usb_tablet: false,
             render_node: None,
         };
         let expected: Vec<String> = vec!["--display egl-headless,gl=core".to_string()];
@@ -114,6 +121,7 @@ mod tests {
         let display = RemoteViewer {
             auto_resize: false,
             full_screen: false,
+            usb_tablet: false,
             render_node: Some("/dev/dri/renderD128".to_string()),
         };
         let expected: Vec<String> = vec!["--display egl-headless,gl=core".to_string()];
@@ -129,5 +137,20 @@ mod tests {
             ))),
             expected
         );
+    }
+
+    #[test]
+    fn test_usb_tablet_qemu_arg() {
+        let display = RemoteViewer {
+            auto_resize: true,
+            full_screen: false,
+            usb_tablet: true,
+            render_node: None,
+        };
+        let expected: Vec<String> = vec![
+            "--display egl-headless,gl=core".to_string(),
+            "-device usb-tablet".to_string(),
+        ];
+        assert_eq!(display.get_qemu_args(0), expected);
     }
 }
