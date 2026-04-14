@@ -135,6 +135,60 @@ Group similar components into clear architectural layers to reduce dependency cy
 - Keep adapter-specific details out of domain models where possible.
 - Document any intentional architecture exceptions near the affected module.
 
+## 4. Architecture Decision Records (ADRs)
+
+Major architecture decisions are recorded in `doc/dev/adr/` for visibility and future reference.
+
+### Current ADRs
+
+- [ADR-0001: Base Selection](adr/ADR-0001-base-selection.md) - Why current codebase was chosen as foundation for incremental convergence
+- [ADR-0002: Import Normalization Contract](adr/ADR-0002-import-normalization-contract.md) - How external configs (Proxmox) normalize to canonical schema
+- [ADR-0003: Hooks Policy](adr/ADR-0003-hooks-policy.md) - VM lifecycle hooks design (pre/post start/stop)
+- [ADR-0004: Trait Seam Policy](adr/ADR-0004-trait-seam-policy.md) - Where and how trait-based extensibility is allowed
+
+### Adding New ADRs
+
+When proposing an architecture decision:
+1. Create a new file in `doc/dev/adr/ADR-NNNN-{title}.md`
+2. Use the [template below](#adr-template)
+3. Reference related ADRs
+4. Link from this document
+5. Discuss during architecture review before merging
+
+### ADR Template
+
+```markdown
+# ADR-NNNN: {Title}
+
+**Date:** YYYY-MM-DD  
+**Status:** Proposed | Accepted | Deprecated | Superseded  
+**Context:** Brief one-liner
+
+## Question
+
+What question does this decision answer?
+
+## Decision
+
+Clear statement of the decision.
+
+## Rationale
+
+Why was this decision made? What alternatives were considered?
+
+## Consequences
+
+What are the positive and negative consequences?
+
+## Related ADRs
+
+Links to related decisions.
+
+## References
+
+Links to docs, code, or external resources.
+```
+
 ### Evolution Guidance
 - For new capabilities, add or extend a context module before creating global utility modules.
 - For larger features, create a thin orchestrator function and push detailed logic into focused helpers.

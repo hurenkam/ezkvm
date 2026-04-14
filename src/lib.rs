@@ -6,6 +6,7 @@
 pub mod cli;
 pub mod config;
 pub mod device;
+pub mod import;
 pub mod network;
 pub mod qemu;
 pub mod state;
