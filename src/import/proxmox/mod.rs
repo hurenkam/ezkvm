@@ -1,9 +1,11 @@
 pub mod error;
+pub mod mapper;
 pub mod model;
 pub mod parser;
 pub mod storage_parser;
 
 pub use error::ImportError;
+pub use mapper::{CanonicalMappingResult, map_proxmox_to_canonical_yaml};
 pub use model::{
     ProxmoxDiskEntry, ProxmoxHostPciEntry, ProxmoxNetEntry, ProxmoxStorageConfig,
     ProxmoxStorageEntry, ProxmoxUsbEntry, ProxmoxVmConfig,
