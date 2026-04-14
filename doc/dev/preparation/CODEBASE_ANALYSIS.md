@@ -727,34 +727,34 @@ fn validate_config(config: &VmConfig) -> Result<()> {
 
 ### Configuration & Schema
 
-- [src/config/vm_schema/vm_config.rs](src/config/vm_schema/vm_config.rs) - Main VmConfig with profile loading
-- [src/config/vm_schema/system.rs](src/config/vm_schema/system.rs) - SystemConfig, CPU, memory, boot
-- [src/config/vm_schema/device.rs](src/config/vm_schema/device.rs) - Device device structure
-- [src/config/vm_schema/drive.rs](src/config/vm_schema/drive.rs) - Drive config & QEMU args
-- [src/config/vm_schema/network.rs](src/config/vm_schema/network.rs) - Network backends
-- [src/config/vm_schema/display.rs](src/config/vm_schema/display.rs) - Display devices
-- [src/config/platform/](src/config/platform/) - TPM, audio, GPU, SPICE, Hyper-V, ivshmem
-- [src/config/loader/merge.rs](src/config/loader/merge.rs) - Profile merge logic
-- [src/config/validation.rs](src/config/validation.rs) - Comprehensive config validation
+- [src/config/vm_schema/vm_config.rs](../../../src/config/vm_schema/vm_config.rs) - Main VmConfig with profile loading
+- [src/config/vm_schema/system.rs](../../../src/config/vm_schema/system.rs) - SystemConfig, CPU, memory, boot
+- [src/config/vm_schema/device.rs](../../../src/config/vm_schema/device.rs) - Device device structure
+- [src/config/vm_schema/drive.rs](../../../src/config/vm_schema/drive.rs) - Drive config & QEMU args
+- [src/config/vm_schema/network.rs](../../../src/config/vm_schema/network.rs) - Network backends
+- [src/config/vm_schema/display.rs](../../../src/config/vm_schema/display.rs) - Display devices
+- [src/config/platform/](../../../src/config/platform/) - TPM, audio, GPU, SPICE, Hyper-V, ivshmem
+- [src/config/loader/merge.rs](../../../src/config/loader/merge.rs) - Profile merge logic
+- [src/config/validation.rs](../../../src/config/validation.rs) - Comprehensive config validation
 
 ### QEMU Integration
 
-- [src/qemu/manager.rs](src/qemu/manager.rs) - QemuManager, command building interface
-- [src/qemu/executor.rs](src/qemu/executor.rs) - Process execution, dry-run, logging
-- [src/qemu/types.rs](src/qemu/types.rs) - QemuArgs newtype and utilities
-- [src/qemu/process/](src/qemu/process/) - VM discovery, stop, kill
+- [src/qemu/manager.rs](../../../src/qemu/manager.rs) - QemuManager, command building interface
+- [src/qemu/executor.rs](../../../src/qemu/executor.rs) - Process execution, dry-run, logging
+- [src/qemu/types.rs](../../../src/qemu/types.rs) - QemuArgs newtype and utilities
+- [src/qemu/process/](../../../src/qemu/process/) - VM discovery, stop, kill
 
 ### Runtime & CLI
 
-- [src/cli/types.rs](src/cli/types.rs) - All command enums and clap definitions
-- [src/cli/commands.rs](src/cli/commands.rs) - Command handlers (create, storage, device, network)
-- [src/cli/runtime/start.rs](src/cli/runtime/start.rs) - VM startup orchestration
-- [src/cli/runtime/auxiliary/](src/cli/runtime/auxiliary/) - swtpm, Looking Glass, SPICE launches
+- [src/cli/types.rs](../../../src/cli/types.rs) - All command enums and clap definitions
+- [src/cli/commands.rs](../../../src/cli/commands.rs) - Command handlers (create, storage, device, network)
+- [src/cli/runtime/start.rs](../../../src/cli/runtime/start.rs) - VM startup orchestration
+- [src/cli/runtime/auxiliary/](../../../src/cli/runtime/auxiliary/) - swtpm, Looking Glass, SPICE launches
 
 ### State & Metadata
 
-- [src/state/](src/state/) - PID files, logs, config cache, path conventions
-- [doc/user/config/](doc/user/config/) - User-facing YAML config documentation
+- [src/state/](../../../src/state/) - PID files, logs, config cache, path conventions
+- [doc/user/config/](../../user/config/) - User-facing YAML config documentation
 
 ---
 
@@ -816,40 +816,40 @@ fn validate_config(config: &VmConfig) -> Result<()> {
 - Test config parsing, validation, command generation
 
 ### Integration Tests (`tests/` directory)
-- [tests/integration_tests.rs](tests/integration_tests.rs) - Integration test entrypoint
-- [tests/config_tests.rs](tests/config_tests.rs) - Config parsing tests
+- [tests/integration_tests.rs](../../../tests/integration_tests.rs) - Integration test entrypoint
+- [tests/config_tests.rs](../../../tests/config_tests.rs) - Config parsing tests
 - Subdirectories organize tests by domain:
   - `tests/config/` - Config loading, profiles, validation
   - `tests/integration/` - Command workflows, end-to-end scenarios
 
 ### Test Examples
-- Profile merging: [tests/integration/profile_compat.rs](tests/integration/profile_compat.rs)
-- Config parsing with environment variables: [tests/config/config_parsing_env.rs](tests/config/config_parsing_env.rs)
+- Profile merging: [tests/integration/profile_compat.rs](../../../tests/integration/profile_compat.rs)
+- Config parsing with environment variables: [tests/config/config_parsing_env.rs](../../../tests/config/config_parsing_env.rs)
 
 ---
 
 ## 11. Documentation Structure
 
 ### User-Facing Docs (`doc/user/config/`)
-- [vm-structure.md](doc/user/config/vm-structure.md) - Overall YAML schema
-- [central-config.md](doc/user/config/central-config.md) - Tool paths, locations
-- [profiles-and-merge.md](doc/user/config/profiles-and-merge.md) - Profile system
-- [system-and-boot.md](doc/user/config/system-and-boot.md) - CPU, mem, boot config
-- [devices.md](doc/user/config/devices.md) - Drives, networks, displays
-- [platform-features.md](doc/user/config/platform-features.md) - TPM, SPICE, audio, GPU
-- [examples.md](doc/user/config/examples.md) - Configuration examples
+- [vm-structure.md](../../user/config/vm-structure.md) - Overall YAML schema
+- [central-config.md](../../user/config/central-config.md) - Tool paths, locations
+- [profiles-and-merge.md](../../user/config/profiles-and-merge.md) - Profile system
+- [system-and-boot.md](../../user/config/system-and-boot.md) - CPU, mem, boot config
+- [devices.md](../../user/config/devices.md) - Drives, networks, displays
+- [platform-features.md](../../user/config/platform-features.md) - TPM, SPICE, audio, GPU
+- [examples.md](../../user/config/examples.md) - Configuration examples
 
 ### Developer Docs (`doc/dev/`)
-- [ARCHITECTURE_GUIDELINES.md](doc/dev/ARCHITECTURE_GUIDELINES.md) - Modular design, layering
-- [CODING_GUIDELINES.md](doc/dev/CODING_GUIDELINES.md) - Rust style, error handling
-- [IMPROVED_PROFILES.md](doc/dev/IMPROVED_PROFILES.md) - Profile system design notes
-- [IMPROVED_TARGET_SCHEMA.md](doc/dev/IMPROVED_TARGET_SCHEMA.md) - Schema evolution notes
-- [TODO.md](doc/dev/TODO.md) - Known limitations and roadmap
+- [ARCHITECTURE_GUIDELINES.md](../ARCHITECTURE_GUIDELINES.md) - Modular design, layering
+- [CODING_GUIDELINES.md](../CODING_GUIDELINES.md) - Rust style, error handling
+- [IMPROVED_PROFILES.md](./IMPROVED_PROFILES.md) - Profile system design notes
+- [IMPROVED_TARGET_SCHEMA.md](./IMPROVED_TARGET_SCHEMA.md) - Schema evolution notes
+- [TODO.md](../../backlog/TODO.md) - Known limitations and roadmap
 
 ### Examples (`examples/`)
-- [basic-vm.yaml](examples/basic-vm.yaml) - Minimal working config
-- [ezkvm-profiles.yaml](examples/ezkvm-profiles.yaml) - Profile naming examples
-- [profiles/](examples/profiles/) - Reusable profile templates
+- [basic-vm.yaml](../../../examples/basic-vm.yaml) - Minimal working config
+- [ezkvm-profiles.yaml](../../../examples/ezkvm-profiles.yaml) - Profile naming examples
+- [profiles/](../../../examples/profiles/) - Reusable profile templates
 
 ---
 
