@@ -55,7 +55,7 @@ pub(crate) async fn handle_import_proxmox(
         if !result.warnings.is_empty() {
             println!("# warnings ({}):", result.warnings.len());
             for warning in &result.warnings {
-                println!("# - {}", warning);
+                println!("# - {}: {}", warning.source_field, warning.message);
             }
         }
         println!("{}", result.yaml);
@@ -66,7 +66,7 @@ pub(crate) async fn handle_import_proxmox(
         if !result.warnings.is_empty() {
             println!("Warnings ({}):", result.warnings.len());
             for warning in &result.warnings {
-                println!("- {}", warning);
+                println!("- {}: {}", warning.source_field, warning.message);
             }
         }
     }

@@ -1,5 +1,6 @@
 use super::{
-    ImportError, map_proxmox_to_canonical_yaml, parse_proxmox_config, parse_proxmox_storage_config,
+    ImportError, map_proxmox_to_canonical_yaml, mapper::MappingWarning, parse_proxmox_config,
+    parse_proxmox_storage_config,
 };
 use crate::config::{VmConfig, validation};
 use std::path::Path;
@@ -16,7 +17,7 @@ pub struct ImportRunOptions {
 pub struct ImportRunResult {
     pub output_path: String,
     pub yaml: String,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<MappingWarning>,
 }
 
 pub fn run_import_from_files(
@@ -53,7 +54,7 @@ pub fn run_import_from_files(
         return Err(ImportError::ParseError(format!(
             "strict import failed due to {} warning(s): {}",
             mapped.warnings.len(),
-            mapped.warnings.join("; ")
+            format_warnings(&mapped.warnings)
         )));
     }
 
@@ -87,6 +88,14 @@ fn default_output_path(input_path: &str) -> String {
         .unwrap_or("imported-vm");
 
     format!("{}.yaml", stem)
+}
+
+fn format_warnings(warnings: &[MappingWarning]) -> String {
+    warnings
+        .iter()
+        .map(|warning| format!("{}: {}", warning.source_field, warning.message))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 #[cfg(test)]
@@ -149,6 +158,7 @@ mod tests {
         let err =
             run_import_from_files(&input_path.to_string_lossy(), &options).expect_err("must fail");
         assert!(err.to_string().contains("strict import failed"));
+        assert!(err.to_string().contains("arch"));
     }
 
     #[test]

@@ -9,10 +9,16 @@ use crate::config::{
 };
 use std::collections::BTreeMap;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MappingWarning {
+    pub source_field: String,
+    pub message: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct CanonicalMappingResult {
     pub yaml: String,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<MappingWarning>,
 }
 
 pub fn map_proxmox_to_canonical_yaml(
@@ -122,17 +128,20 @@ pub fn map_proxmox_to_canonical_yaml(
     Ok(CanonicalMappingResult { yaml, warnings })
 }
 
-fn map_architecture(arch: Option<&String>, warnings: &mut Vec<String>) -> String {
+fn map_architecture(arch: Option<&String>, warnings: &mut Vec<MappingWarning>) -> String {
     match arch.map(String::as_str).unwrap_or("x86_64") {
         "amd64" => "x86_64".to_string(),
         "x86_64" | "aarch64" | "x86" | "ppc64" | "riscv64" => {
             arch.cloned().unwrap_or_else(|| "x86_64".to_string())
         }
         other => {
-            warnings.push(format!(
-                "unsupported Proxmox architecture '{}' mapped to 'x86_64'",
-                other
-            ));
+            warnings.push(MappingWarning {
+                source_field: "arch".to_string(),
+                message: format!(
+                    "unsupported Proxmox architecture '{}' mapped to 'x86_64'",
+                    other
+                ),
+            });
             "x86_64".to_string()
         }
     }
@@ -171,7 +180,7 @@ fn map_vcpus(scalars: &BTreeMap<String, String>) -> u32 {
 fn map_scsi_controllers(
     scalars: &BTreeMap<String, String>,
     disks: &[ProxmoxDiskEntry],
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<MappingWarning>,
 ) -> Vec<ScsiControllerConfig> {
     let has_scsi_disks = disks.iter().any(|d| d.bus == "scsi");
     let scsihw = scalars.get("scsihw").map(String::as_str);
@@ -188,10 +197,13 @@ fn map_scsi_controllers(
         "megasas" => "megasas".to_string(),
         "megasas-gen2" => "megasas-gen2".to_string(),
         unknown => {
-            warnings.push(format!(
-                "unsupported scsihw '{}' mapped to 'virtio-scsi-pci'",
-                unknown
-            ));
+            warnings.push(MappingWarning {
+                source_field: "scsihw".to_string(),
+                message: format!(
+                    "unsupported scsihw '{}' mapped to 'virtio-scsi-pci'",
+                    unknown
+                ),
+            });
             "virtio-scsi-pci".to_string()
         }
     };
@@ -266,15 +278,18 @@ fn map_drive(disk: &ProxmoxDiskEntry) -> DriveConfig {
     }
 }
 
-fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<String>) -> NetworkConfig {
+fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) -> NetworkConfig {
     let model = match network.model.as_str() {
         "virtio" => "virtio-net".to_string(),
         "virtio-net" | "virtio-net-pci" | "e1000" | "e1000e" | "rtl8139" => network.model.clone(),
         other => {
-            warnings.push(format!(
-                "unsupported network model '{}' mapped to 'virtio-net'",
-                other
-            ));
+            warnings.push(MappingWarning {
+                source_field: network.key.clone(),
+                message: format!(
+                    "unsupported network model '{}' mapped to 'virtio-net'",
+                    other
+                ),
+            });
             "virtio-net".to_string()
         }
     };
@@ -397,7 +412,7 @@ fn map_tpm(scalars: &BTreeMap<String, String>, boot: &BootConfig) -> Option<TpmC
 
 fn map_displays(
     scalars: &BTreeMap<String, String>,
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<MappingWarning>,
 ) -> Vec<DisplayConfig> {
     let Some(vga) = scalars.get("vga") else {
         return Vec::new();
@@ -413,10 +428,10 @@ fn map_displays(
         "vmware" | "vmware-svga" => "vmware-svga".to_string(),
         "none" => "none".to_string(),
         other => {
-            warnings.push(format!(
-                "unsupported display '{}' mapped to 'virtio-gpu'",
-                other
-            ));
+            warnings.push(MappingWarning {
+                source_field: "vga".to_string(),
+                message: format!("unsupported display '{}' mapped to 'virtio-gpu'", other),
+            });
             "virtio-gpu".to_string()
         }
     };
@@ -578,5 +593,27 @@ mod tests {
         assert_eq!(cfg.system.machine, "q35");
         assert_eq!(cfg.system.cpu.vcpus, 1);
         assert_eq!(cfg.system.memory.size, 2048);
+    }
+
+    #[test]
+    fn warnings_include_source_field_reference() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-warn
+            arch: sparc
+            memory: 2048
+            cores: 2
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        assert_eq!(mapped.warnings.len(), 1);
+        assert_eq!(mapped.warnings[0].source_field, "arch");
+        assert!(
+            mapped.warnings[0]
+                .message
+                .contains("unsupported Proxmox architecture")
+        );
     }
 }
