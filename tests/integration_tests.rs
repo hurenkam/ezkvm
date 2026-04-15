@@ -16,5 +16,7 @@ mod command_regression;
 mod parsing;
 #[path = "integration/profile_compat.rs"]
 mod profile_compat;
+#[path = "integration/proxmox_import.rs"]
+mod proxmox_import;
 #[path = "integration/wakiza.rs"]
 mod wakiza;

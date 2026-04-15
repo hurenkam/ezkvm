@@ -49,7 +49,7 @@ Source: doc/backlog/BACKLOG.md
 | B-02 | Add canonical mapper (intermediate model to current schema) | B | Phase-1-Features | epic:proxmox, phase:1-features | B-01 | unassigned | Done |
 | B-03 | Add import CLI command | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-04 | Add import validation and reporting | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
-| B-05 | Integration tests for import-to-start pipeline | B | Phase-1-Features | epic:proxmox, phase:1-features | B-03, B-04 | unassigned | Todo |
+| B-05 | Integration tests for import-to-start pipeline | B | Phase-1-Features | epic:proxmox, phase:1-features | B-03, B-04 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
