@@ -1,6 +1,7 @@
 use super::error::ImportError;
 use super::model::{
-    ProxmoxDiskEntry, ProxmoxHostPciEntry, ProxmoxNetEntry, ProxmoxUsbEntry, ProxmoxVmConfig,
+    ProxmoxDiskEntry, ProxmoxHostPciEntry, ProxmoxNetEntry, ProxmoxStorageConfig, ProxmoxUsbEntry,
+    ProxmoxVmConfig,
 };
 use crate::config::{
     BootConfig, ControllersConfig, DeviceConfig, DisplayConfig, DriveConfig, HostConfig,
@@ -23,6 +24,13 @@ pub struct CanonicalMappingResult {
 
 pub fn map_proxmox_to_canonical_yaml(
     proxmox: &ProxmoxVmConfig,
+) -> Result<CanonicalMappingResult, ImportError> {
+    map_proxmox_to_canonical_yaml_with_storage(proxmox, None)
+}
+
+pub fn map_proxmox_to_canonical_yaml_with_storage(
+    proxmox: &ProxmoxVmConfig,
+    storage_config: Option<&ProxmoxStorageConfig>,
 ) -> Result<CanonicalMappingResult, ImportError> {
     let mut warnings = Vec::new();
 
@@ -61,7 +69,11 @@ pub fn map_proxmox_to_canonical_yaml(
     };
 
     let scsi_controllers = map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
-    let drives = proxmox.disks.iter().map(map_drive).collect::<Vec<_>>();
+    let drives = proxmox
+        .disks
+        .iter()
+        .map(|disk| map_drive(disk, storage_config))
+        .collect::<Vec<_>>();
     let networks = proxmox
         .networks
         .iter()
@@ -218,7 +230,10 @@ fn map_scsi_controllers(
     }]
 }
 
-fn map_drive(disk: &ProxmoxDiskEntry) -> DriveConfig {
+fn map_drive(
+    disk: &ProxmoxDiskEntry,
+    storage_config: Option<&ProxmoxStorageConfig>,
+) -> DriveConfig {
     let is_cdrom = disk
         .options
         .get("media")
@@ -229,7 +244,8 @@ fn map_drive(disk: &ProxmoxDiskEntry) -> DriveConfig {
     let path = if is_cdrom && disk.source == "none" {
         String::new()
     } else {
-        disk.source.clone()
+        resolve_volume_reference(&disk.source, storage_config)
+            .unwrap_or_else(|| disk.source.clone())
     };
 
     let format = disk.options.get("format").cloned().unwrap_or_else(|| {
@@ -276,6 +292,70 @@ fn map_drive(disk: &ProxmoxDiskEntry) -> DriveConfig {
         bus: None,
         unit: None,
     }
+}
+
+fn resolve_volume_reference(
+    source: &str,
+    storage_config: Option<&ProxmoxStorageConfig>,
+) -> Option<String> {
+    if source.starts_with('/') {
+        return Some(source.to_string());
+    }
+
+    let (store_id, volume) = source.split_once(':')?;
+    let storage = storage_config?.storages.get(store_id)?;
+
+    match storage.storage_type.as_str() {
+        "dir" => storage
+            .options
+            .get("path")
+            .map(|base_path| resolve_dir_volume(base_path, volume)),
+        "lvm" | "lvmthin" => storage.options.get("vgname").and_then(|vgname| {
+            if volume.contains('/') {
+                None
+            } else {
+                Some(format!("/dev/{}/{}", vgname, volume))
+            }
+        }),
+        "zfspool" => storage
+            .options
+            .get("pool")
+            .map(|pool| resolve_zfspool_volume(pool, volume)),
+        _ => None,
+    }
+}
+
+fn resolve_zfspool_volume(pool: &str, volume: &str) -> String {
+    let trimmed_pool = pool.trim_matches('/');
+    let trimmed_volume = volume.trim_start_matches('/');
+    format!("/dev/zvol/{}/{}", trimmed_pool, trimmed_volume)
+}
+
+fn resolve_dir_volume(base_path: &str, volume: &str) -> String {
+    let trimmed_base = base_path.trim_end_matches('/');
+
+    if volume.starts_with('/') {
+        return volume.to_string();
+    }
+
+    if volume.starts_with("images/")
+        || volume.starts_with("iso/")
+        || volume.starts_with("vztmpl/")
+        || volume.starts_with("backup/")
+        || volume.starts_with("snippets/")
+        || volume.starts_with("template/")
+        || volume.starts_with("rootdir/")
+    {
+        return format!("{}/{}", trimmed_base, volume);
+    }
+
+    if let Some((prefix, _)) = volume.split_once('/')
+        && prefix.chars().all(|ch| ch.is_ascii_digit())
+    {
+        return format!("{}/images/{}", trimmed_base, volume);
+    }
+
+    format!("{}/{}", trimmed_base, volume)
 }
 
 fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) -> NetworkConfig {
@@ -341,7 +421,7 @@ fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) ->
 
 fn map_host_pci(entry: &ProxmoxHostPciEntry) -> HostPciConfig {
     HostPciConfig {
-        device: entry.host.clone(),
+        device: normalize_host_pci_device(&entry.host),
         id: entry.key.clone(),
         pcie: is_enabled(entry.options.get("pcie")),
         x_vga: is_enabled(entry.options.get("x-vga")) || is_enabled(entry.options.get("x_vga")),
@@ -350,6 +430,21 @@ fn map_host_pci(entry: &ProxmoxHostPciEntry) -> HostPciConfig {
         multifunction: is_enabled(entry.options.get("multifunction")),
         romfile: entry.options.get("romfile").cloned(),
     }
+}
+
+fn normalize_host_pci_device(device: &str) -> String {
+    let trimmed = device.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    if let Some((prefix, slot)) = trimmed.rsplit_once(':')
+        && !slot.contains('.')
+    {
+        return format!("{}:{}.0", prefix, slot);
+    }
+
+    trimmed.to_string()
 }
 
 fn map_usb(entry: &ProxmoxUsbEntry) -> UsbDeviceConfig {
@@ -458,13 +553,24 @@ fn is_enabled(value: Option<&String>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::map_proxmox_to_canonical_yaml;
+    use super::{map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage};
     use crate::config::{VmConfig, validation};
-    use crate::import::proxmox::parse_proxmox_config;
+    use crate::import::proxmox::{parse_proxmox_config, parse_proxmox_storage_config};
 
     fn map_and_validate(input: &str) -> (String, VmConfig) {
         let parsed = parse_proxmox_config(input).expect("parser should succeed");
         let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        validation::validate_config(&config).expect("config should validate");
+        (mapped.yaml, config)
+    }
+
+    fn map_and_validate_with_storage(input: &str, storage_input: &str) -> (String, VmConfig) {
+        let parsed = parse_proxmox_config(input).expect("parser should succeed");
+        let storage =
+            parse_proxmox_storage_config(storage_input).expect("storage parser should succeed");
+        let mapped = map_proxmox_to_canonical_yaml_with_storage(&parsed, Some(&storage))
+            .expect("mapper should succeed");
         let config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         validation::validate_config(&config).expect("config should validate");
         (mapped.yaml, config)
@@ -509,6 +615,50 @@ mod tests {
     }
 
     #[test]
+    fn resolves_storage_backed_disk_paths() {
+        let (_, cfg) = map_and_validate_with_storage(
+            r#"
+            name: vm-storage-paths
+            scsi0: vm1-pool:vm-108-boot,discard=on
+            ide2: local:iso/virtio-win.iso,media=cdrom
+            "#,
+            r#"
+            dir: local
+                path /var/lib/vz
+                content iso,vztmpl
+
+            lvmthin: vm1-pool
+                thinpool pool
+                vgname vm1
+                content images,rootdir
+            "#,
+        );
+
+        assert_eq!(cfg.devices.drives[0].path, "/dev/vm1/vm-108-boot");
+        assert_eq!(cfg.devices.drives[1].path, "/var/lib/vz/iso/virtio-win.iso");
+    }
+
+    #[test]
+    fn resolves_zfspool_backed_disk_paths() {
+        let (_, cfg) = map_and_validate_with_storage(
+            r#"
+            name: vm-zfs-paths
+            scsi0: local-zfs:vm-500-disk-0,discard=on
+            "#,
+            r#"
+            zfspool: local-zfs
+                pool rpool/data
+                content images,rootdir
+            "#,
+        );
+
+        assert_eq!(
+            cfg.devices.drives[0].path,
+            "/dev/zvol/rpool/data/vm-500-disk-0"
+        );
+    }
+
+    #[test]
     fn maps_network_bridge_and_mac() {
         let (_, cfg) = map_and_validate(
             r#"
@@ -532,7 +682,7 @@ mod tests {
         let (_, cfg) = map_and_validate(
             r#"
             name: vm-host
-            hostpci0: 0000:03:00.0,pcie=1,x-vga=1,multifunction=1
+            hostpci0: 0000:03:00,pcie=1,x-vga=1,multifunction=1
             usb0: host=1-2
             usb1: host=0451:16a0
             "#,

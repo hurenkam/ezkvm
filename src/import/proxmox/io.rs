@@ -1,6 +1,6 @@
 use super::{
-    ImportError, map_proxmox_to_canonical_yaml, mapper::MappingWarning, parse_proxmox_config,
-    parse_proxmox_storage_config,
+    ImportError, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
+    mapper::MappingWarning, parse_proxmox_config, parse_proxmox_storage_config,
 };
 use crate::config::{VmConfig, validation};
 use std::path::Path;
@@ -28,18 +28,25 @@ pub fn run_import_from_files(
         ImportError::ParseError(format!("unable to read input file '{}': {}", input_path, e))
     })?;
 
-    if let Some(storage_path) = options.storage_path.as_deref() {
+    let storage_config = if let Some(storage_path) = options.storage_path.as_deref() {
         let storage_text = std::fs::read_to_string(storage_path).map_err(|e| {
             ImportError::ParseError(format!(
                 "unable to read storage file '{}': {}",
                 storage_path, e
             ))
         })?;
-        let _ = parse_proxmox_storage_config(&storage_text)?;
-    }
+        Some(parse_proxmox_storage_config(&storage_text)?)
+    } else {
+        None
+    };
 
     let parsed = parse_proxmox_config(&input)?;
-    let mapped = map_proxmox_to_canonical_yaml(&parsed)?;
+    let mapped = match storage_config.as_ref() {
+        Some(storage_config) => {
+            map_proxmox_to_canonical_yaml_with_storage(&parsed, Some(storage_config))?
+        }
+        None => map_proxmox_to_canonical_yaml(&parsed)?,
+    };
 
     let config: VmConfig = serde_yaml::from_str(&mapped.yaml).map_err(|e| {
         ImportError::ParseError(format!(
@@ -183,5 +190,67 @@ mod tests {
             run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
         assert_eq!(result.output_path, output_path.to_string_lossy());
         assert!(output_path.exists());
+    }
+
+    #[test]
+    fn resolves_storage_references_when_storage_cfg_is_provided() {
+        let dir = create_temp_test_dir("import-storage-resolution");
+        let input_path = dir.join("108.conf");
+        let storage_path = dir.join("storage.cfg");
+
+        std::fs::write(
+            &input_path,
+            "name: vm-storage\nmemory: 2048\ncores: 2\nscsi0: vm1-pool:vm-108-boot,discard=on\n",
+        )
+        .expect("write input");
+        std::fs::write(
+            &storage_path,
+            "lvmthin: vm1-pool\n    thinpool pool\n    vgname vm1\n    content images,rootdir\n",
+        )
+        .expect("write storage");
+
+        let options = ImportRunOptions {
+            output_path: None,
+            storage_path: Some(storage_path.to_string_lossy().to_string()),
+            strict: false,
+            dry_run: true,
+        };
+
+        let result =
+            run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
+        assert!(result.yaml.contains("path: /dev/vm1/vm-108-boot"));
+    }
+
+    #[test]
+    fn resolves_zfspool_references_when_storage_cfg_is_provided() {
+        let dir = create_temp_test_dir("import-zfspool-resolution");
+        let input_path = dir.join("500.conf");
+        let storage_path = dir.join("storage.cfg");
+
+        std::fs::write(
+            &input_path,
+            "name: vm-zfs\nmemory: 2048\ncores: 2\nscsi0: local-zfs:vm-500-disk-0,discard=on\n",
+        )
+        .expect("write input");
+        std::fs::write(
+            &storage_path,
+            "zfspool: local-zfs\n    pool rpool/data\n    content images,rootdir\n",
+        )
+        .expect("write storage");
+
+        let options = ImportRunOptions {
+            output_path: None,
+            storage_path: Some(storage_path.to_string_lossy().to_string()),
+            strict: false,
+            dry_run: true,
+        };
+
+        let result =
+            run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
+        assert!(
+            result
+                .yaml
+                .contains("path: /dev/zvol/rpool/data/vm-500-disk-0")
+        );
     }
 }
