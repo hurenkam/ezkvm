@@ -6,6 +6,7 @@
 mod cli;
 mod config;
 mod device;
+mod import;
 mod network;
 mod qemu;
 mod state;

@@ -1,6 +1,8 @@
 use anyhow::Result;
 
-use super::commands::{handle_create, handle_device, handle_network, handle_storage};
+use super::commands::{
+    handle_create, handle_device, handle_import_proxmox, handle_network, handle_storage,
+};
 use super::runtime::{
     handle_console, handle_kill, handle_list, handle_start, handle_status, handle_stop,
     handle_validate,
@@ -28,6 +30,22 @@ pub async fn execute(cli: Cli) -> Result<()> {
             config,
             show_resolved_config,
         } => handle_validate(&config, show_resolved_config).await,
+        Commands::ImportProxmox {
+            input,
+            proxmox_storage,
+            output,
+            dry_run,
+            strict,
+        } => {
+            handle_import_proxmox(
+                &input,
+                proxmox_storage.as_deref(),
+                output.as_deref(),
+                dry_run,
+                strict,
+            )
+            .await
+        }
         Commands::Storage(cmd) => handle_storage(cmd).await,
         Commands::Device(cmd) => handle_device(cmd).await,
         Commands::Network(cmd) => handle_network(cmd).await,

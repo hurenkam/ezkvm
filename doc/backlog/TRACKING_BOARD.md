@@ -47,7 +47,7 @@ Source: doc/backlog/BACKLOG.md
 | A-03 | Create convergence tracking board | A | Phase-0-Foundation | epic:foundation, phase:0-foundation, sprint:1 | None | unassigned | Done |
 | B-01 | Port Proxmox parser into dedicated module | B | Phase-1-Features | epic:proxmox, phase:1-features, sprint:1 | A-01 | unassigned | Done |
 | B-02 | Add canonical mapper (intermediate model to current schema) | B | Phase-1-Features | epic:proxmox, phase:1-features | B-01 | unassigned | Done |
-| B-03 | Add import CLI command | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-03 | Add import CLI command | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-04 | Add import validation and reporting | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
 | B-05 | Integration tests for import-to-start pipeline | B | Phase-1-Features | epic:proxmox, phase:1-features | B-03, B-04 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |

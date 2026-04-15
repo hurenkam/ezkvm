@@ -31,6 +31,49 @@ pub(crate) async fn handle_create(config_path: &str, validate_only: bool) -> Res
     Ok(())
 }
 
+pub(crate) async fn handle_import_proxmox(
+    input: &str,
+    proxmox_storage: Option<&str>,
+    output: Option<&str>,
+    dry_run: bool,
+    strict: bool,
+) -> Result<()> {
+    let options = crate::import::proxmox::ImportRunOptions {
+        output_path: output.map(ToString::to_string),
+        storage_path: proxmox_storage.map(ToString::to_string),
+        strict,
+        dry_run,
+    };
+
+    let result = crate::import::proxmox::run_import_from_files(input, &options)
+        .map_err(|e| anyhow::anyhow!("proxmox import failed: {}", e))?;
+
+    if dry_run {
+        println!("# import-proxmox dry run");
+        println!("# input: {}", input);
+        println!("# output (not written): {}", result.output_path);
+        if !result.warnings.is_empty() {
+            println!("# warnings ({}):", result.warnings.len());
+            for warning in &result.warnings {
+                println!("# - {}", warning);
+            }
+        }
+        println!("{}", result.yaml);
+    } else {
+        println!("Import complete");
+        println!("Input: {}", input);
+        println!("Output: {}", result.output_path);
+        if !result.warnings.is_empty() {
+            println!("Warnings ({}):", result.warnings.len());
+            for warning in &result.warnings {
+                println!("- {}", warning);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn handle_storage(cmd: StorageCommands) -> Result<()> {
     match cmd {
         StorageCommands::Create { name, size } => handle_storage_create(&name, size),

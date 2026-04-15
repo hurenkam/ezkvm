@@ -77,6 +77,28 @@ pub enum Commands {
         show_resolved_config: bool,
     },
 
+    /// Import a Proxmox VM config into canonical ezkvm YAML
+    ImportProxmox {
+        /// Path to Proxmox VM config (e.g. /etc/pve/qemu-server/100.conf)
+        input: String,
+
+        /// Optional path to Proxmox storage metadata file (e.g. /etc/pve/storage.cfg)
+        #[arg(long)]
+        proxmox_storage: Option<String>,
+
+        /// Optional output path for generated canonical YAML
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Dry run: print generated YAML and do not write files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Fail if mapper emits warnings
+        #[arg(long)]
+        strict: bool,
+    },
+
     /// Storage management commands
     #[command(subcommand)]
     Storage(StorageCommands),
