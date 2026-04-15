@@ -88,6 +88,78 @@ Acceptance Criteria:
 - Dry-run QEMU args match expected snapshots.
 Estimate: 3 days
 
+### B-06 Parse and map `efidisk0` for UEFI vars parity
+Scope:
+- Parse Proxmox `efidisk0` and map it to canonical UEFI vars handling for pflash unit=1 emission.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported configs with `efidisk0` emit both UEFI code and vars drives in dry-run args.
+- Includes size/path mapping coverage in tests.
+Estimate: 2 days
+
+### B-07 Parse and map `audio0` for SPICE/HDA parity
+Scope:
+- Parse Proxmox `audio0` and map to canonical audio devices/audiodev wiring.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported configs with `audio0` emit expected `-audiodev` and HDA codec args.
+- Unit and fixture tests cover at least one SPICE audio case.
+Estimate: 2 days
+
+### B-08 Parse and map `agent` field for guest-agent plumbing
+Scope:
+- Parse Proxmox `agent` and map to guest-agent socket and virtio-serial device config.
+Dependencies: B-02
+Acceptance Criteria:
+- `agent: 1` imports produce guest-agent chardev/device args in dry-run.
+- Disabled/absent agent remains non-emitting and tested.
+Estimate: 2 days
+
+### B-09 Parse and map `args` passthrough (safe subset first)
+Scope:
+- Parse Proxmox `args` into canonical representations for supported subsets first (SPICE, vdagent, input, ivshmem), with warnings for unsupported tokens.
+Dependencies: B-02, B-04
+Acceptance Criteria:
+- Supported subset from `args` is preserved in generated command.
+- Unsupported tokens are reported in structured warnings.
+Estimate: 3 days
+
+### B-10 Preserve machine and CPU feature fidelity
+Scope:
+- Import machine options (for example `hpet=off`) and CPU feature list/Hyper-V flags when present.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported machine/cpu sections preserve source options when representable.
+- Fixture snapshots assert these flags appear in dry-run output.
+Estimate: 2 days
+
+### B-11 Improve network backend fidelity for Proxmox bridge/tap
+Scope:
+- Map Proxmox networking to canonical backend fields that can emit tap/bridge options (ifname/script/downscript/vhost/queues) with deterministic behavior.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported net configs preserve bridge/tap behavior from representative Proxmox samples.
+- Snapshot tests cover queue sizes and vhost behavior where present.
+Estimate: 3 days
+
+### B-12 Expand host PCI fidelity for multifunction devices
+Scope:
+- Improve host PCI mapping for multi-function GPU pairs (for example `.0` + `.1`) and preserve bus/addr/multifunction semantics.
+Dependencies: B-02
+Acceptance Criteria:
+- Representative GPU passthrough samples import both functions when present.
+- Snapshot tests verify expected vfio device emission order and attributes.
+Estimate: 2 days
+
+### B-13 Add wakiza parity fixture and regression test
+Scope:
+- Add dedicated `wakiza` import fixture pair (`108.conf` + expected args snapshot) to lock in Proxmox parity improvements.
+Dependencies: B-06, B-07, B-08, B-09, B-10, B-11, B-12
+Acceptance Criteria:
+- Fixture test verifies key command fragments from Proxmox command are preserved.
+- Fails on regressions in efidisk/audio/agent/args/network/machine/cpu/hostpci coverage.
+Estimate: 2 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy

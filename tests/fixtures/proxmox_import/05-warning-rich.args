@@ -15,7 +15,7 @@ file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discar
 -device
 scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
 -netdev
-type=bridge,id=net0,br=vmbr9
+type=tap,id=net0,bridge=vmbr9,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
 -device
 virtio-net,netdev=net0,mac=52:54:00:fe:ed:01
 -device

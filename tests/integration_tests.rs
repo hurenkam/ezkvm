@@ -18,5 +18,7 @@ mod parsing;
 mod profile_compat;
 #[path = "integration/proxmox_import.rs"]
 mod proxmox_import;
+#[path = "integration/proxmox_import_wakiza.rs"]
+mod proxmox_import_wakiza;
 #[path = "integration/wakiza.rs"]
 mod wakiza;

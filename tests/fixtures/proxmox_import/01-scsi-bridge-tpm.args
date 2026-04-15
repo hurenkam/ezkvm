@@ -15,7 +15,7 @@ file=local-lvm:vm-200-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,s
 -device
 scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,rotation_rate=1,bootindex=100
 -netdev
-type=bridge,id=net0,br=vmbr0,queues=4
+type=tap,id=net0,bridge=vmbr0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on,queues=4
 -device
 virtio-net,netdev=net0,mac=52:54:00:12:34:56
 -device

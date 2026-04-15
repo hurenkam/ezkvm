@@ -4,12 +4,13 @@ use super::model::{
     ProxmoxVmConfig,
 };
 use crate::config::{
-    BallooningConfig, BootConfig, ControllersConfig, DeviceConfig, DisplayConfig, DriveConfig,
-    HostConfig, HostPciConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
-    ScsiControllerConfig, SmbiosConfig, SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig,
-    VmOptions,
+    AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig, DeviceConfig,
+    DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, InputDeviceConfig,
+    IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
+    ScsiControllerConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig, UsbDeviceConfig,
+    VmConfig, VmOptions,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MappingWarning {
@@ -41,7 +42,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .cloned()
         .unwrap_or_else(|| "imported-vm".to_string());
     let architecture = map_architecture(proxmox.scalars.get("arch"), &mut warnings);
-    let machine = map_machine(proxmox.scalars.get("machine"));
+    let (machine, machine_options) = parse_machine_and_options(proxmox.scalars.get("machine"));
 
     let memory = proxmox
         .scalars
@@ -49,11 +50,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(2048);
     let vcpus = map_vcpus(&proxmox.scalars);
-    let cpu_model = proxmox
-        .scalars
-        .get("cpu")
-        .cloned()
-        .unwrap_or_else(|| "host".to_string());
+    let (cpu_model, cpu_features) = parse_cpu_model_and_features(proxmox.scalars.get("cpu"));
 
     let firmware = proxmox
         .scalars
@@ -68,10 +65,11 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let ostype = proxmox.scalars.get("ostype").map(String::as_str);
     let is_windows = ostype.is_some_and(|ot| ot.starts_with("win"));
 
-    let boot = BootConfig {
+    let mut boot = BootConfig {
         firmware,
         ..Default::default()
     };
+    apply_efidisk0_to_boot(&proxmox.scalars, storage_config, &mut boot);
 
     // Parse boot order and SMBIOS early
     let boot_indices = parse_boot_order(&proxmox.scalars);
@@ -101,10 +99,32 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         }
     }
     let displays = map_displays(&proxmox.scalars, &mut warnings);
+    let (audio, mut spice) = map_audio_and_spice(&proxmox.scalars, &mut warnings);
+    let mut input_devices = Vec::new();
+    let mut ivshmem = None;
+    apply_args_passthrough_subset(
+        &proxmox.scalars,
+        &mut spice,
+        &mut input_devices,
+        &mut ivshmem,
+        &mut warnings,
+    );
+    let explicit_host_functions = proxmox
+        .host_pci
+        .iter()
+        .filter(|entry| {
+            entry
+                .host
+                .rsplit_once(':')
+                .is_some_and(|(_, slot)| slot.contains('.'))
+        })
+        .map(|entry| normalize_host_pci_device(&entry.host))
+        .collect::<BTreeSet<_>>();
+
     let host_pci = proxmox
         .host_pci
         .iter()
-        .map(map_host_pci)
+        .flat_map(|entry| map_host_pci_entries(entry, &explicit_host_functions))
         .collect::<Vec<_>>();
     let host_usb = proxmox.usb.iter().map(map_usb).collect::<Vec<_>>();
 
@@ -118,6 +138,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     });
 
     let tpm = map_tpm(&proxmox.scalars, &boot);
+    let guest_agent = map_guest_agent(&proxmox.scalars);
 
     let smbios = smbios_uuid.map(|uuid| SmbiosConfig {
         manufacturer: None,
@@ -137,16 +158,16 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         system: SystemConfig {
             architecture,
             machine,
-            machine_options: Vec::new(),
+            machine_options,
             memory: MemoryConfig {
                 size: memory,
                 ballooning,
-                ivshmem: None,
+                ivshmem,
             },
             cpu: crate::config::CpuConfig {
                 model: cpu_model,
                 vcpus,
-                features: Vec::new(),
+                features: cpu_features,
                 numa: Vec::new(),
             },
             boot,
@@ -159,8 +180,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             networks,
             displays,
             serials: Vec::new(),
-            input: Vec::new(),
-            audio: Vec::new(),
+            input: input_devices,
+            audio,
         },
         controllers: ControllersConfig {
             scsi: scsi_controllers,
@@ -170,7 +191,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             pci: host_pci,
             usb: host_usb,
         },
-        spice: None,
+        spice,
         iscsi_disks: Vec::new(),
         hyperv: None,
         options: VmOptions {
@@ -182,6 +203,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             } else {
                 None
             },
+            guest_agent,
             ..VmOptions::default()
         },
     };
@@ -211,10 +233,54 @@ fn map_architecture(arch: Option<&String>, warnings: &mut Vec<MappingWarning>) -
     }
 }
 
-fn map_machine(machine: Option<&String>) -> String {
-    let m = machine.map(String::as_str).unwrap_or("q35");
-    // Keep full machine version (e.g., "pc-q35-8.1"), don't strip to just "q35"
-    m.to_string()
+fn parse_machine_and_options(machine: Option<&String>) -> (String, Vec<String>) {
+    let raw = machine.map(String::as_str).unwrap_or("q35").trim();
+    if raw.is_empty() {
+        return ("q35".to_string(), Vec::new());
+    }
+
+    let mut parts = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        return ("q35".to_string(), Vec::new());
+    }
+
+    if let Some(machine_part) = parts.first()
+        && let Some(machine_type) = machine_part.strip_prefix("type=")
+    {
+        let machine = machine_type.trim().to_string();
+        parts.remove(0);
+        return (machine, parts.iter().map(|p| p.to_string()).collect());
+    }
+
+    let machine = parts.remove(0).to_string();
+    let options = parts.iter().map(|p| p.to_string()).collect();
+    (machine, options)
+}
+
+fn parse_cpu_model_and_features(cpu: Option<&String>) -> (String, Vec<String>) {
+    let raw = cpu.map(String::as_str).unwrap_or("host").trim();
+    if raw.is_empty() {
+        return ("host".to_string(), Vec::new());
+    }
+
+    let mut parts = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        return ("host".to_string(), Vec::new());
+    }
+
+    let model = parts.remove(0).to_string();
+    let features = parts.iter().map(|p| p.to_string()).collect();
+    (model, features)
 }
 
 fn map_vcpus(scalars: &BTreeMap<String, String>) -> u32 {
@@ -453,27 +519,46 @@ fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) ->
         }
     };
 
-    let backend_type = if network.options.contains_key("bridge") {
-        "bridge".to_string()
+    let has_bridge = network.options.contains_key("bridge");
+    let backend_type = if has_bridge {
+        "tap".to_string()
     } else {
         "user".to_string()
     };
 
-    let mut extra = BTreeMap::new();
-    for (k, v) in &network.options {
-        if k != "bridge" && k != "queues" {
-            extra.insert(k.clone(), v.clone());
-        }
-    }
+    let ifname = network.options.get("ifname").cloned();
+    let script = if has_bridge {
+        network
+            .options
+            .get("script")
+            .cloned()
+            .or_else(|| Some("/usr/libexec/qemu-server/pve-bridge".to_string()))
+    } else {
+        network.options.get("script").cloned()
+    };
+    let downscript = if has_bridge {
+        network
+            .options
+            .get("downscript")
+            .cloned()
+            .or_else(|| Some("/usr/libexec/qemu-server/pve-bridgedown".to_string()))
+    } else {
+        network.options.get("downscript").cloned()
+    };
+    let vhost = network
+        .options
+        .get("vhost")
+        .map(|value| is_enabled(Some(value)))
+        .or(if has_bridge { Some(true) } else { None });
 
     let backend = NetworkBackendConfig {
         backend_type,
-        ifname: None,
+        ifname,
         bridge: network.options.get("bridge").cloned(),
-        script: None,
-        downscript: None,
+        script,
+        downscript,
         helper: None,
-        vhost: None,
+        vhost,
         queues: network
             .options
             .get("queues")
@@ -482,7 +567,7 @@ fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) ->
         listen: None,
         connect: None,
         fd: None,
-        extra,
+        extra: BTreeMap::new(),
     };
 
     NetworkConfig {
@@ -498,17 +583,74 @@ fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) ->
     }
 }
 
-fn map_host_pci(entry: &ProxmoxHostPciEntry) -> HostPciConfig {
-    HostPciConfig {
-        device: normalize_host_pci_device(&entry.host),
-        id: entry.key.clone(),
-        pcie: is_enabled(entry.options.get("pcie")),
-        x_vga: is_enabled(entry.options.get("x-vga")) || is_enabled(entry.options.get("x_vga")),
-        bus: entry.options.get("bus").cloned(),
-        addr: entry.options.get("addr").cloned(),
-        multifunction: is_enabled(entry.options.get("multifunction")),
+fn map_host_pci_entries(
+    entry: &ProxmoxHostPciEntry,
+    explicit_host_functions: &BTreeSet<String>,
+) -> Vec<HostPciConfig> {
+    let has_explicit_function = entry
+        .host
+        .rsplit_once(':')
+        .is_some_and(|(_, slot)| slot.contains('.'));
+    let base_device = normalize_host_pci_device(&entry.host);
+    let pcie = is_enabled(entry.options.get("pcie"));
+    let x_vga = is_enabled(entry.options.get("x-vga")) || is_enabled(entry.options.get("x_vga"));
+    let wants_multifunction = is_enabled(entry.options.get("multifunction"));
+    let should_expand_pair = !has_explicit_function && (x_vga || wants_multifunction);
+
+    let default_bus = if should_expand_pair {
+        Some("ich9-pcie-port-1".to_string())
+    } else {
+        None
+    };
+    let base_bus = entry.options.get("bus").cloned().or(default_bus);
+    let base_addr = entry.options.get("addr").cloned().or_else(|| {
+        if should_expand_pair {
+            Some("0x0.0".to_string())
+        } else {
+            None
+        }
+    });
+
+    let base_id = if should_expand_pair {
+        format!("{}.0", entry.key)
+    } else {
+        entry.key.clone()
+    };
+
+    let mut mapped = vec![HostPciConfig {
+        device: base_device.clone(),
+        id: base_id,
+        pcie,
+        x_vga,
+        bus: base_bus.clone(),
+        addr: base_addr.clone(),
+        multifunction: wants_multifunction || should_expand_pair,
         romfile: entry.options.get("romfile").cloned(),
+    }];
+
+    if should_expand_pair && let Some(function_one) = sibling_function_one(&base_device) {
+        if explicit_host_functions.contains(&function_one) {
+            return mapped;
+        }
+
+        let second_addr = base_addr
+            .as_deref()
+            .and_then(increment_function_address)
+            .or_else(|| Some("0x0.1".to_string()));
+
+        mapped.push(HostPciConfig {
+            device: function_one,
+            id: format!("{}.1", entry.key),
+            pcie: false,
+            x_vga: false,
+            bus: base_bus,
+            addr: second_addr,
+            multifunction: false,
+            romfile: None,
+        });
     }
+
+    mapped
 }
 
 fn normalize_host_pci_device(device: &str) -> String {
@@ -524,6 +666,21 @@ fn normalize_host_pci_device(device: &str) -> String {
     }
 
     trimmed.to_string()
+}
+
+fn sibling_function_one(device: &str) -> Option<String> {
+    let (prefix, slot_function) = device.rsplit_once(':')?;
+    let (slot, function) = slot_function.split_once('.')?;
+    if function != "0" {
+        return None;
+    }
+
+    Some(format!("{}:{}.1", prefix, slot))
+}
+
+fn increment_function_address(addr: &str) -> Option<String> {
+    addr.strip_suffix(".0")
+        .map(|prefix| format!("{}.1", prefix))
 }
 
 fn map_usb(entry: &ProxmoxUsbEntry) -> UsbDeviceConfig {
@@ -655,6 +812,435 @@ fn parse_smbios_uuid(scalars: &BTreeMap<String, String>) -> Option<String> {
     })
 }
 
+fn apply_efidisk0_to_boot(
+    scalars: &BTreeMap<String, String>,
+    storage_config: Option<&ProxmoxStorageConfig>,
+    boot: &mut BootConfig,
+) {
+    let Some(raw) = scalars.get("efidisk0") else {
+        return;
+    };
+
+    let (source, options) = parse_source_and_options(raw);
+    if !source.is_empty() && source != "none" {
+        boot.uefi_vars = Some(
+            resolve_volume_reference(source, storage_config).unwrap_or_else(|| source.to_string()),
+        );
+    }
+
+    boot.uefi_vars_size = map_efidisk_vars_size(&options);
+}
+
+fn parse_source_and_options(raw: &str) -> (&str, BTreeMap<String, String>) {
+    let mut tokens = raw.split(',').map(str::trim).filter(|t| !t.is_empty());
+    let source = tokens.next().unwrap_or("");
+    let mut options = BTreeMap::new();
+
+    for token in tokens {
+        if let Some((k, v)) = token.split_once('=') {
+            options.insert(k.trim().to_string(), v.trim().to_string());
+        }
+    }
+
+    (source, options)
+}
+
+fn map_efidisk_vars_size(options: &BTreeMap<String, String>) -> Option<u64> {
+    if let Some(efitype) = options.get("efitype") {
+        match efitype.trim().to_ascii_lowercase().as_str() {
+            "4m" => return Some(540_672),
+            "2m" => return Some(131_072),
+            _ => {}
+        }
+    }
+
+    options
+        .get("size")
+        .and_then(|value| parse_human_size_to_bytes(value))
+}
+
+fn parse_human_size_to_bytes(raw: &str) -> Option<u64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let mut digits_end = 0;
+    for (idx, ch) in trimmed.char_indices() {
+        if ch.is_ascii_digit() {
+            digits_end = idx + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    if digits_end == 0 {
+        return None;
+    }
+
+    let number = trimmed[..digits_end].parse::<u64>().ok()?;
+    let suffix = trimmed[digits_end..].trim().to_ascii_lowercase();
+
+    let multiplier = match suffix.as_str() {
+        "" | "b" => 1,
+        "k" | "kb" => 1024,
+        "m" | "mb" => 1024_u64.pow(2),
+        "g" | "gb" => 1024_u64.pow(3),
+        "t" | "tb" => 1024_u64.pow(4),
+        _ => return None,
+    };
+
+    number.checked_mul(multiplier)
+}
+
+fn map_audio_and_spice(
+    scalars: &BTreeMap<String, String>,
+    warnings: &mut Vec<MappingWarning>,
+) -> (Vec<AudioDeviceConfig>, Option<SpiceConfig>) {
+    let Some(raw) = scalars.get("audio0") else {
+        return (Vec::new(), None);
+    };
+
+    let options = parse_options(raw);
+    let device = options
+        .get("device")
+        .map(String::as_str)
+        .unwrap_or("ich9-intel-hda");
+    if device != "ich9-intel-hda" {
+        warnings.push(MappingWarning {
+            source_field: "audio0".to_string(),
+            message: format!(
+                "unsupported audio device '{}' omitted (currently only ich9-intel-hda is mapped)",
+                device
+            ),
+        });
+        return (Vec::new(), None);
+    }
+
+    let driver = options
+        .get("driver")
+        .map(|v| v.to_ascii_lowercase())
+        .unwrap_or_else(|| "spice".to_string());
+    if driver != "spice" {
+        warnings.push(MappingWarning {
+            source_field: "audio0".to_string(),
+            message: format!(
+                "unsupported audio driver '{}' omitted (currently only spice is mapped)",
+                driver
+            ),
+        });
+        return (Vec::new(), None);
+    }
+
+    let controller_id = "audiodev0".to_string();
+    let backend_id = "spice-backend0".to_string();
+
+    let audio = vec![
+        AudioDeviceConfig {
+            r#type: "ich9-intel-hda".to_string(),
+            id: controller_id.clone(),
+            bus: Some("pci.2".to_string()),
+            addr: Some("0xc".to_string()),
+            cad: None,
+            audiodev: None,
+        },
+        AudioDeviceConfig {
+            r#type: "hda-micro".to_string(),
+            id: format!("{}-codec0", controller_id),
+            bus: Some("audiodev0.0".to_string()),
+            addr: None,
+            cad: Some(0),
+            audiodev: Some(backend_id.clone()),
+        },
+        AudioDeviceConfig {
+            r#type: "hda-duplex".to_string(),
+            id: "audiodev0-codec1".to_string(),
+            bus: Some("audiodev0.0".to_string()),
+            addr: None,
+            cad: Some(1),
+            audiodev: Some(backend_id),
+        },
+    ];
+
+    (
+        audio,
+        Some(SpiceConfig {
+            enabled: true,
+            port: 5900,
+            addr: "127.0.0.1".to_string(),
+            disable_ticketing: false,
+            audio: true,
+            vdagent: true,
+        }),
+    )
+}
+
+fn map_guest_agent(scalars: &BTreeMap<String, String>) -> Option<GuestAgentConfig> {
+    let raw = scalars.get("agent")?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+
+    let options = parse_options(raw);
+    let enabled = if options.is_empty() {
+        matches!(raw, "1" | "on" | "yes" | "true")
+    } else {
+        options
+            .get("enabled")
+            .is_none_or(|value| is_enabled(Some(value)))
+    };
+
+    if !enabled {
+        return None;
+    }
+
+    let socket_path = options
+        .get("path")
+        .or_else(|| options.get("socket"))
+        .cloned()
+        .or_else(|| Some("/var/run/qemu-server/qga.sock".to_string()));
+
+    Some(GuestAgentConfig {
+        enabled: true,
+        socket_path,
+        freeze_cpu: false,
+        bus: Some("pci.0".to_string()),
+        addr: Some("0x8".to_string()),
+    })
+}
+
+fn apply_args_passthrough_subset(
+    scalars: &BTreeMap<String, String>,
+    spice: &mut Option<SpiceConfig>,
+    input_devices: &mut Vec<InputDeviceConfig>,
+    ivshmem: &mut Option<IvshmemConfig>,
+    warnings: &mut Vec<MappingWarning>,
+) {
+    let Some(raw_args) = scalars.get("args") else {
+        return;
+    };
+
+    let tokens = shell_split(raw_args);
+    let mut index = 0usize;
+
+    let mut ivshmem_memdev: Option<String> = None;
+    let mut ivshmem_bus: Option<String> = None;
+    let mut ivshmem_id: Option<String> = None;
+    let mut ivshmem_mem_path: Option<String> = None;
+    let mut ivshmem_size: Option<u32> = None;
+
+    while index < tokens.len() {
+        match tokens[index].as_str() {
+            "-spice" => {
+                if let Some(spec) = tokens.get(index + 1) {
+                    apply_spice_spec(spec, spice);
+                    index += 2;
+                } else {
+                    warnings.push(MappingWarning {
+                        source_field: "args".to_string(),
+                        message: "-spice missing argument".to_string(),
+                    });
+                    index += 1;
+                }
+            }
+            "-chardev" => {
+                if let Some(spec) = tokens.get(index + 1) {
+                    if is_vdagent_spicevmc(spec) {
+                        ensure_spice(spice).vdagent = true;
+                    }
+                    index += 2;
+                } else {
+                    warnings.push(MappingWarning {
+                        source_field: "args".to_string(),
+                        message: "-chardev missing argument".to_string(),
+                    });
+                    index += 1;
+                }
+            }
+            "-device" => {
+                if let Some(spec) = tokens.get(index + 1) {
+                    let (device_type, options) = parse_prefixed_options(spec);
+                    match device_type.as_str() {
+                        "virtio-mouse" | "virtio-keyboard" => {
+                            if !input_devices.iter().any(|d| d.r#type == device_type) {
+                                input_devices.push(InputDeviceConfig {
+                                    r#type: device_type,
+                                });
+                            }
+                        }
+                        "virtserialport" => {
+                            if options.get("chardev").map(String::as_str) == Some("vdagent")
+                                && options.get("name").map(String::as_str)
+                                    == Some("com.redhat.spice.0")
+                            {
+                                ensure_spice(spice).vdagent = true;
+                            }
+                        }
+                        "ivshmem-plain" => {
+                            ivshmem_memdev = options.get("memdev").cloned();
+                            ivshmem_bus = options.get("bus").cloned();
+                        }
+                        _ => {}
+                    }
+                    index += 2;
+                } else {
+                    warnings.push(MappingWarning {
+                        source_field: "args".to_string(),
+                        message: "-device missing argument".to_string(),
+                    });
+                    index += 1;
+                }
+            }
+            "-object" => {
+                if let Some(spec) = tokens.get(index + 1) {
+                    let (object_type, options) = parse_prefixed_options(spec);
+                    if object_type == "memory-backend-file" {
+                        ivshmem_id = options.get("id").cloned();
+                        ivshmem_mem_path = options.get("mem-path").cloned();
+                        ivshmem_size = options
+                            .get("size")
+                            .and_then(|raw| parse_human_size_to_bytes(raw))
+                            .and_then(|bytes| u32::try_from(bytes / (1024 * 1024)).ok());
+                    }
+                    index += 2;
+                } else {
+                    warnings.push(MappingWarning {
+                        source_field: "args".to_string(),
+                        message: "-object missing argument".to_string(),
+                    });
+                    index += 1;
+                }
+            }
+            token if token.starts_with('-') => {
+                warnings.push(MappingWarning {
+                    source_field: "args".to_string(),
+                    message: format!("unsupported args token '{}' ignored", token),
+                });
+                index += 1;
+            }
+            _ => {
+                index += 1;
+            }
+        }
+    }
+
+    let has_ivshmem_device = ivshmem_memdev.is_some() || ivshmem_bus.is_some();
+    let has_ivshmem_object =
+        ivshmem_id.is_some() || ivshmem_mem_path.is_some() || ivshmem_size.is_some();
+    if has_ivshmem_device && has_ivshmem_object {
+        let memdev_matches = ivshmem_memdev
+            .as_ref()
+            .zip(ivshmem_id.as_ref())
+            .is_none_or(|(memdev, id)| memdev == id);
+
+        if memdev_matches {
+            *ivshmem = Some(IvshmemConfig {
+                enabled: true,
+                size: ivshmem_size.unwrap_or(32),
+                vectors: 1,
+                id: ivshmem_id.unwrap_or_else(|| "ivshmem0".to_string()),
+                bus: ivshmem_bus,
+                mem_path: ivshmem_mem_path.unwrap_or_else(|| "/dev/kvmfr0".to_string()),
+            });
+        } else {
+            warnings.push(MappingWarning {
+                source_field: "args".to_string(),
+                message: "ivshmem memdev/id mismatch in args; ivshmem mapping skipped".to_string(),
+            });
+        }
+    }
+}
+
+fn shell_split(raw: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_single = false;
+    let mut in_double = false;
+
+    for ch in raw.chars() {
+        match ch {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            c if c.is_whitespace() && !in_single && !in_double => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+}
+
+fn parse_prefixed_options(raw: &str) -> (String, BTreeMap<String, String>) {
+    let mut tokens = raw.split(',').map(str::trim).filter(|t| !t.is_empty());
+    let prefix = tokens.next().unwrap_or("").to_string();
+    let mut options = BTreeMap::new();
+
+    for token in tokens {
+        if let Some((k, v)) = token.split_once('=') {
+            options.insert(k.trim().to_string(), v.trim().to_string());
+        }
+    }
+
+    (prefix, options)
+}
+
+fn apply_spice_spec(spec: &str, spice: &mut Option<SpiceConfig>) {
+    let spice_cfg = ensure_spice(spice);
+    for token in spec.split(',').map(str::trim).filter(|t| !t.is_empty()) {
+        if let Some((k, v)) = token.split_once('=') {
+            match k.trim() {
+                "port" => {
+                    if let Ok(port) = v.trim().parse::<u16>() {
+                        spice_cfg.port = port;
+                    }
+                }
+                "addr" => spice_cfg.addr = v.trim().to_string(),
+                "disable-ticketing" => {
+                    spice_cfg.disable_ticketing = matches!(v.trim(), "on" | "1" | "yes" | "true")
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn ensure_spice(spice: &mut Option<SpiceConfig>) -> &mut SpiceConfig {
+    spice.get_or_insert(SpiceConfig {
+        enabled: true,
+        port: 5900,
+        addr: "127.0.0.1".to_string(),
+        disable_ticketing: false,
+        audio: false,
+        vdagent: false,
+    })
+}
+
+fn is_vdagent_spicevmc(spec: &str) -> bool {
+    let (prefix, options) = parse_prefixed_options(spec);
+    prefix == "spicevmc"
+        && options.get("id").map(String::as_str) == Some("vdagent")
+        && options.get("name").map(String::as_str) == Some("vdagent")
+}
+
+fn parse_options(raw: &str) -> BTreeMap<String, String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .filter_map(|token| {
+            token
+                .split_once('=')
+                .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage};
@@ -696,6 +1282,43 @@ mod tests {
         assert_eq!(cfg.system.cpu.model, "host");
         assert_eq!(cfg.system.cpu.vcpus, 8);
         assert_eq!(cfg.system.memory.size, 8192);
+    }
+
+    #[test]
+    fn maps_machine_options_and_cpu_features_from_scalar_fields() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-machine-cpu
+            machine: type=pc-q35-8.1+pve0,hpet=off
+            cpu: host,hv_ipi,hv_relaxed,kvm=off
+            cores: 4
+            "#,
+        );
+
+        assert_eq!(cfg.system.machine, "pc-q35-8.1+pve0");
+        assert_eq!(cfg.system.machine_options, vec!["hpet=off".to_string()]);
+        assert_eq!(cfg.system.cpu.model, "host");
+        assert_eq!(
+            cfg.system.cpu.features,
+            vec![
+                "hv_ipi".to_string(),
+                "hv_relaxed".to_string(),
+                "kvm=off".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn maps_machine_value_with_inline_options_without_type_prefix() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-machine-inline
+            machine: pc-q35-8.1,hpet=off
+            "#,
+        );
+
+        assert_eq!(cfg.system.machine, "pc-q35-8.1");
+        assert_eq!(cfg.system.machine_options, vec!["hpet=off".to_string()]);
     }
 
     #[test]
@@ -781,9 +1404,18 @@ mod tests {
         assert_eq!(net.model, "virtio-net");
         assert_eq!(net.mac.as_deref(), Some("52:54:00:12:34:56"));
         let backend = net.backend.as_ref().expect("backend must be set");
-        assert_eq!(backend.backend_type, "bridge");
+        assert_eq!(backend.backend_type, "tap");
         assert_eq!(backend.bridge.as_deref(), Some("vmbr0"));
         assert_eq!(backend.queues, Some(4));
+        assert_eq!(
+            backend.script.as_deref(),
+            Some("/usr/libexec/qemu-server/pve-bridge")
+        );
+        assert_eq!(
+            backend.downscript.as_deref(),
+            Some("/usr/libexec/qemu-server/pve-bridgedown")
+        );
+        assert_eq!(backend.vhost, Some(true));
     }
 
     #[test]
@@ -797,16 +1429,44 @@ mod tests {
             "#,
         );
 
-        assert_eq!(cfg.host.pci.len(), 1);
+        assert_eq!(cfg.host.pci.len(), 2);
         assert_eq!(cfg.host.pci[0].device, "0000:03:00.0");
+        assert_eq!(cfg.host.pci[0].id, "hostpci0.0");
         assert!(cfg.host.pci[0].pcie);
         assert!(cfg.host.pci[0].x_vga);
         assert!(cfg.host.pci[0].multifunction);
+        assert_eq!(cfg.host.pci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(cfg.host.pci[0].addr.as_deref(), Some("0x0.0"));
+
+        assert_eq!(cfg.host.pci[1].device, "0000:03:00.1");
+        assert_eq!(cfg.host.pci[1].id, "hostpci0.1");
+        assert!(!cfg.host.pci[1].pcie);
+        assert!(!cfg.host.pci[1].x_vga);
+        assert!(!cfg.host.pci[1].multifunction);
+        assert_eq!(cfg.host.pci[1].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(cfg.host.pci[1].addr.as_deref(), Some("0x0.1"));
 
         assert_eq!(cfg.host.usb.len(), 2);
         assert_eq!(cfg.host.usb[0].hostbus.as_deref(), Some("1"));
         assert_eq!(cfg.host.usb[0].hostport.as_deref(), Some("2"));
         assert_eq!(cfg.host.usb[1].host, "0451:16a0");
+    }
+
+    #[test]
+    fn preserves_explicit_hostpci_function_entries_without_synthetic_pairing() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-host-explicit
+            hostpci0: 0000:03:00.0,pcie=1,x-vga=1,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=1
+            hostpci1: 0000:03:00.1,bus=ich9-pcie-port-1,addr=0x0.1
+            "#,
+        );
+
+        assert_eq!(cfg.host.pci.len(), 2);
+        assert_eq!(cfg.host.pci[0].id, "hostpci0");
+        assert_eq!(cfg.host.pci[0].device, "0000:03:00.0");
+        assert_eq!(cfg.host.pci[1].id, "hostpci1");
+        assert_eq!(cfg.host.pci[1].device, "0000:03:00.1");
     }
 
     #[test]
@@ -823,6 +1483,178 @@ mod tests {
         assert_eq!(tpm.version, "2.0");
         assert_eq!(tpm.backend, "emulator");
         assert_eq!(tpm.model, "tpm-tis");
+    }
+
+    #[test]
+    fn maps_efidisk0_into_boot_uefi_vars_with_storage_resolution() {
+        let (_, cfg) = map_and_validate_with_storage(
+            r#"
+            name: vm-uefi
+            bios: ovmf
+            efidisk0: vm1-pool:vm-108-efidisk,efitype=4m,size=4M
+            "#,
+            r#"
+            lvmthin: vm1-pool
+                thinpool pool
+                vgname vm1
+                content images,rootdir
+            "#,
+        );
+
+        assert_eq!(cfg.system.boot.firmware.as_deref(), Some("uefi"));
+        assert_eq!(
+            cfg.system.boot.uefi_vars.as_deref(),
+            Some("/dev/vm1/vm-108-efidisk")
+        );
+        assert_eq!(cfg.system.boot.uefi_vars_size, Some(540_672));
+    }
+
+    #[test]
+    fn maps_efidisk0_size_from_size_option_when_efitype_is_absent() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-uefi-size
+            bios: ovmf
+            efidisk0: /var/lib/vm/vars.fd,size=4M
+            "#,
+        );
+
+        assert_eq!(
+            cfg.system.boot.uefi_vars.as_deref(),
+            Some("/var/lib/vm/vars.fd")
+        );
+        assert_eq!(cfg.system.boot.uefi_vars_size, Some(4 * 1024 * 1024));
+    }
+
+    #[test]
+    fn maps_audio0_to_hda_devices_with_spice_backend() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-audio
+            audio0: device=ich9-intel-hda,driver=spice
+            "#,
+        );
+
+        assert_eq!(cfg.devices.audio.len(), 3);
+        assert_eq!(cfg.devices.audio[0].r#type, "ich9-intel-hda");
+        assert_eq!(cfg.devices.audio[0].id, "audiodev0");
+        assert_eq!(cfg.devices.audio[1].r#type, "hda-micro");
+        assert_eq!(cfg.devices.audio[2].r#type, "hda-duplex");
+
+        let spice = cfg.spice.as_ref().expect("spice should be configured");
+        assert!(spice.enabled);
+        assert!(spice.audio);
+        assert_eq!(spice.addr, "127.0.0.1");
+        assert_eq!(spice.port, 5900);
+    }
+
+    #[test]
+    fn unsupported_audio_driver_emits_warning_and_skips_audio_mapping() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-audio-unsupported
+            audio0: device=ich9-intel-hda,driver=alsa
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        validation::validate_config(&cfg).expect("config should validate");
+
+        assert!(cfg.devices.audio.is_empty());
+        assert!(cfg.spice.is_none());
+        assert!(mapped.warnings.iter().any(|w| {
+            w.source_field == "audio0" && w.message.contains("unsupported audio driver")
+        }));
+    }
+
+    #[test]
+    fn maps_agent_enabled_into_guest_agent_config() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-agent
+            agent: 1
+            "#,
+        );
+
+        let agent = cfg
+            .options
+            .guest_agent
+            .as_ref()
+            .expect("guest agent should be configured");
+        assert!(agent.enabled);
+        assert_eq!(
+            agent.socket_path.as_deref(),
+            Some("/var/run/qemu-server/qga.sock")
+        );
+        assert_eq!(agent.bus.as_deref(), Some("pci.0"));
+        assert_eq!(agent.addr.as_deref(), Some("0x8"));
+    }
+
+    #[test]
+    fn skips_guest_agent_mapping_when_agent_disabled() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-agent-off
+            agent: enabled=0
+            "#,
+        );
+
+        assert!(cfg.options.guest_agent.is_none());
+    }
+
+    #[test]
+    fn maps_args_subset_for_spice_input_and_ivshmem() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-args
+            args: -spice port=5903,addr=0.0.0.0,disable-ticketing=on -chardev spicevmc,id=vdagent,name=vdagent -device virtserialport,chardev=vdagent,name=com.redhat.spice.0 -device virtio-mouse -device virtio-keyboard -device ivshmem-plain,memdev=ivshmem0,bus=pcie.0 -object memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M
+            "#,
+        );
+
+        let spice = cfg.spice.as_ref().expect("spice should be configured");
+        assert!(spice.enabled);
+        assert_eq!(spice.port, 5903);
+        assert_eq!(spice.addr, "0.0.0.0");
+        assert!(spice.disable_ticketing);
+        assert!(spice.vdagent);
+
+        assert!(cfg.devices.input.iter().any(|d| d.r#type == "virtio-mouse"));
+        assert!(
+            cfg.devices
+                .input
+                .iter()
+                .any(|d| d.r#type == "virtio-keyboard")
+        );
+
+        let iv = cfg
+            .system
+            .memory
+            .ivshmem
+            .as_ref()
+            .expect("ivshmem should be configured");
+        assert!(iv.enabled);
+        assert_eq!(iv.id, "ivshmem0");
+        assert_eq!(iv.bus.as_deref(), Some("pcie.0"));
+        assert_eq!(iv.mem_path, "/dev/kvmfr0");
+        assert_eq!(iv.size, 128);
+    }
+
+    #[test]
+    fn unsupported_args_token_emits_warning() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-args-unsupported
+            args: -foo bar
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        assert!(mapped.warnings.iter().any(|w| {
+            w.source_field == "args" && w.message.contains("unsupported args token '-foo'")
+        }));
     }
 
     #[test]

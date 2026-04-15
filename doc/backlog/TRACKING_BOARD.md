@@ -50,6 +50,14 @@ Source: doc/backlog/BACKLOG.md
 | B-03 | Add import CLI command | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-04 | Add import validation and reporting | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-05 | Integration tests for import-to-start pipeline | B | Phase-1-Features | epic:proxmox, phase:1-features | B-03, B-04 | unassigned | Done |
+| B-06 | Parse and map efidisk0 for UEFI vars parity | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
+| B-07 | Parse and map audio0 for SPICE HDA parity | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
+| B-08 | Parse and map agent field for guest-agent plumbing | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
+| B-09 | Parse and map args passthrough safe subset | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02, B-04 | unassigned | Done |
+| B-10 | Preserve machine and CPU feature fidelity | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
+| B-11 | Improve network backend fidelity for Proxmox bridge/tap | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
+| B-12 | Expand host PCI fidelity for multifunction devices | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
+| B-13 | Add wakiza parity fixture and regression test | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-06, B-07, B-08, B-09, B-10, B-11, B-12 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -71,6 +79,14 @@ Source: doc/backlog/BACKLOG.md
 - B-01 -> B-02 -> B-03
 - B-02 -> B-04
 - (B-03 and B-04) -> B-05
+- B-02 -> B-06
+- B-02 -> B-07
+- B-02 -> B-08
+- (B-02 and B-04) -> B-09
+- B-02 -> B-10
+- B-02 -> B-11
+- B-02 -> B-12
+- (B-06 and B-07 and B-08 and B-09 and B-10 and B-11 and B-12) -> B-13
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05
