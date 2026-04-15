@@ -1,0 +1,51 @@
+name: e2e-usb
+backend: qemu
+profiles: []
+system:
+  architecture: x86_64
+  machine: q35
+  machine_options: []
+  memory:
+    size: 2048
+    ballooning:
+      enabled: true
+      free_page_reporting: false
+      model: virtio-balloon-pci
+  cpu:
+    model: host
+    vcpus: 2
+    features: []
+    numa: []
+  boot:
+    boot_order: []
+    menu: false
+    strict: false
+    secure_boot: false
+  readconfig: []
+devices:
+  drives: []
+  networks: []
+  displays: []
+  serials: []
+  input: []
+  audio: []
+controllers:
+  scsi: []
+  xhci: []
+host:
+  pci: []
+  usb:
+  - id: usb0
+    host: ''
+    hostbus: '1'
+    hostport: '2.2'
+    bus: xhci.0
+    port: '1'
+  - id: usb1
+    host: 0451:16a0
+iscsi_disks: []
+options:
+  enable_kvm: true
+  daemonize: false
+  nodefaults: true
+  global_options: []

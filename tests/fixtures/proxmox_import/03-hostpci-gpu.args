@@ -13,11 +13,14 @@ type=bridge,id=net0,br=vmbr1
 -device
 virtio-net,netdev=net0,mac=52:54:00:de:ad:01
 -device
+virtio-balloon-pci
+-device
 vfio-pci,host=0000:03:00.0,id=hostpci0,x-vga=on,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on
 -device
 vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.pid
+-nodefaults
 -vga
 none
 -nographic

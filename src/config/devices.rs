@@ -55,6 +55,7 @@ mod tests {
             controller: None,
             boot_index: None,
             scsi_id: None,
+            rotation_rate: None,
             bus: None,
             unit: None,
         };
@@ -85,6 +86,7 @@ mod tests {
             controller: Some("scsihw0".to_string()),
             boot_index: Some(100),
             scsi_id: Some(0),
+            rotation_rate: None,
             bus: None,
             unit: None,
         };
@@ -117,6 +119,7 @@ mod tests {
             controller: None,
             boot_index: Some(101),
             scsi_id: None,
+            rotation_rate: None,
             bus: Some("ide.1".to_string()),
             unit: Some(0),
         };
@@ -235,6 +238,7 @@ mod tests {
                 controller: None,
                 boot_index: None,
                 scsi_id: None,
+                rotation_rate: None,
                 bus: None,
                 unit: None,
             }],

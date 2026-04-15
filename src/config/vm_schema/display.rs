@@ -16,6 +16,11 @@ impl From<DisplayConfig> for QemuArgs {
     fn from(display: DisplayConfig) -> Self {
         let mut args = QemuArgs::new();
 
+        // Skip device emission for "none" display (explicit vga=none from Proxmox)
+        if display.r#type == "none" {
+            return args;
+        }
+
         args.push_str("-device");
         let mut device_spec = display.r#type.clone();
 

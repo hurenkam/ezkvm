@@ -18,6 +18,9 @@ type=user,id=net0
 e1000,netdev=net0,mac=52:54:00:aa:bb:cc
 -device
 cirrus
+-device
+virtio-balloon-pci
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-bios-cdrom.pid
+-nodefaults
 -enable-kvm

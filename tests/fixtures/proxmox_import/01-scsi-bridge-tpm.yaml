@@ -1,0 +1,74 @@
+name: e2e-scsi-bridge
+backend: qemu
+profiles: []
+system:
+  architecture: x86_64
+  machine: q35
+  machine_options: []
+  memory:
+    size: 4096
+    ballooning:
+      enabled: true
+      free_page_reporting: false
+      model: virtio-balloon-pci
+  cpu:
+    model: host
+    vcpus: 4
+    features: []
+    numa: []
+  boot:
+    firmware: uefi
+    boot_order: []
+    menu: false
+    strict: false
+    secure_boot: false
+  tpm:
+    version: '2.0'
+    backend: emulator
+    state_path: /var/run/ezkvm/tpmstate0-tpm.socket
+    model: tpm-tis
+  readconfig: []
+devices:
+  drives:
+  - id: scsi0
+    path: local-lvm:vm-200-disk-0
+    interface: scsi
+    type: disk
+    format: qcow2
+    readonly: false
+    discard: true
+    ssd: true
+    cache: none
+    controller: scsihw0
+    boot_index: 100
+    rotation_rate: 1
+  networks:
+  - id: net0
+    model: virtio-net
+    backend:
+      type: bridge
+      bridge: vmbr0
+      queues: 4
+      hostfwd: []
+      extra: {}
+    mac: 52:54:00:12:34:56
+  displays:
+  - type: qxl
+    vram: 64
+  serials: []
+  input: []
+  audio: []
+controllers:
+  scsi:
+  - id: scsihw0
+    type: virtio-scsi-pci
+  xhci: []
+host:
+  pci: []
+  usb: []
+iscsi_disks: []
+options:
+  enable_kvm: true
+  daemonize: false
+  nodefaults: true
+  global_options: []

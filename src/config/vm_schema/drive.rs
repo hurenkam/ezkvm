@@ -61,6 +61,10 @@ pub struct DriveConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scsi_id: Option<u32>,
 
+    /// Rotation rate: 1 for SSD (non-rotating), 0 or None for HDD
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation_rate: Option<u32>,
+
     /// Explicit attachment bus for device-based drive emission
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
@@ -204,6 +208,10 @@ impl From<DriveConfig> for QemuArgs {
 
             if let Some(scsi_id) = drive.scsi_id {
                 device_spec.push_str(&format!(",scsi-id={}", scsi_id));
+            }
+
+            if let Some(rotation_rate) = drive.rotation_rate {
+                device_spec.push_str(&format!(",rotation_rate={}", rotation_rate));
             }
 
             if let Some(boot_index) = drive.boot_index {

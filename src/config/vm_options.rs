@@ -2,6 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{GuestAgentConfig, LookingGlassOptions, QmpConfig};
 
+fn default_nodefaults() -> bool {
+    true
+}
+
 /// Additional VM options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VmOptions {
@@ -12,7 +16,7 @@ pub struct VmOptions {
     pub daemonize: bool,
 
     /// Disable QEMU default devices
-    #[serde(default)]
+    #[serde(default = "default_nodefaults")]
     pub nodefaults: bool,
 
     /// Raw `-global` options
@@ -57,7 +61,7 @@ impl Default for VmOptions {
         Self {
             enable_kvm: true,
             daemonize: false,
-            nodefaults: false,
+            nodefaults: true,
             global_options: Vec::new(),
             rtc: None,
             pid_file: None,

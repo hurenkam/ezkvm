@@ -1,0 +1,60 @@
+name: e2e-bios-cdrom
+backend: qemu
+profiles: []
+system:
+  architecture: x86_64
+  machine: q35
+  machine_options: []
+  memory:
+    size: 2048
+    ballooning:
+      enabled: true
+      free_page_reporting: false
+      model: virtio-balloon-pci
+  cpu:
+    model: host
+    vcpus: 2
+    features: []
+    numa: []
+  boot:
+    boot_order: []
+    menu: false
+    strict: false
+    secure_boot: false
+  readconfig: []
+devices:
+  drives:
+  - id: ide2
+    path: ''
+    interface: ide
+    type: cdrom
+    format: raw
+    readonly: true
+    discard: false
+    ssd: false
+    boot_index: 101
+  networks:
+  - id: net0
+    model: e1000
+    backend:
+      type: user
+      hostfwd: []
+      extra: {}
+    mac: 52:54:00:aa:bb:cc
+  displays:
+  - type: cirrus
+  serials: []
+  input: []
+  audio: []
+controllers:
+  scsi: []
+  xhci: []
+host:
+  pci: []
+  usb: []
+iscsi_disks: []
+options:
+  enable_kvm: true
+  daemonize: false
+  nodefaults: true
+  global_options: []

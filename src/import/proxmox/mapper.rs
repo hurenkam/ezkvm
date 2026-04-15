@@ -4,9 +4,10 @@ use super::model::{
     ProxmoxVmConfig,
 };
 use crate::config::{
-    BootConfig, ControllersConfig, DeviceConfig, DisplayConfig, DriveConfig, HostConfig,
-    HostPciConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, ScsiControllerConfig,
-    SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig, VmOptions,
+    BallooningConfig, BootConfig, ControllersConfig, DeviceConfig, DisplayConfig, DriveConfig,
+    HostConfig, HostPciConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
+    ScsiControllerConfig, SmbiosConfig, SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig,
+    VmOptions,
 };
 use std::collections::BTreeMap;
 
@@ -63,22 +64,42 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             _ => None,
         });
 
+    // Determine Windows status for RTC and ballooning
+    let ostype = proxmox.scalars.get("ostype").map(String::as_str);
+    let is_windows = ostype.is_some_and(|ot| ot.starts_with("win"));
+
     let boot = BootConfig {
         firmware,
         ..Default::default()
     };
 
+    // Parse boot order and SMBIOS early
+    let boot_indices = parse_boot_order(&proxmox.scalars);
+    let smbios_uuid = parse_smbios_uuid(&proxmox.scalars);
+
     let scsi_controllers = map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
-    let drives = proxmox
+    let mut drives = proxmox
         .disks
         .iter()
         .map(|disk| map_drive(disk, storage_config))
         .collect::<Vec<_>>();
-    let networks = proxmox
+    let mut networks = proxmox
         .networks
         .iter()
         .map(|network| map_network(network, &mut warnings))
         .collect::<Vec<_>>();
+
+    // Apply boot indices from parsed boot order
+    for drive in &mut drives {
+        if let Some(idx) = boot_indices.get(&drive.id) {
+            drive.boot_index = Some(*idx);
+        }
+    }
+    for network in &mut networks {
+        if let Some(idx) = boot_indices.get(&network.id) {
+            network.boot_index = Some(*idx);
+        }
+    }
     let displays = map_displays(&proxmox.scalars, &mut warnings);
     let host_pci = proxmox
         .host_pci
@@ -86,7 +107,28 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .map(map_host_pci)
         .collect::<Vec<_>>();
     let host_usb = proxmox.usb.iter().map(map_usb).collect::<Vec<_>>();
+
+    let ballooning = Some(BallooningConfig {
+        enabled: true,
+        free_page_reporting: false,
+        model: "virtio-balloon-pci".to_string(),
+        id: None,
+        bus: None,
+        addr: None,
+    });
+
     let tpm = map_tpm(&proxmox.scalars, &boot);
+
+    let smbios = smbios_uuid.map(|uuid| SmbiosConfig {
+        manufacturer: None,
+        product: None,
+        version: None,
+        serial: None,
+        uuid: Some(uuid),
+        sku: None,
+        family: None,
+        vm_generation_id: proxmox.scalars.get("vmgenid").cloned(),
+    });
 
     let vm_config = VmConfig {
         name,
@@ -98,7 +140,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             machine_options: Vec::new(),
             memory: MemoryConfig {
                 size: memory,
-                ballooning: None,
+                ballooning,
                 ivshmem: None,
             },
             cpu: crate::config::CpuConfig {
@@ -109,7 +151,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             },
             boot,
             tpm,
-            smbios: None,
+            smbios,
             readconfig: Vec::new(),
         },
         devices: DeviceConfig {
@@ -131,7 +173,17 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         spice: None,
         iscsi_disks: Vec::new(),
         hyperv: None,
-        options: VmOptions::default(),
+        options: VmOptions {
+            rtc: if is_windows {
+                Some(RtcConfig {
+                    base: Some("localtime".to_string()),
+                    driftfix: Some("slew".to_string()),
+                })
+            } else {
+                None
+            },
+            ..VmOptions::default()
+        },
     };
 
     let yaml = serde_yaml::to_string(&vm_config)
@@ -161,11 +213,8 @@ fn map_architecture(arch: Option<&String>, warnings: &mut Vec<MappingWarning>) -
 
 fn map_machine(machine: Option<&String>) -> String {
     let m = machine.map(String::as_str).unwrap_or("q35");
-    if m.contains("q35") {
-        "q35".to_string()
-    } else {
-        m.to_string()
-    }
+    // Keep full machine version (e.g., "pc-q35-8.1"), don't strip to just "q35"
+    m.to_string()
 }
 
 fn map_vcpus(scalars: &BTreeMap<String, String>) -> u32 {
@@ -262,6 +311,35 @@ fn map_drive(
 
     let boot_index = disk.options.get("boot").and_then(|v| v.parse::<u32>().ok());
 
+    // Set I/O defaults for block devices (LVM, ZFS, etc.)
+    let is_block_device = path.starts_with("/dev/");
+    let cache = disk.options.get("cache").cloned().or_else(|| {
+        if is_block_device {
+            Some("none".to_string())
+        } else {
+            None
+        }
+    });
+    let aio = disk.options.get("aio").cloned().or_else(|| {
+        if is_block_device {
+            Some("io_uring".to_string())
+        } else {
+            None
+        }
+    });
+    let detect_zeroes = disk
+        .options
+        .get("detect_zeroes")
+        .cloned()
+        .or_else(|| disk.options.get("detect-zeroes").cloned())
+        .or_else(|| {
+            if is_block_device {
+                Some("unmap".to_string())
+            } else {
+                None
+            }
+        });
+
     DriveConfig {
         id: disk.key.clone(),
         path,
@@ -275,13 +353,9 @@ fn map_drive(
         readonly,
         discard,
         ssd,
-        cache: disk.options.get("cache").cloned(),
-        aio: disk.options.get("aio").cloned(),
-        detect_zeroes: disk
-            .options
-            .get("detect_zeroes")
-            .cloned()
-            .or_else(|| disk.options.get("detect-zeroes").cloned()),
+        cache,
+        aio,
+        detect_zeroes,
         controller: if disk.bus == "scsi" {
             Some("scsihw0".to_string())
         } else {
@@ -289,6 +363,11 @@ fn map_drive(
         },
         boot_index,
         scsi_id: None,
+        rotation_rate: if ssd && disk.bus == "scsi" {
+            Some(1)
+        } else {
+            None
+        },
         bus: None,
         unit: None,
     }
@@ -475,7 +554,7 @@ fn map_usb(entry: &ProxmoxUsbEntry) -> UsbDeviceConfig {
     }
 }
 
-fn map_tpm(scalars: &BTreeMap<String, String>, boot: &BootConfig) -> Option<TpmConfig> {
+fn map_tpm(scalars: &BTreeMap<String, String>, _boot: &BootConfig) -> Option<TpmConfig> {
     let (key, raw) = scalars
         .iter()
         .find(|(k, _)| k.starts_with("tpmstate"))
@@ -489,11 +568,7 @@ fn map_tpm(scalars: &BTreeMap<String, String>, boot: &BootConfig) -> Option<TpmC
         }
     }
 
-    let model = if boot.firmware.as_deref() == Some("uefi") {
-        "tpm-crb".to_string()
-    } else {
-        "tpm-tis".to_string()
-    };
+    let model = "tpm-tis".to_string();
 
     Some(TpmConfig {
         version,
@@ -549,6 +624,35 @@ fn is_enabled(value: Option<&String>) -> bool {
         value.map(String::as_str),
         Some("1") | Some("on") | Some("yes") | Some("true")
     )
+}
+
+fn parse_boot_order(scalars: &BTreeMap<String, String>) -> BTreeMap<String, u32> {
+    let mut boot_indices = BTreeMap::new();
+    if let Some(boot_str) = scalars.get("boot") {
+        // Parse "order=scsi0;ide2;net0" format
+        if let Some(order) = boot_str.strip_prefix("order=") {
+            for (index, device_key) in order.split(';').enumerate() {
+                let dev_key = device_key.trim();
+                if !dev_key.is_empty() {
+                    // Proxmox bootindex typically starts at 100, 101, 102...
+                    boot_indices.insert(dev_key.to_string(), 100 + index as u32);
+                }
+            }
+        }
+    }
+    boot_indices
+}
+
+fn parse_smbios_uuid(scalars: &BTreeMap<String, String>) -> Option<String> {
+    scalars.get("smbios1").and_then(|smbios_str| {
+        // Parse "uuid=04d064c3-66a1-4aa7-9589-f8b3ecf91cd7" format
+        for token in smbios_str.split(',') {
+            if let Some(uuid) = token.strip_prefix("uuid=") {
+                return Some(uuid.trim().to_string());
+            }
+        }
+        None
+    })
 }
 
 #[cfg(test)]
@@ -718,7 +822,7 @@ mod tests {
         let tpm = cfg.system.tpm.as_ref().expect("tpm should be mapped");
         assert_eq!(tpm.version, "2.0");
         assert_eq!(tpm.backend, "emulator");
-        assert_eq!(tpm.model, "tpm-crb");
+        assert_eq!(tpm.model, "tpm-tis");
     }
 
     #[test]

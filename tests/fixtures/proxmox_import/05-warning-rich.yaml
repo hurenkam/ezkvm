@@ -1,0 +1,68 @@
+name: e2e-warning
+backend: qemu
+profiles: []
+system:
+  architecture: x86_64
+  machine: q35
+  machine_options: []
+  memory:
+    size: 3072
+    ballooning:
+      enabled: true
+      free_page_reporting: false
+      model: virtio-balloon-pci
+  cpu:
+    model: host
+    vcpus: 2
+    features: []
+    numa: []
+  boot:
+    boot_order: []
+    menu: false
+    strict: false
+    secure_boot: false
+  readconfig: []
+devices:
+  drives:
+  - id: scsi0
+    path: local-zfs:vm-500-disk-0
+    interface: scsi
+    type: disk
+    format: qcow2
+    readonly: false
+    discard: true
+    ssd: false
+    controller: scsihw0
+  networks:
+  - id: net0
+    model: virtio-net
+    backend:
+      type: bridge
+      bridge: vmbr9
+      hostfwd: []
+      extra: {}
+    mac: 52:54:00:fe:ed:01
+  displays:
+  - type: virtio-gpu
+    vram: 32
+  serials: []
+  input: []
+  audio: []
+controllers:
+  scsi:
+  - id: scsihw0
+    type: virtio-scsi-pci
+  xhci: []
+host:
+  pci: []
+  usb:
+  - id: usb0
+    host: ''
+    hostbus: '3'
+    hostport: '1.4'
+iscsi_disks: []
+options:
+  enable_kvm: true
+  daemonize: false
+  nodefaults: true
+  global_options: []

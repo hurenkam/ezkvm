@@ -1,0 +1,65 @@
+name: e2e-hostpci-gpu
+backend: qemu
+profiles: []
+system:
+  architecture: x86_64
+  machine: q35
+  machine_options: []
+  memory:
+    size: 8192
+    ballooning:
+      enabled: true
+      free_page_reporting: false
+      model: virtio-balloon-pci
+  cpu:
+    model: host
+    vcpus: 8
+    features: []
+    numa: []
+  boot:
+    boot_order: []
+    menu: false
+    strict: false
+    secure_boot: false
+  readconfig: []
+devices:
+  drives: []
+  networks:
+  - id: net0
+    model: virtio-net
+    backend:
+      type: bridge
+      bridge: vmbr1
+      hostfwd: []
+      extra: {}
+    mac: 52:54:00:de:ad:01
+  displays: []
+  serials: []
+  input: []
+  audio: []
+controllers:
+  scsi: []
+  xhci: []
+host:
+  pci:
+  - device: 0000:03:00.0
+    id: hostpci0
+    pcie: true
+    x_vga: true
+    bus: ich9-pcie-port-1
+    addr: 0x0.0
+    multifunction: true
+  - device: 0000:03:00.1
+    id: hostpci1
+    pcie: false
+    x_vga: false
+    bus: ich9-pcie-port-1
+    addr: 0x0.1
+    multifunction: false
+  usb: []
+iscsi_disks: []
+options:
+  enable_kvm: true
+  daemonize: false
+  nodefaults: true
+  global_options: []

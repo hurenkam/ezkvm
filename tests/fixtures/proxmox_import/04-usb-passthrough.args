@@ -9,6 +9,8 @@ host
 -smp
 cpus=2
 -device
+virtio-balloon-pci
+-device
 qemu-xhci,id=xhci
 -device
 usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1
@@ -16,4 +18,5 @@ usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1
 usb-host,host=0451:16a0,id=usb1
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-usb.pid
+-nodefaults
 -enable-kvm
