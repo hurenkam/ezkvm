@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BootConfig {
     /// Firmware type (uefi, bios, or ovmf)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub firmware: Option<String>,
 
     /// Boot order (disk, cdrom, network)
@@ -22,28 +22,36 @@ pub struct BootConfig {
     pub strict: bool,
 
     /// Reboot timeout in milliseconds
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reboot_timeout: Option<u32>,
 
     /// Splash screen image path
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub splash: Option<String>,
 
     /// Kernel path (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kernel: Option<String>,
 
     /// Initrd path (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub initrd: Option<String>,
 
     /// Kernel command line
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cmdline: Option<String>,
 
     /// UEFI firmware code path (for custom OVMF)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uefi_code: Option<String>,
 
     /// UEFI variables path
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uefi_vars: Option<String>,
 
     /// Optional explicit UEFI variables drive size in bytes for pflash unit 1.
     /// Proxmox uses `size=540672` for OVMF vars even when the backing device is larger.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uefi_vars_size: Option<u64>,
 
     /// Enable secure boot

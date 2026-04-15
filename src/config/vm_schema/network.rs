@@ -11,31 +11,31 @@ pub struct NetworkBackendConfig {
     pub backend_type: String,
 
     /// Host-side interface name for tap backends.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ifname: Option<String>,
 
     /// Host bridge name for bridge-style backends.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bridge: Option<String>,
 
     /// Optional helper script path.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub script: Option<String>,
 
     /// Optional teardown helper script path.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub downscript: Option<String>,
 
     /// Optional bridge helper path.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub helper: Option<String>,
 
     /// Enable or disable vhost acceleration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vhost: Option<bool>,
 
     /// Optional queue count for supported backends.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queues: Option<u16>,
 
     /// User-mode host forwarding rules in native QEMU `hostfwd=` syntax.
@@ -43,15 +43,15 @@ pub struct NetworkBackendConfig {
     pub hostfwd: Vec<String>,
 
     /// Listen address or path for socket-like backends.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub listen: Option<String>,
 
     /// Connect address or path for socket-like backends.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub connect: Option<String>,
 
     /// File descriptor reference for fd-backed netdevs.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fd: Option<String>,
 
     /// Additional backend options preserved for compatibility.
@@ -124,25 +124,31 @@ pub struct NetworkConfig {
     pub model: String,
 
     /// Structured network backend configuration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backend: Option<NetworkBackendConfig>,
 
     /// MAC address
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mac: Option<String>,
 
     /// RX queue size
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rx_queue_size: Option<u32>,
 
     /// TX queue size
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_queue_size: Option<u32>,
 
     /// Boot index for firmware boot ordering
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_index: Option<u32>,
 
     /// PCI/PCIe bus placement for the network device
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
     /// Slot or function address on the selected bus
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub addr: Option<String>,
 }
 

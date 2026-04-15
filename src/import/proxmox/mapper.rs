@@ -221,7 +221,7 @@ fn map_scsi_controllers(
     };
 
     vec![ScsiControllerConfig {
-        id: "scsi0".to_string(),
+        id: "scsihw0".to_string(),
         r#type: controller_type,
         iothread: None,
         max_targets: None,
@@ -249,7 +249,7 @@ fn map_drive(
     };
 
     let format = disk.options.get("format").cloned().unwrap_or_else(|| {
-        if is_cdrom {
+        if is_cdrom || path.starts_with("/dev/") {
             "raw".to_string()
         } else {
             "qcow2".to_string()
@@ -283,7 +283,7 @@ fn map_drive(
             .cloned()
             .or_else(|| disk.options.get("detect-zeroes").cloned()),
         controller: if disk.bus == "scsi" {
-            Some("scsi0".to_string())
+            Some("scsihw0".to_string())
         } else {
             None
         },
@@ -606,7 +606,9 @@ mod tests {
         );
 
         assert_eq!(cfg.controllers.scsi.len(), 1);
+        assert_eq!(cfg.controllers.scsi[0].id, "scsihw0");
         assert_eq!(cfg.controllers.scsi[0].r#type, "virtio-scsi-pci");
+        assert_eq!(cfg.devices.drives[0].controller.as_deref(), Some("scsihw0"));
         assert_eq!(cfg.devices.drives.len(), 2);
         assert_eq!(cfg.devices.drives[0].interface, "scsi");
         assert!(cfg.devices.drives[0].discard);
@@ -635,7 +637,9 @@ mod tests {
         );
 
         assert_eq!(cfg.devices.drives[0].path, "/dev/vm1/vm-108-boot");
+        assert_eq!(cfg.devices.drives[0].format, "raw");
         assert_eq!(cfg.devices.drives[1].path, "/var/lib/vz/iso/virtio-win.iso");
+        assert_eq!(cfg.devices.drives[1].format, "raw");
     }
 
     #[test]
@@ -656,6 +660,7 @@ mod tests {
             cfg.devices.drives[0].path,
             "/dev/zvol/rpool/data/vm-500-disk-0"
         );
+        assert_eq!(cfg.devices.drives[0].format, "raw");
     }
 
     #[test]

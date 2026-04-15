@@ -9,11 +9,11 @@ host
 -smp
 cpus=2
 -device
-virtio-scsi-pci,id=scsi0
+virtio-scsi-pci,id=scsihw0
 -drive
-file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap
+file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discard=unmap
 -device
-scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsi0.0
+scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
 -netdev
 type=bridge,id=net0,br=vmbr9
 -device

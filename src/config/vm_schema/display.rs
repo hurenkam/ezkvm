@@ -8,7 +8,7 @@ pub struct DisplayConfig {
     pub r#type: String,
 
     /// Video RAM in MiB
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vram: Option<u32>,
 }
 

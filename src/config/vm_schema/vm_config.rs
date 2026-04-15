@@ -63,7 +63,7 @@ pub struct VmConfig {
     pub host: HostConfig,
 
     /// SPICE display configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spice: Option<SpiceConfig>,
 
     /// iSCSI storage configuration
@@ -71,7 +71,7 @@ pub struct VmConfig {
     pub iscsi_disks: Vec<IscsiDiskConfig>,
 
     /// Hyper-V enlightenments configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hyperv: Option<HypervConfig>,
 
     /// Additional options

@@ -29,11 +29,11 @@ pub struct SystemConfig {
     pub boot: BootConfig,
 
     /// Canonical TPM configuration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tpm: Option<TpmConfig>,
 
     /// Canonical SMBIOS configuration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub smbios: Option<SmbiosConfig>,
 
     /// Optional QEMU config file(s) to load via -readconfig.
@@ -50,11 +50,11 @@ pub struct MemoryConfig {
     pub size: u32,
 
     /// Optional canonical memory ballooning configuration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ballooning: Option<BallooningConfig>,
 
     /// Optional canonical ivshmem configuration.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ivshmem: Option<IvshmemConfig>,
 }
 

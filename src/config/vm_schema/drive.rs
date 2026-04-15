@@ -38,27 +38,35 @@ pub struct DriveConfig {
     pub ssd: bool,
 
     /// QEMU cache mode
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cache: Option<String>,
 
     /// QEMU async I/O backend
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aio: Option<String>,
 
     /// Detect-zeroes behavior
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub detect_zeroes: Option<String>,
 
     /// SCSI controller to attach to (for SCSI drives)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub controller: Option<String>,
 
     /// Boot index for firmware boot ordering
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_index: Option<u32>,
 
     /// SCSI target ID for attached SCSI devices
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scsi_id: Option<u32>,
 
     /// Explicit attachment bus for device-based drive emission
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
     /// Unit number for IDE/SATA style drive placement
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<u32>,
 }
 

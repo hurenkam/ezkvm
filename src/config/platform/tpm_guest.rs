@@ -10,6 +10,7 @@ pub struct TpmConfig {
     pub backend: String,
 
     /// Path to TPM socket file (overrides the default run-dir path)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub state_path: Option<String>,
 
     /// Directory containing swtpm state files.
@@ -17,13 +18,14 @@ pub struct TpmConfig {
     /// instead of the default empty run-dir subdirectory.
     /// Use this to point at a mounted Proxmox TPM-state disk so Windows keeps its
     /// existing BitLocker keys (e.g. mount /dev/vm1/vm-108-tpmstate → /mnt/tpmstate).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub state_dir: Option<String>,
 
     /// URI for swtpm state backend, passed as `--tpmstate backend-uri=<uri>`.
     /// This can be used instead of mounting a TPM-state volume and configuring
     /// `state_dir`.
     /// Example: `file:///dev/vm1/vm-108-tpmstate`
-    #[serde(alias = "state_backend_url")]
+    #[serde(alias = "state_backend_url", skip_serializing_if = "Option::is_none")]
     pub state_backend_uri: Option<String>,
 
     /// Device model (tpm-tis or tpm-crb)
@@ -47,6 +49,7 @@ pub struct GuestAgentConfig {
     pub enabled: bool,
 
     /// Path to guest agent socket
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub socket_path: Option<String>,
 
     /// Freeze CPU on suspend
@@ -54,9 +57,11 @@ pub struct GuestAgentConfig {
     pub freeze_cpu: bool,
 
     /// PCI/PCIe bus placement for the virtio-serial controller
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
     /// Slot or function address on the selected bus
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub addr: Option<String>,
 }
 
@@ -76,12 +81,15 @@ pub struct BallooningConfig {
     pub model: String,
 
     /// Optional device identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
 
     /// PCI/PCIe bus placement for the balloon device
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
     /// Slot or function address on the selected bus
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub addr: Option<String>,
 }
 

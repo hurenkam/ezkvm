@@ -9,11 +9,11 @@ host
 -smp
 cpus=4
 -device
-virtio-scsi-pci,id=scsi0
+virtio-scsi-pci,id=scsihw0
 -drive
 file=local-lvm:vm-200-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,ssd=on,cache=none
 -device
-scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsi0.0,bootindex=100
+scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,bootindex=100
 -netdev
 type=bridge,id=net0,br=vmbr0,queues=4
 -device
