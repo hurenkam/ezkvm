@@ -56,6 +56,13 @@ Recommended thresholds:
 - Validate parsed configuration before runtime execution.
 - Add tests for merge order, override precedence, and error paths.
 
+Serialization policy for YAML/JSON config output:
+- Prefer compact output by omitting fields that are set to their semantic default.
+- Use serde defaults and `skip_serializing_if` consistently for `Option`, empty collections, and default scalar values when omission preserves behavior.
+- Treat omission semantics as part of the schema contract: absence must deserialize to the same runtime behavior as explicit defaults.
+- Preserve explicit values only when they are required to override profile/merge defaults.
+- For any serialization compactness change, add or update tests for roundtrip equivalence and merge/override behavior.
+
 ## 8. Concurrency and Safety
 
 - Prefer message-passing or scoped synchronization over shared mutable state.
@@ -103,8 +110,8 @@ Before submitting a change, confirm:
 ## 13. Additional Points of attention
 - keep mod.rs files clean, meaning they contain no struct, fn, or impl sections
 - when several files (>=3) in a directory have a similar function, different from other files in that directory, group them in a new subdirectory
-- keep "impl From<A> for B" in the same file as the "struct A" and "impl A" sections
-- keep large structs (>35 lines, or structs that have one or more impl or impl <trait> sections) together with their impl and related impl <trait> sections together in a single file per type
+- keep `impl From<A> for B` in the same file as the `struct A` and `impl A` sections
+- keep large structs (>35 lines, or structs that have one or more `impl` or `impl <Trait>` sections) together with their impl and related `impl <Trait>` sections together in a single file per type
 - adhere to SOLID principles:
   - Single responsibility principle
   - Open / Closed principle

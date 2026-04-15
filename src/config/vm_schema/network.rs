@@ -39,7 +39,7 @@ pub struct NetworkBackendConfig {
     pub queues: Option<u16>,
 
     /// User-mode host forwarding rules in native QEMU `hostfwd=` syntax.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hostfwd: Vec<String>,
 
     /// Listen address or path for socket-like backends.
@@ -55,7 +55,7 @@ pub struct NetworkBackendConfig {
     pub fd: Option<String>,
 
     /// Additional backend options preserved for compatibility.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, String>,
 }
 

@@ -12,6 +12,7 @@ pub struct QmpConfig {
     pub enabled: bool,
 
     /// Socket path for QMP connection
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub socket_path: Option<String>,
 
     /// Socket type (unix, tcp)
@@ -32,27 +33,35 @@ pub enum QmpSocketType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SmbiosConfig {
     /// Manufacturer name
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub manufacturer: Option<String>,
 
     /// Product name
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub product: Option<String>,
 
     /// Version string
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 
     /// Serial number
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub serial: Option<String>,
 
     /// UUID for the VM
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uuid: Option<String>,
 
     /// SKU number
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sku: Option<String>,
 
     /// Family name
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub family: Option<String>,
 
     /// VM generation ID (for Windows Server 2016+)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_generation_id: Option<String>,
 }
 
@@ -69,5 +78,6 @@ pub struct NumaConfig {
     pub cpus: Vec<u32>,
 
     /// Host NUMA node to bind to (for host-passthrough)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub host_node: Option<u32>,
 }

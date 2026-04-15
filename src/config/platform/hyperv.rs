@@ -34,7 +34,7 @@ pub struct HypervConfig {
     pub reset: bool,
 
     /// Enable Hyper-V vendor ID spoofing
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vendor_id: Option<String>,
 
     /// Enable Hyper-V frequency MSRs
@@ -54,6 +54,6 @@ pub struct HypervConfig {
     pub ipi: bool,
 
     /// Enable Hyper-V spinlock retry
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spinlock_retry: Option<u32>,
 }

@@ -17,17 +17,17 @@ use super::{BootConfig, DeviceConfig, SystemConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ControllersConfig {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scsi: Vec<ScsiControllerConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub xhci: Vec<XhciControllerConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HostConfig {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pci: Vec<HostPciConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub usb: Vec<UsbDeviceConfig>,
 }
 
@@ -44,7 +44,7 @@ pub struct VmConfig {
 
     /// Optional list of profile names to layer before applying VM overrides.
     /// Profile files are resolved from the configured profile directory.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub profiles: Vec<String>,
 
     /// System configuration (CPU, memory, etc.)
@@ -67,7 +67,7 @@ pub struct VmConfig {
     pub spice: Option<SpiceConfig>,
 
     /// iSCSI storage configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub iscsi_disks: Vec<IscsiDiskConfig>,
 
     /// Hyper-V enlightenments configuration

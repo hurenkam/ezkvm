@@ -14,7 +14,7 @@ pub struct SystemConfig {
     pub machine: String,
 
     /// Additional machine-specific options appended to `-machine`
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub machine_options: Vec<String>,
 
     /// Canonical memory configuration.
@@ -40,7 +40,7 @@ pub struct SystemConfig {
     /// Use this to supply machine topology files such as
     /// /usr/share/qemu-server/pve-q35-4.0.cfg which define the
     /// PCI/PCIe bridge buses (pci.0, pci.1, ich9-pcie-port-*, etc.)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readconfig: Vec<String>,
 }
 
@@ -70,11 +70,11 @@ pub struct CpuConfig {
     pub vcpus: u32,
 
     /// CPU-specific features
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub features: Vec<String>,
 
     /// NUMA topology configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub numa: Vec<NumaConfig>,
 }
 

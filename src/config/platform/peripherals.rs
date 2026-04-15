@@ -4,11 +4,19 @@ fn default_true() -> bool {
     true
 }
 
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// SPICE display configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpiceConfig {
     /// Enable SPICE display
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub enabled: bool,
 
     /// SPICE server port
@@ -20,15 +28,15 @@ pub struct SpiceConfig {
     pub addr: String,
 
     /// Disable ticketing (password authentication)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub disable_ticketing: bool,
 
     /// Enable SPICE audio
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub audio: bool,
 
     /// Enable vdagent (clipboard sharing)
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub vdagent: bool,
 }
 
@@ -50,15 +58,19 @@ pub struct AudioDeviceConfig {
     pub id: String,
 
     /// Bus placement for the device
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
     /// Address on the selected bus
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub addr: Option<String>,
 
     /// Codec address on the parent HDA controller
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cad: Option<u8>,
 
     /// Backend ID used by codec devices
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub audiodev: Option<String>,
 }
 
@@ -89,6 +101,7 @@ pub struct IvshmemConfig {
     pub id: String,
 
     /// Bus placement for the ivshmem device
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
     /// Shared memory file path

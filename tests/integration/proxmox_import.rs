@@ -105,6 +105,7 @@ fn check_fixture_case(case: &ImportFixtureCase) -> Option<String> {
                 .map(|path| path.to_string_lossy().to_string()),
             strict: false,
             dry_run: true,
+            compact_lists: false,
         },
     )
     .unwrap_or_else(|err| panic!("fixture '{}' import failed: {err}", case.name));

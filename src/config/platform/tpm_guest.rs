@@ -41,11 +41,19 @@ fn default_true() -> bool {
     true
 }
 
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Guest agent configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuestAgentConfig {
     /// Enable guest agent
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub enabled: bool,
 
     /// Path to guest agent socket
@@ -53,7 +61,7 @@ pub struct GuestAgentConfig {
     pub socket_path: Option<String>,
 
     /// Freeze CPU on suspend
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub freeze_cpu: bool,
 
     /// PCI/PCIe bus placement for the virtio-serial controller
@@ -69,11 +77,11 @@ pub struct GuestAgentConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BallooningConfig {
     /// Enable memory ballooning
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub enabled: bool,
 
     /// Enable free page reporting
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub free_page_reporting: bool,
 
     /// Balloon device model

@@ -12,6 +12,7 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
             storage_path: Some("storage.cfg".to_string()),
             strict: false,
             dry_run: true,
+            compact_lists: false,
         },
     )
     .expect("wakiza import should succeed");

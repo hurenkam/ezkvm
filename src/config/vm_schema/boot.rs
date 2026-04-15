@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Boot configuration.
 /// Kept as a single schema type because these fields map directly to one YAML section
 /// and are consumed together when emitting boot-related QEMU arguments.
@@ -10,15 +14,15 @@ pub struct BootConfig {
     pub firmware: Option<String>,
 
     /// Boot order (disk, cdrom, network)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub boot_order: Vec<String>,
 
     /// Show the boot menu
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub menu: bool,
 
     /// Enforce strict boot ordering
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub strict: bool,
 
     /// Reboot timeout in milliseconds
@@ -55,6 +59,6 @@ pub struct BootConfig {
     pub uefi_vars_size: Option<u64>,
 
     /// Enable secure boot
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub secure_boot: bool,
 }

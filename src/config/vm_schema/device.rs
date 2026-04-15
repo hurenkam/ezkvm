@@ -7,26 +7,26 @@ use super::{DisplayConfig, DriveConfig, NetworkConfig, SerialConfig};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DeviceConfig {
     /// Storage devices
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub drives: Vec<DriveConfig>,
 
     /// Network devices
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub networks: Vec<NetworkConfig>,
 
     /// Display devices
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub displays: Vec<DisplayConfig>,
 
     /// Serial devices
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub serials: Vec<SerialConfig>,
 
     /// Explicit input devices
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub input: Vec<InputDeviceConfig>,
 
     /// Audio devices backed by the selected audio backend
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audio: Vec<AudioDeviceConfig>,
 }

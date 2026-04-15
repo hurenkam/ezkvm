@@ -188,3 +188,51 @@ fn merge_sequence_append_all(base: &mut serde_yaml::Value, overlay: serde_yaml::
 
     base_seq.extend(overlay_seq);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::merge_yaml_values;
+    use serde_yaml::Value;
+
+    #[test]
+    fn merge_explicit_false_overrides_profile_true() {
+        let mut base: Value = serde_yaml::from_str(
+            "options:\n  guest_agent:\n    enabled: true\n    freeze_cpu: true\n",
+        )
+        .expect("base yaml");
+        let overlay: Value =
+            serde_yaml::from_str("options:\n  guest_agent:\n    freeze_cpu: false\n")
+                .expect("overlay yaml");
+
+        merge_yaml_values(&mut base, overlay);
+
+        let freeze_cpu = base
+            .as_mapping()
+            .and_then(|m| m.get(Value::String("options".to_string())))
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get(Value::String("guest_agent".to_string())))
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get(Value::String("freeze_cpu".to_string())))
+            .and_then(Value::as_bool);
+        assert_eq!(freeze_cpu, Some(false));
+    }
+
+    #[test]
+    fn merge_absent_key_keeps_profile_value() {
+        let mut base: Value =
+            serde_yaml::from_str("system:\n  boot:\n    menu: true\n").expect("base yaml");
+        let overlay: Value = serde_yaml::from_str("system:\n  boot: {}\n").expect("overlay yaml");
+
+        merge_yaml_values(&mut base, overlay);
+
+        let menu = base
+            .as_mapping()
+            .and_then(|m| m.get(Value::String("system".to_string())))
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get(Value::String("boot".to_string())))
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get(Value::String("menu".to_string())))
+            .and_then(Value::as_bool);
+        assert_eq!(menu, Some(true));
+    }
+}

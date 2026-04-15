@@ -20,5 +20,6 @@ fn unique_test_dir(prefix: &str) -> std::path::PathBuf {
     dir
 }
 
+mod compact_serialization;
 mod path_behavior;
 mod profile_merge;

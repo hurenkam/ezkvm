@@ -97,6 +97,10 @@ pub enum Commands {
         /// Fail if mapper emits warnings
         #[arg(long)]
         strict: bool,
+
+        /// Disable compact inline mapping style for list and deep nested items
+        #[arg(long)]
+        no_compact: bool,
     },
 
     /// Storage management commands

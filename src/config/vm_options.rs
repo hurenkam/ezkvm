@@ -6,21 +6,35 @@ fn default_nodefaults() -> bool {
     true
 }
 
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Additional VM options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VmOptions {
     /// Enable KVM acceleration
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub enable_kvm: bool,
 
     /// Run in daemon mode
+    #[serde(default, skip_serializing_if = "is_false")]
     pub daemonize: bool,
 
     /// Disable QEMU default devices
-    #[serde(default = "default_nodefaults")]
+    #[serde(default = "default_nodefaults", skip_serializing_if = "is_true")]
     pub nodefaults: bool,
 
     /// Raw `-global` options
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub global_options: Vec<String>,
 
     /// RTC configuration
@@ -85,4 +99,17 @@ pub struct RtcConfig {
     /// RTC drift fix policy, usually `slew` or `none`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub driftfix: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VmOptions;
+
+    #[test]
+    fn vm_options_omitted_fields_deserialize_to_defaults() {
+        let options: VmOptions = serde_yaml::from_str("{}").expect("deserialize vm options");
+        assert!(options.enable_kvm);
+        assert!(!options.daemonize);
+        assert!(options.nodefaults);
+    }
 }

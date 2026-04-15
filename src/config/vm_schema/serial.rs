@@ -8,16 +8,19 @@ pub struct SerialConfig {
     pub r#type: String,
 
     /// Port number (for multi-port setups)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u32>,
 
     /// Output file path for `file` serial backends
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 
     /// Hostname or IP for `socket` serial backends
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
 
     /// TCP port for `socket` serial backends
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub socket_port: Option<u16>,
 
     /// Whether the socket backend should listen in server mode

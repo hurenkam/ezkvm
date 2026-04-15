@@ -2,6 +2,10 @@ use crate::qemu::types::QemuArgs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Drive configuration.
 /// Kept as one type because deserialization, validation rules, and `From<DriveConfig>`
 /// argument emission are tightly coupled and should evolve together.
@@ -26,15 +30,15 @@ pub struct DriveConfig {
     pub format: String,
 
     /// Whether the drive is read-only
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub readonly: bool,
 
     /// Enable discard (TRIM) support
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub discard: bool,
 
     /// Enable SSD emulation
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub ssd: bool,
 
     /// QEMU cache mode

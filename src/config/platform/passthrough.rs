@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Hardware passthrough configuration for PCI devices
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostPciConfig {
@@ -10,11 +14,11 @@ pub struct HostPciConfig {
     pub id: String,
 
     /// PCIe configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub pcie: bool,
 
     /// VGA passthrough (for GPU devices)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub x_vga: bool,
 
     /// Optional guest bus placement for the passthrough device
@@ -26,7 +30,7 @@ pub struct HostPciConfig {
     pub addr: Option<String>,
 
     /// Enable multifunction on the guest slot when grouping related functions
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub multifunction: bool,
 
     /// ROM file path (optional)

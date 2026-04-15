@@ -1,6 +1,7 @@
 use super::{
     ImportError, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
     mapper::MappingWarning, parse_proxmox_config, parse_proxmox_storage_config,
+    yaml_compact::compact_sequence_mappings,
 };
 use crate::config::{VmConfig, validation};
 use std::path::Path;
@@ -11,6 +12,7 @@ pub struct ImportRunOptions {
     pub storage_path: Option<String>,
     pub strict: bool,
     pub dry_run: bool,
+    pub compact_lists: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -65,13 +67,19 @@ pub fn run_import_from_files(
         )));
     }
 
+    let rendered_yaml = if options.compact_lists {
+        compact_sequence_mappings(&mapped.yaml)?
+    } else {
+        mapped.yaml.clone()
+    };
+
     let output_path = options
         .output_path
         .clone()
         .unwrap_or_else(|| default_output_path(input_path));
 
     if !options.dry_run {
-        std::fs::write(&output_path, &mapped.yaml).map_err(|e| {
+        std::fs::write(&output_path, &rendered_yaml).map_err(|e| {
             ImportError::ParseError(format!(
                 "unable to write output file '{}': {}",
                 output_path, e
@@ -81,7 +89,7 @@ pub fn run_import_from_files(
 
     Ok(ImportRunResult {
         output_path,
-        yaml: mapped.yaml,
+        yaml: rendered_yaml,
         warnings: mapped.warnings,
     })
 }
@@ -137,6 +145,7 @@ mod tests {
             storage_path: None,
             strict: false,
             dry_run: true,
+            compact_lists: false,
         };
 
         let result =
@@ -160,6 +169,7 @@ mod tests {
             storage_path: None,
             strict: true,
             dry_run: true,
+            compact_lists: false,
         };
 
         let err =
@@ -184,6 +194,7 @@ mod tests {
             storage_path: None,
             strict: false,
             dry_run: false,
+            compact_lists: false,
         };
 
         let result =
@@ -214,6 +225,7 @@ mod tests {
             storage_path: Some(storage_path.to_string_lossy().to_string()),
             strict: false,
             dry_run: true,
+            compact_lists: false,
         };
 
         let result =
@@ -243,6 +255,7 @@ mod tests {
             storage_path: Some(storage_path.to_string_lossy().to_string()),
             strict: false,
             dry_run: true,
+            compact_lists: false,
         };
 
         let result =

@@ -37,12 +37,14 @@ pub(crate) async fn handle_import_proxmox(
     output: Option<&str>,
     dry_run: bool,
     strict: bool,
+    no_compact: bool,
 ) -> Result<()> {
     let options = crate::import::proxmox::ImportRunOptions {
         output_path: output.map(ToString::to_string),
         storage_path: proxmox_storage.map(ToString::to_string),
         strict,
         dry_run,
+        compact_lists: !no_compact,
     };
 
     let result = crate::import::proxmox::run_import_from_files(input, &options)
