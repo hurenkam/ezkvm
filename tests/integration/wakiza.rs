@@ -4,7 +4,7 @@ use super::*;
 fn test_wakiza_matches_key_proxmox_fragments() {
     let _guard = env_lock().lock().unwrap();
 
-    let config = VmConfig::from_file("input/wakiza/wakiza.yaml").unwrap();
+    let config = VmConfig::from_file("input/felucia/108.yaml").unwrap();
     let has_cdrom = config
         .devices
         .drives
@@ -23,7 +23,7 @@ fn test_wakiza_matches_key_proxmox_fragments() {
             .join(" ")
     );
 
-    let proxmox_cmd = include_str!("../../input/wakiza/108.cmd");
+    let proxmox_cmd = include_str!("../../input/felucia/108.qemu.cmd");
 
     let always_fragments: &[&[&str]] = &[
         &["if=pflash,unit=0", "readonly=on", "OVMF_CODE_4M.secboot.fd"],

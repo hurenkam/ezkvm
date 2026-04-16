@@ -4,12 +4,16 @@ use ezkvm::import::proxmox::{ImportRunOptions, run_import_from_files};
 #[test]
 fn test_wakiza_import_preserves_key_proxmox_fragments() {
     let _guard = env_lock().lock().unwrap();
+    let storage_path = format!(
+        "{}/input/felucia/storage.cfg",
+        env!("CARGO_MANIFEST_DIR")
+    );
 
     let result = run_import_from_files(
-        "input/wakiza/108.conf",
+        "input/felucia/108.conf",
         &ImportRunOptions {
             output_path: None,
-            storage_path: Some("storage.cfg".to_string()),
+            storage_path: Some(storage_path),
             strict: false,
             dry_run: true,
             compact_lists: false,
@@ -41,7 +45,7 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
             .join(" ")
     );
 
-    let proxmox_cmd = include_str!("../../input/wakiza/108.cmd");
+    let proxmox_cmd = include_str!("../../input/felucia/108.qemu.cmd");
 
     let shared_fragments = [
         "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-108-efidisk,size=540672",
