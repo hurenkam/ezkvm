@@ -7,8 +7,8 @@ use crate::config::{
     AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig, DeviceConfig,
     DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, InputDeviceConfig,
     IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
-    SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig,
-    UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
+    SataControllerConfig, ScsiControllerConfig, SerialConfig, SmbiosConfig, SpiceConfig,
+    SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -103,6 +103,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         }
     }
     let displays = map_displays(&proxmox.scalars, &mut warnings);
+    let serials = map_serials(&proxmox.scalars, inferred_vmid, &mut warnings);
     let (audio, mut spice) = map_audio_and_spice(&proxmox.scalars, &mut warnings);
     let mut input_devices = Vec::new();
     let mut ivshmem = None;
@@ -200,7 +201,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             drives,
             networks,
             displays,
-            serials: Vec::new(),
+            serials,
             input: input_devices,
             audio,
         },
@@ -1024,6 +1025,151 @@ fn map_displays(
     vec![DisplayConfig { r#type, vram }]
 }
 
+fn map_serials(
+    scalars: &BTreeMap<String, String>,
+    vmid: Option<u32>,
+    warnings: &mut Vec<MappingWarning>,
+) -> Vec<SerialConfig> {
+    let mut serials = Vec::new();
+
+    for (key, value) in scalars {
+        let Some(port) = key
+            .strip_prefix("serial")
+            .and_then(|index| index.parse::<u32>().ok())
+        else {
+            continue;
+        };
+
+        let raw = value.trim();
+        if raw.is_empty() || raw == "none" {
+            continue;
+        }
+
+        if raw == "socket" {
+            serials.push(default_socket_serial(port, vmid));
+            continue;
+        }
+
+        if let Some(path) = raw.strip_prefix("file:") {
+            serials.push(SerialConfig {
+                r#type: "file".to_string(),
+                id: Some(format!("serial{}", port)),
+                port: Some(port),
+                path: Some(path.trim().to_string()),
+                host: None,
+                socket_port: None,
+                server: true,
+                wait: false,
+                chardev: None,
+            });
+            continue;
+        }
+
+        if raw == "pty" || raw == "stdio" {
+            serials.push(SerialConfig {
+                r#type: raw.to_string(),
+                id: Some(format!("serial{}", port)),
+                port: Some(port),
+                path: None,
+                host: None,
+                socket_port: None,
+                server: true,
+                wait: false,
+                chardev: None,
+            });
+            continue;
+        }
+
+        if let Some(chardev) = raw
+            .strip_prefix("chardev:")
+            .or_else(|| raw.strip_prefix("chardev="))
+        {
+            serials.push(SerialConfig {
+                r#type: "chardev".to_string(),
+                id: Some(format!("serial{}", port)),
+                port: Some(port),
+                path: None,
+                host: None,
+                socket_port: None,
+                server: true,
+                wait: false,
+                chardev: Some(chardev.trim().to_string()),
+            });
+            continue;
+        }
+
+        if raw.starts_with("socket,") {
+            serials.push(parse_socket_serial(raw, port, vmid));
+            continue;
+        }
+
+        warnings.push(MappingWarning {
+            source_field: key.clone(),
+            message: format!(
+                "unsupported serial backend '{}' mapped to default socket",
+                raw
+            ),
+        });
+        serials.push(default_socket_serial(port, vmid));
+    }
+
+    serials
+}
+
+fn default_socket_serial(port: u32, vmid: Option<u32>) -> SerialConfig {
+    SerialConfig {
+        r#type: "socket".to_string(),
+        id: Some(format!("serial{}", port)),
+        port: Some(port),
+        path: vmid.map(|id| format!("/var/run/qemu-server/{}.serial{}", id, port)),
+        host: if vmid.is_none() {
+            Some("127.0.0.1".to_string())
+        } else {
+            None
+        },
+        socket_port: if vmid.is_none() {
+            Some(4444 + port as u16)
+        } else {
+            None
+        },
+        server: true,
+        wait: false,
+        chardev: None,
+    }
+}
+
+fn parse_socket_serial(raw: &str, port: u32, vmid: Option<u32>) -> SerialConfig {
+    let mut serial = default_socket_serial(port, vmid);
+
+    for token in raw.split(',').skip(1).map(str::trim) {
+        if let Some((key, value)) = token.split_once('=') {
+            match key.trim() {
+                "path" => {
+                    serial.path = Some(value.trim().to_string());
+                    serial.host = None;
+                    serial.socket_port = None;
+                }
+                "host" => {
+                    serial.host = Some(value.trim().to_string());
+                }
+                "port" => {
+                    serial.socket_port = value.trim().parse::<u16>().ok();
+                    serial.path = None;
+                }
+                "server" => {
+                    serial.server = matches!(value.trim(), "1" | "on" | "yes" | "true");
+                }
+                "wait" => {
+                    serial.wait = matches!(value.trim(), "1" | "on" | "yes" | "true");
+                }
+                _ => {}
+            }
+        }
+    }
+
+    serial
+}
+
 fn is_enabled(value: Option<&String>) -> bool {
     matches!(
         value.map(String::as_str),
@@ -1800,6 +1946,54 @@ mod tests {
         assert_eq!(sata1.bus.as_deref(), Some("sata0.1"));
         assert_eq!(sata1.unit, Some(0));
         assert_eq!(sata1.boot_index, Some(101));
+    }
+
+    #[test]
+    fn maps_serial_socket_and_file_backends() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-serial
+            serial0: socket,path=/tmp/serial0.sock,server=1,wait=0
+            serial1: file:/tmp/serial1.log
+            "#,
+        );
+
+        assert_eq!(cfg.devices.serials.len(), 2);
+
+        let serial0 = &cfg.devices.serials[0];
+        assert_eq!(serial0.r#type, "socket");
+        assert_eq!(serial0.id.as_deref(), Some("serial0"));
+        assert_eq!(serial0.port, Some(0));
+        assert_eq!(serial0.path.as_deref(), Some("/tmp/serial0.sock"));
+        assert!(serial0.server);
+        assert!(!serial0.wait);
+
+        let serial1 = &cfg.devices.serials[1];
+        assert_eq!(serial1.r#type, "file");
+        assert_eq!(serial1.id.as_deref(), Some("serial1"));
+        assert_eq!(serial1.port, Some(1));
+        assert_eq!(serial1.path.as_deref(), Some("/tmp/serial1.log"));
+    }
+
+    #[test]
+    fn maps_serial_socket_default_path_from_vmid() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-serial-default
+            scsi0: local-lvm:vm-108-disk-0,size=10G
+            serial0: socket
+            "#,
+        );
+
+        assert_eq!(cfg.devices.serials.len(), 1);
+        let serial0 = &cfg.devices.serials[0];
+        assert_eq!(serial0.r#type, "socket");
+        assert_eq!(
+            serial0.path.as_deref(),
+            Some("/var/run/qemu-server/108.serial0")
+        );
+        assert_eq!(serial0.host, None);
+        assert_eq!(serial0.socket_port, None);
     }
 
     #[test]

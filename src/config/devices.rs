@@ -256,32 +256,45 @@ mod tests {
     fn test_serial_file_backend() {
         let serial = SerialConfig {
             r#type: "file".to_string(),
+            id: Some("serial0".to_string()),
             port: Some(0),
             path: Some("/tmp/serial.log".to_string()),
             host: None,
             socket_port: None,
             server: true,
             wait: false,
+            chardev: None,
         };
 
         let args = QemuArgs::from(serial).into_inner();
-        assert_eq!(args, vec!["-serial", "file:/tmp/serial.log"]);
+        assert_eq!(args[0], "-chardev");
+        assert_eq!(args[1], "file,id=serial0,path=/tmp/serial.log");
+        assert_eq!(args[2], "-device");
+        assert_eq!(args[3], "isa-serial,chardev=serial0,index=0");
     }
 
     #[test]
     fn test_serial_socket_backend() {
         let serial = SerialConfig {
             r#type: "socket".to_string(),
+            id: Some("serial0".to_string()),
             port: Some(0),
             path: None,
             host: Some("127.0.0.1".to_string()),
             socket_port: Some(4444),
             server: true,
             wait: false,
+            chardev: None,
         };
 
         let args = QemuArgs::from(serial).into_inner();
-        assert_eq!(args, vec!["-serial", "tcp:127.0.0.1:4444,server,nowait"]);
+        assert_eq!(args[0], "-chardev");
+        assert_eq!(
+            args[1],
+            "socket,id=serial0,host=127.0.0.1,port=4444,server=on,wait=off"
+        );
+        assert_eq!(args[2], "-device");
+        assert_eq!(args[3], "isa-serial,chardev=serial0,index=0");
     }
 
     #[test]
@@ -326,12 +339,14 @@ mod tests {
             }],
             serials: vec![SerialConfig {
                 r#type: "pty".to_string(),
+                id: Some("serial0".to_string()),
                 port: None,
                 path: None,
                 host: None,
                 socket_port: None,
                 server: true,
                 wait: false,
+                chardev: None,
             }],
             input: vec![],
             audio: vec![],
@@ -342,6 +357,7 @@ mod tests {
         assert_eq!(args[2], "-netdev");
         assert_eq!(args[4], "-device");
         assert_eq!(args[6], "-device");
-        assert_eq!(args[8], "-serial");
+        assert_eq!(args[8], "-chardev");
+        assert_eq!(args[10], "-device");
     }
 }

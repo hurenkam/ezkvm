@@ -107,6 +107,13 @@ fn fixture_cases() -> &'static [ImportFixtureCase] {
             snapshot_fixture: "proxmox_import/06-sata-ahci.args",
             warning_fields: &[],
         },
+        ImportFixtureCase {
+            name: "serial backends",
+            conf_fixture: "proxmox_import/07-serial-backends.conf",
+            storage_fixture: None,
+            snapshot_fixture: "proxmox_import/07-serial-backends.args",
+            warning_fields: &[],
+        },
     ]
 }
 

@@ -169,7 +169,7 @@ devices:
     assert!(result.is_err());
     let error = result.unwrap_err().to_string();
     assert!(
-        error.contains("Serial socket backend requires a non-empty host")
+        error.contains("Serial socket backend requires either a non-empty path or host")
             || error.contains("Serial socket backend requires a TCP port between 1 and 65535")
     );
 }
