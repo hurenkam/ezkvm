@@ -7,8 +7,8 @@ use crate::config::{
     AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig, DeviceConfig,
     DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, InputDeviceConfig,
     IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
-    ScsiControllerConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig, UsbDeviceConfig,
-    VmConfig, VmOptions, XhciControllerConfig,
+    SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig,
+    UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -78,6 +78,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let smbios_uuid = parse_smbios_uuid(&proxmox.scalars);
 
     let scsi_controllers = map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
+    let sata_controllers = map_sata_controllers(&proxmox.disks);
     let inferred_vmid = infer_proxmox_vmid(proxmox);
     let mut drives = proxmox
         .disks
@@ -205,6 +206,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         },
         controllers: ControllersConfig {
             scsi: scsi_controllers,
+            sata: sata_controllers,
             xhci: if use_explicit_xhci {
                 vec![XhciControllerConfig {
                     id: "xhci".to_string(),
@@ -521,9 +523,27 @@ fn map_drive(
         } else {
             None
         },
-        bus: None,
-        unit: None,
+        bus: if disk.bus == "sata" {
+            Some(format!("sata0.{}", disk.index))
+        } else {
+            None
+        },
+        unit: if disk.bus == "sata" { Some(0) } else { None },
     }
+}
+
+fn map_sata_controllers(disks: &[ProxmoxDiskEntry]) -> Vec<SataControllerConfig> {
+    let has_sata_disks = disks.iter().any(|d| d.bus == "sata");
+    if !has_sata_disks {
+        return Vec::new();
+    }
+
+    vec![SataControllerConfig {
+        id: "sata0".to_string(),
+        r#type: "ahci".to_string(),
+        bus: None,
+        addr: None,
+    }]
 }
 
 fn resolve_volume_reference(
@@ -1740,6 +1760,46 @@ mod tests {
             cfg.profiles
                 .contains(&"storage-virtio-scsi-single".to_string())
         );
+    }
+
+    #[test]
+    fn maps_sata_drives_with_ahci_controller_and_port_buses() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-sata
+            sata0: /var/lib/vm/sata0.raw,format=raw,discard=on,boot=100
+            sata1: none,media=cdrom,ro=1,boot=101
+            "#,
+        );
+
+        assert_eq!(cfg.controllers.sata.len(), 1);
+        assert_eq!(cfg.controllers.sata[0].id, "sata0");
+        assert_eq!(cfg.controllers.sata[0].r#type, "ahci");
+
+        assert_eq!(cfg.devices.drives.len(), 2);
+
+        let sata0 = cfg
+            .devices
+            .drives
+            .iter()
+            .find(|drive| drive.id == "sata0")
+            .expect("sata0 should be present");
+        assert_eq!(sata0.interface, "sata");
+        assert_eq!(sata0.bus.as_deref(), Some("sata0.0"));
+        assert_eq!(sata0.unit, Some(0));
+        assert_eq!(sata0.boot_index, Some(100));
+
+        let sata1 = cfg
+            .devices
+            .drives
+            .iter()
+            .find(|drive| drive.id == "sata1")
+            .expect("sata1 should be present");
+        assert_eq!(sata1.interface, "sata");
+        assert_eq!(sata1.r#type, "cdrom");
+        assert_eq!(sata1.bus.as_deref(), Some("sata0.1"));
+        assert_eq!(sata1.unit, Some(0));
+        assert_eq!(sata1.boot_index, Some(101));
     }
 
     #[test]

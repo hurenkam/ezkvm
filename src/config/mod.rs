@@ -19,8 +19,8 @@ pub use central::{CentralConfig, LocationsConfig, LookingGlassOptions, ToolsConf
 pub use platform::{
     AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig,
     InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig, QmpConfig, QmpSocketType,
-    ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig, UsbDeviceConfig,
-    XhciControllerConfig,
+    SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig,
+    UsbDeviceConfig, XhciControllerConfig,
 };
 #[allow(unused_imports)]
 pub use vm_options::{RtcConfig, VmOptions};

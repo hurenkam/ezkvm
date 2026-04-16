@@ -2,7 +2,9 @@ use super::*;
 
 #[test]
 fn test_profile_based_config_file_parsing() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let root = std::env::temp_dir().join(format!(
         "ezkvm-integration-profile-{}-{}",
@@ -73,7 +75,9 @@ system:
 
 #[test]
 fn test_legacy_non_profile_config_still_parses() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let legacy_yaml = r#"
 name: "legacy-vm"
@@ -97,7 +101,9 @@ system:
 
 #[test]
 fn test_profile_policies_apply_to_legacy_network_mode_with_auto_placement() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let root = std::env::temp_dir().join(format!(
         "ezkvm-integration-profile-legacy-placement-{}-{}",
@@ -202,7 +208,9 @@ devices:
 
 #[test]
 fn test_profile_policies_apply_to_additional_device_families() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let root = std::env::temp_dir().join(format!(
         "ezkvm-integration-profile-extra-families-{}-{}",

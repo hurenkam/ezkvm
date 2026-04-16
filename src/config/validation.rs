@@ -17,8 +17,9 @@ use platform::{
     validate_audio_devices, validate_ballooning_config, validate_guest_agent_config,
     validate_hostpci_config, validate_hyperv_config, validate_input_devices,
     validate_iscsi_disk_config, validate_ivshmem_config, validate_numa_config, validate_qmp_config,
-    validate_scsi_controller_config, validate_smbios_config, validate_spice_config,
-    validate_tpm_config, validate_usb_device_config, validate_xhci_controller_config,
+    validate_sata_controller_config, validate_scsi_controller_config, validate_smbios_config,
+    validate_spice_config, validate_tpm_config, validate_usb_device_config,
+    validate_xhci_controller_config,
 };
 use system::validate_system_config;
 use vm_options::validate_vm_options;
@@ -94,6 +95,9 @@ fn validate_collections(config: &VmConfig) -> Result<()> {
     validate_input_devices(&config.devices.input)?;
     for scsi_controller in &config.controllers.scsi {
         validate_scsi_controller_config(scsi_controller)?;
+    }
+    for sata_controller in &config.controllers.sata {
+        validate_sata_controller_config(sata_controller)?;
     }
     for iscsi_disk in &config.iscsi_disks {
         validate_iscsi_disk_config(iscsi_disk)?;

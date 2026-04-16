@@ -11,7 +11,7 @@ pub(super) fn validate_drive_config(drive: &DriveConfig) -> Result<()> {
 }
 
 fn validate_drive_enums(drive: &DriveConfig) -> Result<()> {
-    let valid_interfaces = ["virtio", "scsi", "ide", "nvme"];
+    let valid_interfaces = ["virtio", "scsi", "ide", "sata", "nvme"];
     if !valid_interfaces.contains(&drive.interface.as_str()) {
         return Err(anyhow!(
             "Unsupported drive interface: {}. Supported: {:?}",
@@ -101,13 +101,16 @@ fn validate_drive_bus_and_unit(drive: &DriveConfig) -> Result<()> {
     }
 
     if let Some(unit) = drive.unit {
-        if drive.interface != "ide" {
+        if drive.interface != "ide" && drive.interface != "sata" {
             return Err(anyhow!(
-                "Drive unit is currently only supported for ide interfaces"
+                "Drive unit is currently only supported for ide and sata interfaces"
             ));
         }
-        if unit > 3 {
+        if drive.interface == "ide" && unit > 3 {
             return Err(anyhow!("Drive unit cannot exceed 3 for ide interfaces"));
+        }
+        if drive.interface == "sata" && unit > 5 {
+            return Err(anyhow!("Drive unit cannot exceed 5 for sata interfaces"));
         }
     }
 

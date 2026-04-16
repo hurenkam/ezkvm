@@ -2,7 +2,9 @@ use super::*;
 
 #[test]
 fn test_wakiza_matches_key_proxmox_fragments() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let config = VmConfig::from_file("input/felucia/108.yaml").unwrap();
     let has_cdrom = config

@@ -47,7 +47,9 @@ impl ImportFixtureCase {
 
 #[test]
 fn proxmox_import_fixtures_generate_expected_dry_run_snapshots() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut mismatches = Vec::new();
 
     for case in fixture_cases() {
@@ -97,6 +99,13 @@ fn fixture_cases() -> &'static [ImportFixtureCase] {
             storage_fixture: Some("proxmox_import/storage.cfg"),
             snapshot_fixture: "proxmox_import/05-warning-rich.args",
             warning_fields: &["arch", "scsihw", "net0", "vga"],
+        },
+        ImportFixtureCase {
+            name: "sata ahci",
+            conf_fixture: "proxmox_import/06-sata-ahci.conf",
+            storage_fixture: None,
+            snapshot_fixture: "proxmox_import/06-sata-ahci.args",
+            warning_fields: &[],
         },
     ]
 }

@@ -131,3 +131,16 @@ fn test_scsi_controller_with_bus_and_addr() {
             .any(|arg| arg == "pvscsi,id=scsihw0,bus=pci.0,addr=0x5")
     );
 }
+
+#[test]
+fn test_sata_controller_with_bus_and_addr() {
+    let mut args = QemuArgs::new();
+    args.add_sata_controller("sata0", Some("pci.0"), Some("0x1f"));
+
+    let built = args.build();
+    assert!(
+        built
+            .iter()
+            .any(|arg| arg == "ahci,id=sata0,bus=pci.0,addr=0x1f")
+    );
+}

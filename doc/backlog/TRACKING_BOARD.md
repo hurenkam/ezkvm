@@ -61,7 +61,7 @@ Source: doc/backlog/BACKLOG.md
 | B-14 | Improve CPU and Hyper-V fidelity for Windows guests | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-10 | unassigned | Done |
 | B-15 | Expand network device fidelity (virtio-net-pci placement and queues) | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-11 | unassigned | Done |
 | B-16 | Refine firmware and secure-boot mapping from efidisk metadata | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-06 | unassigned | Done |
-| B-17 | Add SATA support | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-17 | Add SATA support | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-18 | Serial port configuration | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
 | B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
 | B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |

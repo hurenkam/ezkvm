@@ -114,7 +114,8 @@ impl From<DriveConfig> for QemuArgs {
             || drive.scsi_id.is_some()
             || drive.bus.is_some()
             || drive.unit.is_some()
-            || drive.interface == "ide";
+            || drive.interface == "ide"
+            || drive.interface == "sata";
 
         args.push_str("-drive");
 
@@ -175,6 +176,16 @@ impl From<DriveConfig> for QemuArgs {
                     drive.id
                 ),
                 "ide" => format!(
+                    "{},drive={},id={}",
+                    if drive.r#type == "cdrom" {
+                        "ide-cd"
+                    } else {
+                        "ide-hd"
+                    },
+                    drive_node_id,
+                    drive.id
+                ),
+                "sata" => format!(
                     "{},drive={},id={}",
                     if drive.r#type == "cdrom" {
                         "ide-cd"

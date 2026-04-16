@@ -114,4 +114,20 @@ impl QemuArgs {
 
         self.push(controller_spec);
     }
+
+    /// Add SATA controller
+    pub fn add_sata_controller(&mut self, id: &str, bus: Option<&str>, addr: Option<&str>) {
+        self.push_str("-device");
+        let mut controller_spec = format!("ahci,id={}", id);
+
+        if let Some(bus) = bus {
+            controller_spec.push_str(&format!(",bus={}", bus));
+        }
+
+        if let Some(addr) = addr {
+            controller_spec.push_str(&format!(",addr={}", addr));
+        }
+
+        self.push(controller_spec);
+    }
 }

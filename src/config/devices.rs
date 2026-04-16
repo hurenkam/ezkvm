@@ -169,6 +169,39 @@ mod tests {
     }
 
     #[test]
+    fn test_sata_disk_with_ahci_bus_attachment() {
+        let drive = DriveConfig {
+            id: "sata0".to_string(),
+            path: "/var/lib/vm/sata0.raw".to_string(),
+            interface: "sata".to_string(),
+            r#type: "disk".to_string(),
+            format: "raw".to_string(),
+            readonly: false,
+            discard: true,
+            ssd: false,
+            cache: None,
+            aio: None,
+            detect_zeroes: None,
+            controller: None,
+            boot_index: Some(100),
+            scsi_id: None,
+            rotation_rate: None,
+            bus: Some("sata0.0".to_string()),
+            unit: Some(0),
+        };
+
+        let args = QemuArgs::from(drive).into_inner();
+        assert_eq!(args[0], "-drive");
+        assert!(args[1].contains("file=/var/lib/vm/sata0.raw,if=none,id=drive-sata0,format=raw"));
+        assert!(args[1].contains(",discard=unmap"));
+        assert_eq!(args[2], "-device");
+        assert!(args[3].contains("ide-hd,drive=drive-sata0,id=sata0"));
+        assert!(args[3].contains(",bus=sata0.0"));
+        assert!(args[3].contains(",unit=0"));
+        assert!(args[3].contains(",bootindex=100"));
+    }
+
+    #[test]
     fn test_network_config_with_advanced_options() {
         let network = NetworkConfig {
             id: "net0".to_string(),

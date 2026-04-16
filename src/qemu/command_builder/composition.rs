@@ -22,6 +22,14 @@ impl QemuManager {
                 scsi_controller.addr.as_deref(),
             );
         }
+
+        for sata_controller in self.config.controllers_sata() {
+            args.add_sata_controller(
+                &sata_controller.id,
+                sata_controller.bus.as_deref(),
+                sata_controller.addr.as_deref(),
+            );
+        }
     }
 
     pub(super) fn add_devices_and_boot_args(&self, args: &mut QemuArgs) -> Result<()> {

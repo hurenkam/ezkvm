@@ -23,7 +23,9 @@ fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
 
 #[test]
 fn test_wakiza_import_preserves_key_proxmox_fragments() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let storage_path = format!("{}/input/felucia/storage.cfg", env!("CARGO_MANIFEST_DIR"));
 
     let result = with_repo_profiles(|| {

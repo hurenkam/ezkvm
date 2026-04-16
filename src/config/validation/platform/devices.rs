@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use anyhow::{Result, anyhow};
 
 use crate::config::{
-    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig, ScsiControllerConfig,
+    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig, SataControllerConfig,
+    ScsiControllerConfig,
 };
 
 pub(crate) fn validate_input_devices(input_devices: &[InputDeviceConfig]) -> Result<()> {
@@ -104,6 +105,37 @@ pub(crate) fn validate_scsi_controller_config(
     Ok(())
 }
 
+pub(crate) fn validate_sata_controller_config(
+    sata_controller: &SataControllerConfig,
+) -> Result<()> {
+    let valid_types = ["ahci"];
+    if !valid_types.contains(&sata_controller.r#type.as_str()) {
+        return Err(anyhow!(
+            "Unsupported SATA controller type: {}. Supported: {:?}",
+            sata_controller.r#type,
+            valid_types
+        ));
+    }
+
+    if sata_controller.id.trim().is_empty() {
+        return Err(anyhow!("SATA controller id cannot be empty"));
+    }
+
+    if let Some(bus) = &sata_controller.bus
+        && bus.trim().is_empty()
+    {
+        return Err(anyhow!("SATA controller bus cannot be empty"));
+    }
+
+    if let Some(addr) = &sata_controller.addr
+        && addr.trim().is_empty()
+    {
+        return Err(anyhow!("SATA controller addr cannot be empty"));
+    }
+
+    Ok(())
+}
+
 pub(crate) fn validate_iscsi_disk_config(iscsi_disk: &IscsiDiskConfig) -> Result<()> {
     if !iscsi_disk.portal.contains(':') {
         return Err(anyhow!("iSCSI portal must be in format 'host:port'"));
@@ -170,4 +202,39 @@ pub(crate) fn validate_numa_config(numa: &NumaConfig) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_sata_controller_config;
+    use crate::config::SataControllerConfig;
+
+    #[test]
+    fn sata_controller_rejects_unsupported_type() {
+        let controller = SataControllerConfig {
+            id: "sata0".to_string(),
+            r#type: "ich9-ahci".to_string(),
+            bus: None,
+            addr: None,
+        };
+
+        let err = validate_sata_controller_config(&controller).expect_err("must fail");
+        assert!(err.to_string().contains("Unsupported SATA controller type"));
+    }
+
+    #[test]
+    fn sata_controller_rejects_empty_bus_and_addr() {
+        let controller = SataControllerConfig {
+            id: "sata0".to_string(),
+            r#type: "ahci".to_string(),
+            bus: Some(" ".to_string()),
+            addr: Some(" ".to_string()),
+        };
+
+        let err = validate_sata_controller_config(&controller).expect_err("must fail");
+        assert!(
+            err.to_string()
+                .contains("SATA controller bus cannot be empty")
+        );
+    }
 }

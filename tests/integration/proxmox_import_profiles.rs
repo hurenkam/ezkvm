@@ -53,7 +53,9 @@ fn imported_profiles(conf_path: &str, storage_path: Option<&str>) -> Vec<String>
 
 #[test]
 fn wakiza_import_emits_expected_profile_stack() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let profiles = imported_profiles("input/felucia/108.conf", Some("input/felucia/storage.cfg"));
 
@@ -71,7 +73,9 @@ fn wakiza_import_emits_expected_profile_stack() {
 
 #[test]
 fn linux_desktop_import_emits_expected_profile_stack() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let profiles = imported_profiles(
         "input/zbp-server-mh2/301.conf",
@@ -85,7 +89,9 @@ fn linux_desktop_import_emits_expected_profile_stack() {
 
 #[test]
 fn macos_import_emits_expected_profile_stack() {
-    let _guard = env_lock().lock().unwrap();
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let profiles = imported_profiles(
         "input/coruscant/401.conf",

@@ -10,8 +10,9 @@ use super::super::{
 
 use super::super::{
     AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig,
-    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig, ScsiControllerConfig,
-    SmbiosConfig, SpiceConfig, TpmConfig, UsbDeviceConfig, VmOptions, XhciControllerConfig,
+    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig, SataControllerConfig,
+    ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig, UsbDeviceConfig, VmOptions,
+    XhciControllerConfig,
 };
 use super::{BootConfig, DeviceConfig, SystemConfig};
 
@@ -19,6 +20,8 @@ use super::{BootConfig, DeviceConfig, SystemConfig};
 pub struct ControllersConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scsi: Vec<ScsiControllerConfig>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sata: Vec<SataControllerConfig>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub xhci: Vec<XhciControllerConfig>,
 }
@@ -123,6 +126,10 @@ impl VmConfig {
 
     pub fn controllers_xhci(&self) -> &[XhciControllerConfig] {
         &self.controllers.xhci
+    }
+
+    pub fn controllers_sata(&self) -> &[SataControllerConfig] {
+        &self.controllers.sata
     }
 
     pub fn host_pci(&self) -> &[HostPciConfig] {

@@ -31,6 +31,29 @@ fn default_scsi_controller_type() -> String {
     "virtio-scsi-pci".to_string()
 }
 
+/// SATA controller configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SataControllerConfig {
+    /// Unique identifier for the controller
+    pub id: String,
+
+    /// Controller type (currently ahci)
+    #[serde(default = "default_sata_controller_type")]
+    pub r#type: String,
+
+    /// PCI/PCIe bus placement for the controller
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bus: Option<String>,
+
+    /// Slot or function address on the selected bus
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub addr: Option<String>,
+}
+
+fn default_sata_controller_type() -> String {
+    "ahci".to_string()
+}
+
 /// iSCSI disk configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IscsiDiskConfig {
