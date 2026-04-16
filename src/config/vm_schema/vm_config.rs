@@ -322,14 +322,12 @@ impl VmConfig {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(content: &str) -> anyhow::Result<Self> {
         let processed_content = Self::substitute_env_vars(content)?;
-        let mut vm_value: serde_yaml::Value = serde_yaml::from_str(&processed_content)?;
+        let vm_value: serde_yaml::Value = serde_yaml::from_str(&processed_content)?;
         Self::ensure_yaml_mapping_root(&vm_value, "VM config")?;
-        policies::apply_profile_policies(&mut vm_value)?;
-        let mut config: VmConfig = serde_yaml::from_value(vm_value)?;
-        config.assign_default_device_ids();
 
-        validation::validate_config(&config)?;
-
-        Ok(config)
+        let profile_names = Self::extract_profile_names(&vm_value)?;
+        let profile_dir = Self::resolve_profile_dir()?;
+        let merged_value = Self::build_merged_vm_value(vm_value, &profile_dir, &profile_names)?;
+        Self::deserialize_and_validate(merged_value)
     }
 }

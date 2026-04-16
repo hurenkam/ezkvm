@@ -20,6 +20,8 @@ virtio-balloon-pci
 vfio-pci,host=0000:03:00.0,id=hostpci0.0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on
 -device
 vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1
+-device
+qemu-xhci,id=xhci,p2=15,p3=15
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.pid
 -nodefaults

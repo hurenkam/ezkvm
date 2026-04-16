@@ -1,0 +1,3 @@
+options:
+  guest_agent:
+    enabled: true

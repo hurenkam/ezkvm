@@ -1,0 +1,4 @@
+controllers:
+  scsi:
+    - id: "scsihw0"
+      type: "virtio-scsi-pci"

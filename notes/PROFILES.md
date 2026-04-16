@@ -2,7 +2,7 @@
 
 ## Goal
 
-Reduce per-VM YAML verbosity by allowing VM configs to reference reusable profiles such as windows_11 and gpu_passthrough.
+Reduce per-VM YAML verbosity by allowing VM configs to reference reusable profiles such as windows-11 and gpu-passthrough.
 
 ## Problem Statement
 
@@ -23,8 +23,8 @@ A VM config can declare profile references:
 name: "wakiza"
 backend: "qemu"
 profiles:
-  - "windows_11"
-  - "gpu_passthrough"
+  - "windows-11"
+  - "gpu-passthrough"
 
 system:
   memory: 16384
@@ -53,8 +53,8 @@ Default directory:
 Example files:
 
 ```text
-/etc/ezkvm/profiles.d/windows_11.yaml
-/etc/ezkvm/profiles.d/gpu_passthrough.yaml
+/etc/ezkvm/profiles.d/windows-11.yaml
+/etc/ezkvm/profiles.d/gpu-passthrough.yaml
 ```
 
 Example profile file content:
@@ -127,7 +127,7 @@ In VM load path:
 1. Read VM YAML as raw YAML value
 2. Read central config
 3. Resolve profile directory from locations.profile_dir or default /etc/ezkvm/profiles.d
-4. Load referenced profile files by name (for example windows_11 -> windows_11.yaml)
+4. Load referenced profile files by name (for example windows-11 -> windows-11.yaml)
 5. Merge profile values + VM value
 6. Deserialize merged result into VmConfig
 7. Run existing validation
@@ -165,7 +165,7 @@ Once profiles exist, wakiza.yaml can shrink to mostly VM-specific data:
 - hostpci BDF addresses
 - UUIDs and socket paths
 
-Everything else can come from windows_11 + gpu_passthrough defaults.
+Everything else can come from windows-11 + gpu-passthrough defaults.
 
 ## Risks and Mitigations
 

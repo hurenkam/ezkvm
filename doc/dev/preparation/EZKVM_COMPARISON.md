@@ -341,7 +341,7 @@ network:
 ```yaml
 name: "my-vm"
 backend: "qemu"
-profiles: ["gpu_passthrough", "spice_looking_glass"]
+profiles: ["gpu-passthrough", "looking-glass"]
 
 system:
   architecture: "x86_64"
@@ -820,7 +820,7 @@ doc/dev/
 - Example:
   ```yaml
   name: my-vm
-  profiles: ["base", "gpu_passthrough", "spice_looking_glass"]
+  profiles: ["base", "gpu-passthrough", "looking-glass"]
   system:
     cpu_cores: 8  # Override base profile's 4
   ```

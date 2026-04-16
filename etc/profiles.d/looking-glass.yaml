@@ -1,3 +1,8 @@
+spice:
+  enabled: true
+  audio: true
+  vdagent: true
+
 devices:
   displays: []
   input:
@@ -29,19 +34,6 @@ system:
       bus: "pcie.0"
       mem_path: "/dev/kvmfr0"
 
-spice:
-  enabled: true
-  port: 5903
-  addr: "0.0.0.0"
-  disable_ticketing: true
-  audio: true
-  vdagent: true
-
 options:
   looking_glass:
     program: "/usr/local/bin/looking-glass-client"
-    full_screen: true
-    size: "1707x1067"
-    grab_keyboard: true
-    escape_key: "KEY_F12"
-

@@ -1,0 +1,4 @@
+system:
+  architecture: "x86_64"
+  boot:
+    firmware: "uefi"

@@ -1,6 +1,7 @@
 use super::{
     ImportError, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
     mapper::MappingWarning, parse_proxmox_config, parse_proxmox_storage_config,
+    profile_compact::compact_profile_owned_fields,
     yaml_compact::compact_sequence_mappings,
 };
 use crate::config::{VmConfig, validation};
@@ -50,9 +51,9 @@ pub fn run_import_from_files(
         None => map_proxmox_to_canonical_yaml(&parsed)?,
     };
 
-    let config: VmConfig = serde_yaml::from_str(&mapped.yaml).map_err(|e| {
+    let config = VmConfig::from_str(&mapped.yaml).map_err(|e| {
         ImportError::ParseError(format!(
-            "generated canonical YAML failed to deserialize: {e}"
+            "generated canonical YAML failed to deserialize or merge profiles: {e}"
         ))
     })?;
     validation::validate_config(&config).map_err(|e| {
@@ -67,10 +68,12 @@ pub fn run_import_from_files(
         )));
     }
 
+    let compacted_profiles_yaml = compact_profile_owned_fields(&mapped.yaml)?;
+
     let rendered_yaml = if options.compact_lists {
-        compact_sequence_mappings(&mapped.yaml)?
+        compact_sequence_mappings(&compacted_profiles_yaml)?
     } else {
-        mapped.yaml.clone()
+        compacted_profiles_yaml
     };
 
     let output_path = options
@@ -117,6 +120,33 @@ fn format_warnings(warnings: &[MappingWarning]) -> String {
 mod tests {
     use super::{ImportRunOptions, run_import_from_files};
     use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
+        let _guard = env_lock().lock().expect("env lock");
+        let old = std::env::var_os("EZKVM_CONFIG");
+        let central_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("etc/ezkvm.yaml");
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_path);
+        }
+
+        let result = run();
+
+        unsafe {
+            match old {
+                Some(value) => std::env::set_var("EZKVM_CONFIG", value),
+                None => std::env::remove_var("EZKVM_CONFIG"),
+            }
+        }
+
+        result
+    }
 
     fn create_temp_test_dir(name: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
@@ -131,139 +161,149 @@ mod tests {
 
     #[test]
     fn dry_run_does_not_write_output_file() {
-        let dir = create_temp_test_dir("import-dry-run");
-        let input_path = dir.join("100.conf");
-        std::fs::write(
-            &input_path,
-            "name: vm-dry\nmemory: 2048\ncores: 2\nscsi0: local-lvm:disk0,size=10G\n",
-        )
-        .expect("write input");
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-dry-run");
+            let input_path = dir.join("100.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-dry\nmemory: 2048\ncores: 2\nscsi0: local-lvm:disk0,size=10G\n",
+            )
+            .expect("write input");
 
-        let output_path = dir.join("result.yaml");
-        let options = ImportRunOptions {
-            output_path: Some(output_path.to_string_lossy().to_string()),
-            storage_path: None,
-            strict: false,
-            dry_run: true,
-            compact_lists: false,
-        };
+            let output_path = dir.join("result.yaml");
+            let options = ImportRunOptions {
+                output_path: Some(output_path.to_string_lossy().to_string()),
+                storage_path: None,
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+            };
 
-        let result =
-            run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
-        assert!(result.yaml.contains("name: vm-dry"));
-        assert!(!output_path.exists());
+            let result =
+                run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
+            assert!(result.yaml.contains("name: vm-dry"));
+            assert!(!output_path.exists());
+        });
     }
 
     #[test]
     fn strict_mode_fails_when_warnings_exist() {
-        let dir = create_temp_test_dir("import-strict");
-        let input_path = dir.join("101.conf");
-        std::fs::write(
-            &input_path,
-            "name: vm-strict\narch: sparc\nmemory: 2048\ncores: 2\n",
-        )
-        .expect("write input");
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-strict");
+            let input_path = dir.join("101.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-strict\narch: sparc\nmemory: 2048\ncores: 2\n",
+            )
+            .expect("write input");
 
-        let options = ImportRunOptions {
-            output_path: None,
-            storage_path: None,
-            strict: true,
-            dry_run: true,
-            compact_lists: false,
-        };
+            let options = ImportRunOptions {
+                output_path: None,
+                storage_path: None,
+                strict: true,
+                dry_run: true,
+                compact_lists: false,
+            };
 
-        let err =
-            run_import_from_files(&input_path.to_string_lossy(), &options).expect_err("must fail");
-        assert!(err.to_string().contains("strict import failed"));
-        assert!(err.to_string().contains("arch"));
+            let err = run_import_from_files(&input_path.to_string_lossy(), &options)
+                .expect_err("must fail");
+            assert!(err.to_string().contains("strict import failed"));
+            assert!(err.to_string().contains("arch"));
+        });
     }
 
     #[test]
     fn writes_output_file_when_not_dry_run() {
-        let dir = create_temp_test_dir("import-write");
-        let input_path = dir.join("102.conf");
-        std::fs::write(
-            &input_path,
-            "name: vm-write\nmemory: 2048\ncores: 2\nscsi0: local-lvm:disk0,size=10G\n",
-        )
-        .expect("write input");
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-write");
+            let input_path = dir.join("102.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-write\nmemory: 2048\ncores: 2\nscsi0: local-lvm:disk0,size=10G\n",
+            )
+            .expect("write input");
 
-        let output_path = dir.join("custom.yaml");
-        let options = ImportRunOptions {
-            output_path: Some(output_path.to_string_lossy().to_string()),
-            storage_path: None,
-            strict: false,
-            dry_run: false,
-            compact_lists: false,
-        };
+            let output_path = dir.join("custom.yaml");
+            let options = ImportRunOptions {
+                output_path: Some(output_path.to_string_lossy().to_string()),
+                storage_path: None,
+                strict: false,
+                dry_run: false,
+                compact_lists: false,
+            };
 
-        let result =
-            run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
-        assert_eq!(result.output_path, output_path.to_string_lossy());
-        assert!(output_path.exists());
+            let result =
+                run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
+            assert_eq!(result.output_path, output_path.to_string_lossy());
+            assert!(output_path.exists());
+        });
     }
 
     #[test]
     fn resolves_storage_references_when_storage_cfg_is_provided() {
-        let dir = create_temp_test_dir("import-storage-resolution");
-        let input_path = dir.join("108.conf");
-        let storage_path = dir.join("storage.cfg");
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-storage-resolution");
+            let input_path = dir.join("108.conf");
+            let storage_path = dir.join("storage.cfg");
 
-        std::fs::write(
-            &input_path,
-            "name: vm-storage\nmemory: 2048\ncores: 2\nscsi0: vm1-pool:vm-108-boot,discard=on\n",
-        )
-        .expect("write input");
-        std::fs::write(
-            &storage_path,
-            "lvmthin: vm1-pool\n    thinpool pool\n    vgname vm1\n    content images,rootdir\n",
-        )
-        .expect("write storage");
+            std::fs::write(
+                &input_path,
+                "name: vm-storage\nmemory: 2048\ncores: 2\nscsi0: vm1-pool:vm-108-boot,discard=on\n",
+            )
+            .expect("write input");
+            std::fs::write(
+                &storage_path,
+                "lvmthin: vm1-pool\n    thinpool pool\n    vgname vm1\n    content images,rootdir\n",
+            )
+            .expect("write storage");
 
-        let options = ImportRunOptions {
-            output_path: None,
-            storage_path: Some(storage_path.to_string_lossy().to_string()),
-            strict: false,
-            dry_run: true,
-            compact_lists: false,
-        };
+            let options = ImportRunOptions {
+                output_path: None,
+                storage_path: Some(storage_path.to_string_lossy().to_string()),
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+            };
 
-        let result =
-            run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
-        assert!(result.yaml.contains("path: /dev/vm1/vm-108-boot"));
+            let result =
+                run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
+            assert!(result.yaml.contains("path: /dev/vm1/vm-108-boot"));
+        });
     }
 
     #[test]
     fn resolves_zfspool_references_when_storage_cfg_is_provided() {
-        let dir = create_temp_test_dir("import-zfspool-resolution");
-        let input_path = dir.join("500.conf");
-        let storage_path = dir.join("storage.cfg");
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-zfspool-resolution");
+            let input_path = dir.join("500.conf");
+            let storage_path = dir.join("storage.cfg");
 
-        std::fs::write(
-            &input_path,
-            "name: vm-zfs\nmemory: 2048\ncores: 2\nscsi0: local-zfs:vm-500-disk-0,discard=on\n",
-        )
-        .expect("write input");
-        std::fs::write(
-            &storage_path,
-            "zfspool: local-zfs\n    pool rpool/data\n    content images,rootdir\n",
-        )
-        .expect("write storage");
+            std::fs::write(
+                &input_path,
+                "name: vm-zfs\nmemory: 2048\ncores: 2\nscsi0: local-zfs:vm-500-disk-0,discard=on\n",
+            )
+            .expect("write input");
+            std::fs::write(
+                &storage_path,
+                "zfspool: local-zfs\n    pool rpool/data\n    content images,rootdir\n",
+            )
+            .expect("write storage");
 
-        let options = ImportRunOptions {
-            output_path: None,
-            storage_path: Some(storage_path.to_string_lossy().to_string()),
-            strict: false,
-            dry_run: true,
-            compact_lists: false,
-        };
+            let options = ImportRunOptions {
+                output_path: None,
+                storage_path: Some(storage_path.to_string_lossy().to_string()),
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+            };
 
-        let result =
-            run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
-        assert!(
-            result
-                .yaml
-                .contains("path: /dev/zvol/rpool/data/vm-500-disk-0")
-        );
+            let result =
+                run_import_from_files(&input_path.to_string_lossy(), &options).expect("import");
+            assert!(
+                result
+                    .yaml
+                    .contains("path: /dev/zvol/rpool/data/vm-500-disk-0")
+            );
+        });
     }
 }

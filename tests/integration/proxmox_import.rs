@@ -3,6 +3,26 @@ use ezkvm::import::proxmox::{ImportRunOptions, run_import_from_files};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
+    let old = std::env::var_os("EZKVM_CONFIG");
+    let central_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("etc/ezkvm.yaml");
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_path);
+    }
+
+    let result = run();
+
+    unsafe {
+        match old {
+            Some(value) => std::env::set_var("EZKVM_CONFIG", value),
+            None => std::env::remove_var("EZKVM_CONFIG"),
+        }
+    }
+
+    result
+}
+
 struct ImportFixtureCase {
     name: &'static str,
     conf_fixture: &'static str,
@@ -96,22 +116,26 @@ fn check_fixture_case(case: &ImportFixtureCase) -> Option<String> {
         std::env::set_var("XDG_RUNTIME_DIR", &runtime_dir);
     }
 
-    let result = run_import_from_files(
-        &case.conf_path().to_string_lossy(),
-        &ImportRunOptions {
-            output_path: None,
-            storage_path: case
-                .storage_path()
-                .map(|path| path.to_string_lossy().to_string()),
-            strict: false,
-            dry_run: true,
-            compact_lists: false,
-        },
-    )
-    .unwrap_or_else(|err| panic!("fixture '{}' import failed: {err}", case.name));
+    let result = with_repo_profiles(|| {
+        run_import_from_files(
+            &case.conf_path().to_string_lossy(),
+            &ImportRunOptions {
+                output_path: None,
+                storage_path: case
+                    .storage_path()
+                    .map(|path| path.to_string_lossy().to_string()),
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+            },
+        )
+        .unwrap_or_else(|err| panic!("fixture '{}' import failed: {err}", case.name))
+    });
 
-    let config = VmConfig::from_str(&result.yaml)
-        .unwrap_or_else(|err| panic!("fixture '{}' yaml invalid: {err}", case.name));
+    let config = with_repo_profiles(|| {
+        VmConfig::from_str(&result.yaml)
+            .unwrap_or_else(|err| panic!("fixture '{}' yaml invalid: {err}", case.name))
+    });
     let args = QemuManager::new(config, CentralConfig::default())
         .build_command()
         .unwrap_or_else(|err| panic!("fixture '{}' command build failed: {err}", case.name))

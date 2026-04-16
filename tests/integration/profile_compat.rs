@@ -17,7 +17,7 @@ fn test_profile_based_config_file_parsing() {
     let profile_dir = root.join("profiles");
     fs::create_dir_all(&profile_dir).unwrap();
     fs::write(
-        profile_dir.join("windows_11.yaml"),
+      profile_dir.join("windows-11.yaml"),
         r#"
 system:
   architecture: "x86_64"
@@ -47,7 +47,7 @@ system:
 name: "integration-profile-vm"
 backend: "qemu"
 profiles:
-  - "windows_11"
+  - "windows-11"
 system:
   memory:
     size: 8192

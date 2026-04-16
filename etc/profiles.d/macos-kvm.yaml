@@ -1,0 +1,6 @@
+system:
+  machine: "pc-q35-5.2+pve0"
+
+devices:
+  displays:
+    - type: "none"

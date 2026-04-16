@@ -67,6 +67,7 @@ pub(crate) fn validate_scsi_controller_config(
     scsi_controller: &ScsiControllerConfig,
 ) -> Result<()> {
     let valid_types = [
+        "virtio-scsi-single",
         "virtio-scsi-pci",
         "pvscsi",
         "lsi",

@@ -1,6 +1,26 @@
 use super::*;
 use ezkvm::import::proxmox::{ImportRunOptions, run_import_from_files};
 
+fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
+    let old = std::env::var_os("EZKVM_CONFIG");
+    let central_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("etc/ezkvm.yaml");
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_path);
+    }
+
+    let result = run();
+
+    unsafe {
+        match old {
+            Some(value) => std::env::set_var("EZKVM_CONFIG", value),
+            None => std::env::remove_var("EZKVM_CONFIG"),
+        }
+    }
+
+    result
+}
+
 #[test]
 fn test_wakiza_import_preserves_key_proxmox_fragments() {
     let _guard = env_lock().lock().unwrap();
@@ -9,17 +29,19 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
         env!("CARGO_MANIFEST_DIR")
     );
 
-    let result = run_import_from_files(
-        "input/felucia/108.conf",
-        &ImportRunOptions {
-            output_path: None,
-            storage_path: Some(storage_path),
-            strict: false,
-            dry_run: true,
-            compact_lists: false,
-        },
-    )
-    .expect("wakiza import should succeed");
+    let result = with_repo_profiles(|| {
+        run_import_from_files(
+            "input/felucia/108.conf",
+            &ImportRunOptions {
+                output_path: None,
+                storage_path: Some(storage_path),
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+            },
+        )
+        .expect("wakiza import should succeed")
+    });
 
     assert!(
         result.warnings.is_empty(),
@@ -31,7 +53,9 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
             .collect::<Vec<_>>()
     );
 
-    let config = VmConfig::from_str(&result.yaml).expect("imported yaml should deserialize");
+    let config = with_repo_profiles(|| {
+        VmConfig::from_str(&result.yaml).expect("imported yaml should deserialize")
+    });
     let manager = QemuManager::new(config, CentralConfig::default());
     let args = manager
         .build_command()

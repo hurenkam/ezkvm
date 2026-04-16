@@ -171,7 +171,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         vm_generation_id: proxmox.scalars.get("vmgenid").cloned(),
     });
 
-    let vm_config = VmConfig {
+    let mut vm_config = VmConfig {
         name,
         backend: "qemu".to_string(),
         profiles: Vec::new(),
@@ -237,6 +237,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             ..VmOptions::default()
         },
     };
+
+    vm_config.profiles = infer_profile_names(proxmox, &vm_config);
 
     let yaml = serde_yaml::to_string(&vm_config)
         .map_err(|e| ImportError::ParseError(format!("failed to serialize mapped config: {e}")))?;
@@ -1009,6 +1011,95 @@ fn is_enabled(value: Option<&String>) -> bool {
     )
 }
 
+fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<String> {
+    let mut profiles = Vec::new();
+    let ostype = proxmox.scalars.get("ostype").map(String::as_str);
+
+    if config.system.architecture == "x86_64"
+        && config.system.boot.firmware.as_deref() == Some("uefi")
+        && is_q35_machine(&config.system.machine)
+    {
+        profiles.push("proxmox-q35-uefi".to_string());
+    }
+
+    if let Some(controller_type) = proxmox.scalars.get("scsihw").map(String::as_str) {
+        match controller_type {
+            "virtio-scsi-single" => profiles.push("storage-virtio-scsi-single".to_string()),
+            "virtio-scsi-pci" => profiles.push("storage-virtio-scsi-pci".to_string()),
+            _ => {}
+        }
+    }
+
+    match ostype {
+        Some("win11") => {
+            if config.options.rtc.as_ref().is_some_and(|rtc| {
+                rtc.base.as_deref() == Some("localtime")
+                    && rtc.driftfix.as_deref() == Some("slew")
+            }) {
+                profiles.push("windows-common".to_string());
+            }
+            if config.system.boot.secure_boot && config.system.tpm.is_some() {
+                profiles.push("windows-11".to_string());
+            }
+        }
+        Some("win10") => {
+            if config.options.rtc.as_ref().is_some_and(|rtc| {
+                rtc.base.as_deref() == Some("localtime")
+                    && rtc.driftfix.as_deref() == Some("slew")
+            }) {
+                profiles.push("windows-common".to_string());
+            }
+            profiles.push("windows-10".to_string());
+        }
+        Some("l26") => {
+            if config.options.guest_agent.is_some() {
+                profiles.push("linux-l26-common".to_string());
+            }
+        }
+        Some("other") if is_macos_guest(proxmox, config) => {
+            profiles.push("macos-kvm".to_string());
+        }
+        _ => {}
+    }
+
+    if config.system.memory.ivshmem.is_some() {
+        profiles.push("looking-glass".to_string());
+    } else if config.spice.is_some() && has_remote_viewer_input_devices(&config.devices.input) {
+        profiles.push("remote-viewer-spice".to_string());
+    }
+
+    if !config.host.pci.is_empty() {
+        profiles.push("gpu-passthrough".to_string());
+    }
+
+    if proxmox.scalars.contains_key("serial0")
+        && config.spice.is_none()
+        && config.devices.displays.iter().all(|display| display.r#type == "none")
+    {
+        profiles.push("headless-serial".to_string());
+    }
+
+    profiles.dedup();
+    profiles
+}
+
+fn has_remote_viewer_input_devices(input_devices: &[InputDeviceConfig]) -> bool {
+    let has_mouse = input_devices.iter().any(|device| device.r#type == "virtio-mouse");
+    let has_keyboard = input_devices
+        .iter()
+        .any(|device| device.r#type == "virtio-keyboard");
+    has_mouse && has_keyboard
+}
+
+fn is_macos_guest(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
+    let has_applesmc = proxmox
+        .scalars
+        .get("args")
+        .is_some_and(|args| args.contains("isa-applesmc"));
+    let has_macos_display = config.devices.displays.iter().any(|display| display.r#type == "none");
+    has_applesmc && has_macos_display && is_q35_machine(&config.system.machine)
+}
+
 fn parse_boot_order(scalars: &BTreeMap<String, String>) -> BTreeMap<String, u32> {
     let mut boot_indices = BTreeMap::new();
     if let Some(boot_str) = scalars.get("boot") {
@@ -1597,6 +1688,7 @@ mod tests {
         assert!(cfg.devices.drives[0].discard);
         assert!(cfg.devices.drives[0].ssd);
         assert_eq!(cfg.devices.drives[1].r#type, "cdrom");
+        assert!(cfg.profiles.contains(&"storage-virtio-scsi-single".to_string()));
     }
 
     #[test]
@@ -1942,6 +2034,58 @@ mod tests {
         assert_eq!(iv.bus.as_deref(), Some("pcie.0"));
         assert_eq!(iv.mem_path, "/dev/kvmfr0");
         assert_eq!(iv.size, 128);
+        assert!(cfg.profiles.contains(&"looking-glass".to_string()));
+    }
+
+    #[test]
+    fn infers_windows_11_profile_stack() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-win11
+            ostype: win11
+            bios: ovmf
+            machine: pc-q35-8.1+pve0
+            agent: 1
+            efidisk0: /var/lib/vm/vars.fd,efitype=4m,ms-cert=2023,pre-enrolled-keys=1
+            tpmstate0: /var/lib/vm/tpmstate,size=4M,version=v2.0
+            audio0: device=ich9-intel-hda,driver=spice
+            args: -spice port=5903,addr=0.0.0.0,disable-ticketing=on -chardev spicevmc,id=vdagent,name=vdagent -device virtserialport,chardev=vdagent,name=com.redhat.spice.0 -device virtio-mouse -device virtio-keyboard
+            scsi0: local-lvm:vm-108-disk-0
+            scsihw: virtio-scsi-pci
+            hostpci0: 0000:03:00.0,pcie=1
+            "#,
+        );
+
+        assert_eq!(
+            cfg.profiles,
+            vec![
+                "proxmox-q35-uefi".to_string(),
+                "storage-virtio-scsi-pci".to_string(),
+                "windows-common".to_string(),
+                "windows-11".to_string(),
+                "remote-viewer-spice".to_string(),
+                "gpu-passthrough".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn infers_macos_profile() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-macos
+            ostype: other
+            bios: ovmf
+            machine: pc-q35-5.2
+            cpu: Penryn
+            vga: none
+            args: -device isa-applesmc,osk=dummy -smbios type=2
+            hostpci0: 0000:07:00.0,pcie=1
+            "#,
+        );
+
+        assert!(cfg.profiles.contains(&"macos-kvm".to_string()));
+        assert!(cfg.profiles.contains(&"gpu-passthrough".to_string()));
     }
 
     #[test]

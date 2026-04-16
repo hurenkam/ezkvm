@@ -1,0 +1,7 @@
+system:
+  boot:
+    secure_boot: true
+  tpm:
+    version: "2.0"
+    backend: "emulator"
+    model: "tpm-tis"

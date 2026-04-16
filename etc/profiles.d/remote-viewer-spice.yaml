@@ -1,0 +1,8 @@
+spice:
+  enabled: true
+  vdagent: true
+
+devices:
+  input:
+    - type: "virtio-mouse"
+    - type: "virtio-keyboard"

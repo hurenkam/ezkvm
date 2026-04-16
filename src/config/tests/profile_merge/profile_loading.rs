@@ -11,7 +11,7 @@ fn test_vm_config_from_file_merges_profiles_from_profile_dir() {
     std::fs::create_dir_all(&profile_dir).unwrap();
 
     std::fs::write(
-        profile_dir.join("windows_11.yaml"),
+      profile_dir.join("windows-11.yaml"),
         r#"
 system:
   architecture: "x86_64"
@@ -28,7 +28,7 @@ system:
     .unwrap();
 
     std::fs::write(
-        profile_dir.join("gpu_passthrough.yaml"),
+      profile_dir.join("gpu-passthrough.yaml"),
         r#"
 devices:
   displays: []
@@ -50,8 +50,8 @@ devices:
 name: "test-vm"
 backend: "qemu"
 profiles:
-  - "windows_11"
-  - "gpu_passthrough"
+  - "windows-11"
+  - "gpu-passthrough"
 system:
   memory:
     size: 8192

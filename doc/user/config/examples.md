@@ -37,11 +37,12 @@ options:
 name: "wakiza"
 backend: "qemu"
 profiles:
-  - "windows_11_base"
-  - "proxmox_q35_topology"
-  - "spice_looking_glass"
-  - "gpu_passthrough"
-  - "storage_network_defaults"
+  - "proxmox-q35-uefi"
+  - "windows-common"
+  - "windows-11"
+  - "looking-glass"
+  - "gpu-passthrough"
+  - "storage-virtio-scsi-pci"
 
 system:
   memory:

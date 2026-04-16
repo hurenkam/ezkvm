@@ -87,7 +87,7 @@ locations:
 ```yaml
 name: "ubuntu-22.04"
 backend: "qemu"
-profiles: ["gpu_passthrough", "spice_looking_glass"]
+profiles: ["gpu-passthrough", "looking-glass"]
 system: { ... }
 devices: { ... }
 controllers: { ... }
@@ -117,7 +117,7 @@ options: { ... }
 
 **Example Flow:**
 ```yaml
-# Profile 1: gpu_passthrough.yaml
+# Profile 1: gpu-passthrough.yaml
 host:
   pci:
     - id: gpu
@@ -125,7 +125,7 @@ host:
       x_vga: true
 
 # VM config
-profiles: ["gpu_passthrough"]
+profiles: ["gpu-passthrough"]
 host:
   pci:
     - id: gpu2
@@ -768,7 +768,7 @@ fn validate_config(config: &VmConfig) -> Result<()> {
 3. **Config Loading (Config layer):**
    - Load ubuntu.yaml
    - Extract ENV vars (${VAR_NAME})
-   - Resolve profile names: ["gpu_passthrough", "spice_looking_glass"]
+  - Resolve profile names: ["gpu-passthrough", "looking-glass"]
    - Load and merge profiles
    - Deserialize to VmConfig
    - Validate config

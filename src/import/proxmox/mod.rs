@@ -4,6 +4,7 @@ pub mod mapper;
 pub mod model;
 pub mod parser;
 pub mod storage_parser;
+mod profile_compact;
 mod yaml_compact;
 
 pub use error::ImportError;
