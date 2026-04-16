@@ -17,7 +17,7 @@ fn test_profile_based_config_file_parsing() {
     let profile_dir = root.join("profiles");
     fs::create_dir_all(&profile_dir).unwrap();
     fs::write(
-      profile_dir.join("windows-11.yaml"),
+        profile_dir.join("windows-11.yaml"),
         r#"
 system:
   architecture: "x86_64"

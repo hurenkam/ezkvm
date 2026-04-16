@@ -55,10 +55,7 @@ fn imported_profiles(conf_path: &str, storage_path: Option<&str>) -> Vec<String>
 fn wakiza_import_emits_expected_profile_stack() {
     let _guard = env_lock().lock().unwrap();
 
-    let profiles = imported_profiles(
-        "input/felucia/108.conf",
-        Some("input/felucia/storage.cfg"),
-    );
+    let profiles = imported_profiles("input/felucia/108.conf", Some("input/felucia/storage.cfg"));
 
     assert_eq!(
         profiles,
@@ -90,7 +87,10 @@ fn linux_desktop_import_emits_expected_profile_stack() {
 fn macos_import_emits_expected_profile_stack() {
     let _guard = env_lock().lock().unwrap();
 
-    let profiles = imported_profiles("input/coruscant/401.conf", Some("input/coruscant/storage.cfg"));
+    let profiles = imported_profiles(
+        "input/coruscant/401.conf",
+        Some("input/coruscant/storage.cfg"),
+    );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
     assert!(profiles.contains(&"macos-kvm".to_string()));

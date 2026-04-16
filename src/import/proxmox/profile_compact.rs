@@ -124,9 +124,7 @@ fn compact_overlay_against_base(base: &Value, overlay: &Value, path: &[String]) 
                 };
 
                 let keep_child = match base_map.get(key) {
-                    Some(base_value) => {
-                        compact_child_value(base_value, overlay_value, &child_path)
-                    }
+                    Some(base_value) => compact_child_value(base_value, overlay_value, &child_path),
                     None => Some(overlay_value.clone()),
                 };
 
@@ -174,7 +172,9 @@ fn compact_id_merge_sequence(base: &Value, overlay: &Value, path: &[String]) -> 
     };
 
     if base_seq.iter().any(|item| yaml_mapping_id(item).is_none())
-        || overlay_seq.iter().any(|item| yaml_mapping_id(item).is_none())
+        || overlay_seq
+            .iter()
+            .any(|item| yaml_mapping_id(item).is_none())
     {
         return if base == overlay {
             None
@@ -431,17 +431,14 @@ fn merge_sequence_append_all(base: &mut Value, overlay: Value) {
 #[cfg(test)]
 mod tests {
     use super::compact_profile_owned_fields;
+    use crate::test_support::env_lock;
     use serde_yaml::Value;
     use std::path::PathBuf;
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
 
     fn with_test_profiles<T>(run: impl FnOnce(PathBuf) -> T) -> T {
-        let _guard = env_lock().lock().expect("env lock");
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let root = std::env::temp_dir().join(format!(
             "ezkvm-profile-compact-{}",
@@ -583,15 +580,18 @@ controllers:
                 .expect("xhci item mapping");
 
             assert_eq!(
-                item.get(Value::String("id".to_string())).and_then(Value::as_str),
+                item.get(Value::String("id".to_string()))
+                    .and_then(Value::as_str),
                 Some("xhci")
             );
             assert_eq!(
-                item.get(Value::String("bus".to_string())).and_then(Value::as_str),
+                item.get(Value::String("bus".to_string()))
+                    .and_then(Value::as_str),
                 Some("pci.1")
             );
             assert_eq!(
-                item.get(Value::String("addr".to_string())).and_then(Value::as_str),
+                item.get(Value::String("addr".to_string()))
+                    .and_then(Value::as_str),
                 Some("0x1b")
             );
             assert!(!item.contains_key(Value::String("p2".to_string())));

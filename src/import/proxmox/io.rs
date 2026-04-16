@@ -1,8 +1,7 @@
 use super::{
     ImportError, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
     mapper::MappingWarning, parse_proxmox_config, parse_proxmox_storage_config,
-    profile_compact::compact_profile_owned_fields,
-    yaml_compact::compact_sequence_mappings,
+    profile_compact::compact_profile_owned_fields, yaml_compact::compact_sequence_mappings,
 };
 use crate::config::{VmConfig, validation};
 use std::path::Path;
@@ -119,16 +118,13 @@ fn format_warnings(warnings: &[MappingWarning]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{ImportRunOptions, run_import_from_files};
+    use crate::test_support::env_lock;
     use std::path::PathBuf;
-    use std::sync::{Mutex, OnceLock};
-
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
 
     fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
-        let _guard = env_lock().lock().expect("env lock");
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let old = std::env::var_os("EZKVM_CONFIG");
         let central_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("etc/ezkvm.yaml");
 

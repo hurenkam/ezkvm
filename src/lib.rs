@@ -11,3 +11,6 @@ pub mod network;
 pub mod qemu;
 pub mod state;
 pub mod storage;
+
+#[cfg(test)]
+pub(crate) mod test_support;

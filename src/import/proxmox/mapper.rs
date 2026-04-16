@@ -71,7 +71,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         firmware,
         ..Default::default()
     };
-    apply_efidisk0_to_boot(&proxmox.scalars, storage_config, &mut boot);
+    apply_efidisk0_to_boot(&proxmox.scalars, storage_config, &mut boot, &mut warnings);
 
     // Parse boot order and SMBIOS early
     let boot_indices = parse_boot_order(&proxmox.scalars);
@@ -1033,8 +1033,7 @@ fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<Stri
     match ostype {
         Some("win11") => {
             if config.options.rtc.as_ref().is_some_and(|rtc| {
-                rtc.base.as_deref() == Some("localtime")
-                    && rtc.driftfix.as_deref() == Some("slew")
+                rtc.base.as_deref() == Some("localtime") && rtc.driftfix.as_deref() == Some("slew")
             }) {
                 profiles.push("windows-common".to_string());
             }
@@ -1044,8 +1043,7 @@ fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<Stri
         }
         Some("win10") => {
             if config.options.rtc.as_ref().is_some_and(|rtc| {
-                rtc.base.as_deref() == Some("localtime")
-                    && rtc.driftfix.as_deref() == Some("slew")
+                rtc.base.as_deref() == Some("localtime") && rtc.driftfix.as_deref() == Some("slew")
             }) {
                 profiles.push("windows-common".to_string());
             }
@@ -1074,7 +1072,11 @@ fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<Stri
 
     if proxmox.scalars.contains_key("serial0")
         && config.spice.is_none()
-        && config.devices.displays.iter().all(|display| display.r#type == "none")
+        && config
+            .devices
+            .displays
+            .iter()
+            .all(|display| display.r#type == "none")
     {
         profiles.push("headless-serial".to_string());
     }
@@ -1084,7 +1086,9 @@ fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<Stri
 }
 
 fn has_remote_viewer_input_devices(input_devices: &[InputDeviceConfig]) -> bool {
-    let has_mouse = input_devices.iter().any(|device| device.r#type == "virtio-mouse");
+    let has_mouse = input_devices
+        .iter()
+        .any(|device| device.r#type == "virtio-mouse");
     let has_keyboard = input_devices
         .iter()
         .any(|device| device.r#type == "virtio-keyboard");
@@ -1096,7 +1100,11 @@ fn is_macos_guest(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
         .scalars
         .get("args")
         .is_some_and(|args| args.contains("isa-applesmc"));
-    let has_macos_display = config.devices.displays.iter().any(|display| display.r#type == "none");
+    let has_macos_display = config
+        .devices
+        .displays
+        .iter()
+        .any(|display| display.r#type == "none");
     has_applesmc && has_macos_display && is_q35_machine(&config.system.machine)
 }
 
@@ -1133,10 +1141,23 @@ fn apply_efidisk0_to_boot(
     scalars: &BTreeMap<String, String>,
     storage_config: Option<&ProxmoxStorageConfig>,
     boot: &mut BootConfig,
+    warnings: &mut Vec<MappingWarning>,
 ) {
     let Some(raw) = scalars.get("efidisk0") else {
         return;
     };
+
+    if boot.firmware.as_deref() == Some("bios") {
+        warnings.push(MappingWarning {
+            source_field: "efidisk0".to_string(),
+            message: "efidisk0 requires UEFI firmware; overriding BIOS firmware mapping to 'uefi'"
+                .to_string(),
+        });
+    }
+
+    if boot.firmware.is_none() || boot.firmware.as_deref() == Some("bios") {
+        boot.firmware = Some("uefi".to_string());
+    }
 
     let (source, options) = parse_source_and_options(raw);
     if !source.is_empty() && source != "none" {
@@ -1147,31 +1168,58 @@ fn apply_efidisk0_to_boot(
 
     boot.uefi_vars_size = map_efidisk_vars_size(&options);
 
+    let mut secure_boot_signals = Vec::new();
+
     // B-16: Map Microsoft certificate support from efidisk0 metadata
     if let Some(ms_cert) = options.get("ms-cert") {
         boot.uefi_ms_cert = Some(ms_cert.clone());
-        if is_ms_cert_enabled(ms_cert) {
-            boot.secure_boot = true;
+        match parse_ms_cert_signal(ms_cert) {
+            Some(enabled) => secure_boot_signals.push(enabled),
+            None => warnings.push(MappingWarning {
+                source_field: "efidisk0".to_string(),
+                message: format!(
+                    "ms-cert='{}' metadata was preserved, but the exact certificate mode is not representable; secure boot was left unchanged",
+                    ms_cert
+                ),
+            }),
         }
     }
 
     // B-16: Map pre-enrolled keys indicator from efidisk0 metadata
     if let Some(pek) = options.get("pre-enrolled-keys") {
         boot.uefi_pre_enrolled_keys = Some(pek.clone());
-        if is_enabled(Some(pek)) {
-            boot.secure_boot = true;
+        match parse_boolish_signal(pek) {
+            Some(enabled) => secure_boot_signals.push(enabled),
+            None => warnings.push(MappingWarning {
+                source_field: "efidisk0".to_string(),
+                message: format!(
+                    "pre-enrolled-keys='{}' metadata was preserved, but the value is not representable; secure boot was left unchanged",
+                    pek
+                ),
+            }),
         }
+    }
+
+    if secure_boot_signals.into_iter().any(|enabled| enabled) {
+        boot.secure_boot = true;
     }
 }
 
-fn is_ms_cert_enabled(value: &str) -> bool {
+fn parse_ms_cert_signal(value: &str) -> Option<bool> {
+    if let Some(enabled) = parse_boolish_signal(value) {
+        return Some(enabled);
+    }
+
+    value.trim().parse::<u32>().ok().map(|numeric| numeric > 0)
+}
+
+fn parse_boolish_signal(value: &str) -> Option<bool> {
     let normalized = value.trim().to_ascii_lowercase();
-    !normalized.is_empty()
-        && normalized != "0"
-        && normalized != "off"
-        && normalized != "false"
-        && normalized != "no"
-        && normalized != "none"
+    match normalized.as_str() {
+        "1" | "on" | "true" | "yes" => Some(true),
+        "0" | "off" | "false" | "no" | "none" => Some(false),
+        _ => None,
+    }
 }
 
 fn parse_source_and_options(raw: &str) -> (&str, BTreeMap<String, String>) {
@@ -1688,7 +1736,10 @@ mod tests {
         assert!(cfg.devices.drives[0].discard);
         assert!(cfg.devices.drives[0].ssd);
         assert_eq!(cfg.devices.drives[1].r#type, "cdrom");
-        assert!(cfg.profiles.contains(&"storage-virtio-scsi-single".to_string()));
+        assert!(
+            cfg.profiles
+                .contains(&"storage-virtio-scsi-single".to_string())
+        );
     }
 
     #[test]
@@ -2204,6 +2255,7 @@ mod tests {
         );
 
         let boot = &cfg.system.boot;
+        assert_eq!(boot.firmware.as_deref(), Some("uefi"));
         assert_eq!(boot.uefi_vars.as_deref(), Some("/var/lib/vm/vars.fd"));
         assert_eq!(boot.uefi_vars_size, Some(540_672));
         assert_eq!(boot.uefi_ms_cert.as_deref(), Some("2023"));
@@ -2221,6 +2273,68 @@ mod tests {
         );
 
         let boot = &cfg.system.boot;
+        assert_eq!(boot.firmware.as_deref(), Some("uefi"));
         assert!(!boot.secure_boot);
+    }
+
+    #[test]
+    fn efidisk_overrides_bios_firmware_with_warning() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-efi-override
+            bios: seabios
+            efidisk0: /var/lib/vm/vars.fd,efitype=4m
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        validation::validate_config(&cfg).expect("config should validate");
+
+        assert_eq!(cfg.system.boot.firmware.as_deref(), Some("uefi"));
+        assert!(mapped.warnings.iter().any(|warning| {
+            warning.source_field == "efidisk0"
+                && warning
+                    .message
+                    .contains("overriding BIOS firmware mapping to 'uefi'")
+        }));
+    }
+
+    #[test]
+    fn efidisk_warns_when_secure_boot_metadata_is_not_representable() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-efi-warning
+            efidisk0: /var/lib/vm/vars.fd,efitype=4m,ms-cert=custom,pre-enrolled-keys=maybe
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        validation::validate_config(&cfg).expect("config should validate");
+
+        assert_eq!(cfg.system.boot.firmware.as_deref(), Some("uefi"));
+        assert!(!cfg.system.boot.secure_boot);
+        assert_eq!(mapped.warnings.len(), 2);
+        assert!(
+            mapped
+                .warnings
+                .iter()
+                .all(|warning| warning.source_field == "efidisk0")
+        );
+        assert!(
+            mapped
+                .warnings
+                .iter()
+                .any(|warning| warning.message.contains("ms-cert='custom'"))
+        );
+        assert!(
+            mapped
+                .warnings
+                .iter()
+                .any(|warning| warning.message.contains("pre-enrolled-keys='maybe'"))
+        );
     }
 }

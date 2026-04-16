@@ -12,6 +12,9 @@ mod qemu;
 mod state;
 mod storage;
 
+#[cfg(test)]
+mod test_support;
+
 use anyhow::Result;
 use clap::Parser;
 
