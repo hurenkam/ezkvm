@@ -10,9 +10,9 @@ use super::super::{
 
 use super::super::{
     AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig,
-    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig, SataControllerConfig,
-    ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig, UsbDeviceConfig, VmOptions,
-    XhciControllerConfig,
+    InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig,
+    SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig,
+    UsbDeviceConfig, VmOptions, XhciControllerConfig,
 };
 use super::{BootConfig, DeviceConfig, SystemConfig};
 
@@ -76,6 +76,10 @@ pub struct VmConfig {
     /// Hyper-V enlightenments configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hyperv: Option<HypervConfig>,
+
+    /// IOMMU / vIOMMU device configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub iommu: Option<IommuConfig>,
 
     /// Additional options
     #[serde(default)]

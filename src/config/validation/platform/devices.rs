@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use anyhow::{Result, anyhow};
 
 use crate::config::{
-    InputDeviceConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig, SataControllerConfig,
-    ScsiControllerConfig,
+    InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig,
+    SataControllerConfig, ScsiControllerConfig,
 };
 
 pub(crate) fn validate_input_devices(input_devices: &[InputDeviceConfig]) -> Result<()> {
@@ -204,10 +204,31 @@ pub(crate) fn validate_numa_config(numa: &NumaConfig) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn validate_iommu_config(iommu: &IommuConfig) -> Result<()> {
+    let valid_types = ["intel", "amd"];
+    if !valid_types.contains(&iommu.r#type.as_str()) {
+        return Err(anyhow!(
+            "Unsupported IOMMU type: {}. Supported: {:?}",
+            iommu.r#type,
+            valid_types
+        ));
+    }
+
+    if iommu.id.trim().is_empty() {
+        return Err(anyhow!("IOMMU id cannot be empty"));
+    }
+
+    if iommu.r#type == "amd" && iommu.eim {
+        return Err(anyhow!("EIM is only supported for Intel IOMMU"));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::validate_sata_controller_config;
-    use crate::config::SataControllerConfig;
+    use super::{validate_iommu_config, validate_sata_controller_config};
+    use crate::config::{IommuConfig, SataControllerConfig};
 
     #[test]
     fn sata_controller_rejects_unsupported_type() {
@@ -236,5 +257,44 @@ mod tests {
             err.to_string()
                 .contains("SATA controller bus cannot be empty")
         );
+    }
+
+    #[test]
+    fn iommu_rejects_unsupported_type() {
+        let iommu = IommuConfig {
+            r#type: "arm-smmu".to_string(),
+            id: "iommu0".to_string(),
+            intremap: true,
+            caching_mode: false,
+            eim: false,
+        };
+        let err = validate_iommu_config(&iommu).expect_err("must fail");
+        assert!(err.to_string().contains("Unsupported IOMMU type"));
+    }
+
+    #[test]
+    fn iommu_rejects_empty_id() {
+        let iommu = IommuConfig {
+            r#type: "intel".to_string(),
+            id: "  ".to_string(),
+            intremap: true,
+            caching_mode: false,
+            eim: false,
+        };
+        let err = validate_iommu_config(&iommu).expect_err("must fail");
+        assert!(err.to_string().contains("IOMMU id cannot be empty"));
+    }
+
+    #[test]
+    fn iommu_rejects_eim_on_amd() {
+        let iommu = IommuConfig {
+            r#type: "amd".to_string(),
+            id: "iommu0".to_string(),
+            intremap: false,
+            caching_mode: false,
+            eim: true,
+        };
+        let err = validate_iommu_config(&iommu).expect_err("must fail");
+        assert!(err.to_string().contains("EIM is only supported for Intel"));
     }
 }

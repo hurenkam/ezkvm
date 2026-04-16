@@ -130,4 +130,31 @@ impl QemuArgs {
 
         self.push(controller_spec);
     }
+
+    /// Add Intel IOMMU or AMD IOMMU device
+    pub fn add_iommu(
+        &mut self,
+        iommu_type: &str,
+        id: &str,
+        intremap: bool,
+        caching_mode: bool,
+        eim: bool,
+    ) {
+        self.push_str("-device");
+        let device_name = match iommu_type {
+            "amd" => "amd-iommu",
+            _ => "intel-iommu",
+        };
+        let mut spec = format!("{},id={}", device_name, id);
+        if intremap {
+            spec.push_str(",intremap=on");
+        }
+        if caching_mode {
+            spec.push_str(",caching-mode=on");
+        }
+        if eim {
+            spec.push_str(",eim=on");
+        }
+        self.push(spec);
+    }
 }

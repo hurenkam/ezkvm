@@ -1,4 +1,5 @@
 mod hyperv;
+mod iommu;
 mod monitoring;
 mod passthrough;
 mod peripherals;
@@ -6,6 +7,7 @@ mod storage;
 mod tpm_guest;
 
 pub use hyperv::HypervConfig;
+pub use iommu::IommuConfig;
 pub use monitoring::{NumaConfig, QmpConfig, QmpSocketType, SmbiosConfig};
 pub use passthrough::{HostPciConfig, UsbDeviceConfig, XhciControllerConfig};
 pub use peripherals::{AudioDeviceConfig, InputDeviceConfig, IvshmemConfig, SpiceConfig};

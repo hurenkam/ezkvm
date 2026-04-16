@@ -63,7 +63,7 @@ Source: doc/backlog/BACKLOG.md
 | B-16 | Refine firmware and secure-boot mapping from efidisk metadata | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-06 | unassigned | Done |
 | B-17 | Add SATA support | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-18 | Serial port configuration | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
-| B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |

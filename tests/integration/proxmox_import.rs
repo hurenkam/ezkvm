@@ -114,6 +114,13 @@ fn fixture_cases() -> &'static [ImportFixtureCase] {
             snapshot_fixture: "proxmox_import/07-serial-backends.args",
             warning_fields: &[],
         },
+        ImportFixtureCase {
+            name: "iommu intel",
+            conf_fixture: "proxmox_import/08-iommu-intel.conf",
+            storage_fixture: None,
+            snapshot_fixture: "proxmox_import/08-iommu-intel.args",
+            warning_fields: &[],
+        },
     ]
 }
 

@@ -38,6 +38,7 @@ impl QemuManager {
         self.add_tpm_args(args)?;
         self.add_guest_agent_args(args);
         self.add_balloon_args(args);
+        self.add_iommu_args(args);
         self.add_hostpci_args(args);
         self.add_usb_args(args);
         self.add_spice_and_audio_args(args);
@@ -86,6 +87,18 @@ impl QemuManager {
                 ballooning.id.as_deref(),
                 ballooning.bus.as_deref(),
                 ballooning.addr.as_deref(),
+            );
+        }
+    }
+
+    fn add_iommu_args(&self, args: &mut QemuArgs) {
+        if let Some(iommu) = &self.config.iommu {
+            args.add_iommu(
+                &iommu.r#type,
+                &iommu.id,
+                iommu.intremap,
+                iommu.caching_mode,
+                iommu.eim,
             );
         }
     }

@@ -6,7 +6,7 @@ use super::model::{
 use crate::config::{
     AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig, DeviceConfig,
     DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, InputDeviceConfig,
-    IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
+    IommuConfig, IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
     SataControllerConfig, ScsiControllerConfig, SerialConfig, SmbiosConfig, SpiceConfig,
     SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
 };
@@ -45,6 +45,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let (mut machine, machine_options) = parse_machine_and_options(proxmox.scalars.get("machine"));
     let mut readconfig = Vec::new();
     apply_proxmox_q35_compat_if_needed(proxmox, &mut machine, &mut readconfig);
+    let iommu = map_iommu(&machine_options, proxmox.scalars.get("args"));
 
     let memory = proxmox
         .scalars
@@ -227,6 +228,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         spice,
         iscsi_disks: Vec::new(),
         hyperv: None,
+        iommu,
         options: VmOptions {
             rtc: if is_windows {
                 Some(RtcConfig {
@@ -1023,6 +1025,45 @@ fn map_displays(
     }
 
     vec![DisplayConfig { r#type, vram }]
+}
+
+fn map_iommu(machine_options: &[String], raw_args: Option<&String>) -> Option<IommuConfig> {
+    // Detect viommu=intel or viommu=amd in machine options (e.g. "q35,viommu=intel")
+    for option in machine_options {
+        if let Some(iommu_type) = option.strip_prefix("viommu=") {
+            return Some(IommuConfig {
+                r#type: iommu_type.to_string(),
+                ..Default::default()
+            });
+        }
+    }
+
+    // Detect intel-iommu or amd-iommu in raw args passthrough
+    if let Some(args) = raw_args {
+        if args.contains("intel-iommu") {
+            let intremap = args.contains("intremap=on");
+            let caching_mode = args.contains("caching-mode=on");
+            let eim = args.contains("eim=on");
+            return Some(IommuConfig {
+                r#type: "intel".to_string(),
+                id: "iommu0".to_string(),
+                intremap,
+                caching_mode,
+                eim,
+            });
+        }
+        if args.contains("amd-iommu") {
+            return Some(IommuConfig {
+                r#type: "amd".to_string(),
+                id: "iommu0".to_string(),
+                intremap: false,
+                caching_mode: false,
+                eim: false,
+            });
+        }
+    }
+
+    None
 }
 
 fn map_serials(
