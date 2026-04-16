@@ -61,6 +61,10 @@ Source: doc/backlog/BACKLOG.md
 | B-14 | Improve CPU and Hyper-V fidelity for Windows guests | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-10 | unassigned | Done |
 | B-15 | Expand network device fidelity (virtio-net-pci placement and queues) | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-11 | unassigned | Done |
 | B-16 | Refine firmware and secure-boot mapping from efidisk metadata | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-06 | unassigned | Done |
+| B-17 | Add SATA support | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-18 | Serial port configuration | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -93,6 +97,10 @@ Source: doc/backlog/BACKLOG.md
 - B-10 -> B-14
 - B-11 -> B-15
 - B-06 -> B-16
+- B-02 -> B-17
+- B-02 -> B-18
+- B-02 -> B-19
+- B-02 -> B-20
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

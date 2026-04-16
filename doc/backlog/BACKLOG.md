@@ -190,6 +190,54 @@ Acceptance Criteria:
 - Tests cover metadata-driven firmware mapping and fallback paths.
 Estimate: 2 days
 
+### B-17 Add SATA support
+Scope:
+- Add `SataControllerConfig` struct to schema and update `DriveConfig` to support `interface: sata`.
+- Extend Proxmox mapper to parse `sata0`, `sata1`, `sata2` fields from configs.
+- Add SATA controller and disk argument generation in QEMU command builder.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported Proxmox configs with sata-backed disks emit correct `-device ahci` controllers and drive attachment args.
+- Unit and integration tests cover representative SATA disk and controller combinations.
+- Schema validation enforces valid SATA IDs and bus/addr placement.
+Estimate: 3 days
+
+### B-18 Serial port configuration
+Scope:
+- Add `SerialDeviceConfig` struct to schema (parallel to DisplayConfig).
+- Extend mapper to parse `serial0`, `serial1` fields from Proxmox configs.
+- Support common serial backends: socket, file, chardev.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported Proxmox serial configs map to ezkvm SerialDeviceConfig with correct socket paths and backend types.
+- QEMU command builder emits `-chardev` and `-device isa-serial` for each configured serial port.
+- Fixtures include serial-port examples; tests validate round-trip accuracy.
+Estimate: 2 days
+
+### B-19 Support IOMMU/vIOMMU device definitions
+Scope:
+- Add `IommuConfig` struct to schema (e.g., containing `iommu_type`, `intremap`, `caching_mode`).
+- Extend mapper to detect and represent Intel IOMMU (`-device intel-iommu`) or AMD-V IOMMU setup in Proxmox args.
+- Allow explicit IOMMU placement and tuning in schema.
+Dependencies: B-02
+Acceptance Criteria:
+- Imported configs with IOMMU args emit ezkvm IOMMU representation.
+- QEMU command builder correctly generates `-device intel-iommu` with passthrough options when IOMMU is configured.
+- Schema supports IOMMU enable/disable and option overrides.
+- Tests include representative IOMMU passthrough scenarios.
+Estimate: 2 days
+
+### B-20 Full mapping of hugepages settings
+Scope:
+- Enhance hugepages mapping in schema and mapper to preserve complete Proxmox hugepage configuration (size, prealloc, mempath, NUMA binding).
+- Extend memory config to support nuanced hugepages settings (e.g., per-socket hugepage pool specifications).
+Dependencies: B-02
+Acceptance Criteria:
+- Imported Proxmox hugepages settings (including size, prealloc flags, mem-path, and host-nodes affinity) round-trip to ezkvm representation.
+- QEMU command builder emits correct `-object memory-backend-file` args with all applicable options.
+- Tests cover default hugepages, custom sizes (2M, 1G), and NUMA-bound hugepage allocation.
+Estimate: 2 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
