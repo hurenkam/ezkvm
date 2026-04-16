@@ -8,7 +8,7 @@ use crate::config::{
     DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, InputDeviceConfig,
     IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
     ScsiControllerConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig, UsbDeviceConfig,
-    VmConfig, VmOptions,
+    VmConfig, VmOptions, XhciControllerConfig,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -42,7 +42,9 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .cloned()
         .unwrap_or_else(|| "imported-vm".to_string());
     let architecture = map_architecture(proxmox.scalars.get("arch"), &mut warnings);
-    let (machine, machine_options) = parse_machine_and_options(proxmox.scalars.get("machine"));
+    let (mut machine, machine_options) = parse_machine_and_options(proxmox.scalars.get("machine"));
+    let mut readconfig = Vec::new();
+    apply_proxmox_q35_compat_if_needed(proxmox, &mut machine, &mut readconfig);
 
     let memory = proxmox
         .scalars
@@ -76,6 +78,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let smbios_uuid = parse_smbios_uuid(&proxmox.scalars);
 
     let scsi_controllers = map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
+    let inferred_vmid = infer_proxmox_vmid(proxmox);
     let mut drives = proxmox
         .disks
         .iter()
@@ -84,7 +87,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let mut networks = proxmox
         .networks
         .iter()
-        .map(|network| map_network(network, &mut warnings))
+        .map(|network| map_network(network, inferred_vmid, is_windows, &mut warnings))
         .collect::<Vec<_>>();
 
     // Apply boot indices from parsed boot order
@@ -126,19 +129,36 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .iter()
         .flat_map(|entry| map_host_pci_entries(entry, &explicit_host_functions))
         .collect::<Vec<_>>();
-    let host_usb = proxmox.usb.iter().map(map_usb).collect::<Vec<_>>();
+    let use_explicit_xhci = !proxmox.usb.is_empty();
+    let host_usb = proxmox
+        .usb
+        .iter()
+        .map(|entry| map_usb(entry, use_explicit_xhci))
+        .collect::<Vec<_>>();
 
     let ballooning = Some(BallooningConfig {
         enabled: true,
-        free_page_reporting: false,
+        free_page_reporting: is_windows,
         model: "virtio-balloon-pci".to_string(),
-        id: None,
-        bus: None,
-        addr: None,
+        id: if is_windows {
+            Some("balloon0".to_string())
+        } else {
+            None
+        },
+        bus: if is_windows {
+            Some("pci.0".to_string())
+        } else {
+            None
+        },
+        addr: if is_windows {
+            Some("0x3".to_string())
+        } else {
+            None
+        },
     });
 
-    let tpm = map_tpm(&proxmox.scalars, &boot);
-    let guest_agent = map_guest_agent(&proxmox.scalars);
+    let tpm = map_tpm(&proxmox.scalars, storage_config, inferred_vmid);
+    let guest_agent = map_guest_agent(&proxmox.scalars, inferred_vmid);
 
     let smbios = smbios_uuid.map(|uuid| SmbiosConfig {
         manufacturer: None,
@@ -173,7 +193,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             boot,
             tpm,
             smbios,
-            readconfig: Vec::new(),
+            readconfig,
         },
         devices: DeviceConfig {
             drives,
@@ -185,7 +205,17 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         },
         controllers: ControllersConfig {
             scsi: scsi_controllers,
-            xhci: Vec::new(),
+            xhci: if use_explicit_xhci {
+                vec![XhciControllerConfig {
+                    id: "xhci".to_string(),
+                    p2: Some(15),
+                    p3: Some(15),
+                    bus: Some("pci.1".to_string()),
+                    addr: Some("0x1b".to_string()),
+                }]
+            } else {
+                Vec::new()
+            },
         },
         host: HostConfig {
             pci: host_pci,
@@ -281,6 +311,57 @@ fn parse_cpu_model_and_features(cpu: Option<&String>) -> (String, Vec<String>) {
     let model = parts.remove(0).to_string();
     let features = parts.iter().map(|p| p.to_string()).collect();
     (model, features)
+}
+
+fn apply_proxmox_q35_compat_if_needed(
+    proxmox: &ProxmoxVmConfig,
+    machine: &mut String,
+    readconfig: &mut Vec<String>,
+) {
+    const PVE_Q35_READCONFIG: &str = "/usr/share/qemu-server/pve-q35-4.0.cfg";
+
+    if !is_q35_machine(machine) {
+        return;
+    }
+
+    let has_pve_machine_hint = proxmox
+        .scalars
+        .get("machine")
+        .is_some_and(|value| value.contains("+pve"));
+
+    let has_topology_bus_hints = !proxmox.host_pci.is_empty()
+        || proxmox.host_pci.iter().any(|entry| {
+            entry.options.get("bus").is_some_and(|bus| {
+                bus.starts_with("pci.")
+                    || bus.starts_with("pcie.")
+                    || bus.starts_with("ich9-pcie-port")
+            })
+        })
+        || proxmox.scalars.get("args").is_some_and(|args| {
+            args.contains("bus=pci.")
+                || args.contains("bus=pcie.")
+                || args.contains("ich9-pcie-port")
+        });
+
+    if !has_pve_machine_hint && !has_topology_bus_hints {
+        return;
+    }
+
+    if !machine.contains("+pve") {
+        if machine == "q35" {
+            *machine = "pc-q35-8.1+pve0".to_string();
+        } else {
+            *machine = format!("{}+pve0", machine);
+        }
+    }
+
+    if !readconfig.iter().any(|path| path == PVE_Q35_READCONFIG) {
+        readconfig.push(PVE_Q35_READCONFIG.to_string());
+    }
+}
+
+fn is_q35_machine(machine: &str) -> bool {
+    machine == "q35" || machine.contains("q35")
 }
 
 fn map_vcpus(scalars: &BTreeMap<String, String>) -> u32 {
@@ -428,7 +509,11 @@ fn map_drive(
             None
         },
         boot_index,
-        scsi_id: None,
+        scsi_id: if disk.bus == "scsi" {
+            Some(disk.index as u32)
+        } else {
+            None
+        },
         rotation_rate: if ssd && disk.bus == "scsi" {
             Some(1)
         } else {
@@ -503,10 +588,28 @@ fn resolve_dir_volume(base_path: &str, volume: &str) -> String {
     format!("{}/{}", trimmed_base, volume)
 }
 
-fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) -> NetworkConfig {
+fn map_network(
+    network: &ProxmoxNetEntry,
+    vmid: Option<u32>,
+    is_windows: bool,
+    warnings: &mut Vec<MappingWarning>,
+) -> NetworkConfig {
     let model = match network.model.as_str() {
-        "virtio" => "virtio-net".to_string(),
-        "virtio-net" | "virtio-net-pci" | "e1000" | "e1000e" | "rtl8139" => network.model.clone(),
+        "virtio" => {
+            if is_windows {
+                "virtio-net-pci".to_string()
+            } else {
+                "virtio-net".to_string()
+            }
+        }
+        "virtio-net" => {
+            if is_windows {
+                "virtio-net-pci".to_string()
+            } else {
+                "virtio-net".to_string()
+            }
+        }
+        "virtio-net-pci" | "e1000" | "e1000e" | "rtl8139" => network.model.clone(),
         other => {
             warnings.push(MappingWarning {
                 source_field: network.key.clone(),
@@ -526,7 +629,13 @@ fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) ->
         "user".to_string()
     };
 
-    let ifname = network.options.get("ifname").cloned();
+    let ifname = network.options.get("ifname").cloned().or_else(|| {
+        if has_bridge {
+            vmid.map(|id| format!("tap{}i{}", id, network.index))
+        } else {
+            None
+        }
+    });
     let script = if has_bridge {
         network
             .options
@@ -570,17 +679,97 @@ fn map_network(network: &ProxmoxNetEntry, warnings: &mut Vec<MappingWarning>) ->
         extra: BTreeMap::new(),
     };
 
+    // B-15: Extract queue sizes and PCI placement details
+    let rx_queue_size = network
+        .options
+        .get("rx_queue_size")
+        .or_else(|| network.options.get("rxqueuesz"))
+        .and_then(|v| v.parse::<u32>().ok())
+        .or_else(|| {
+            if is_windows && model == "virtio-net-pci" {
+                Some(1024)
+            } else {
+                None
+            }
+        });
+
+    let tx_queue_size = network
+        .options
+        .get("tx_queue_size")
+        .or_else(|| network.options.get("txqueuesz"))
+        .and_then(|v| v.parse::<u32>().ok())
+        .or_else(|| {
+            if is_windows && model == "virtio-net-pci" {
+                Some(256)
+            } else {
+                None
+            }
+        });
+
+    let bus = network.options.get("bus").cloned().or_else(|| {
+        if is_windows && model == "virtio-net-pci" {
+            Some("pci.0".to_string())
+        } else {
+            None
+        }
+    });
+    let addr = network.options.get("addr").cloned().or_else(|| {
+        if is_windows && model == "virtio-net-pci" {
+            Some(format!("0x{:x}", 0x12 + network.index as u32))
+        } else {
+            None
+        }
+    });
+
     NetworkConfig {
         id: network.key.clone(),
         model,
         backend: Some(backend),
         mac: network.mac.clone(),
-        rx_queue_size: None,
-        tx_queue_size: None,
+        rx_queue_size,
+        tx_queue_size,
         boot_index: None,
-        bus: None,
-        addr: None,
+        bus,
+        addr,
     }
+}
+
+fn infer_proxmox_vmid(proxmox: &ProxmoxVmConfig) -> Option<u32> {
+    if let Some(vmid) = proxmox
+        .scalars
+        .get("vmid")
+        .and_then(|value| value.trim().parse::<u32>().ok())
+    {
+        return Some(vmid);
+    }
+
+    for source in proxmox.disks.iter().map(|disk| disk.source.as_str()) {
+        if let Some(vmid) = extract_vmid_from_source(source) {
+            return Some(vmid);
+        }
+    }
+
+    for key in ["efidisk0", "tpmstate0"] {
+        if let Some(raw) = proxmox.scalars.get(key) {
+            let (source, _) = parse_source_and_options(raw);
+            if let Some(vmid) = extract_vmid_from_source(source) {
+                return Some(vmid);
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_vmid_from_source(source: &str) -> Option<u32> {
+    let marker = "vm-";
+    let start = source.find(marker)? + marker.len();
+    let tail = &source[start..];
+    let digit_count = tail.chars().take_while(|ch| ch.is_ascii_digit()).count();
+    if digit_count == 0 {
+        return None;
+    }
+    tail[..digit_count].parse::<u32>().ok()
 }
 
 fn map_host_pci_entries(
@@ -593,9 +782,14 @@ fn map_host_pci_entries(
         .is_some_and(|(_, slot)| slot.contains('.'));
     let base_device = normalize_host_pci_device(&entry.host);
     let pcie = is_enabled(entry.options.get("pcie"));
-    let x_vga = is_enabled(entry.options.get("x-vga")) || is_enabled(entry.options.get("x_vga"));
+    let requested_x_vga =
+        is_enabled(entry.options.get("x-vga")) || is_enabled(entry.options.get("x_vga"));
+    // Proxmox frequently expands hostpciN: <slot> into .0/.1 pairs without carrying x-vga to
+    // the generated command line. Keep expansion behavior, but only emit x-vga when the source
+    // explicitly targets a concrete PCI function.
+    let x_vga = has_explicit_function && requested_x_vga;
     let wants_multifunction = is_enabled(entry.options.get("multifunction"));
-    let should_expand_pair = !has_explicit_function && (x_vga || wants_multifunction);
+    let should_expand_pair = !has_explicit_function && (requested_x_vga || wants_multifunction);
 
     let default_bus = if should_expand_pair {
         Some("ich9-pcie-port-1".to_string())
@@ -683,7 +877,7 @@ fn increment_function_address(addr: &str) -> Option<String> {
         .map(|prefix| format!("{}.1", prefix))
 }
 
-fn map_usb(entry: &ProxmoxUsbEntry) -> UsbDeviceConfig {
+fn map_usb(entry: &ProxmoxUsbEntry, place_on_xhci: bool) -> UsbDeviceConfig {
     let mut host = entry.host.clone();
     if let Some(value) = host.strip_prefix("host=") {
         host = value.to_string();
@@ -706,17 +900,34 @@ fn map_usb(entry: &ProxmoxUsbEntry) -> UsbDeviceConfig {
         host: mapped_host,
         hostbus: hostbus.or_else(|| entry.options.get("hostbus").cloned()),
         hostport: hostport.or_else(|| entry.options.get("hostport").cloned()),
-        bus: entry.options.get("bus").cloned(),
-        port: entry.options.get("port").cloned(),
+        bus: entry.options.get("bus").cloned().or_else(|| {
+            if place_on_xhci {
+                Some("xhci.0".to_string())
+            } else {
+                None
+            }
+        }),
+        port: entry.options.get("port").cloned().or_else(|| {
+            if place_on_xhci {
+                Some((entry.index + 1).to_string())
+            } else {
+                None
+            }
+        }),
     }
 }
 
-fn map_tpm(scalars: &BTreeMap<String, String>, _boot: &BootConfig) -> Option<TpmConfig> {
+fn map_tpm(
+    scalars: &BTreeMap<String, String>,
+    storage_config: Option<&ProxmoxStorageConfig>,
+    vmid: Option<u32>,
+) -> Option<TpmConfig> {
     let (key, raw) = scalars
         .iter()
         .find(|(k, _)| k.starts_with("tpmstate"))
         .map(|(k, v)| (k.as_str(), v.as_str()))?;
 
+    let (source, _) = parse_source_and_options(raw);
     let mut version = "2.0".to_string();
     for token in raw.split(',') {
         let token = token.trim();
@@ -725,14 +936,29 @@ fn map_tpm(scalars: &BTreeMap<String, String>, _boot: &BootConfig) -> Option<Tpm
         }
     }
 
+    let state_backend_uri = if source.is_empty() || source == "none" {
+        None
+    } else {
+        let resolved =
+            resolve_volume_reference(source, storage_config).unwrap_or_else(|| source.to_string());
+        if resolved.starts_with('/') {
+            Some(resolved)
+        } else {
+            None
+        }
+    };
+
     let model = "tpm-tis".to_string();
 
     Some(TpmConfig {
         version,
         backend: "emulator".to_string(),
-        state_path: Some(format!("/var/run/ezkvm/{}-tpm.socket", key)),
+        state_path: Some(match vmid {
+            Some(id) => format!("/var/run/qemu-server/{}.swtpm", id),
+            None => format!("/var/run/ezkvm/{}-tpm.socket", key),
+        }),
         state_dir: None,
-        state_backend_uri: None,
+        state_backend_uri,
         model,
     })
 }
@@ -829,6 +1055,32 @@ fn apply_efidisk0_to_boot(
     }
 
     boot.uefi_vars_size = map_efidisk_vars_size(&options);
+
+    // B-16: Map Microsoft certificate support from efidisk0 metadata
+    if let Some(ms_cert) = options.get("ms-cert") {
+        boot.uefi_ms_cert = Some(ms_cert.clone());
+        if is_ms_cert_enabled(ms_cert) {
+            boot.secure_boot = true;
+        }
+    }
+
+    // B-16: Map pre-enrolled keys indicator from efidisk0 metadata
+    if let Some(pek) = options.get("pre-enrolled-keys") {
+        boot.uefi_pre_enrolled_keys = Some(pek.clone());
+        if is_enabled(Some(pek)) {
+            boot.secure_boot = true;
+        }
+    }
+}
+
+fn is_ms_cert_enabled(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    !normalized.is_empty()
+        && normalized != "0"
+        && normalized != "off"
+        && normalized != "false"
+        && normalized != "no"
+        && normalized != "none"
 }
 
 fn parse_source_and_options(raw: &str) -> (&str, BTreeMap<String, String>) {
@@ -975,7 +1227,10 @@ fn map_audio_and_spice(
     )
 }
 
-fn map_guest_agent(scalars: &BTreeMap<String, String>) -> Option<GuestAgentConfig> {
+fn map_guest_agent(
+    scalars: &BTreeMap<String, String>,
+    vmid: Option<u32>,
+) -> Option<GuestAgentConfig> {
     let raw = scalars.get("agent")?.trim();
     if raw.is_empty() {
         return None;
@@ -998,6 +1253,7 @@ fn map_guest_agent(scalars: &BTreeMap<String, String>) -> Option<GuestAgentConfi
         .get("path")
         .or_else(|| options.get("socket"))
         .cloned()
+        .or_else(|| vmid.map(|id| format!("/var/run/qemu-server/{}.qga", id)))
         .or_else(|| Some("/var/run/qemu-server/qga.sock".to_string()));
 
     Some(GuestAgentConfig {
@@ -1419,6 +1675,21 @@ mod tests {
     }
 
     #[test]
+    fn infers_tap_ifname_from_vmid_for_bridge_networks() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-net-ifname
+            scsi0: local-lvm:vm-108-disk-0
+            net0: virtio=52:54:00:12:34:56,bridge=vmbr0
+            "#,
+        );
+
+        let net = &cfg.devices.networks[0];
+        let backend = net.backend.as_ref().expect("backend must be set");
+        assert_eq!(backend.ifname.as_deref(), Some("tap108i0"));
+    }
+
+    #[test]
     fn maps_host_pci_and_usb() {
         let (_, cfg) = map_and_validate(
             r#"
@@ -1429,11 +1700,17 @@ mod tests {
             "#,
         );
 
+        assert_eq!(cfg.system.machine, "pc-q35-8.1+pve0");
+        assert_eq!(
+            cfg.system.readconfig,
+            vec!["/usr/share/qemu-server/pve-q35-4.0.cfg".to_string()]
+        );
+
         assert_eq!(cfg.host.pci.len(), 2);
         assert_eq!(cfg.host.pci[0].device, "0000:03:00.0");
         assert_eq!(cfg.host.pci[0].id, "hostpci0.0");
         assert!(cfg.host.pci[0].pcie);
-        assert!(cfg.host.pci[0].x_vga);
+        assert!(!cfg.host.pci[0].x_vga);
         assert!(cfg.host.pci[0].multifunction);
         assert_eq!(cfg.host.pci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
         assert_eq!(cfg.host.pci[0].addr.as_deref(), Some("0x0.0"));
@@ -1465,6 +1742,7 @@ mod tests {
         assert_eq!(cfg.host.pci.len(), 2);
         assert_eq!(cfg.host.pci[0].id, "hostpci0");
         assert_eq!(cfg.host.pci[0].device, "0000:03:00.0");
+        assert!(cfg.host.pci[0].x_vga);
         assert_eq!(cfg.host.pci[1].id, "hostpci1");
         assert_eq!(cfg.host.pci[1].device, "0000:03:00.1");
     }
@@ -1483,6 +1761,31 @@ mod tests {
         assert_eq!(tpm.version, "2.0");
         assert_eq!(tpm.backend, "emulator");
         assert_eq!(tpm.model, "tpm-tis");
+        assert_eq!(tpm.state_backend_uri, None);
+    }
+
+    #[test]
+    fn maps_tpm_backend_uri_with_storage_resolution() {
+        let (_, cfg) = map_and_validate_with_storage(
+            r#"
+            name: vm-tpm
+            bios: ovmf
+            tpmstate0: vm1-pool:vm-108-tpmstate,size=4M,version=v2.0
+            "#,
+            r#"
+            lvmthin: vm1-pool
+                thinpool pool
+                vgname vm1
+                content images,rootdir
+            "#,
+        );
+
+        let tpm = cfg.system.tpm.as_ref().expect("tpm should be mapped");
+        assert_eq!(tpm.version, "2.0");
+        assert_eq!(
+            tpm.state_backend_uri.as_deref(),
+            Some("/dev/vm1/vm-108-tpmstate")
+        );
     }
 
     #[test]
@@ -1706,5 +2009,74 @@ mod tests {
                 .message
                 .contains("unsupported Proxmox architecture")
         );
+    }
+
+    #[test]
+    fn b14_maps_cpu_hyperv_features_for_windows_guests() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-windows-hyperv
+            cores: 4
+            cpu: host,+hyperv-vendor-id,+hyperv-enlightened-vmx,+hyperv-time,+hyperv-synic
+            "#,
+        );
+
+        let cpu = &cfg.system.cpu;
+        assert_eq!(cpu.vcpus, 4);
+        assert_eq!(cpu.model, "host");
+        assert!(cpu.features.contains(&"+hyperv-vendor-id".to_string()));
+        assert!(
+            cpu.features
+                .contains(&"+hyperv-enlightened-vmx".to_string())
+        );
+        assert!(cpu.features.contains(&"+hyperv-time".to_string()));
+        assert!(cpu.features.contains(&"+hyperv-synic".to_string()));
+    }
+
+    #[test]
+    fn b15_maps_network_device_queue_sizes_and_pci_placement() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-net-queues
+            net0: virtio=52:54:00:12:34:56,bridge=vmbr0,rx_queue_size=256,tx_queue_size=256,bus=pci.0,addr=1f.0
+            "#,
+        );
+
+        assert_eq!(cfg.devices.networks.len(), 1);
+        let net = &cfg.devices.networks[0];
+        assert_eq!(net.rx_queue_size, Some(256));
+        assert_eq!(net.tx_queue_size, Some(256));
+        assert_eq!(net.bus.as_deref(), Some("pci.0"));
+        assert_eq!(net.addr.as_deref(), Some("1f.0"));
+    }
+
+    #[test]
+    fn b16_maps_efidisk0_with_ms_cert_and_pre_enrolled_keys() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-efi-secure
+            efidisk0: /var/lib/vm/vars.fd,efitype=4m,ms-cert=2023,pre-enrolled-keys=1
+            "#,
+        );
+
+        let boot = &cfg.system.boot;
+        assert_eq!(boot.uefi_vars.as_deref(), Some("/var/lib/vm/vars.fd"));
+        assert_eq!(boot.uefi_vars_size, Some(540_672));
+        assert_eq!(boot.uefi_ms_cert.as_deref(), Some("2023"));
+        assert_eq!(boot.uefi_pre_enrolled_keys.as_deref(), Some("1"));
+        assert!(boot.secure_boot);
+    }
+
+    #[test]
+    fn efidisk_metadata_can_disable_secure_boot_signal() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-efi-non-secure
+            efidisk0: /var/lib/vm/vars.fd,efitype=4m,ms-cert=none,pre-enrolled-keys=0
+            "#,
+        );
+
+        let boot = &cfg.system.boot;
+        assert!(!boot.secure_boot);
     }
 }

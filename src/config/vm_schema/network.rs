@@ -66,13 +66,10 @@ impl NetworkBackendConfig {
         if let Some(ifname) = &self.ifname {
             parts.push(format!("ifname={}", ifname));
         }
-        if let Some(bridge) = &self.bridge {
-            let key = if self.backend_type == "bridge" {
-                "br"
-            } else {
-                "bridge"
-            };
-            parts.push(format!("{}={}", key, bridge));
+        if self.backend_type == "bridge"
+            && let Some(bridge) = &self.bridge
+        {
+            parts.push(format!("br={}", bridge));
         }
         if let Some(script) = &self.script {
             parts.push(format!("script={}", script));

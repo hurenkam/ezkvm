@@ -119,5 +119,63 @@ pub(super) fn build_tpmstate_arg(
         }
         default
     };
+
+    if create_default_dir {
+        std::fs::create_dir_all(&state_dir_path)?;
+    }
+
     Ok(format!("dir={}", state_dir_path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_tpmstate_arg;
+    use crate::config::TpmConfig;
+    use std::path::Path;
+
+    fn unique_temp_path(suffix: &str) -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("ezkvm-{}-{}", suffix, nanos))
+    }
+
+    #[test]
+    fn creates_explicit_state_dir_when_requested() {
+        let explicit_dir = unique_temp_path("swtpm-explicit");
+        let tpm = TpmConfig {
+            version: "2.0".to_string(),
+            backend: "emulator".to_string(),
+            state_path: None,
+            state_dir: Some(explicit_dir.to_string_lossy().to_string()),
+            state_backend_uri: None,
+            model: "tpm-tis".to_string(),
+        };
+
+        let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
+            .expect("building tpmstate arg should succeed");
+        assert!(arg.starts_with("dir="));
+        assert!(explicit_dir.is_dir());
+
+        let _ = std::fs::remove_dir_all(&explicit_dir);
+    }
+
+    #[test]
+    fn does_not_create_explicit_state_dir_for_preview_mode() {
+        let explicit_dir = unique_temp_path("swtpm-explicit-preview");
+        let tpm = TpmConfig {
+            version: "2.0".to_string(),
+            backend: "emulator".to_string(),
+            state_path: None,
+            state_dir: Some(explicit_dir.to_string_lossy().to_string()),
+            state_backend_uri: None,
+            model: "tpm-tis".to_string(),
+        };
+
+        let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), false)
+            .expect("building tpmstate arg should succeed");
+        assert!(arg.starts_with("dir="));
+        assert!(!explicit_dir.exists());
+    }
 }

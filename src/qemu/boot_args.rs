@@ -1,4 +1,5 @@
 use super::{QemuManager, types::QemuArgs};
+use std::path::Path;
 
 impl QemuManager {
     /// Build boot-related arguments
@@ -93,9 +94,29 @@ impl QemuManager {
                 .locations
                 .ovmf_dir
                 .as_ref()
-                .map(|ovmf_dir| format!("{}/OVMF.fd", ovmf_dir))
+                .map(|ovmf_dir| {
+                    resolve_ovmf_code_from_dir(ovmf_dir, self.config.system_boot().secure_boot)
+                })
         })
     }
+}
+
+fn resolve_ovmf_code_from_dir(ovmf_dir: &str, secure_boot: bool) -> String {
+    let preferred_files = if secure_boot {
+        ["OVMF_CODE_4M.secboot.fd", "OVMF_CODE.secboot.fd", "OVMF.fd"]
+    } else {
+        ["OVMF_CODE_4M.fd", "OVMF_CODE.fd", "OVMF.fd"]
+    };
+
+    for file in preferred_files {
+        let candidate = format!("{}/{}", ovmf_dir, file);
+        if Path::new(&candidate).exists() {
+            return candidate;
+        }
+    }
+
+    // Fall back to the most compatible default path even if it is missing.
+    format!("{}/OVMF.fd", ovmf_dir)
 }
 
 fn map_boot_device(device: &str) -> String {
@@ -105,5 +126,46 @@ fn map_boot_device(device: &str) -> String {
         "floppy" => "a".to_string(),
         "network" => "n".to_string(),
         _ => device.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_ovmf_code_from_dir;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("ezkvm-{}-{}", label, nanos))
+    }
+
+    #[test]
+    fn prefers_non_secure_ovmf_code_4m_file_when_present() {
+        let dir = unique_temp_dir("ovmf-non-secure");
+        std::fs::create_dir_all(&dir).expect("temp dir should be creatable");
+        let file = dir.join("OVMF_CODE_4M.fd");
+        std::fs::write(&file, b"mock").expect("mock firmware file should be writable");
+
+        let resolved = resolve_ovmf_code_from_dir(&dir.to_string_lossy(), false);
+        assert_eq!(resolved, file.to_string_lossy());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prefers_secure_ovmf_code_4m_file_when_present() {
+        let dir = unique_temp_dir("ovmf-secure");
+        std::fs::create_dir_all(&dir).expect("temp dir should be creatable");
+        let file = dir.join("OVMF_CODE_4M.secboot.fd");
+        std::fs::write(&file, b"mock").expect("mock firmware file should be writable");
+
+        let resolved = resolve_ovmf_code_from_dir(&dir.to_string_lossy(), true);
+        assert_eq!(resolved, file.to_string_lossy());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

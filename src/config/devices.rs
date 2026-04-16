@@ -103,6 +103,37 @@ mod tests {
     }
 
     #[test]
+    fn test_scsi_ssd_does_not_emit_unsupported_drive_option() {
+        let drive = DriveConfig {
+            id: "scsi0".to_string(),
+            path: "/dev/vm1/vm-108-boot".to_string(),
+            interface: "scsi".to_string(),
+            r#type: "disk".to_string(),
+            format: "raw".to_string(),
+            readonly: false,
+            discard: true,
+            ssd: true,
+            cache: Some("none".to_string()),
+            aio: Some("io_uring".to_string()),
+            detect_zeroes: Some("unmap".to_string()),
+            controller: Some("scsihw0".to_string()),
+            boot_index: Some(100),
+            scsi_id: Some(0),
+            rotation_rate: Some(1),
+            bus: None,
+            unit: None,
+        };
+
+        let args = QemuArgs::from(drive).into_inner();
+        assert_eq!(args[0], "-drive");
+        assert!(!args[1].contains(",ssd=on"));
+        assert!(args[1].contains("file=/dev/vm1/vm-108-boot,if=none,id=drive-scsi0,format=raw"));
+        assert_eq!(args[2], "-device");
+        assert!(args[3].contains("scsi-hd,drive=drive-scsi0,id=scsi0"));
+        assert!(args[3].contains(",rotation_rate=1"));
+    }
+
+    #[test]
     fn test_ide_cdrom_with_bus_and_unit() {
         let drive = DriveConfig {
             id: "ide2".to_string(),

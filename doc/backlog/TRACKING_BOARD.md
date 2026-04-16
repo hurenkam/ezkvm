@@ -58,6 +58,9 @@ Source: doc/backlog/BACKLOG.md
 | B-11 | Improve network backend fidelity for Proxmox bridge/tap | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
 | B-12 | Expand host PCI fidelity for multifunction devices | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-02 | unassigned | Done |
 | B-13 | Add wakiza parity fixture and regression test | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-06, B-07, B-08, B-09, B-10, B-11, B-12 | unassigned | Done |
+| B-14 | Improve CPU and Hyper-V fidelity for Windows guests | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-10 | unassigned | Done |
+| B-15 | Expand network device fidelity (virtio-net-pci placement and queues) | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-11 | unassigned | Done |
+| B-16 | Refine firmware and secure-boot mapping from efidisk metadata | B | Phase-1-Features | epic:proxmox, phase:1-features, ready | B-06 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -87,6 +90,9 @@ Source: doc/backlog/BACKLOG.md
 - B-02 -> B-11
 - B-02 -> B-12
 - (B-06 and B-07 and B-08 and B-09 and B-10 and B-11 and B-12) -> B-13
+- B-10 -> B-14
+- B-11 -> B-15
+- B-06 -> B-16
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

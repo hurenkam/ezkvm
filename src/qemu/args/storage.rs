@@ -20,7 +20,7 @@ impl QemuArgs {
         format: &str,
         readonly: bool,
         discard: bool,
-        ssd: bool,
+        _ssd: bool,
         controller: Option<&str>,
     ) {
         self.push_str("-drive");
@@ -32,10 +32,6 @@ impl QemuArgs {
 
         if discard {
             spec.push_str(",discard=unmap");
-        }
-
-        if ssd {
-            spec.push_str(",ssd=on");
         }
 
         if let Some(controller) = controller {

@@ -191,3 +191,47 @@
  - stale/variable NVRAM state
 
  After correcting those issues and converging on Proxmox runtime parity, `wakiza.yaml` now boots successfully in ezkvm with GPU passthrough, Looking Glass, and RDP working.
+
+## Imported Proxmox Config Parity Findings (2026-04-16)
+
+These findings came from validating `import-proxmox` output against VM 108 behavior and command shape.
+
+### Symptoms This Specifically Addressed
+- VM process reached `running`, but guest stayed inaccessible from both Looking Glass and RDP.
+- Tap traffic stayed very low and guest-service signals were missing, indicating pre-service boot stall behavior.
+
+### Mapper Changes That Mattered For Imported Windows Guests
+1. Network model and queue defaults:
+- map Proxmox `virtio` NICs to `virtio-net-pci` for Windows imports
+- default `rx_queue_size=1024` and `tx_queue_size=256` when not explicitly set
+- default PCI placement `bus=pci.0,addr=0x12` (index-based for additional NICs)
+
+2. SCSI drive identity parity:
+- emit `scsi-id=<disk.index>` for SCSI drives (`scsi-id=0`, `scsi-id=1`, ...)
+
+3. USB/xHCI deterministic topology:
+- synthesize explicit xHCI controller when USB passthrough devices are present
+- use `qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b`
+- place USB host devices on `xhci.0` with deterministic sequential ports (`port=1`, `port=2`, ...)
+
+4. Balloon device parity for Windows imports:
+- emit `virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x3,free-page-reporting=on`
+
+5. VMID-aware socket paths:
+- QGA chardev path: `/var/run/qemu-server/<vmid>.qga`
+- TPM socket path: `/var/run/qemu-server/<vmid>.swtpm`
+
+### Additional Import Reliability Notes
+- Do not emit `bridge=` on QEMU `-netdev tap`; it is not a valid tap netdev option.
+- Preserve VMID-aware tap ifname synthesis for Proxmox-style defaults (for example `tap108i0`) when not explicitly provided.
+
+### Verification Snapshot
+Validated via dry-run command inspection that imported 108 output includes all critical fragments:
+- `virtio-net-pci` with queue sizes and expected PCI placement
+- `scsi-id=0` and `scsi-id=1`
+- explicit xHCI placement and USB port binding
+- VMID-aware QGA and TPM socket paths
+- Windows-parity balloon device options
+
+### Practical Takeaway
+For imported Windows passthrough VMs, device-shape parity (NIC model/options, SCSI IDs, USB topology, balloon options, socket naming) can determine whether the guest reaches service startup even when QEMU reports `running`.

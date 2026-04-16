@@ -75,10 +75,7 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
         );
     }
 
-    let generated_only_fragments = [
-        "bridge=vmbr0",
-        "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8",
-    ];
+    let generated_only_fragments = ["virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8"];
     for fragment in generated_only_fragments {
         assert!(
             generated.contains(fragment),

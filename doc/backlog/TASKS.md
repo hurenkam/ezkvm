@@ -4,6 +4,18 @@
 
 ## Postponed Items
 
+### Proxmox Parity: Command Diagnostics
+- [ ] Add a parity report command to generate detailed diff between imported config's generated QEMU args and a reference Proxmox command output
+- [ ] Would help users understand what features are not yet fully preserved during import
+
+### Proxmox Parity: Runtime Path Compatibility
+- [ ] Extend import mapping to handle Proxmox runtime paths and environment-specific configurations  
+- [ ] Includes path resolution for firmware, storage, and resource references specific to Proxmox deployment
+
+### Proxmox Parity: Compatibility Profile Mode
+- [ ] Implement an opt-in `--proxmox-compat` profile mode that prioritizes Proxmox-specific feature preservation over portable defaults
+- [ ] Allows users to generate configs more closely matching original Proxmox behavior when needed for specific use cases
+
 ### Profile System
 - [ ] Support multiple profile search directories in priority order
 

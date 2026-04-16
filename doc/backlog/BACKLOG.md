@@ -160,6 +160,36 @@ Acceptance Criteria:
 - Fails on regressions in efidisk/audio/agent/args/network/machine/cpu/hostpci coverage.
 Estimate: 2 days
 
+### B-14 Improve CPU and Hyper-V fidelity for Windows guests
+Scope:
+- Add import mapping and/or policy support to preserve representative Hyper-V CPU feature bundles used by Proxmox Windows workloads.
+- Keep default behavior portable while allowing higher Proxmox compatibility where representable.
+Dependencies: B-10
+Acceptance Criteria:
+- Imported Windows guest configs can emit validated Hyper-V feature flags required by representative Proxmox examples.
+- Tests cover both default portable output and compatibility-preserving output.
+Estimate: 3 days
+
+### B-15 Expand network device fidelity (virtio-net-pci placement and queues)
+Scope:
+- Extend network import/output mapping to preserve queue sizes and optional explicit PCI placement where present in Proxmox command behavior.
+- Preserve deterministic defaults when source data is absent.
+Dependencies: B-11
+Acceptance Criteria:
+- Imported representative bridge/tap configs preserve queue-size settings and placement details when available.
+- Regression tests verify generated args include expected net device model/options.
+Estimate: 3 days
+
+### B-16 Refine firmware and secure-boot mapping from efidisk metadata
+Scope:
+- Improve OVMF/secure-boot related mapping using Proxmox `efidisk0` metadata (for example `ms-cert`, `pre-enrolled-keys`) where safely representable.
+- Keep current default fallback behavior when metadata is incomplete or unsupported.
+Dependencies: B-06
+Acceptance Criteria:
+- Imported configs with secure-boot-related efidisk metadata map to expected firmware behavior or emit explicit structured warnings when not representable.
+- Tests cover metadata-driven firmware mapping and fallback paths.
+Estimate: 2 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy

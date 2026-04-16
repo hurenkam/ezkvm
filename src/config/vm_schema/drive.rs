@@ -145,10 +145,6 @@ impl From<DriveConfig> for QemuArgs {
             drive_parts.push("discard=unmap".to_string());
         }
 
-        if has_path && drive.ssd {
-            drive_parts.push("ssd=on".to_string());
-        }
-
         if has_path {
             if let Some(cache) = drive.cache.as_ref() {
                 drive_parts.push(format!("cache={}", cache));

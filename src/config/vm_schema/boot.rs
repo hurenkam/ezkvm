@@ -61,4 +61,12 @@ pub struct BootConfig {
     /// Enable secure boot
     #[serde(default, skip_serializing_if = "is_false")]
     pub secure_boot: bool,
+
+    /// Microsoft certificate support indicator (e.g., from Proxmox efidisk0 ms-cert option)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uefi_ms_cert: Option<String>,
+
+    /// Pre-enrolled keys indicator (e.g., from Proxmox efidisk0 pre-enrolled-keys option)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uefi_pre_enrolled_keys: Option<String>,
 }
