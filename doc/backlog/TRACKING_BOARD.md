@@ -64,7 +64,7 @@ Source: doc/backlog/BACKLOG.md
 | B-17 | Add SATA support | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-18 | Serial port configuration | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
-| B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Todo |
+| B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |

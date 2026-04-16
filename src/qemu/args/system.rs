@@ -47,7 +47,7 @@ impl QemuArgs {
         self.push(format!("vmgenid,guid={}", generation_id));
     }
 
-    /// Add NUMA node configuration
+    /// Add NUMA node configuration with optional memory-backend binding
     pub fn add_numa_node(
         &mut self,
         node_id: u32,
@@ -69,6 +69,36 @@ impl QemuArgs {
             self.push_str("-numa");
             self.push(format!("cpu,node-id={},socket-id={}", node_id, cpu));
         }
+    }
+
+    /// Add NUMA node with hugepages memory-backend binding
+    pub fn add_numa_node_with_memdev(&mut self, node_id: u32, cpus: &[u32], memdev_id: &str) {
+        self.push_str("-numa");
+        self.push(format!("node,nodeid={},memdev={}", node_id, memdev_id));
+
+        for cpu in cpus {
+            self.push_str("-numa");
+            self.push(format!("cpu,node-id={},socket-id={}", node_id, cpu));
+        }
+    }
+
+    /// Add a hugepages memory-backend-file object for a single NUMA node
+    pub fn add_hugepages_memory_backend(
+        &mut self,
+        id: &str,
+        size_mib: u32,
+        mem_path: &str,
+        prealloc: bool,
+    ) {
+        self.push_str("-object");
+        let mut spec = format!(
+            "memory-backend-file,id={},size={}M,mem-path={},share=on",
+            id, size_mib, mem_path
+        );
+        if prealloc {
+            spec.push_str(",prealloc=yes");
+        }
+        self.push(spec);
     }
 
     /// Add Hyper-V enlightenments

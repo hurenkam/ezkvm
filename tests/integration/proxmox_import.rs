@@ -121,6 +121,13 @@ fn fixture_cases() -> &'static [ImportFixtureCase] {
             snapshot_fixture: "proxmox_import/08-iommu-intel.args",
             warning_fields: &[],
         },
+        ImportFixtureCase {
+            name: "hugepages 1g",
+            conf_fixture: "proxmox_import/09-hugepages-1g.conf",
+            storage_fixture: Some("proxmox_import/storage.cfg"),
+            snapshot_fixture: "proxmox_import/09-hugepages-1g.args",
+            warning_fields: &[],
+        },
     ]
 }
 

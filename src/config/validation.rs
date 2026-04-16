@@ -15,8 +15,9 @@ use boot::validate_boot_config;
 use devices::validate_device_config;
 use platform::{
     validate_audio_devices, validate_ballooning_config, validate_guest_agent_config,
-    validate_hostpci_config, validate_hyperv_config, validate_input_devices, validate_iommu_config,
-    validate_iscsi_disk_config, validate_ivshmem_config, validate_numa_config, validate_qmp_config,
+    validate_hostpci_config, validate_hugepages_config, validate_hyperv_config,
+    validate_input_devices, validate_iommu_config, validate_iscsi_disk_config,
+    validate_ivshmem_config, validate_numa_config, validate_qmp_config,
     validate_sata_controller_config, validate_scsi_controller_config, validate_smbios_config,
     validate_spice_config, validate_tpm_config, validate_usb_device_config,
     validate_xhci_controller_config,
@@ -68,6 +69,9 @@ fn validate_optional_platform_sections(config: &VmConfig) -> Result<()> {
     }
     if let Some(ivshmem) = &config.system.memory.ivshmem {
         validate_ivshmem_config(ivshmem)?;
+    }
+    if let Some(hugepages) = &config.system.memory.hugepages {
+        validate_hugepages_config(hugepages)?;
     }
     if let Some(qmp) = &config.options.qmp {
         validate_qmp_config(qmp)?;

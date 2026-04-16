@@ -1,7 +1,9 @@
 use crate::qemu::types::QemuArgs;
 use serde::{Deserialize, Serialize};
 
-use super::super::{BallooningConfig, IvshmemConfig, NumaConfig, SmbiosConfig, TpmConfig};
+use super::super::{
+    BallooningConfig, HugepagesConfig, IvshmemConfig, NumaConfig, SmbiosConfig, TpmConfig,
+};
 use super::BootConfig;
 
 /// System-level configuration
@@ -56,6 +58,10 @@ pub struct MemoryConfig {
     /// Optional canonical ivshmem configuration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ivshmem: Option<IvshmemConfig>,
+
+    /// Optional hugepages memory backend configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hugepages: Option<HugepagesConfig>,
 }
 
 /// Canonical CPU configuration nested under `system.cpu`.

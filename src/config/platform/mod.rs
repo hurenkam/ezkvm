@@ -1,3 +1,4 @@
+mod hugepages;
 mod hyperv;
 mod iommu;
 mod monitoring;
@@ -6,6 +7,7 @@ mod peripherals;
 mod storage;
 mod tpm_guest;
 
+pub use hugepages::HugepagesConfig;
 pub use hyperv::HypervConfig;
 pub use iommu::IommuConfig;
 pub use monitoring::{NumaConfig, QmpConfig, QmpSocketType, SmbiosConfig};

@@ -11,8 +11,8 @@ pub(crate) use core::{
     validate_tpm_config,
 };
 pub(crate) use devices::{
-    validate_input_devices, validate_iommu_config, validate_iscsi_disk_config,
-    validate_ivshmem_config, validate_numa_config, validate_sata_controller_config,
-    validate_scsi_controller_config,
+    validate_hugepages_config, validate_input_devices, validate_iommu_config,
+    validate_iscsi_disk_config, validate_ivshmem_config, validate_numa_config,
+    validate_sata_controller_config, validate_scsi_controller_config,
 };
 pub(crate) use usb::{validate_usb_device_config, validate_xhci_controller_config};

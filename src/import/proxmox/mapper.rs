@@ -5,10 +5,11 @@ use super::model::{
 };
 use crate::config::{
     AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig, DeviceConfig,
-    DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, InputDeviceConfig,
-    IommuConfig, IvshmemConfig, MemoryConfig, NetworkBackendConfig, NetworkConfig, RtcConfig,
-    SataControllerConfig, ScsiControllerConfig, SerialConfig, SmbiosConfig, SpiceConfig,
-    SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
+    DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, HugepagesConfig,
+    InputDeviceConfig, IommuConfig, IvshmemConfig, MemoryConfig, NetworkBackendConfig,
+    NetworkConfig, NumaConfig, RtcConfig, SataControllerConfig, ScsiControllerConfig, SerialConfig,
+    SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig, VmOptions,
+    XhciControllerConfig,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -52,6 +53,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .get("memory")
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(2048);
+    let hugepages = map_hugepages(&proxmox.scalars);
     let vcpus = map_vcpus(&proxmox.scalars);
     let (cpu_model, cpu_features) = parse_cpu_model_and_features(proxmox.scalars.get("cpu"));
 
@@ -186,12 +188,17 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
                 size: memory,
                 ballooning,
                 ivshmem,
+                hugepages: hugepages.clone(),
             },
             cpu: crate::config::CpuConfig {
                 model: cpu_model,
                 vcpus,
                 features: cpu_features,
-                numa: Vec::new(),
+                numa: if hugepages.is_some() {
+                    synthesize_hugepages_numa(memory, vcpus)
+                } else {
+                    Vec::new()
+                },
             },
             boot,
             tpm,
@@ -1025,6 +1032,37 @@ fn map_displays(
     }
 
     vec![DisplayConfig { r#type, vram }]
+}
+
+fn map_hugepages(scalars: &BTreeMap<String, String>) -> Option<HugepagesConfig> {
+    let raw = scalars.get("hugepages")?;
+    let raw = raw.trim();
+
+    // "0" or "any" means disabled / use any available
+    if raw == "0" || raw == "any" || raw.is_empty() {
+        return None;
+    }
+
+    // Proxmox encodes hugepage size in MiB ("2" = 2 MiB, "1024" = 1 GiB)
+    let size_mib: u64 = raw.parse().ok()?;
+    let size_kib = size_mib * 1024;
+
+    Some(HugepagesConfig {
+        enabled: true,
+        size_kib: Some(size_kib),
+        mem_path: None, // will be derived from size_kib
+        prealloc: true,
+    })
+}
+
+fn synthesize_hugepages_numa(memory_mib: u32, vcpus: u32) -> Vec<NumaConfig> {
+    let cpus: Vec<u32> = (0..vcpus).collect();
+    vec![NumaConfig {
+        id: 0,
+        memory: memory_mib,
+        cpus,
+        host_node: None,
+    }]
 }
 
 fn map_iommu(machine_options: &[String], raw_args: Option<&String>) -> Option<IommuConfig> {

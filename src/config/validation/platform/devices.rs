@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::{Result, anyhow};
 
 use crate::config::{
-    InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig,
+    HugepagesConfig, InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig,
     SataControllerConfig, ScsiControllerConfig,
 };
 
@@ -204,6 +204,22 @@ pub(crate) fn validate_numa_config(numa: &NumaConfig) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn validate_hugepages_config(hp: &HugepagesConfig) -> Result<()> {
+    if let Some(path) = &hp.mem_path
+        && path.trim().is_empty()
+    {
+        return Err(anyhow!("hugepages mem_path cannot be empty"));
+    }
+
+    if let Some(size) = hp.size_kib
+        && size == 0
+    {
+        return Err(anyhow!("hugepages size_kib must be greater than 0"));
+    }
+
+    Ok(())
+}
+
 pub(crate) fn validate_iommu_config(iommu: &IommuConfig) -> Result<()> {
     let valid_types = ["intel", "amd"];
     if !valid_types.contains(&iommu.r#type.as_str()) {
@@ -227,8 +243,10 @@ pub(crate) fn validate_iommu_config(iommu: &IommuConfig) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_iommu_config, validate_sata_controller_config};
-    use crate::config::{IommuConfig, SataControllerConfig};
+    use super::{
+        validate_hugepages_config, validate_iommu_config, validate_sata_controller_config,
+    };
+    use crate::config::{HugepagesConfig, IommuConfig, SataControllerConfig};
 
     #[test]
     fn sata_controller_rejects_unsupported_type() {
@@ -296,5 +314,40 @@ mod tests {
         };
         let err = validate_iommu_config(&iommu).expect_err("must fail");
         assert!(err.to_string().contains("EIM is only supported for Intel"));
+    }
+
+    #[test]
+    fn hugepages_rejects_empty_mem_path() {
+        let hp = HugepagesConfig {
+            enabled: true,
+            size_kib: None,
+            mem_path: Some("  ".to_string()),
+            prealloc: true,
+        };
+        let err = validate_hugepages_config(&hp).expect_err("must fail");
+        assert!(err.to_string().contains("mem_path cannot be empty"));
+    }
+
+    #[test]
+    fn hugepages_rejects_zero_size_kib() {
+        let hp = HugepagesConfig {
+            enabled: true,
+            size_kib: Some(0),
+            mem_path: None,
+            prealloc: true,
+        };
+        let err = validate_hugepages_config(&hp).expect_err("must fail");
+        assert!(err.to_string().contains("size_kib must be greater than 0"));
+    }
+
+    #[test]
+    fn hugepages_accepts_valid_config() {
+        let hp = HugepagesConfig {
+            enabled: true,
+            size_kib: Some(1048576),
+            mem_path: None,
+            prealloc: true,
+        };
+        validate_hugepages_config(&hp).expect("must succeed");
     }
 }
