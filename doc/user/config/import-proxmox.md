@@ -32,6 +32,7 @@ This document summarizes how Proxmox VM config fields map into canonical ezkvm Y
 Import output is profile-aware and compacted:
 - importer-inferred `profiles` are emitted
 - redundant VM-local fields already provided by those profiles may be omitted
+- sparse id-merge sections can omit repeated default fields when they are owned by schema defaults (for example repeated controller `type` values)
 
 By default, `import-proxmox` uses `--output-mode compact`.
 
@@ -65,6 +66,8 @@ Debug mode includes source comments such as:
 ### List Path Merge Safety
 
 For merge-safe list paths (for example id-merged controller/host device lists and append-unique option lists), redundant overlay entries may be pruned while preserving the same merged runtime result.
+
+In sparse sections, repeated values may also be omitted when profile base data or schema defaults provide the same effective value after merge.
 
 ### Profile Resolution Requirement
 

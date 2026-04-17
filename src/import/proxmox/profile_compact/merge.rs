@@ -1,6 +1,16 @@
 use serde_yaml::Value;
 use std::collections::HashMap;
 
+// B-34 ownership boundaries (merge side):
+// - id-merge lists: host.pci, host.usb, controllers.{scsi,sata,xhci}, devices.audio
+//   Example: controllers.scsi items merge by id, preserving profile defaults per controller id.
+// - append-unique lists: system.cpu.features, system.machine_options, devices.input,
+//   options.global_options.
+// - append-all lists: devices.{drives,networks} and policies.* list families.
+//
+// These boundaries are intentionally mirrored by compaction rules so profile-stack
+// merge remains the inverse of compact output.
+
 pub(super) fn merge_yaml_values(base: &mut Value, overlay: Value) {
     merge_yaml_values_at_path(base, overlay, &[]);
 }

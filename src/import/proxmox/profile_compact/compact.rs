@@ -25,7 +25,7 @@ pub(super) fn compact_overlay_against_base(
 
                 let keep_child = match base_map.get(key) {
                     Some(base_value) => compact_child_value(base_value, overlay_value, &child_path),
-                    None => Some(overlay_value.clone()),
+                    None => compact_value_without_base(overlay_value, &child_path),
                 };
 
                 if let Some(value) = keep_child {
@@ -40,6 +40,16 @@ pub(super) fn compact_overlay_against_base(
             }
         }
         _ if base == overlay => None,
+        _ => Some(overlay.clone()),
+    }
+}
+
+fn compact_value_without_base(overlay: &Value, path: &[String]) -> Option<Value> {
+    match overlay {
+        Value::Mapping(_) => compact_overlay_against_base(&Value::Mapping(Mapping::new()), overlay, path),
+        Value::Sequence(_) if super::paths::is_id_merge_list_path(path) => {
+            compact_id_merge_sequence(&Value::Sequence(Vec::new()), overlay, path)
+        }
         _ => Some(overlay.clone()),
     }
 }
@@ -107,10 +117,91 @@ fn compact_id_merge_sequence(base: &Value, overlay: &Value, path: &[String]) -> 
         }
     }
 
+    compact_sparse_repeated_item_fields(path, &mut kept);
+
     if kept.is_empty() {
         None
     } else {
         Some(Value::Sequence(kept))
+    }
+}
+
+// B-34: sparse id-merge list heuristic.
+//
+// Ownership boundaries for repeated-field omission in sparse sections:
+// - `controllers.scsi[].type`: owned by serde default `virtio-scsi-pci`
+// - `controllers.sata[].type`: owned by serde default `ahci`
+//
+// When these fields repeat across sibling items, they are dropped to keep output
+// concise while preserving inversion through config defaults.
+fn compact_sparse_repeated_item_fields(path: &[String], items: &mut [Value]) {
+    if items.len() < 2 {
+        return;
+    }
+
+    let mut repeated_values: HashMap<String, Value> = HashMap::new();
+
+    for item in items.iter() {
+        let Value::Mapping(item_map) = item else {
+            return;
+        };
+
+        for (key, value) in item_map {
+            let Value::String(key_name) = key else {
+                continue;
+            };
+
+            if key_name == "id" {
+                continue;
+            }
+
+            if !matches_path_default_scalar(path, key_name, value) {
+                continue;
+            }
+
+            repeated_values
+                .entry(key_name.clone())
+                .and_modify(|existing| {
+                    if existing != value {
+                        *existing = Value::Null;
+                    }
+                })
+                .or_insert_with(|| value.clone());
+        }
+    }
+
+    repeated_values.retain(|_, value| *value != Value::Null);
+    if repeated_values.is_empty() {
+        return;
+    }
+
+    for item in items.iter_mut() {
+        let Value::Mapping(item_map) = item else {
+            continue;
+        };
+
+        for (key_name, expected) in &repeated_values {
+            let key = Value::String(key_name.clone());
+            if item_map.get(&key).is_some_and(|actual| actual == expected) {
+                item_map.remove(&key);
+            }
+        }
+    }
+}
+
+fn matches_path_default_scalar(path: &[String], key: &str, value: &Value) -> bool {
+    match (path, key, value) {
+        ([first, second], "type", Value::String(v))
+            if first == "controllers" && second == "scsi" =>
+        {
+            v == "virtio-scsi-pci"
+        }
+        ([first, second], "type", Value::String(v))
+            if first == "controllers" && second == "sata" =>
+        {
+            v == "ahci"
+        }
+        _ => false,
     }
 }
 

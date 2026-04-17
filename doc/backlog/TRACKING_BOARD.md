@@ -78,9 +78,8 @@ Source: doc/backlog/BACKLOG.md
 | B-31 | Expand profile inference coverage for Proxmox importer | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-23 | unassigned | Todo |
 | B-32 | Omit deterministic fields in import-output mode | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Done |
 | B-33 | Introduce explicit export modes (canonical, compact, debug-canonical) | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30, B-32 | unassigned | Done |
-| B-34 | Extend compaction policies for repeated field omission | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Todo |
-| B-35 | Add --canonical flag to emit full explicit schema without profile compaction | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30 | unassigned | Todo |
-| B-36 | Add controller-centric schema normalization for consistency-by-construction | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-32 | unassigned | Done |
+| B-34 | Extend compaction policies for repeated field omission | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Done |
+| B-35 | Update schema to attach drives to controllers which belong to devices | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |

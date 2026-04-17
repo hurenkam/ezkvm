@@ -406,22 +406,16 @@ Acceptance Criteria:
 - Snapshot tests show compacted form 10-15% smaller for dense multi-device fixtures.
 Estimate: 2 days
 
-### B-35 Update schema to attach devices to controllers which belong to devices
+### B-35 Update schema to attach drives to controllers which belong to devices
 Scope:
 - Allow for controllers to reside under devices, and drives under controllers, and make this the default for generated vm yaml files.
-
+- Allow for pci bus to reside under host
 Example yaml:
 ```
 devices:
    - controller: "pvscsi"
-     interface: "scsi"
      drives:
       - { path: "/dev/vm1/vm-108-boot", type: "disk", boot_index: 100 }
-
-   - controller: "xhci"
-     usb:
-       - hostbus: "1"
-       - hostport: "2-2"
 ```
 Note that id's can be generated automatically when creating the qemu commandline, and interface type can be linked to the controller rather than the drive.
 Allow the original devices.drives stansa as well, to maintain backwards compatibility, but also to allow for controller to be exposed in profile, and drives connected to that from vm config.
