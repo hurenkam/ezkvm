@@ -337,6 +337,88 @@ Acceptance Criteria:
 - Technical debt is explicitly tracked until files return to guideline range.
 Estimate: 1 day
 
+### B-30 Audit profile-first compaction implementation status
+Scope:
+- Verify that mapper profiling inference and profile-aware compaction are working correctly in import output.
+- Confirm that profile-overlay form is the default and only export mode.
+- Document current behavior: profiles are inferred automatically and compaction is mandatory (no canonical export mode currently available).
+- If canonical output is needed, defer to separate backlog item.
+Dependencies: B-29
+Acceptance Criteria:
+- Verified that profiles are inferred from Proxmox config (15 layers: proxmox-q35-uefi, windows-common, windows-11, linux-l26-common, macos-kvm, looking-glass, remote-viewer-spice, gpu-passthrough, hugepages, viommu, hidden-hypervisor, headless-vnc, headless-serial, storage-virtio-scsi-single, storage-virtio-scsi-pci).
+- Verified that profile-aware compaction omits redundant fields owned by profiles (always enabled, no opt-out).
+- Verified that compact output sizes match expectations (5-6x reduction vs. canonical for complex fixtures like wakiza: 212→34 lines).
+- CLI behavior documented: `--no-compact` only affects flow-style, not profile compaction.
+- Decision made: canonical output mode is optional and can be deferred if not needed or added as separate backlog item if required.
+Estimate: 1 day
+
+### B-31 Expand profile inference coverage for Proxmox importer
+Scope:
+- Extend profile inference heuristics to cover additional Proxmox patterns beyond current 11 layers.
+- Add inferred profiles for: nested virtualization (l2 profiles), AppleSMC + SMBIOS (macOS-kvm variant), mixed storage buses, specific Hyper-V variants.
+- Document profile inference decision tree and maintainability model.
+Dependencies: B-23
+Acceptance Criteria:
+- At least 5 new profile inference rules added and tested.
+- Inference decision tree documented in CONFIGURATION.md profiles section.
+- Representative fixtures validate correct inference across rule set with snapshot tests.
+- No breaking changes to existing profile stack behavior.
+Estimate: 2.5 days
+
+### B-32 Omit deterministic fields in import-output mode
+Scope:
+- Identify deterministic/derived fields (e.g., auto-assigned IDs, bus/address allocations, socket paths) that should be omitted from import output to reduce clutter.
+- Extend `skip_serializing_if` policies in config schema to omit deterministic fields when serializing imported configs.
+- Ensure QEMU command generation infers or auto-derives these fields from context when deserializing.
+Dependencies: B-29
+Acceptance Criteria:
+- Deterministic field list documented (at least 8-10 fields identified).
+- Serialization omits these fields; QEMU arg generation reconstructs them deterministically.
+- Schema validation allows missing deterministic fields during import deserialization.
+- Snapshot tests verify generated QEMU args remain identical with/without deterministic fields.
+Estimate: 2 days
+
+### B-33 Introduce explicit export modes (canonical, compact, debug-canonical)
+Scope:
+- Add explicit output mode parameter to ImportRunOptions supporting three modes: canonical (full explicit), compact (profile-overlay), debug-canonical (canonical + deterministic fields + inline comments).
+- CLI support via `--output-mode {canonical,compact,debug}` flag (default: compact).
+- Validate mode combinations with dry-run behavior.
+Dependencies: B-30, B-32
+Acceptance Criteria:
+- Three output modes working end-to-end from import pipeline.
+- Mode selection visible in `--help` with use-case examples.
+- Integration tests cover mode switching, snapshot accuracy, and deterministic output.
+- Debug mode includes source mapping comments (e.g., "# from Proxmox ostype: win11").
+Estimate: 2 days
+
+### B-34 Extend compaction policies for repeated field omission
+Scope:
+- Enhance profile-aware compaction to omit values that repeat across multiple fields within same section (e.g., same bus/addr pattern across controllers).
+- Add compaction heuristics for sparse sections where only a few fields differ from baseline profile.
+- Document expanded compaction ownership boundaries in compact.rs and merge.rs.
+Dependencies: B-29
+Acceptance Criteria:
+- Compaction identifies and omits repeated field values when profile base or sibling fields provide redundancy.
+- Compaction ownership boundaries explicitly documented with examples.
+- Regression tests verify profile-stack composition still inverts compaction correctly.
+- Snapshot tests show compacted form 10-15% smaller for dense multi-device fixtures.
+Estimate: 2 days
+
+### B-35 Add --canonical flag to emit full explicit schema without profile compaction
+Scope:
+- Add `--canonical` flag (or `--output-mode canonical`) to the `import-proxmox` CLI command.
+- When set, skip `compact_profile_owned_fields` and emit the full serialized schema directly.
+- Add `output_mode` field to `ImportRunOptions` (compact | canonical) with compact as default.
+- Preserve the `profiles` list field in canonical output for informational purposes.
+Dependencies: B-30
+Acceptance Criteria:
+- CLI accepts `--canonical` flag; help text explains canonical vs. compact trade-off.
+- Canonical output contains all fields (including profile-owned defaults) without omissions.
+- Compact mode remains unchanged and is the default when `--canonical` is absent.
+- Integration test verifies that canonical and compact outputs produce identical QEMU args in dry-run.
+- `--canonical` and `--no-compact` flags are composable without conflict.
+Estimate: 1.5 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
