@@ -3,7 +3,6 @@ Cargo.lock
 .vscode/**
 bak/**
 diff/**
-etc/**
 target/**
 usr/**
 var/**

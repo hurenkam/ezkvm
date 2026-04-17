@@ -1,8 +1,7 @@
 use anyhow::Result;
 
 use super::{
-    DeviceCommands, ImportOutputModeArg, NetworkCommands, PciCommands, StorageCommands,
-    UsbCommands,
+    DeviceCommands, ImportOutputModeArg, NetworkCommands, PciCommands, StorageCommands, UsbCommands,
 };
 
 pub(crate) async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {

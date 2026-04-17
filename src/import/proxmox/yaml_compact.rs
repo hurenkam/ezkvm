@@ -101,11 +101,7 @@ fn has_nested_nonempty_sequence(map: &serde_yaml::Mapping) -> bool {
 /// Render a sequence mapping item in expanded block form.
 /// The first key appears on the same line as the `- ` prefix already written by the
 /// caller; subsequent keys are indented at `indent + 2`.
-fn render_sequence_mapping_expanded(
-    map: &serde_yaml::Mapping,
-    indent: usize,
-    out: &mut String,
-) {
+fn render_sequence_mapping_expanded(map: &serde_yaml::Mapping, indent: usize, out: &mut String) {
     let inner_indent = indent + 2;
     for (i, (key, value)) in map.iter().enumerate() {
         if i > 0 {
@@ -220,6 +216,9 @@ mod tests {
         let compacted = compact_sequence_mappings(input).expect("compaction should succeed");
 
         assert!(compacted.contains("- type: virtio-scsi-pci"));
-        assert!(compacted.contains("drives:\n          - {path: /dev/vm0/disk0, type: disk, format: raw}"));
+        assert!(
+            compacted
+                .contains("drives:\n          - {path: /dev/vm0/disk0, type: disk, format: raw}")
+        );
     }
 }

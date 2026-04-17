@@ -8,6 +8,8 @@ host
 2048M
 -smp
 cpus=2
+-boot
+menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
 virtio-balloon-pci
 -device
@@ -19,4 +21,6 @@ usb-host,host=0451:16a0,id=usb1,bus=xhci.0,port=2
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-usb.pid
 -nodefaults
+-global
+kvm-pit.lost_tick_policy=discard
 -enable-kvm

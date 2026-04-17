@@ -1,0 +1,36 @@
+# Profile: proxmox-base
+#
+# Provides Proxmox-specific runtime defaults that Proxmox applies when launching VMs
+# but does not store in the .conf file.
+#
+# Assign this profile to all VMs imported from Proxmox.
+
+system:
+  boot:
+    menu: true
+    strict: true
+    reboot_timeout: 1000
+    splash: /usr/share/qemu-server/bootsplash.jpg
+
+options:
+  global_options:
+    - kvm-pit.lost_tick_policy=discard
+
+policies:
+  drives:
+    - match:
+        interface: scsi
+      defaults:
+        cache: none
+        aio: io_uring
+        detect_zeroes: unmap
+  networks:
+    - match:
+        backend_type: tap
+      defaults:
+        rx_queue_size: 1024
+        tx_queue_size: 256
+        backend:
+          vhost: true
+          script: /usr/libexec/qemu-server/pve-bridge
+          downscript: /usr/libexec/qemu-server/pve-bridgedown

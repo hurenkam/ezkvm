@@ -166,9 +166,7 @@ fn render_debug_canonical_yaml(
     config.assign_default_device_ids();
 
     serde_yaml::to_string(&config).map_err(|e| {
-        ImportError::ParseError(format!(
-            "failed to serialize debug-canonical YAML: {e}"
-        ))
+        ImportError::ParseError(format!("failed to serialize debug-canonical YAML: {e}"))
     })
 }
 
@@ -176,7 +174,9 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
     use serde_yaml::{Mapping, Value};
 
     let parsed: Value = serde_yaml::from_str(input_yaml).map_err(|e| {
-        ImportError::ParseError(format!("failed to parse rendered YAML for B-35 reshape: {e}"))
+        ImportError::ParseError(format!(
+            "failed to parse rendered YAML for B-35 reshape: {e}"
+        ))
     })?;
 
     let mut root = match parsed {
@@ -207,17 +207,19 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
             root.insert(devices_key, Value::Mapping(devices_map));
             return Ok(input_yaml.to_string());
         }
-        None => {
-            root.insert(devices_key, Value::Mapping(devices_map));
-            return Ok(input_yaml.to_string());
-        }
+        // No controllers key in the compact YAML (e.g., IDE-only VMs after profile
+        // compaction strips an empty controllers: {}). Proceed with an empty map so
+        // IDE drives can still be nested under devices.controllers.ide.
+        None => Mapping::new(),
     };
 
     let Some(Value::Sequence(drives)) = devices_map.remove(&drives_key) else {
         root.insert(devices_key, Value::Mapping(devices_map));
         root.insert(controllers_key, Value::Mapping(controllers_map));
         return serde_yaml::to_string(&Value::Mapping(root)).map_err(|e| {
-            ImportError::ParseError(format!("failed to serialize rendered YAML for B-35 reshape: {e}"))
+            ImportError::ParseError(format!(
+                "failed to serialize rendered YAML for B-35 reshape: {e}"
+            ))
         });
     };
 
@@ -319,7 +321,10 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
         );
     }
     if !nested_devices_controllers.is_empty() {
-        devices_map.insert(nested_controllers_key, Value::Mapping(nested_devices_controllers));
+        devices_map.insert(
+            nested_controllers_key,
+            Value::Mapping(nested_devices_controllers),
+        );
     }
 
     if !devices_map.is_empty() {
@@ -330,7 +335,9 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
     }
 
     serde_yaml::to_string(&Value::Mapping(root)).map_err(|e| {
-        ImportError::ParseError(format!("failed to serialize rendered YAML for B-35 reshape: {e}"))
+        ImportError::ParseError(format!(
+            "failed to serialize rendered YAML for B-35 reshape: {e}"
+        ))
     })
 }
 
@@ -439,7 +446,6 @@ fn build_debug_source_comments(parsed: &ProxmoxVmConfig, warnings: &[MappingWarn
 
     lines.join("\n")
 }
-
 
 #[cfg(test)]
 mod tests {

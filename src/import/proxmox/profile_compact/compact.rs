@@ -46,7 +46,9 @@ pub(super) fn compact_overlay_against_base(
 
 fn compact_value_without_base(overlay: &Value, path: &[String]) -> Option<Value> {
     match overlay {
-        Value::Mapping(_) => compact_overlay_against_base(&Value::Mapping(Mapping::new()), overlay, path),
+        Value::Mapping(_) => {
+            compact_overlay_against_base(&Value::Mapping(Mapping::new()), overlay, path)
+        }
         Value::Sequence(_) if super::paths::is_id_merge_list_path(path) => {
             compact_id_merge_sequence(&Value::Sequence(Vec::new()), overlay, path)
         }
@@ -81,7 +83,9 @@ fn compact_id_merge_sequence(base: &Value, overlay: &Value, path: &[String]) -> 
         return Some(overlay.clone());
     };
 
-    if base_seq.iter().any(|item| super::yaml::yaml_mapping_id(item).is_none())
+    if base_seq
+        .iter()
+        .any(|item| super::yaml::yaml_mapping_id(item).is_none())
         || overlay_seq
             .iter()
             .any(|item| super::yaml::yaml_mapping_id(item).is_none())

@@ -5,6 +5,11 @@ pub(super) fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) 
     let mut profiles = Vec::new();
     let ostype = proxmox.scalars.get("ostype").map(String::as_str);
 
+    // Always assign the Proxmox base profile to provide Proxmox runtime defaults
+    // (boot menu, kvm-pit, drive tuning, tap network scripts) that are not stored
+    // in the Proxmox .conf file but are applied by Proxmox at launch time.
+    profiles.push("proxmox-base".to_string());
+
     if config.system.architecture == "x86_64"
         && config.system.boot.firmware.as_deref() == Some("uefi")
         && is_q35_machine(&config.system.machine)
@@ -22,6 +27,8 @@ pub(super) fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) 
 
     match ostype {
         Some("win11") => {
+            // proxmox-windows provides the HV CPU flags Proxmox adds for Windows guests
+            profiles.push("proxmox-windows".to_string());
             if config.options.rtc.as_ref().is_some_and(|rtc| {
                 rtc.base.as_deref() == Some("localtime") && rtc.driftfix.as_deref() == Some("slew")
             }) {
@@ -32,6 +39,8 @@ pub(super) fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) 
             }
         }
         Some("win10") => {
+            // proxmox-windows provides the HV CPU flags Proxmox adds for Windows guests
+            profiles.push("proxmox-windows".to_string());
             if config.options.rtc.as_ref().is_some_and(|rtc| {
                 rtc.base.as_deref() == Some("localtime") && rtc.driftfix.as_deref() == Some("slew")
             }) {

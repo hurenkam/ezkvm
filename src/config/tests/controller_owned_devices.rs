@@ -35,7 +35,10 @@ controllers:
     assert_eq!(config.controllers.scsi[0].id, "scsihw0");
 
     assert_eq!(config.devices.drives.len(), 1);
-    assert_eq!(config.devices.drives[0].controller.as_deref(), Some("scsihw0"));
+    assert_eq!(
+        config.devices.drives[0].controller.as_deref(),
+        Some("scsihw0")
+    );
     assert_eq!(config.devices.drives[0].id, "scsi0");
 
     assert_eq!(config.controllers.xhci.len(), 1);
@@ -125,7 +128,10 @@ devices:
     assert_eq!(config.controllers.scsi[0].r#type, "pvscsi");
     assert_eq!(config.devices.drives.len(), 1);
     assert_eq!(config.devices.drives[0].interface, "scsi");
-    assert_eq!(config.devices.drives[0].controller.as_deref(), Some("scsihw0"));
+    assert_eq!(
+        config.devices.drives[0].controller.as_deref(),
+        Some("scsihw0")
+    );
 
     assert_eq!(config.controllers.xhci.len(), 1);
     assert_eq!(config.controllers.xhci[0].id, "xhci");
@@ -164,7 +170,10 @@ devices:
     assert_eq!(config.controllers.scsi[0].r#type, "pvscsi");
     assert_eq!(config.devices.displays.len(), 1);
     assert_eq!(config.devices.drives.len(), 1);
-    assert_eq!(config.devices.drives[0].controller.as_deref(), Some("scsihw0"));
+    assert_eq!(
+        config.devices.drives[0].controller.as_deref(),
+        Some("scsihw0")
+    );
     assert_eq!(config.devices.drives[0].interface, "scsi");
 }
 
@@ -223,7 +232,10 @@ controllers:
     assert_eq!(config.controllers.sata.len(), 1);
     assert_eq!(config.controllers.sata[0].id, "sata0");
     assert_eq!(config.devices.drives.len(), 1);
-    assert_eq!(config.devices.drives[0].controller.as_deref(), Some("sata0"));
+    assert_eq!(
+        config.devices.drives[0].controller.as_deref(),
+        Some("sata0")
+    );
     assert_eq!(config.devices.drives[0].interface, "sata");
 }
 

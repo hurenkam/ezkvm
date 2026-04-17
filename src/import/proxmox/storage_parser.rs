@@ -288,7 +288,10 @@ mod tests {
         )
         .expect("storage with many properties should parse");
 
-        let local = parsed.storages.get("local").expect("should have local storage");
+        let local = parsed
+            .storages
+            .get("local")
+            .expect("should have local storage");
         assert_eq!(local.options.len(), 7);
         assert_eq!(
             local.options.get("content").map(String::as_str),
@@ -413,7 +416,10 @@ mod tests {
         )
         .expect("nfs storage should parse");
 
-        let nfs = parsed.storages.get("nfs-backup").expect("should have nfs storage");
+        let nfs = parsed
+            .storages
+            .get("nfs-backup")
+            .expect("should have nfs storage");
         assert_eq!(nfs.storage_type, "nfs");
         assert_eq!(
             nfs.options.get("server").map(String::as_str),
@@ -427,10 +433,8 @@ mod tests {
 
     #[test]
     fn parses_storage_with_extra_indentation() {
-        let parsed = parse_proxmox_storage_config(
-            "dir: local\n        path /var/lib/vz"
-        )
-        .expect("extra indentation should still parse");
+        let parsed = parse_proxmox_storage_config("dir: local\n        path /var/lib/vz")
+            .expect("extra indentation should still parse");
 
         assert_eq!(
             parsed

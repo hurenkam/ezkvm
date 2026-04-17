@@ -1,10 +1,10 @@
 // Temporary over-size rationale (B-29): device policy mapping is still concentrated
 // here after B-26. Closure target is <=250 lines by extracting display/audio/input
 // policy helpers without changing generated YAML semantics.
-use super::helpers::{
-    parse_options, parse_prefixed_options, parse_human_size_to_bytes, shell_split,
-};
 use super::super::model::{ProxmoxHostPciEntry, ProxmoxUsbEntry};
+use super::helpers::{
+    parse_human_size_to_bytes, parse_options, parse_prefixed_options, shell_split,
+};
 use super::{
     AppleSmcConfig, AudioDeviceConfig, DisplayConfig, InputDeviceConfig, IvshmemConfig,
     MappingWarning, SerialConfig, SpiceConfig, UsbDeviceConfig, VncConfig,
@@ -103,7 +103,8 @@ fn sibling_function_one(device: &str) -> Option<String> {
 }
 
 fn increment_function_address(addr: &str) -> Option<String> {
-    addr.strip_suffix(".0").map(|prefix| format!("{}.1", prefix))
+    addr.strip_suffix(".0")
+        .map(|prefix| format!("{}.1", prefix))
 }
 
 pub(super) fn map_usb(entry: &ProxmoxUsbEntry, place_on_xhci: bool) -> UsbDeviceConfig {

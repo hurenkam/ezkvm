@@ -1,6 +1,7 @@
 // Temporary over-size rationale (B-29): system-path mapping still combines several
 // ownership areas (cpu/memory/boot/firmware). Closure target is <=250 lines by
 // splitting memory and boot helpers while keeping behavior stable.
+use super::super::model::{ProxmoxStorageConfig, ProxmoxVmConfig};
 use super::helpers::{
     is_enabled, parse_human_size_to_bytes, parse_options, parse_source_and_options,
 };
@@ -9,10 +10,12 @@ use super::{
     BallooningConfig, BootConfig, GuestAgentConfig, HugepagesConfig, IommuConfig, MappingWarning,
     NumaConfig, TpmConfig,
 };
-use super::super::model::{ProxmoxStorageConfig, ProxmoxVmConfig};
 use std::collections::BTreeMap;
 
-pub(super) fn map_architecture(arch: Option<&String>, warnings: &mut Vec<MappingWarning>) -> String {
+pub(super) fn map_architecture(
+    arch: Option<&String>,
+    warnings: &mut Vec<MappingWarning>,
+) -> String {
     match arch.map(String::as_str).unwrap_or("x86_64") {
         "amd64" => "x86_64".to_string(),
         "x86_64" | "aarch64" | "x86" | "ppc64" | "riscv64" => {
@@ -128,7 +131,10 @@ pub(super) fn synthesize_hugepages_numa(memory_mib: u32, vcpus: u32) -> Vec<Numa
     }]
 }
 
-pub(super) fn map_iommu(machine_options: &[String], raw_args: Option<&String>) -> Option<IommuConfig> {
+pub(super) fn map_iommu(
+    machine_options: &[String],
+    raw_args: Option<&String>,
+) -> Option<IommuConfig> {
     for option in machine_options {
         if let Some(iommu_type) = option.strip_prefix("viommu=") {
             return Some(IommuConfig {
@@ -394,4 +400,3 @@ pub(super) fn map_ballooning(is_windows: bool) -> Option<BallooningConfig> {
         },
     })
 }
-

@@ -1,5 +1,5 @@
-use super::helpers::is_enabled;
 use super::super::model::ProxmoxNetEntry;
+use super::helpers::is_enabled;
 use super::{MappingWarning, NetworkBackendConfig, NetworkConfig};
 use std::collections::BTreeMap;
 
@@ -37,9 +37,12 @@ pub(super) fn map_network(
         }
     };
 
+    // Proxmox uses a tap backend with a bridge script when a bridge is configured.
+    // The QEMU `bridge` backend helper is a different mechanism; map to `tap` instead
+    // so that the proxmox-base profile can supply the Proxmox bridge scripts.
     let has_bridge = network.options.contains_key("bridge");
     let backend_type = if has_bridge {
-        "bridge".to_string()
+        "tap".to_string()
     } else {
         "user".to_string()
     };

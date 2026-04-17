@@ -22,9 +22,13 @@ isa-serial,chardev=serial0,index=0
 file,id=serial1,path=/tmp/serial1.log
 -device
 isa-serial,chardev=serial1,index=1
+-boot
+menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
 virtio-balloon-pci
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-serial-backends.pid
 -nodefaults
+-global
+kvm-pit.lost_tick_policy=discard
 -enable-kvm

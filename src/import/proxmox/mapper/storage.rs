@@ -1,5 +1,5 @@
-use super::helpers::is_enabled;
 use super::super::model::{ProxmoxDiskEntry, ProxmoxStorageConfig};
+use super::helpers::is_enabled;
 use super::{DriveConfig, MappingWarning, SataControllerConfig, ScsiControllerConfig};
 use std::collections::BTreeMap;
 
@@ -90,14 +90,18 @@ pub(super) fn map_drive(
         .or_else(|| disk.options.get("scsi-id"))
         .and_then(|value| value.parse::<u32>().ok());
 
+    // Proxmox derives rotation_rate=1 (non-rotating/SSD) from the ssd flag at runtime.
+    // The conf file only stores `ssd=1`; capture the same semantic here so that the
+    // ezkvm command builder can emit rotation_rate without a separate Proxmox profile.
     let rotation_rate = disk
         .options
         .get("rotation_rate")
         .or_else(|| disk.options.get("rotation-rate"))
-        .and_then(|value| value.parse::<u32>().ok());
+        .and_then(|value| value.parse::<u32>().ok())
+        .or(if ssd { Some(1) } else { None });
 
     DriveConfig {
-        id: String::new(),
+        id: disk.key.clone(),
         path,
         interface: disk.bus.clone(),
         r#type: if is_cdrom {

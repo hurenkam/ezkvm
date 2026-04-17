@@ -11,9 +11,11 @@ cpus=8
 -readconfig
 /usr/share/qemu-server/pve-q35-4.0.cfg
 -netdev
-type=bridge,id=net0,br=vmbr1
+type=tap,id=net0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
 -device
-virtio-net,netdev=net0,mac=52:54:00:de:ad:01
+virtio-net,netdev=net0,mac=52:54:00:de:ad:01,rx_queue_size=1024,tx_queue_size=256
+-boot
+menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
 virtio-balloon-pci
 -device
@@ -28,4 +30,6 @@ qemu-xhci,id=xhci,p2=15,p3=15
 -vga
 none
 -nographic
+-global
+kvm-pit.lost_tick_policy=discard
 -enable-kvm

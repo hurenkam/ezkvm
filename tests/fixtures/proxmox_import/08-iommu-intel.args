@@ -14,6 +14,8 @@ type=user,id=net0
 e1000,netdev=net0,mac=52:54:00:aa:bb:cd
 -device
 cirrus
+-boot
+menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
 virtio-balloon-pci
 -device
@@ -21,4 +23,6 @@ intel-iommu,id=iommu0,intremap=on
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-iommu-intel.pid
 -nodefaults
+-global
+kvm-pit.lost_tick_policy=discard
 -enable-kvm

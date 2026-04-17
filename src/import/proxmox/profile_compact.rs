@@ -336,16 +336,16 @@ devices:
         });
     }
 
-        #[test]
-        fn compacts_sparse_controller_sections_by_omitting_repeated_default_types() {
-                with_test_profiles(|profile_dir| {
-                        std::fs::write(
-                                profile_dir.join("base-empty.yaml"),
-                                "system:\n  architecture: x86_64\n",
-                        )
-                        .expect("write profile");
+    #[test]
+    fn compacts_sparse_controller_sections_by_omitting_repeated_default_types() {
+        with_test_profiles(|profile_dir| {
+            std::fs::write(
+                profile_dir.join("base-empty.yaml"),
+                "system:\n  architecture: x86_64\n",
+            )
+            .expect("write profile");
 
-                        let input = r#"
+            let input = r#"
 name: vm
 backend: qemu
 profiles:
@@ -382,47 +382,51 @@ devices:
           scsi_id: 0
 "#;
 
-                        let compacted = compact_profile_owned_fields(input).expect("compact");
-                        let value: Value = serde_yaml::from_str(&compacted).expect("parse compacted");
+            let compacted = compact_profile_owned_fields(input).expect("compact");
+            let value: Value = serde_yaml::from_str(&compacted).expect("parse compacted");
 
-                        let scsi = value
-                                .as_mapping()
-                                .and_then(|m| m.get(Value::String("controllers".to_string())))
-                                .and_then(Value::as_mapping)
-                                .and_then(|m| m.get(Value::String("scsi".to_string())))
-                                .and_then(Value::as_sequence)
-                                .expect("scsi sequence");
+            let scsi = value
+                .as_mapping()
+                .and_then(|m| m.get(Value::String("controllers".to_string())))
+                .and_then(Value::as_mapping)
+                .and_then(|m| m.get(Value::String("scsi".to_string())))
+                .and_then(Value::as_sequence)
+                .expect("scsi sequence");
 
-                        for item in scsi {
-                                let map = item.as_mapping().expect("controller item mapping");
-                                assert!(map.contains_key(Value::String("id".to_string())));
-                                assert!(!map.contains_key(Value::String("type".to_string())));
-                        }
+            for item in scsi {
+                let map = item.as_mapping().expect("controller item mapping");
+                assert!(map.contains_key(Value::String("id".to_string())));
+                assert!(!map.contains_key(Value::String("type".to_string())));
+            }
 
-                        let roundtrip = VmConfig::from_str(&compacted).expect("compacted yaml must rehydrate");
-                        assert!(roundtrip
-                                .controllers
-                                .scsi
-                                .iter()
-                                .all(|ctrl| ctrl.r#type == "virtio-scsi-pci"));
-                        assert!(roundtrip
-                                .controllers
-                                .sata
-                                .iter()
-                                .all(|ctrl| ctrl.r#type == "ahci"));
-                });
-        }
+            let roundtrip = VmConfig::from_str(&compacted).expect("compacted yaml must rehydrate");
+            assert!(
+                roundtrip
+                    .controllers
+                    .scsi
+                    .iter()
+                    .all(|ctrl| ctrl.r#type == "virtio-scsi-pci")
+            );
+            assert!(
+                roundtrip
+                    .controllers
+                    .sata
+                    .iter()
+                    .all(|ctrl| ctrl.r#type == "ahci")
+            );
+        });
+    }
 
-        #[test]
-        fn dense_multi_device_sparse_compaction_reduces_output_size_by_ten_percent() {
-                with_test_profiles(|profile_dir| {
-                        std::fs::write(
-                                profile_dir.join("base-empty.yaml"),
-                                "system:\n  architecture: x86_64\n",
-                        )
-                        .expect("write profile");
+    #[test]
+    fn dense_multi_device_sparse_compaction_reduces_output_size_by_ten_percent() {
+        with_test_profiles(|profile_dir| {
+            std::fs::write(
+                profile_dir.join("base-empty.yaml"),
+                "system:\n  architecture: x86_64\n",
+            )
+            .expect("write profile");
 
-                        let input = r#"
+            let input = r#"
 name: dense
 backend: qemu
 profiles:
@@ -460,14 +464,14 @@ controllers:
           type: ahci
 "#;
 
-                        let compacted = compact_profile_owned_fields(input).expect("compact");
-                        let input_lines = input.lines().count();
-                        let compacted_lines = compacted.lines().count();
+            let compacted = compact_profile_owned_fields(input).expect("compact");
+            let input_lines = input.lines().count();
+            let compacted_lines = compacted.lines().count();
 
-                        assert!(
-                                compacted_lines * 100 <= input_lines * 90,
-                                "expected >=10% line reduction, got input_lines={input_lines}, compacted_lines={compacted_lines}"
-                        );
-                });
-        }
+            assert!(
+                compacted_lines * 100 <= input_lines * 90,
+                "expected >=10% line reduction, got input_lines={input_lines}, compacted_lines={compacted_lines}"
+            );
+        });
+    }
 }

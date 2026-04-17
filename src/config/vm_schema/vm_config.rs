@@ -250,7 +250,8 @@ impl VmConfig {
                     }
 
                     let controller_key = Value::String("controller".to_string());
-                    let Some(Value::String(controller_name)) = block_map.remove(&controller_key) else {
+                    let Some(Value::String(controller_name)) = block_map.remove(&controller_key)
+                    else {
                         continue;
                     };
 
@@ -284,7 +285,8 @@ impl VmConfig {
                             if !drive_map.contains_key(&interface_key)
                                 && let Some(interface) = inferred_interface
                             {
-                                drive_map.insert(interface_key, Value::String(interface.to_string()));
+                                drive_map
+                                    .insert(interface_key, Value::String(interface.to_string()));
                             }
                         }
                     }
@@ -295,7 +297,8 @@ impl VmConfig {
                             Value::String("type".to_string()),
                             Value::String(controller_name),
                         );
-                        controller_map.insert(Value::String("drives".to_string()), Value::Sequence(drives));
+                        controller_map
+                            .insert(Value::String("drives".to_string()), Value::Sequence(drives));
                         for (k, v) in block_map {
                             controller_map.insert(k, v);
                         }
@@ -313,7 +316,8 @@ impl VmConfig {
                             Value::String("type".to_string()),
                             Value::String("ahci".to_string()),
                         );
-                        controller_map.insert(Value::String("drives".to_string()), Value::Sequence(drives));
+                        controller_map
+                            .insert(Value::String("drives".to_string()), Value::Sequence(drives));
                         for (k, v) in block_map {
                             controller_map.insert(k, v);
                         }
@@ -349,10 +353,7 @@ impl VmConfig {
         }
     }
 
-    fn merge_controller_maps(
-        target: &mut serde_yaml::Mapping,
-        nested: serde_yaml::Mapping,
-    ) {
+    fn merge_controller_maps(target: &mut serde_yaml::Mapping, nested: serde_yaml::Mapping) {
         use serde_yaml::Value;
 
         for (key, value) in nested {
@@ -442,7 +443,11 @@ impl VmConfig {
             .iter()
             .filter_map(|c| {
                 let id = c.id.trim();
-                if id.is_empty() { None } else { Some(id.to_string()) }
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
             })
             .collect::<HashSet<_>>();
         for (index, ctrl) in self.controllers.scsi.iter_mut().enumerate() {
@@ -455,7 +460,11 @@ impl VmConfig {
             .iter()
             .filter_map(|c| {
                 let id = c.id.trim();
-                if id.is_empty() { None } else { Some(id.to_string()) }
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
             })
             .collect::<HashSet<_>>();
         for (index, ctrl) in self.controllers.sata.iter_mut().enumerate() {
@@ -468,7 +477,11 @@ impl VmConfig {
             .iter()
             .filter_map(|c| {
                 let id = c.id.trim();
-                if id.is_empty() { None } else { Some(id.to_string()) }
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
             })
             .collect::<HashSet<_>>();
         for (index, ctrl) in self.controllers.xhci.iter_mut().enumerate() {
@@ -481,7 +494,11 @@ impl VmConfig {
             .iter()
             .filter_map(|p| {
                 let id = p.id.trim();
-                if id.is_empty() { None } else { Some(id.to_string()) }
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
             })
             .collect::<HashSet<_>>();
         for (index, pci) in self.host.pci.iter_mut().enumerate() {
@@ -693,8 +710,7 @@ impl VmConfig {
                     if let Value::Mapping(drive_map) = &mut drive_value {
                         let interface_key = Value::String("interface".to_string());
                         if !drive_map.contains_key(&interface_key) {
-                            drive_map
-                                .insert(interface_key, Value::String("ide".to_string()));
+                            drive_map.insert(interface_key, Value::String("ide".to_string()));
                         }
                     }
                     Self::append_under_sequence(vm_map, "devices", "drives", drive_value);

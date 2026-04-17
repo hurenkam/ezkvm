@@ -431,10 +431,9 @@ mod tests {
 
     #[test]
     fn parses_disk_options_with_special_characters() {
-        let parsed = parse_proxmox_config(
-            "scsi0: local-lvm:vm-100/disk-0,cache=none,notes=test-notes"
-        )
-        .expect("parse should succeed");
+        let parsed =
+            parse_proxmox_config("scsi0: local-lvm:vm-100/disk-0,cache=none,notes=test-notes")
+                .expect("parse should succeed");
 
         assert_eq!(parsed.disks.len(), 1);
         assert_eq!(
@@ -453,16 +452,16 @@ mod tests {
 
     #[test]
     fn parses_hostpci_with_function_notation() {
-        let parsed = parse_proxmox_config("hostpci0: 0000:08:10.7,pcie=0")
-            .expect("parse should succeed");
+        let parsed =
+            parse_proxmox_config("hostpci0: 0000:08:10.7,pcie=0").expect("parse should succeed");
 
         assert_eq!(parsed.host_pci[0].host, "0000:08:10.7");
     }
 
     #[test]
     fn parses_scalar_with_whitespace_padding_in_value() {
-        let parsed = parse_proxmox_config("name:   vm-with-padding   ")
-            .expect("parse should succeed");
+        let parsed =
+            parse_proxmox_config("name:   vm-with-padding   ").expect("parse should succeed");
 
         assert_eq!(
             parsed.scalars.get("name").map(String::as_str),
@@ -472,8 +471,8 @@ mod tests {
 
     #[test]
     fn parses_key_with_numeric_suffix_that_could_confuse_device_detection() {
-        let parsed = parse_proxmox_config("scsi100_meta: some-value")
-            .expect("parse should succeed");
+        let parsed =
+            parse_proxmox_config("scsi100_meta: some-value").expect("parse should succeed");
 
         // scsi100_meta should NOT be parsed as a device since there's non-numeric after index
         assert_eq!(parsed.disks.len(), 0);
@@ -521,8 +520,8 @@ mod tests {
 
     #[test]
     fn parses_usb_with_vendor_and_device_id_style_host() {
-        let parsed = parse_proxmox_config("usb0: host=1234:5678,usb3=1")
-            .expect("parse should succeed");
+        let parsed =
+            parse_proxmox_config("usb0: host=1234:5678,usb3=1").expect("parse should succeed");
 
         assert_eq!(parsed.usb.len(), 1);
         assert_eq!(parsed.usb[0].host, "host=1234:5678");
@@ -551,9 +550,8 @@ mod tests {
     #[test]
     fn rejects_invalid_line_with_value_containing_colon() {
         // This should still parse successfully since only the first colon is the separator
-        let parsed =
-            parse_proxmox_config("args: -machine type=pc-q35-8.1,hpet=off")
-                .expect("parse should succeed");
+        let parsed = parse_proxmox_config("args: -machine type=pc-q35-8.1,hpet=off")
+            .expect("parse should succeed");
 
         assert_eq!(
             parsed.scalars.get("args").map(String::as_str),
@@ -582,7 +580,10 @@ mod tests {
         )
         .expect("parse should succeed");
 
-        assert_eq!(parsed.scalars.get("cpu").map(String::as_str), Some("host,hv_ipi,hv_relaxed"));
+        assert_eq!(
+            parsed.scalars.get("cpu").map(String::as_str),
+            Some("host,hv_ipi,hv_relaxed")
+        );
         assert_eq!(parsed.scalars.get("cores").map(String::as_str), Some("8"));
         assert_eq!(parsed.scalars.get("sockets").map(String::as_str), Some("2"));
         assert_eq!(parsed.scalars.get("numa").map(String::as_str), Some("1"));

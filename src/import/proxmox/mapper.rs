@@ -50,7 +50,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .cloned()
         .unwrap_or_else(|| "imported-vm".to_string());
     let architecture = system::map_architecture(proxmox.scalars.get("arch"), &mut warnings);
-    let (mut machine, machine_options) = helpers::parse_machine_and_options(proxmox.scalars.get("machine"));
+    let (mut machine, machine_options) =
+        helpers::parse_machine_and_options(proxmox.scalars.get("machine"));
     let mut readconfig = Vec::new();
     system::apply_proxmox_q35_compat_if_needed(proxmox, &mut machine, &mut readconfig);
     let iommu = system::map_iommu(&machine_options, proxmox.scalars.get("args"));
@@ -62,7 +63,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .unwrap_or(2048);
     let hugepages = system::map_hugepages(&proxmox.scalars);
     let vcpus = system::map_vcpus(&proxmox.scalars);
-    let (cpu_model, cpu_features) = helpers::parse_cpu_model_and_features(proxmox.scalars.get("cpu"));
+    let (cpu_model, cpu_features) =
+        helpers::parse_cpu_model_and_features(proxmox.scalars.get("cpu"));
 
     let firmware = proxmox
         .scalars
@@ -87,7 +89,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let boot_indices = system::parse_boot_order(&proxmox.scalars);
     let smbios_uuid = system::parse_smbios_uuid(&proxmox.scalars);
 
-    let scsi_controllers = storage::map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
+    let scsi_controllers =
+        storage::map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
     let sata_controllers = storage::map_sata_controllers(&proxmox.disks);
     let inferred_vmid = helpers::infer_proxmox_vmid(proxmox);
     let mut drives = proxmox
@@ -274,7 +277,8 @@ mod tests {
     fn map_and_validate(input: &str) -> (String, VmConfig) {
         let parsed = parse_proxmox_config(input).expect("parser should succeed");
         let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
-        let mut config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        let mut config: VmConfig =
+            serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         config.assign_default_device_ids();
         validation::validate_config(&config).expect("config should validate");
         (mapped.yaml, config)
@@ -286,7 +290,8 @@ mod tests {
             parse_proxmox_storage_config(storage_input).expect("storage parser should succeed");
         let mapped = map_proxmox_to_canonical_yaml_with_storage(&parsed, Some(&storage))
             .expect("mapper should succeed");
-        let mut config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        let mut config: VmConfig =
+            serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         config.assign_default_device_ids();
         validation::validate_config(&config).expect("config should validate");
         (mapped.yaml, config)
@@ -541,7 +546,7 @@ mod tests {
         assert_eq!(net.model, "virtio-net");
         assert_eq!(net.mac.as_deref(), Some("52:54:00:12:34:56"));
         let backend = net.backend.as_ref().expect("backend must be set");
-        assert_eq!(backend.backend_type, "bridge");
+        assert_eq!(backend.backend_type, "tap");
         assert_eq!(backend.bridge.as_deref(), Some("vmbr0"));
         assert_eq!(backend.queues, Some(4));
         assert_eq!(backend.script, None);
@@ -842,8 +847,10 @@ mod tests {
         assert_eq!(
             cfg.profiles,
             vec![
+                "proxmox-base".to_string(),
                 "proxmox-q35-uefi".to_string(),
                 "storage-virtio-scsi-pci".to_string(),
+                "proxmox-windows".to_string(),
                 "windows-common".to_string(),
                 "windows-11".to_string(),
                 "remote-viewer-spice".to_string(),
@@ -1233,28 +1240,32 @@ mod tests {
 
         assert_eq!(cfg.devices.drives.len(), 4);
         assert_eq!(
-            cfg.devices.drives
+            cfg.devices
+                .drives
                 .iter()
                 .filter(|d| d.interface == "scsi")
                 .count(),
             1
         );
         assert_eq!(
-            cfg.devices.drives
+            cfg.devices
+                .drives
                 .iter()
                 .filter(|d| d.interface == "sata")
                 .count(),
             1
         );
         assert_eq!(
-            cfg.devices.drives
+            cfg.devices
+                .drives
                 .iter()
                 .filter(|d| d.interface == "ide")
                 .count(),
             1
         );
         assert_eq!(
-            cfg.devices.drives
+            cfg.devices
+                .drives
                 .iter()
                 .filter(|d| d.interface == "virtio")
                 .count(),

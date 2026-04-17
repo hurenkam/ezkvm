@@ -11,15 +11,17 @@ cpus=2
 -device
 virtio-scsi-pci,id=scsihw0
 -drive
-file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discard=unmap
+file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap
 -device
 scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
 -netdev
-type=bridge,id=net0,br=vmbr9
+type=tap,id=net0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
 -device
-virtio-net,netdev=net0,mac=52:54:00:fe:ed:01
+virtio-net,netdev=net0,mac=52:54:00:fe:ed:01,rx_queue_size=1024,tx_queue_size=256
 -device
 virtio-gpu,vram=33554432
+-boot
+menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
 virtio-balloon-pci
 -device
@@ -29,4 +31,6 @@ usb-host,hostbus=3,hostport=1.4,id=usb0,bus=xhci.0,port=1
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-warning.pid
 -nodefaults
+-global
+kvm-pit.lost_tick_policy=discard
 -enable-kvm

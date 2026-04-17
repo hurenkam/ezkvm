@@ -11,7 +11,7 @@ cpus=4
 -device
 virtio-scsi-pci,id=scsihw0
 -drive
-file=local-lvm:vm-300-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,cache=none
+file=local-lvm:vm-300-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap
 -device
 scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
 -netdev
@@ -20,6 +20,8 @@ type=user,id=net0
 e1000,netdev=net0,mac=52:54:00:aa:bb:ee
 -device
 cirrus
+-boot
+menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
 virtio-balloon-pci
 -object
@@ -37,4 +39,6 @@ cpu,node-id=0,socket-id=3
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-hugepages-1g.pid
 -nodefaults
+-global
+kvm-pit.lost_tick_policy=discard
 -enable-kvm

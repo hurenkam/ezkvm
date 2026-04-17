@@ -63,7 +63,9 @@ fn wakiza_import_emits_expected_profile_stack() {
     assert_eq!(
         profiles,
         vec![
+            "proxmox-base",
             "proxmox-q35-uefi",
+            "proxmox-windows",
             "windows-common",
             "windows-11",
             "looking-glass",
