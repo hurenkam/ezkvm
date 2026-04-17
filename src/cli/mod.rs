@@ -11,7 +11,8 @@ mod types;
 mod tests;
 
 pub use types::{
-    Cli, Commands, DeviceCommands, NetworkCommands, PciCommands, StorageCommands, UsbCommands,
+    Cli, Commands, DeviceCommands, ImportOutputModeArg, NetworkCommands, PciCommands,
+    StorageCommands, UsbCommands,
 };
 
 pub use execute::execute;

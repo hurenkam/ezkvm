@@ -33,6 +33,35 @@ Import output is profile-aware and compacted:
 - importer-inferred `profiles` are emitted
 - redundant VM-local fields already provided by those profiles may be omitted
 
+By default, `import-proxmox` uses `--output-mode compact`.
+
+### Export Modes
+
+`import-proxmox` supports explicit output modes:
+
+- `--output-mode compact` (default): profile-overlay form with profile-owned fields omitted
+- `--output-mode canonical`: full explicit mapped YAML before profile compaction
+- `--output-mode debug`: canonical output plus deterministic IDs and source comments
+
+Examples:
+
+```bash
+# default compact profile-overlay output
+ezkvm import-proxmox /etc/pve/qemu-server/108.conf --dry-run
+
+# full explicit mapped output
+ezkvm import-proxmox /etc/pve/qemu-server/108.conf --output-mode canonical --dry-run
+
+# debug-friendly output with source comments and deterministic ids
+ezkvm import-proxmox /etc/pve/qemu-server/108.conf --output-mode debug --dry-run
+```
+
+Debug mode includes source comments such as:
+
+```yaml
+# from Proxmox ostype: win11
+```
+
 ### List Path Merge Safety
 
 For merge-safe list paths (for example id-merged controller/host device lists and append-unique option lists), redundant overlay entries may be pruned while preserving the same merged runtime result.

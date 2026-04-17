@@ -1,6 +1,9 @@
 use anyhow::Result;
 
-use super::{DeviceCommands, NetworkCommands, PciCommands, StorageCommands, UsbCommands};
+use super::{
+    DeviceCommands, ImportOutputModeArg, NetworkCommands, PciCommands, StorageCommands,
+    UsbCommands,
+};
 
 pub(crate) async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
@@ -38,13 +41,21 @@ pub(crate) async fn handle_import_proxmox(
     dry_run: bool,
     strict: bool,
     no_compact: bool,
+    output_mode: ImportOutputModeArg,
 ) -> Result<()> {
+    let output_mode = match output_mode {
+        ImportOutputModeArg::Canonical => crate::import::proxmox::ImportOutputMode::Canonical,
+        ImportOutputModeArg::Compact => crate::import::proxmox::ImportOutputMode::Compact,
+        ImportOutputModeArg::Debug => crate::import::proxmox::ImportOutputMode::DebugCanonical,
+    };
+
     let options = crate::import::proxmox::ImportRunOptions {
         output_path: output.map(ToString::to_string),
         storage_path: proxmox_storage.map(ToString::to_string),
         strict,
         dry_run,
         compact_lists: !no_compact,
+        output_mode,
     };
 
     let result = crate::import::proxmox::run_import_from_files(input, &options)
@@ -54,6 +65,7 @@ pub(crate) async fn handle_import_proxmox(
         println!("# import-proxmox dry run");
         println!("# input: {}", input);
         println!("# output (not written): {}", result.output_path);
+        println!("# output mode: {:?}", output_mode);
         if !result.warnings.is_empty() {
             println!("# warnings ({}):", result.warnings.len());
             for warning in &result.warnings {
@@ -65,6 +77,7 @@ pub(crate) async fn handle_import_proxmox(
         println!("Import complete");
         println!("Input: {}", input);
         println!("Output: {}", result.output_path);
+        println!("Output mode: {:?}", output_mode);
         if !result.warnings.is_empty() {
             println!("Warnings ({}):", result.warnings.len());
             for warning in &result.warnings {

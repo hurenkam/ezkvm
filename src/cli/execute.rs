@@ -37,6 +37,7 @@ pub async fn execute(cli: Cli) -> Result<()> {
             dry_run,
             strict,
             no_compact,
+            output_mode,
         } => {
             handle_import_proxmox(
                 &input,
@@ -45,6 +46,7 @@ pub async fn execute(cli: Cli) -> Result<()> {
                 dry_run,
                 strict,
                 no_compact,
+                output_mode,
             )
             .await
         }

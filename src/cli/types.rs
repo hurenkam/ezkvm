@@ -1,4 +1,11 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+pub enum ImportOutputModeArg {
+    Canonical,
+    Compact,
+    Debug,
+}
 
 /// ezkvm - Easy KVM virtual machine manager
 #[derive(Parser)]
@@ -78,6 +85,9 @@ pub enum Commands {
     },
 
     /// Import a Proxmox VM config into canonical ezkvm YAML
+    #[command(
+        after_help = "Examples:\n  ezkvm import-proxmox /etc/pve/qemu-server/108.conf --dry-run\n  ezkvm import-proxmox /etc/pve/qemu-server/108.conf --output-mode canonical --dry-run\n  ezkvm import-proxmox /etc/pve/qemu-server/108.conf --output-mode debug --dry-run"
+    )]
     ImportProxmox {
         /// Path to Proxmox VM config (e.g. /etc/pve/qemu-server/100.conf)
         input: String,
@@ -101,6 +111,15 @@ pub enum Commands {
         /// Disable compact inline mapping style for list and deep nested items
         #[arg(long)]
         no_compact: bool,
+
+        /// Output mode for generated YAML
+        #[arg(
+            long,
+            value_enum,
+            default_value_t = ImportOutputModeArg::Compact,
+            help = "Output mode: canonical (full), compact (profile-overlay), debug (canonical + deterministic ids + source comments)"
+        )]
+        output_mode: ImportOutputModeArg,
     },
 
     /// Storage management commands

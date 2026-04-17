@@ -406,34 +406,27 @@ Acceptance Criteria:
 - Snapshot tests show compacted form 10-15% smaller for dense multi-device fixtures.
 Estimate: 2 days
 
-### B-35 Add --canonical flag to emit full explicit schema without profile compaction
+### B-35 Update schema to attach devices to controllers which belong to devices
 Scope:
-- Add `--canonical` flag (or `--output-mode canonical`) to the `import-proxmox` CLI command.
-- When set, skip `compact_profile_owned_fields` and emit the full serialized schema directly.
-- Add `output_mode` field to `ImportRunOptions` (compact | canonical) with compact as default.
-- Preserve the `profiles` list field in canonical output for informational purposes.
-Dependencies: B-30
-Acceptance Criteria:
-- CLI accepts `--canonical` flag; help text explains canonical vs. compact trade-off.
-- Canonical output contains all fields (including profile-owned defaults) without omissions.
-- Compact mode remains unchanged and is the default when `--canonical` is absent.
-- Integration test verifies that canonical and compact outputs produce identical QEMU args in dry-run.
-- `--canonical` and `--no-compact` flags are composable without conflict.
-Estimate: 1.5 days
+- Allow for controllers to reside under devices, and drives under controllers, and make this the default for generated vm yaml files.
 
-### B-36 Add controller-centric schema normalization for consistency-by-construction
-Scope:
-- Support nested controller-owned devices in VM YAML while keeping backward compatibility with current flat canonical sections.
-- Accept `controllers.scsi[].drives[]` and normalize into `devices.drives[]` with inferred `controller` links.
-- Accept `controllers.xhci[].usb[]` and normalize into `host.usb[]` with inferred `bus` links.
-- Auto-generate missing IDs for normalized controller and USB entries.
-Dependencies: B-32
-Acceptance Criteria:
-- Nested controller-owned drive and USB entries deserialize successfully.
-- Normalized output remains functionally equivalent to existing flat schema for QEMU arg generation.
-- Existing flat schema remains fully supported (no breaking changes).
-- Tests cover inferred controller links, inferred USB bus links, and ID auto-generation behavior.
-Estimate: 2 days
+Example yaml:
+```
+devices:
+   - controller: "pvscsi"
+     interface: "scsi"
+     drives:
+      - { path: "/dev/vm1/vm-108-boot", type: "disk", boot_index: 100 }
+
+   - controller: "xhci"
+     usb:
+       - hostbus: "1"
+       - hostport: "2-2"
+```
+Note that id's can be generated automatically when creating the qemu commandline, and interface type can be linked to the controller rather than the drive.
+Allow the original devices.drives stansa as well, to maintain backwards compatibility, but also to allow for controller to be exposed in profile, and drives connected to that from vm config.
+
+Note: This may already be partially implemented, but as of the time of writing, a generated yaml from proxmox config does not default to the suggested layout. After this task is finished, it should do so.
 
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 

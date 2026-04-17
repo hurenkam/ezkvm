@@ -20,6 +20,8 @@ mod profile_compat;
 mod proxmox_import;
 #[path = "integration/proxmox_import_profiles.rs"]
 mod proxmox_import_profiles;
+#[path = "integration/proxmox_import_output_modes.rs"]
+mod proxmox_import_output_modes;
 #[path = "integration/proxmox_import_wakiza.rs"]
 mod proxmox_import_wakiza;
 #[path = "integration/wakiza.rs"]

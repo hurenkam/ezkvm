@@ -6,6 +6,7 @@ use super::{
     mapper::{
         MappingWarning, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
     },
+    model::ProxmoxVmConfig,
     parser::parse_proxmox_config,
     profile_compact::compact_profile_owned_fields,
     storage_parser::parse_proxmox_storage_config,
@@ -14,6 +15,14 @@ use super::{
 use crate::config::{VmConfig, validation};
 use std::path::Path;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImportOutputMode {
+    Canonical,
+    #[default]
+    Compact,
+    DebugCanonical,
+}
+
 #[derive(Debug, Clone)]
 pub struct ImportRunOptions {
     pub output_path: Option<String>,
@@ -21,6 +30,7 @@ pub struct ImportRunOptions {
     pub strict: bool,
     pub dry_run: bool,
     pub compact_lists: bool,
+    pub output_mode: ImportOutputMode,
 }
 
 #[derive(Debug, Clone)]
@@ -75,13 +85,19 @@ pub fn run_import_from_files(
         )));
     }
 
-    let compacted_profiles_yaml = compact_profile_owned_fields(&mapped.yaml)?;
+    let mut rendered_yaml = render_export_yaml(&parsed, &mapped.yaml, options)?;
 
-    let rendered_yaml = if options.compact_lists {
-        compact_sequence_mappings(&compacted_profiles_yaml)?
-    } else {
-        compacted_profiles_yaml
-    };
+    if options.compact_lists {
+        rendered_yaml = compact_sequence_mappings(&rendered_yaml)?;
+    }
+
+    if options.output_mode == ImportOutputMode::DebugCanonical {
+        rendered_yaml = format!(
+            "{}\n{}",
+            build_debug_source_comments(&parsed, &mapped.warnings),
+            rendered_yaml
+        );
+    }
 
     let output_path = options
         .output_path
@@ -121,6 +137,65 @@ fn format_warnings(warnings: &[MappingWarning]) -> String {
         .map(|warning| format!("{}: {}", warning.source_field, warning.message))
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+fn render_export_yaml(
+    parsed: &ProxmoxVmConfig,
+    canonical_yaml: &str,
+    options: &ImportRunOptions,
+) -> Result<String, ImportError> {
+    let rendered = match options.output_mode {
+        ImportOutputMode::Canonical => canonical_yaml.to_string(),
+        ImportOutputMode::Compact => compact_profile_owned_fields(canonical_yaml)?,
+        ImportOutputMode::DebugCanonical => render_debug_canonical_yaml(parsed, canonical_yaml)?,
+    };
+
+    Ok(rendered)
+}
+
+fn render_debug_canonical_yaml(
+    _parsed: &ProxmoxVmConfig,
+    canonical_yaml: &str,
+) -> Result<String, ImportError> {
+    let mut config = serde_yaml::from_str::<VmConfig>(canonical_yaml).map_err(|e| {
+        ImportError::ParseError(format!(
+            "generated canonical YAML failed to deserialize for debug export: {e}"
+        ))
+    })?;
+    config.assign_default_device_ids();
+
+    serde_yaml::to_string(&config).map_err(|e| {
+        ImportError::ParseError(format!(
+            "failed to serialize debug-canonical YAML: {e}"
+        ))
+    })
+}
+
+fn build_debug_source_comments(parsed: &ProxmoxVmConfig, warnings: &[MappingWarning]) -> String {
+    let mut lines = vec![
+        "# debug-canonical export".to_string(),
+        "# source: Proxmox config".to_string(),
+    ];
+
+    for key in [
+        "name", "ostype", "machine", "bios", "cpu", "memory", "cores", "sockets", "agent", "args",
+    ] {
+        if let Some(value) = parsed.scalars.get(key) {
+            lines.push(format!("# from Proxmox {key}: {value}"));
+        }
+    }
+
+    if !warnings.is_empty() {
+        lines.push(format!("# mapper warnings: {}", warnings.len()));
+        for warning in warnings {
+            lines.push(format!(
+                "# warning {}: {}",
+                warning.source_field, warning.message
+            ));
+        }
+    }
+
+    lines.join("\n")
 }
 
 
@@ -182,6 +257,7 @@ mod tests {
                 strict: false,
                 dry_run: true,
                 compact_lists: false,
+                output_mode: super::ImportOutputMode::Compact,
             };
 
             let result =
@@ -208,6 +284,7 @@ mod tests {
                 strict: true,
                 dry_run: true,
                 compact_lists: false,
+                output_mode: super::ImportOutputMode::Compact,
             };
 
             let err = run_import_from_files(&input_path.to_string_lossy(), &options)
@@ -235,6 +312,7 @@ mod tests {
                 strict: false,
                 dry_run: false,
                 compact_lists: false,
+                output_mode: super::ImportOutputMode::Compact,
             };
 
             let result =
@@ -268,6 +346,7 @@ mod tests {
                 strict: false,
                 dry_run: true,
                 compact_lists: false,
+                output_mode: super::ImportOutputMode::Compact,
             };
 
             let result =
@@ -300,6 +379,7 @@ mod tests {
                 strict: false,
                 dry_run: true,
                 compact_lists: false,
+                output_mode: super::ImportOutputMode::Compact,
             };
 
             let result =
@@ -309,6 +389,91 @@ mod tests {
                     .yaml
                     .contains("path: /dev/zvol/rpool/data/vm-500-disk-0")
             );
+        });
+    }
+
+    #[test]
+    fn canonical_and_compact_modes_render_different_yaml_shapes() {
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-output-mode-shapes");
+            let input_path = dir.join("700.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-mode\nostype: win11\nbios: ovmf\nmemory: 4096\ncores: 4\nscsi0: /var/lib/vm/disk.raw,format=raw\n",
+            )
+            .expect("write input");
+
+            let canonical = run_import_from_files(
+                &input_path.to_string_lossy(),
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: None,
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::Canonical,
+                },
+            )
+            .expect("canonical import");
+
+            let compact = run_import_from_files(
+                &input_path.to_string_lossy(),
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: None,
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::Compact,
+                },
+            )
+            .expect("compact import");
+
+            assert_ne!(canonical.yaml, compact.yaml);
+            assert!(canonical.yaml.contains("architecture:"));
+        });
+    }
+
+    #[test]
+    fn debug_mode_includes_source_comments_and_deterministic_ids() {
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-output-mode-debug");
+            let input_path = dir.join("701.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-debug\nostype: win11\nbios: ovmf\nmemory: 4096\ncores: 4\nusb0: host=1-2.2\n",
+            )
+            .expect("write input");
+
+            let canonical = run_import_from_files(
+                &input_path.to_string_lossy(),
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: None,
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::Canonical,
+                },
+            )
+            .expect("canonical import");
+
+            let debug = run_import_from_files(
+                &input_path.to_string_lossy(),
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: None,
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::DebugCanonical,
+                },
+            )
+            .expect("debug import");
+
+            assert!(debug.yaml.contains("# from Proxmox ostype: win11"));
+            assert!(debug.yaml.contains("id: xhci"));
+            assert!(!canonical.yaml.contains("id: xhci"));
         });
     }
 }

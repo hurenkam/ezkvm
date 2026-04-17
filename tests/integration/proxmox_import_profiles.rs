@@ -33,6 +33,7 @@ fn imported_profiles(conf_path: &str, storage_path: Option<&str>) -> Vec<String>
                 strict: false,
                 dry_run: true,
                 compact_lists: false,
+                output_mode: ezkvm::import::proxmox::ImportOutputMode::Compact,
             },
         )
         .expect("import should succeed")
