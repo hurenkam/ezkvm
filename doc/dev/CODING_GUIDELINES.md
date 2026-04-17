@@ -68,6 +68,13 @@ Import output compactness rule:
 - A field may be omitted from import output only when a profile assigned during import guarantees its restoration at runtime.
 - Import-specific defaults must not live in mapper code. Proxmox runtime values not stored in `.conf` files belong in dedicated Proxmox profiles (`proxmox-base`, `proxmox-windows`, `proxmox-q35-uefi`).
 - Device IDs (drives, networks) must be set from the Proxmox source key (e.g. `"scsi0"`, `"net0"`) to preserve boot-order lookup semantics.
+- Preserve Proxmox runtime integration paths and identifiers when VMID is known:
+  - tap interface names: `tap<vmid>i<index>`
+  - pid file path: `/var/run/qemu-server/<vmid>.pid`
+  - guest agent socket path: `/var/run/qemu-server/<vmid>.qga`
+- Preserve Proxmox-compatible PCI topology for imported devices when defaults are expected by guest OS behavior (for example NIC `bus/addr` placement and guest-agent controller placement).
+- Preserve Proxmox-compatible serial topology for guest agent and SPICE/vdagent channels to avoid Looking Glass keyboard/input regressions.
+- For Proxmox import changes that affect runtime arguments, update fixture snapshots and verify dry-run parity against captured Proxmox command lines.
 - See ADR-0002 for the full single-defaults contract.
 
 ## 8. Concurrency and Safety

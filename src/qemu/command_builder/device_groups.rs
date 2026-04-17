@@ -41,7 +41,11 @@ impl QemuManager {
             let has_serial_controller = self
                 .config
                 .options_guest_agent()
-                .map(|guest_agent| guest_agent.enabled)
+                .map(|guest_agent| {
+                    // Proxmox-style pinned guest-agent controllers should not be reused
+                    // for SPICE vdagent. Keep a dedicated vdagent serial controller.
+                    guest_agent.enabled && guest_agent.bus.is_none() && guest_agent.addr.is_none()
+                })
                 .unwrap_or(false);
             let attach_display_device = !self.has_primary_passthrough_gpu();
             args.add_spice(

@@ -93,6 +93,15 @@ Use a layered modular monolith pattern with ports-and-adapters influence:
 - Use deterministic command generation for regression comparability.
 - Handle external command/protocol errors as structured failures, not best-effort logs.
 
+### Proxmox Runtime Parity Invariants
+- For Proxmox imports, preserve host/runtime integration anchors that Proxmox tooling depends on:
+  - tap naming format (`tap<vmid>i<net-index>`)
+  - pid file path (`/var/run/qemu-server/<vmid>.pid`)
+  - runtime socket paths under `/var/run/qemu-server/`
+- Preserve stable PCI topology for imported devices when Proxmox behavior depends on it (for example network and guest-agent controller placement).
+- Keep guest-agent and SPICE/vdagent serial topology compatible with Proxmox to avoid input-channel regressions in Looking Glass workflows.
+- Treat dry-run parity against captured Proxmox command lines as a required architecture-level regression check for import changes.
+
 ## 3. Layering / Packaging
 
 ### Goal

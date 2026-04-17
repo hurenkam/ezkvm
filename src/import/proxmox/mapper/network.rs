@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 pub(super) fn map_network(
     network: &ProxmoxNetEntry,
-    _vmid: Option<u32>,
+    vmid: Option<u32>,
     is_windows: bool,
     warnings: &mut Vec<MappingWarning>,
 ) -> NetworkConfig {
@@ -47,7 +47,14 @@ pub(super) fn map_network(
         "user".to_string()
     };
 
-    let ifname = network.options.get("ifname").cloned();
+    let ifname = network
+        .options
+        .get("ifname")
+        .cloned()
+        .or_else(|| match (has_bridge, vmid) {
+            (true, Some(id)) => Some(format!("tap{}i{}", id, network.index)),
+            _ => None,
+        });
     let script = network.options.get("script").cloned();
     let downscript = network.options.get("downscript").cloned();
     let vhost = network

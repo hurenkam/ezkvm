@@ -347,8 +347,8 @@ pub(super) fn map_guest_agent(
         enabled: true,
         socket_path,
         freeze_cpu: false,
-        bus: None,
-        addr: None,
+        bus: Some("pci.0".to_string()),
+        addr: Some("0x8".to_string()),
     })
 }
 

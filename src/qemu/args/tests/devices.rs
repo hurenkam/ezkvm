@@ -98,7 +98,7 @@ fn test_guest_agent_with_bus_and_addr() {
     assert!(
         built
             .iter()
-            .any(|arg| arg == "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8")
+            .any(|arg| arg == "virtio-serial,id=qga0,bus=pci.0,addr=0x8")
     );
 }
 

@@ -253,6 +253,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             } else {
                 None
             },
+            pid_file: inferred_vmid.map(|id| format!("/var/run/qemu-server/{}.pid", id)),
             guest_agent,
             ..VmOptions::default()
         },
@@ -486,6 +487,21 @@ mod tests {
     }
 
     #[test]
+    fn maps_pid_file_from_vmid() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-pid-default
+            scsi0: local-lvm:vm-108-disk-0,size=10G
+            "#,
+        );
+
+        assert_eq!(
+            cfg.options.pid_file.as_deref(),
+            Some("/var/run/qemu-server/108.pid")
+        );
+    }
+
+    #[test]
     fn resolves_storage_backed_disk_paths() {
         let (_, cfg) = map_and_validate_with_storage(
             r#"
@@ -555,11 +571,25 @@ mod tests {
     }
 
     #[test]
-    fn does_not_infer_tap_ifname_for_bridge_networks() {
+    fn infers_tap_ifname_for_bridge_networks_from_vmid() {
         let (_, cfg) = map_and_validate(
             r#"
             name: vm-net-ifname
             scsi0: local-lvm:vm-108-disk-0
+            net0: virtio=52:54:00:12:34:56,bridge=vmbr0
+            "#,
+        );
+
+        let net = &cfg.devices.networks[0];
+        let backend = net.backend.as_ref().expect("backend must be set");
+        assert_eq!(backend.ifname.as_deref(), Some("tap108i0"));
+    }
+
+    #[test]
+    fn does_not_infer_tap_ifname_without_vmid() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-net-ifname-no-vmid
             net0: virtio=52:54:00:12:34:56,bridge=vmbr0
             "#,
         );
@@ -771,8 +801,8 @@ mod tests {
             agent.socket_path.as_deref(),
             Some("/var/run/qemu-server/qga.sock")
         );
-        assert_eq!(agent.bus, None);
-        assert_eq!(agent.addr, None);
+        assert_eq!(agent.bus.as_deref(), Some("pci.0"));
+        assert_eq!(agent.addr.as_deref(), Some("0x8"));
     }
 
     #[test]

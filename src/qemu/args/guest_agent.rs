@@ -20,7 +20,13 @@ impl QemuArgs {
 }
 
 fn build_guest_agent_serial_spec(bus: Option<&str>, addr: Option<&str>) -> String {
-    let mut serial_spec = "virtio-serial-pci,id=virtio-serial0".to_string();
+    // When placement is explicit, use the Proxmox-style legacy controller form.
+    // This keeps device topology aligned with imported Proxmox VMs.
+    let mut serial_spec = if bus.is_some() || addr.is_some() {
+        "virtio-serial,id=qga0".to_string()
+    } else {
+        "virtio-serial-pci,id=virtio-serial0".to_string()
+    };
     if let Some(bus) = bus {
         serial_spec.push_str(&format!(",bus={}", bus));
     }

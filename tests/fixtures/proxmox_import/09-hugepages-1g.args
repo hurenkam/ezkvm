@@ -37,7 +37,7 @@ cpu,node-id=0,socket-id=2
 -numa
 cpu,node-id=0,socket-id=3
 -pidfile
-<RUNTIME_DIR>/ezkvm/e2e-hugepages-1g.pid
+/var/run/qemu-server/300.pid
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

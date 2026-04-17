@@ -13,7 +13,7 @@ cpus=8
 -netdev
 type=tap,id=net0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
 -device
-virtio-net,netdev=net0,mac=52:54:00:de:ad:01,rx_queue_size=1024,tx_queue_size=256
+virtio-net,netdev=net0,mac=52:54:00:de:ad:01,bus=pci.0,addr=0x12,rx_queue_size=1024,tx_queue_size=256
 -boot
 menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device

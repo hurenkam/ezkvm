@@ -85,7 +85,7 @@ fn test_spice_vdagent_reuses_existing_serial_controller() {
     let built = args.build();
     let serial_controller_count = built
         .iter()
-        .filter(|arg| arg.starts_with("virtio-serial-pci"))
+        .filter(|arg| arg.starts_with("virtio-serial-pci") || arg.starts_with("virtio-serial,id="))
         .count();
 
     assert_eq!(serial_controller_count, 1);

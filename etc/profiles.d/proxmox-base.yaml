@@ -36,9 +36,16 @@ policies:
     - match:
         backend_type: tap
       defaults:
+        bus: pci.0
         rx_queue_size: 1024
         tx_queue_size: 256
         backend:
           vhost: true
           script: /usr/libexec/qemu-server/pve-bridge
           downscript: /usr/libexec/qemu-server/pve-bridgedown
+      placement:
+        addr:
+          scope: bus
+          bus: pci.0
+          start: "0x12"
+          step: 1
