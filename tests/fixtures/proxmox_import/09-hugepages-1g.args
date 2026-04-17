@@ -13,7 +13,7 @@ virtio-scsi-pci,id=scsihw0
 -drive
 file=local-lvm:vm-300-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap
 -device
-scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
+scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,scsi-id=0
 -netdev
 type=user,id=net0
 -device

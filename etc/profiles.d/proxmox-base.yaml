@@ -24,6 +24,14 @@ policies:
         cache: none
         aio: io_uring
         detect_zeroes: unmap
+    - match:
+        interface: scsi
+        type: disk
+      placement:
+        scsi_id:
+          scope: controller
+          start: 0
+          step: 1
   networks:
     - match:
         backend_type: tap

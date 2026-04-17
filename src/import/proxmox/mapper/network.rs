@@ -90,7 +90,7 @@ pub(super) fn map_network(
     let addr = network.options.get("addr").cloned();
 
     NetworkConfig {
-        id: String::new(),
+        id: network.key.clone(),
         model,
         backend: Some(backend),
         mac: network.mac.clone(),

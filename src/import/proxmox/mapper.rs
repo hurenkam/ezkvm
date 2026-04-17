@@ -1210,8 +1210,8 @@ mod tests {
         assert_eq!(cfg.devices.networks[0].id, "net0");
         assert_eq!(cfg.devices.networks[1].id, "net1");
         assert_eq!(cfg.devices.networks[2].id, "net2");
-        // Network IDs are renumbered to be sequential (net0-net3)
-        assert_eq!(cfg.devices.networks[3].id, "net3");
+        // Network IDs preserve the Proxmox source key so boot order lookup can match
+        assert_eq!(cfg.devices.networks[3].id, "net5");
     }
 
     #[test]

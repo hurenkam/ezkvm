@@ -1,7 +1,7 @@
 -name
 fixture-nested
 -machine
-type=q35,viommu=intel
+type=q35,hpet=off,viommu=intel
 -cpu
 host,kvm=off,-hypervisor,hidden=1
 -m
@@ -13,7 +13,7 @@ virtio-scsi-pci,id=scsihw0
 -drive
 file=/var/lib/vm/nested.raw,if=none,id=drive-scsi0,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap
 -device
-scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
+scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,scsi-id=0
 -netdev
 type=tap,id=net0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
 -device

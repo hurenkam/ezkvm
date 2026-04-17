@@ -1,4 +1,6 @@
 system:
   architecture: "x86_64"
+  machine_options:
+    - "hpet=off"
   boot:
     firmware: "uefi"

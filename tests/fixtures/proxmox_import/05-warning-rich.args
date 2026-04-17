@@ -13,7 +13,7 @@ virtio-scsi-pci,id=scsihw0
 -drive
 file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap
 -device
-scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
+scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,scsi-id=0
 -netdev
 type=tap,id=net0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
 -device
