@@ -475,6 +475,18 @@ spice:
   disable_ticketing: true
 ```
 
+## `headless-vnc`
+
+```yaml
+vnc:
+  enabled: true
+  display: "127.0.0.1:0"
+
+devices:
+  displays:
+    - type: "none"
+```
+
 ## `looking-glass`
 
 ```yaml
@@ -520,6 +532,23 @@ system:
     hugepages:
       enabled: true
       prealloc: true
+```
+
+## `viommu`
+
+```yaml
+iommu:
+  intremap: true
+```
+
+## `hidden-hypervisor`
+
+```yaml
+system:
+  cpu:
+    features:
+      - "kvm=off"
+      - "-hypervisor"
 ```
 
 ## Example Profile Stacks
@@ -577,6 +606,17 @@ profiles:
   - proxmox-q35-uefi
   - macos-kvm
   - gpu-passthrough
+```
+
+### Nested virtualization VM with IOMMU and hidden hypervisor
+
+```yaml
+profiles:
+  - proxmox-q35-uefi
+  - storage-virtio-scsi-single
+  - linux-l26-common
+  - viommu
+  - hidden-hypervisor
 ```
 
 ## Importer Assignment Rules
@@ -677,9 +717,13 @@ The following concrete profile files have now been added under `etc/profiles.d` 
 - `linux-l26-common.yaml`
 - `macos-kvm.yaml`
 - `remote-viewer-spice.yaml`
+- `headless-vnc.yaml`
+- `headless-serial.yaml`
 - `looking-glass.yaml`
 - `gpu-passthrough.yaml`
-- `headless-serial.yaml`
+- `hugepages.yaml`
+- `viommu.yaml`
+- `hidden-hypervisor.yaml`
 
 These files are intentionally narrower than the ideal long-term taxonomy. They only encode settings that the current canonical profile schema can represent safely.
 
@@ -687,7 +731,7 @@ Importer status update:
 
 - Proxmox import now emits inferred `profiles` stacks.
 - Import output now applies a conservative profile-aware compaction pass that removes redundant VM-local fields already provided by inferred profiles.
-- Profile-stack integration tests are in place for representative Windows, Linux, and macOS fixtures.
+- Profile-stack integration tests are in place for representative Windows, Linux, macOS, headless VNC, and nested viommu/hidden-hypervisor fixtures.
 
 ## Deferred Or Partially Represented Profiles
 
@@ -695,21 +739,46 @@ Some profile ideas from this analysis are not fully materialized yet. In some ca
 
 ### `headless-vnc`
 
-Deferred.
+Materialized.
 
-Reason:
+- canonical `vnc` schema section (`VncConfig`) has been added with `enabled`, `display`, and `password` fields
+- VNC validation is wired into `validate_optional_platform_sections`
+- QEMU emission: `-vnc display[,password=on]` is emitted before SPICE when `vnc.enabled` is true
+- `uses_headless_vnc()` detection in the command builder suppresses `-vga`/`-nographic` for the passthrough GPU disambiguation path when all displays are `none` and VNC is active
+- importer parses `-vnc spec` from raw Proxmox `args` field
+- `headless-vnc` profile is inferred when VNC is enabled and all configured displays have type `none`
+- fixture and profile-stack integration tests are in place
 
-- the current canonical profile schema includes `spice` but not a canonical `vnc` section in the profile-oriented VM schema used by these layered profiles
+Profile shape:
+
+```yaml
+vnc:
+  enabled: true
+  display: "127.0.0.1:0"
+
+devices:
+  displays:
+    - type: "none"
+```
 
 ### `hugepages`
 
-Partially materialized.
+Materialized.
 
-Reason:
+- hugepages are represented in canonical schema (`system.memory.hugepages`) and imported from Proxmox `hugepages:` values
+- QEMU emission generates `-object memory-backend-file` and `-numa ... memdev=` wiring
+- canonical profile file `hugepages.yaml` exists and encodes the shared defaults
+- profile inference and compaction alignment remain areas for future tightening
 
-- hugepages are now represented in canonical schema (`system.memory.hugepages`) and imported from Proxmox `hugepages:` values
-- QEMU emission now generates `-object memory-backend-file` and `-numa ... memdev=` wiring for hugepages-backed memory
-- profile-layer materialization remains incomplete because `hugepages` profile inference and canonical profile file adoption are not yet fully integrated into compaction behavior
+Profile shape:
+
+```yaml
+system:
+  memory:
+    hugepages:
+      enabled: true
+      prealloc: true
+```
 
 ### `macos-kvm` raw AppleSMC and SMBIOS extras
 
@@ -727,35 +796,48 @@ Remaining gap:
 
 ### `viommu`
 
-Partially materialized.
-
-Reason:
+Materialized.
 
 - IOMMU/vIOMMU device representation exists in canonical schema and QEMU emission
-- importer assignment as a dedicated tuning profile layer is not yet consistently materialized across profile inference and compaction
+- importer now infers `viommu` profile when `config.iommu` is present (set via Proxmox `machine: ...,viommu=intel` or equivalent)
+- fixture and profile-stack integration tests are in place
+
+Profile shape:
+
+```yaml
+iommu:
+  intremap: true
+```
 
 ### `hidden-hypervisor`
 
-Deferred.
+Materialized.
 
-Reason:
+- importer detects hypervisor-hiding signals: `kvm=off`, `-hypervisor`, or `hidden=1` in CPU features or raw `args`
+- `hidden-hypervisor` profile is inferred when any of those signals are present
+- fixture and profile-stack integration tests are in place (including real-world Proxmox corpus fixture)
 
-- source signals can be detected from CPU feature flags (`kvm=off`, hypervisor-hiding patterns)
-- a dedicated canonical profile layer with importer assignment and compaction ownership is not yet fully defined
+Profile shape:
+
+```yaml
+system:
+  cpu:
+    features:
+      - "kvm=off"
+      - "-hypervisor"
+```
 
 ## Recommended Next Steps
 
-1. Complete `hugepages` profile materialization end-to-end by adding canonical profile file coverage plus importer profile inference/compaction ownership for `system.memory.hugepages`.
-2. Materialize `headless-vnc` by extending the profile-oriented schema with explicit VNC settings and adding a corresponding layered profile.
-3. Continue narrowing profile ownership boundaries (especially list-shaped sections) so compaction can safely remove redundant VM-local fields when profile defaults already provide them.
-4. Extend profile-stack corpus tests with more edge cases (nested virtualization, multiple display backends, mixed storage buses, and macOS-specific AppleSMC/SMBIOS type handling).
+1. Tighten profile-aware compaction boundaries, especially for list-shaped sections (CPU features, display devices), so compaction can safely remove VM-local fields already provided by inferred profiles.
+2. Extend compaction ownership for `hugepages` so that profile defaults are used rather than repeated inline values.
+3. Add `usb-passthrough` and `audio-desktop` profiles once corresponding schema sections are stabilized.
+4. Further expand the profile-stack corpus with macOS-specific AppleSMC/SMBIOS edge cases and USB passthrough scenarios.
 
 ## Recommended Rollout Order
 
-1. Keep current base stack (`proxmox-q35-uefi`, storage profiles, OS-family profiles, `remote-viewer-spice`, `looking-glass`, `gpu-passthrough`, `headless-serial`) as the default emitted taxonomy.
-2. Finalize `hugepages` as a first-class opt-in layer (profile file + importer assignment + compaction alignment).
-3. Add `headless-vnc` as a first-class access-mode layer once VNC is represented in the profile-oriented schema.
-4. Expand opt-in tuning layers (`viommu`, `hidden-hypervisor`) with explicit importer assignment rules and fixture coverage.
-5. Tighten profile-aware compaction boundaries so emitted VM YAML consistently prefers profile stacks over repeated inline defaults.
+1. All primary profile layers are now landed: base stack, OS-family profiles, display/access profiles (`remote-viewer-spice`, `headless-vnc`, `headless-serial`, `looking-glass`), passthrough profiles (`gpu-passthrough`), and tuning profiles (`hugepages`, `viommu`, `hidden-hypervisor`).
+2. Remaining work is primarily compaction quality: tighten profile ownership boundaries so emitted VM YAML consistently uses profile stack defaults over repeated inline values.
+3. Add remaining access and tuning layers (`usb-passthrough`, `audio-desktop`) as their schema sections mature.
 
-This order reflects what is already landed and focuses the remaining work on deferred profile layers and compaction quality.
+This order reflects the landing of all B-series backlog items and focuses remaining work on compaction quality and coverage expansion.
