@@ -9,9 +9,9 @@ host
 -smp
 cpus=2
 -drive
-if=none,id=drive-ide2,media=cdrom,readonly=on
+if=none,id=drive-ide0,media=cdrom,readonly=on
 -device
-ide-cd,drive=drive-ide2,id=ide2,bootindex=101
+ide-cd,drive=drive-ide0,id=ide0,bootindex=101
 -netdev
 type=user,id=net0
 -device

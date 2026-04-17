@@ -35,7 +35,7 @@ pub(super) fn map_scsi_controllers(
     };
 
     vec![ScsiControllerConfig {
-        id: "scsihw0".to_string(),
+        id: String::new(),
         r#type: controller_type,
         iothread: None,
         max_targets: None,
@@ -105,7 +105,7 @@ pub(super) fn map_drive(
         });
 
     DriveConfig {
-        id: disk.key.clone(),
+        id: String::new(),
         path,
         interface: disk.bus.clone(),
         r#type: if is_cdrom {
@@ -152,7 +152,7 @@ pub(super) fn map_sata_controllers(disks: &[ProxmoxDiskEntry]) -> Vec<SataContro
     }
 
     vec![SataControllerConfig {
-        id: "sata0".to_string(),
+        id: String::new(),
         r#type: "ahci".to_string(),
         bus: None,
         addr: None,

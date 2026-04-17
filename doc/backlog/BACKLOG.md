@@ -370,12 +370,14 @@ Scope:
 - Identify deterministic/derived fields (e.g., auto-assigned IDs, bus/address allocations, socket paths) that should be omitted from import output to reduce clutter.
 - Extend `skip_serializing_if` policies in config schema to omit deterministic fields when serializing imported configs.
 - Ensure QEMU command generation infers or auto-derives these fields from context when deserializing.
+- Capture consistency finding: where feasible, prefer schema-level ownership (controller-owned devices) over post-parse cross-reference checks.
 Dependencies: B-29
 Acceptance Criteria:
 - Deterministic field list documented (at least 8-10 fields identified).
 - Serialization omits these fields; QEMU arg generation reconstructs them deterministically.
 - Schema validation allows missing deterministic fields during import deserialization.
-- Snapshot tests verify generated QEMU args remain identical with/without deterministic fields.
+- Snapshot tests verify generated QEMU args remain identical with/without fields.
+- Documented decision: schema-driven linkage is the preferred long-term approach for controller/device consistency.
 Estimate: 2 days
 
 ### B-33 Introduce explicit export modes (canonical, compact, debug-canonical)
@@ -418,6 +420,20 @@ Acceptance Criteria:
 - Integration test verifies that canonical and compact outputs produce identical QEMU args in dry-run.
 - `--canonical` and `--no-compact` flags are composable without conflict.
 Estimate: 1.5 days
+
+### B-36 Add controller-centric schema normalization for consistency-by-construction
+Scope:
+- Support nested controller-owned devices in VM YAML while keeping backward compatibility with current flat canonical sections.
+- Accept `controllers.scsi[].drives[]` and normalize into `devices.drives[]` with inferred `controller` links.
+- Accept `controllers.xhci[].usb[]` and normalize into `host.usb[]` with inferred `bus` links.
+- Auto-generate missing IDs for normalized controller and USB entries.
+Dependencies: B-32
+Acceptance Criteria:
+- Nested controller-owned drive and USB entries deserialize successfully.
+- Normalized output remains functionally equivalent to existing flat schema for QEMU arg generation.
+- Existing flat schema remains fully supported (no breaking changes).
+- Tests cover inferred controller links, inferred USB bus links, and ID auto-generation behavior.
+Estimate: 2 days
 
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 

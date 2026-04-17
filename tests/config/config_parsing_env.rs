@@ -295,7 +295,7 @@ devices:
     let config = VmConfig::from_str(yaml).unwrap();
 
     assert_eq!(config.devices.drives[0].id, "virtio0");
-    assert_eq!(config.devices.drives[1].id, "ide1");
+    assert_eq!(config.devices.drives[1].id, "ide0");
     assert_eq!(config.devices.networks[0].id, "net0");
     assert_eq!(config.devices.networks[1].id, "uplink0");
 }

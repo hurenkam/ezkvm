@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::super::{
@@ -183,6 +183,8 @@ impl VmConfig {
     }
 
     fn deserialize_and_validate(mut merged_value: serde_yaml::Value) -> anyhow::Result<Self> {
+        Self::normalize_devices_controller_sequence(&mut merged_value);
+        Self::normalize_controller_owned_devices(&mut merged_value);
         policies::apply_profile_policies(&mut merged_value)?;
         let mut config: VmConfig = serde_yaml::from_value(merged_value)?;
         config.assign_default_device_ids();
@@ -190,7 +192,158 @@ impl VmConfig {
         Ok(config)
     }
 
-    fn assign_default_device_ids(&mut self) {
+    fn normalize_devices_controller_sequence(vm_value: &mut serde_yaml::Value) {
+        use serde_yaml::{Mapping, Value};
+
+        let Value::Mapping(vm_map) = vm_value else {
+            return;
+        };
+
+        let devices_key = Value::String("devices".to_string());
+        let Some(devices_value) = vm_map.remove(&devices_key) else {
+            return;
+        };
+
+        let Value::Sequence(device_blocks) = devices_value else {
+            vm_map.insert(devices_key, devices_value);
+            return;
+        };
+
+        let mut controllers_map = match vm_map.remove(&Value::String("controllers".to_string())) {
+            Some(Value::Mapping(map)) => map,
+            Some(other) => {
+                vm_map.insert(Value::String("controllers".to_string()), other);
+                Mapping::new()
+            }
+            None => Mapping::new(),
+        };
+
+        for block in device_blocks {
+            let Value::Mapping(mut block_map) = block else {
+                continue;
+            };
+
+            if let Some(Value::Mapping(legacy_map)) =
+                block_map.remove(&Value::String("legacy".to_string()))
+            {
+                for (legacy_key, legacy_value) in legacy_map {
+                    let Value::String(legacy_name) = legacy_key else {
+                        continue;
+                    };
+                    let Value::Sequence(entries) = legacy_value else {
+                        continue;
+                    };
+                    for entry in entries {
+                        Self::append_under_sequence(vm_map, "devices", &legacy_name, entry);
+                    }
+                }
+                continue;
+            }
+
+            let controller_key = Value::String("controller".to_string());
+            let Some(Value::String(controller_name)) = block_map.remove(&controller_key) else {
+                continue;
+            };
+
+            if controller_name == "xhci" {
+                let xhci_key = Value::String("xhci".to_string());
+                let entry = controllers_map
+                    .entry(xhci_key)
+                    .or_insert_with(|| Value::Sequence(Vec::new()));
+                if let Value::Sequence(items) = entry {
+                    items.push(Value::Mapping(block_map));
+                }
+                continue;
+            }
+
+            let drives_key = Value::String("drives".to_string());
+            let Some(Value::Sequence(mut drives)) = block_map.remove(&drives_key) else {
+                continue;
+            };
+
+            let inferred_interface = if Self::is_scsi_controller_name(&controller_name) {
+                Some("scsi")
+            } else if Self::is_sata_controller_name(&controller_name) {
+                Some("sata")
+            } else {
+                Some(controller_name.as_str())
+            };
+
+            for drive in &mut drives {
+                if let Value::Mapping(drive_map) = drive {
+                    let interface_key = Value::String("interface".to_string());
+                    if !drive_map.contains_key(&interface_key)
+                        && let Some(interface) = inferred_interface
+                    {
+                        drive_map.insert(interface_key, Value::String(interface.to_string()));
+                    }
+                }
+            }
+
+            if Self::is_scsi_controller_name(&controller_name) {
+                let mut controller_map = Mapping::new();
+                controller_map.insert(
+                    Value::String("type".to_string()),
+                    Value::String(controller_name),
+                );
+                controller_map.insert(Value::String("drives".to_string()), Value::Sequence(drives));
+                for (k, v) in block_map {
+                    controller_map.insert(k, v);
+                }
+
+                let scsi_key = Value::String("scsi".to_string());
+                let entry = controllers_map
+                    .entry(scsi_key)
+                    .or_insert_with(|| Value::Sequence(Vec::new()));
+                if let Value::Sequence(items) = entry {
+                    items.push(Value::Mapping(controller_map));
+                }
+            } else if Self::is_sata_controller_name(&controller_name) {
+                let mut controller_map = Mapping::new();
+                controller_map.insert(
+                    Value::String("type".to_string()),
+                    Value::String("ahci".to_string()),
+                );
+                controller_map.insert(Value::String("drives".to_string()), Value::Sequence(drives));
+                for (k, v) in block_map {
+                    controller_map.insert(k, v);
+                }
+
+                let sata_key = Value::String("sata".to_string());
+                let entry = controllers_map
+                    .entry(sata_key)
+                    .or_insert_with(|| Value::Sequence(Vec::new()));
+                if let Value::Sequence(items) = entry {
+                    items.push(Value::Mapping(controller_map));
+                }
+            } else {
+                for drive in drives {
+                    Self::append_under_sequence(vm_map, "devices", "drives", drive);
+                }
+            }
+        }
+
+        vm_map.insert(devices_key, Value::Mapping(Mapping::new()));
+        if !controllers_map.is_empty() {
+            vm_map.insert(
+                Value::String("controllers".to_string()),
+                Value::Mapping(controllers_map),
+            );
+        }
+    }
+
+    fn is_scsi_controller_name(name: &str) -> bool {
+        matches!(
+            name,
+            "pvscsi" | "virtio-scsi-single" | "virtio-scsi-pci" | "lsi" | "megasas"
+        )
+    }
+
+    fn is_sata_controller_name(name: &str) -> bool {
+        matches!(name, "sata" | "ahci")
+    }
+
+    pub(crate) fn assign_default_device_ids(&mut self) {
         let mut reserved_drive_ids = self
             .devices
             .drives
@@ -204,8 +357,14 @@ impl VmConfig {
                 }
             })
             .collect::<HashSet<_>>();
-        for (index, drive) in self.devices.drives.iter_mut().enumerate() {
-            drive.assign_default_id(index, &mut reserved_drive_ids);
+        let mut drive_interface_indices: HashMap<String, usize> = HashMap::new();
+        for drive in &mut self.devices.drives {
+            let interface_key = drive.interface.trim().to_string();
+            let index = drive_interface_indices
+                .entry(interface_key)
+                .and_modify(|v| *v += 1)
+                .or_insert(0);
+            drive.assign_default_id(*index, &mut reserved_drive_ids);
         }
 
         let mut reserved_network_ids = self
@@ -223,6 +382,75 @@ impl VmConfig {
             .collect::<HashSet<_>>();
         for (index, network) in self.devices.networks.iter_mut().enumerate() {
             network.assign_default_id(index, &mut reserved_network_ids);
+        }
+
+        let mut reserved_usb_ids = self
+            .host
+            .usb
+            .iter()
+            .filter_map(|usb| {
+                let id = usb.id.trim();
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
+            })
+            .collect::<HashSet<_>>();
+        for (index, usb) in self.host.usb.iter_mut().enumerate() {
+            usb.assign_default_id(index, &mut reserved_usb_ids);
+        }
+
+        let mut reserved_scsi_ids = self
+            .controllers
+            .scsi
+            .iter()
+            .filter_map(|c| {
+                let id = c.id.trim();
+                if id.is_empty() { None } else { Some(id.to_string()) }
+            })
+            .collect::<HashSet<_>>();
+        for (index, ctrl) in self.controllers.scsi.iter_mut().enumerate() {
+            ctrl.assign_default_id(index, &mut reserved_scsi_ids);
+        }
+
+        let mut reserved_sata_ids = self
+            .controllers
+            .sata
+            .iter()
+            .filter_map(|c| {
+                let id = c.id.trim();
+                if id.is_empty() { None } else { Some(id.to_string()) }
+            })
+            .collect::<HashSet<_>>();
+        for (index, ctrl) in self.controllers.sata.iter_mut().enumerate() {
+            ctrl.assign_default_id(index, &mut reserved_sata_ids);
+        }
+
+        let mut reserved_xhci_ids = self
+            .controllers
+            .xhci
+            .iter()
+            .filter_map(|c| {
+                let id = c.id.trim();
+                if id.is_empty() { None } else { Some(id.to_string()) }
+            })
+            .collect::<HashSet<_>>();
+        for (index, ctrl) in self.controllers.xhci.iter_mut().enumerate() {
+            ctrl.assign_default_id(index, &mut reserved_xhci_ids);
+        }
+
+        let mut reserved_pci_ids = self
+            .host
+            .pci
+            .iter()
+            .filter_map(|p| {
+                let id = p.id.trim();
+                if id.is_empty() { None } else { Some(id.to_string()) }
+            })
+            .collect::<HashSet<_>>();
+        for (index, pci) in self.host.pci.iter_mut().enumerate() {
+            pci.assign_default_id(index, &mut reserved_pci_ids);
         }
     }
 
@@ -328,6 +556,145 @@ impl VmConfig {
 
     fn merge_yaml_values(base: &mut serde_yaml::Value, overlay: serde_yaml::Value) {
         merge::merge_yaml_values(base, overlay);
+    }
+
+    fn normalize_controller_owned_devices(vm_value: &mut serde_yaml::Value) {
+        use serde_yaml::{Mapping, Value};
+
+        let Value::Mapping(vm_map) = vm_value else {
+            return;
+        };
+
+        let controllers_key = Value::String("controllers".to_string());
+        let Some(controllers_value) = vm_map.remove(&controllers_key) else {
+            return;
+        };
+
+        let mut controllers_map = match controllers_value {
+            Value::Mapping(map) => map,
+            other => {
+                vm_map.insert(controllers_key, other);
+                return;
+            }
+        };
+
+        let scsi_key = Value::String("scsi".to_string());
+        if let Some(Value::Sequence(scsi_controllers)) = controllers_map.get_mut(&scsi_key) {
+            for (index, controller_value) in scsi_controllers.iter_mut().enumerate() {
+                let Value::Mapping(controller_map) = controller_value else {
+                    continue;
+                };
+
+                let controller_id = Self::ensure_controller_id(controller_map, "scsihw", index);
+                let drives_key = Value::String("drives".to_string());
+                let Some(drives_value) = controller_map.remove(&drives_key) else {
+                    continue;
+                };
+
+                if let Value::Sequence(drives) = drives_value {
+                    for mut drive_value in drives {
+                        if let Value::Mapping(drive_map) = &mut drive_value {
+                            let controller_key = Value::String("controller".to_string());
+                            if !drive_map.contains_key(&controller_key) {
+                                drive_map
+                                    .insert(controller_key, Value::String(controller_id.clone()));
+                            }
+                        }
+                        Self::append_under_sequence(vm_map, "devices", "drives", drive_value);
+                    }
+                }
+            }
+        }
+
+        let xhci_key = Value::String("xhci".to_string());
+        if let Some(Value::Sequence(xhci_controllers)) = controllers_map.get_mut(&xhci_key) {
+            for (index, controller_value) in xhci_controllers.iter_mut().enumerate() {
+                let Value::Mapping(controller_map) = controller_value else {
+                    continue;
+                };
+
+                let controller_id = Self::ensure_controller_id(controller_map, "xhci", index);
+                let usb_key = Value::String("usb".to_string());
+                let Some(usb_value) = controller_map.remove(&usb_key) else {
+                    continue;
+                };
+
+                if let Value::Sequence(usb_devices) = usb_value {
+                    for mut usb_device_value in usb_devices {
+                        if let Value::Mapping(usb_map) = &mut usb_device_value {
+                            let bus_key = Value::String("bus".to_string());
+                            if !usb_map.contains_key(&bus_key) {
+                                usb_map.insert(
+                                    bus_key,
+                                    Value::String(format!("{}.0", controller_id.as_str())),
+                                );
+                            }
+                        }
+                        Self::append_under_sequence(vm_map, "host", "usb", usb_device_value);
+                    }
+                }
+            }
+        }
+
+        vm_map.insert(controllers_key, Value::Mapping(controllers_map));
+
+        if !vm_map.contains_key(&Value::String("devices".to_string())) {
+            vm_map.insert("devices".into(), Value::Mapping(Mapping::new()));
+        }
+        if !vm_map.contains_key(&Value::String("host".to_string())) {
+            vm_map.insert("host".into(), Value::Mapping(Mapping::new()));
+        }
+    }
+
+    fn append_under_sequence(
+        vm_map: &mut serde_yaml::Mapping,
+        parent: &str,
+        child: &str,
+        entry: serde_yaml::Value,
+    ) {
+        use serde_yaml::{Mapping, Value};
+
+        let parent_key = Value::String(parent.to_string());
+        if !vm_map.contains_key(&parent_key) {
+            vm_map.insert(parent_key.clone(), Value::Mapping(Mapping::new()));
+        }
+
+        let Some(Value::Mapping(parent_map)) = vm_map.get_mut(&parent_key) else {
+            return;
+        };
+
+        let child_key = Value::String(child.to_string());
+        if !parent_map.contains_key(&child_key) {
+            parent_map.insert(child_key.clone(), Value::Sequence(Vec::new()));
+        }
+
+        if let Some(Value::Sequence(items)) = parent_map.get_mut(&child_key) {
+            items.push(entry);
+        }
+    }
+
+    fn ensure_controller_id(
+        controller_map: &mut serde_yaml::Mapping,
+        prefix: &str,
+        index: usize,
+    ) -> String {
+        use serde_yaml::Value;
+
+        let id_key = Value::String("id".to_string());
+        if let Some(Value::String(id)) = controller_map.get(&id_key)
+            && !id.trim().is_empty()
+        {
+            return id.clone();
+        }
+
+        let generated = if prefix == "xhci" && index == 0 {
+            "xhci".to_string()
+        } else {
+            format!("{}{}", prefix, index)
+        };
+
+        controller_map.insert(id_key, Value::String(generated.clone()));
+        generated
     }
 
     /// Substitute environment variables in configuration content.

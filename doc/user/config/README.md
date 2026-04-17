@@ -4,13 +4,24 @@ This directory contains the user-facing configuration reference for ezkvm.
 
 ## Reading Order
 
-1. [vm-structure.md](vm-structure.md)
-2. [central-config.md](central-config.md)
-3. [profiles-and-merge.md](profiles-and-merge.md)
-4. [system-and-boot.md](system-and-boot.md)
-5. [devices.md](devices.md)
-6. [platform-features.md](platform-features.md)
-7. [examples.md](examples.md)
+**Foundation:**
+1. [vm-structure.md](vm-structure.md) — Top-level schema overview and canonical keys
+2. [central-config.md](central-config.md) — Central configuration and runtime location defaults
+
+**Core Configuration:**
+3. [profiles-and-merge.md](profiles-and-merge.md) — Profile layering and merge semantics
+4. [system-and-boot.md](system-and-boot.md) — System/CPU/memory/boot configuration
+5. [devices.md](devices.md) — Devices, controllers, and host passthrough
+6. [platform-features.md](platform-features.md) — Platform options, hyperv, and special features
+
+**Reference and Examples:**
+7. [examples.md](examples.md) — Practical end-to-end configuration examples
+8. [code-backed-shapes.md](code-backed-shapes.md) — Minimal schema patterns from implementation
+9. [field-reference.md](field-reference.md) — Complete field tables (legacy schema reference)
+
+**Special Topics:**
+10. [import-proxmox.md](import-proxmox.md) — Proxmox import mapping and post-import validation
+11. [troubleshooting.md](troubleshooting.md) — Common issues and diagnostic checks
 
 ## Canonical First
 
@@ -32,14 +43,32 @@ Use canonical paths for new configs:
 - `devices.input`
 - `devices.audio`
 
-Use canonical paths only.
+Do not use legacy top-level sections (`general`, `gpu`, `display`, `storage`, `network`, `extras`). See [field-reference.md](field-reference.md) for historical documentation.
 
-## See also
+## Quick Links
 
-- [VM structure](vm-structure.md)
-- [Central config](central-config.md)
-- [Profiles and merge](profiles-and-merge.md)
-- [System and boot](system-and-boot.md)
-- [Devices, controllers, and host passthrough](devices.md)
-- [Platform features and options](platform-features.md)
-- [Examples](examples.md)
+- **Getting Started**: Start with [vm-structure.md](vm-structure.md)
+- **Practical Examples**: See [examples.md](examples.md)
+- **Profiles**: Learn about layering in [profiles-and-merge.md](profiles-and-merge.md)
+- **Hardware Passthrough**: See [devices.md](devices.md)
+- **Migrating from Proxmox**: Check [import-proxmox.md](import-proxmox.md)
+- **Debugging Issues**: Use [troubleshooting.md](troubleshooting.md)
+- **Field Reference**: See [field-reference.md](field-reference.md) for complete tables
+
+## Document Structure
+
+Each document focuses on a specific area:
+
+| Document | Focus |
+| --- | --- |
+| [vm-structure.md](vm-structure.md) | Top-level keys and required fields |
+| [central-config.md](central-config.md) | `-E EZKVM_CONFIG` resolution and locations |
+| [profiles-and-merge.md](profiles-and-merge.md) | Profile stacking and merge rules |
+| [system-and-boot.md](system-and-boot.md) | CPU, memory, boot, TPM, NUMA |
+| [devices.md](devices.md) | Drives, networks, controllers, passthrough |
+| [platform-features.md](platform-features.md) | Hyper-V, IOMMU, options, QMP, guest agent |
+| [examples.md](examples.md) | Real-world scenarios (desktop, headless, GPU, NUMA) |
+| [code-backed-shapes.md](code-backed-shapes.md) | Schema examples from serde implementation |
+| [field-reference.md](field-reference.md) | Legacy field tables and auto-ID rules |
+| [import-proxmox.md](import-proxmox.md) | Proxmox config mapping and checklist |
+| [troubleshooting.md](troubleshooting.md) | Memory, display, boot, PCI, USB issues |

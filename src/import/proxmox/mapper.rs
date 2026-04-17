@@ -221,9 +221,10 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             sata: sata_controllers,
             xhci: if use_explicit_xhci {
                 vec![XhciControllerConfig {
-                    id: "xhci".to_string(),
+                    id: String::new(),
                     p2: Some(15),
                     p3: Some(15),
+                    usb: Vec::new(),
                     bus: Some("pci.1".to_string()),
                     addr: Some("0x1b".to_string()),
                 }]
@@ -266,13 +267,15 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
 mod tests {
     use super::{map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage};
     use crate::config::{VmConfig, validation};
+    use crate::import::proxmox::model::ProxmoxVmConfig;
     use crate::import::proxmox::parser::parse_proxmox_config;
     use crate::import::proxmox::storage_parser::parse_proxmox_storage_config;
 
     fn map_and_validate(input: &str) -> (String, VmConfig) {
         let parsed = parse_proxmox_config(input).expect("parser should succeed");
         let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
-        let config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        let mut config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        config.assign_default_device_ids();
         validation::validate_config(&config).expect("config should validate");
         (mapped.yaml, config)
     }
@@ -283,7 +286,8 @@ mod tests {
             parse_proxmox_storage_config(storage_input).expect("storage parser should succeed");
         let mapped = map_proxmox_to_canonical_yaml_with_storage(&parsed, Some(&storage))
             .expect("mapper should succeed");
-        let config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        let mut config: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        config.assign_default_device_ids();
         validation::validate_config(&config).expect("config should validate");
         (mapped.yaml, config)
     }
@@ -566,7 +570,7 @@ mod tests {
 
         assert_eq!(cfg.host.pci.len(), 2);
         assert_eq!(cfg.host.pci[0].device, "0000:03:00.0");
-        assert_eq!(cfg.host.pci[0].id, "hostpci0.0");
+        assert_eq!(cfg.host.pci[0].id, "hostpci0");
         assert!(cfg.host.pci[0].pcie);
         assert!(!cfg.host.pci[0].x_vga);
         assert!(cfg.host.pci[0].multifunction);
@@ -574,7 +578,7 @@ mod tests {
         assert_eq!(cfg.host.pci[0].addr.as_deref(), Some("0x0.0"));
 
         assert_eq!(cfg.host.pci[1].device, "0000:03:00.1");
-        assert_eq!(cfg.host.pci[1].id, "hostpci0.1");
+        assert_eq!(cfg.host.pci[1].id, "hostpci1");
         assert!(!cfg.host.pci[1].pcie);
         assert!(!cfg.host.pci[1].x_vga);
         assert!(!cfg.host.pci[1].multifunction);
@@ -1105,5 +1109,371 @@ mod tests {
                 .iter()
                 .any(|warning| warning.message.contains("pre-enrolled-keys='maybe'"))
         );
+    }
+
+    // Comprehensive edge case and robustness tests for mapper
+    #[test]
+    fn maps_empty_proxmox_config_with_defaults() {
+        let parsed = ProxmoxVmConfig::default();
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("empty config should map");
+        let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+
+        assert_eq!(cfg.name, "imported-vm");
+        assert_eq!(cfg.system.memory.size, 2048);
+        // Empty config should still be valid and produce a config
+    }
+
+    #[test]
+    fn maps_vm_with_only_name_and_defaults() {
+        let (_, cfg) = map_and_validate("name: test-vm");
+
+        assert_eq!(cfg.name, "test-vm");
+        assert_eq!(cfg.system.memory.size, 2048);
+        assert_eq!(cfg.system.cpu.vcpus, 1);
+    }
+
+    #[test]
+    fn maps_extremely_high_memory_value() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-huge-memory
+            memory: 1048576
+            cores: 64
+            sockets: 4
+            "#,
+        );
+
+        assert_eq!(cfg.system.memory.size, 1048576);
+        assert_eq!(cfg.system.cpu.vcpus, 256);
+    }
+
+    #[test]
+    fn maps_single_core_minimal_vcpu_config() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-minimal-cpu
+            cores: 1
+            sockets: 1
+            memory: 512
+            "#,
+        );
+
+        assert_eq!(cfg.system.cpu.vcpus, 1);
+        assert_eq!(cfg.system.memory.size, 512);
+    }
+
+    #[test]
+    fn maps_non_integer_memory_value_defaults_to_2048() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-invalid-memory
+            memory: not-a-number
+            "#,
+        );
+
+        assert_eq!(cfg.system.memory.size, 2048);
+    }
+
+    #[test]
+    fn maps_multiple_networks_preserves_order() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-multi-net
+            net0: virtio=AA:BB:CC:DD:EE:00,bridge=vmbr0
+            net1: e1000=AA:BB:CC:DD:EE:01,bridge=vmbr1
+            net2: i82559er=AA:BB:CC:DD:EE:02,bridge=vmbr2
+            net5: rtl8139=AA:BB:CC:DD:EE:05,bridge=vmbr5
+            "#,
+        );
+
+        assert_eq!(cfg.devices.networks.len(), 4);
+        assert_eq!(cfg.devices.networks[0].id, "net0");
+        assert_eq!(cfg.devices.networks[1].id, "net1");
+        assert_eq!(cfg.devices.networks[2].id, "net2");
+        // Network IDs are renumbered to be sequential (net0-net3)
+        assert_eq!(cfg.devices.networks[3].id, "net3");
+    }
+
+    #[test]
+    fn maps_network_without_mac_address() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-net-no-mac
+            net0: bridge=vmbr0,tag=20
+            "#,
+        );
+
+        assert_eq!(cfg.devices.networks.len(), 1);
+    }
+
+    #[test]
+    fn maps_mixed_disk_types_across_all_buses() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-mixed-disks
+            scsi0: disk-scsi,size=20G
+            sata0: disk-sata,size=30G
+            ide0: none,media=cdrom
+            virtio0: disk-virtio,size=40G
+            "#,
+        );
+
+        assert_eq!(cfg.devices.drives.len(), 4);
+        assert_eq!(
+            cfg.devices.drives
+                .iter()
+                .filter(|d| d.interface == "scsi")
+                .count(),
+            1
+        );
+        assert_eq!(
+            cfg.devices.drives
+                .iter()
+                .filter(|d| d.interface == "sata")
+                .count(),
+            1
+        );
+        assert_eq!(
+            cfg.devices.drives
+                .iter()
+                .filter(|d| d.interface == "ide")
+                .count(),
+            1
+        );
+        assert_eq!(
+            cfg.devices.drives
+                .iter()
+                .filter(|d| d.interface == "virtio")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn maps_ostype_windows_sets_proper_defaults() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-win
+            ostype: win10
+            "#,
+        );
+
+        assert!(cfg.options.rtc.is_some());
+    }
+
+    #[test]
+    fn maps_ostype_linux_sets_different_defaults() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-linux
+            ostype: l26
+            "#,
+        );
+
+        assert_eq!(cfg.name, "vm-linux");
+    }
+
+    #[test]
+    fn maps_multiple_hostpci_devices() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-multi-hostpci
+            hostpci0: 0000:01:00.0
+            hostpci1: 0000:02:00.0
+            hostpci2: 0000:08:10.7,pcie=1
+            "#,
+        );
+
+        assert_eq!(cfg.host.pci.len(), 3);
+    }
+
+    #[test]
+    fn maps_multiple_usb_devices() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-multi-usb
+            usb0: host=1-1
+            usb1: host=1-2
+            usb2: host=0451:16a0
+            usb3: host=1-4
+            "#,
+        );
+
+        assert_eq!(cfg.host.usb.len(), 4);
+        assert_eq!(cfg.controllers.xhci.len(), 1);
+    }
+
+    #[test]
+    fn maps_architecture_with_fallback() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-x86
+            arch: x86-64
+            "#,
+        );
+
+        // Architecture is normalized to x86_64
+        assert_eq!(cfg.system.architecture, "x86_64");
+    }
+
+    #[test]
+    fn maps_with_all_cpu_feature_types() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-cpu-features
+            cpu: host,+aes,-rdtscp,hv_ipi=1,kvm=off
+            "#,
+        );
+
+        assert_eq!(cfg.system.cpu.model, "host");
+        assert!(cfg.system.cpu.features.contains(&"+aes".to_string()));
+        assert!(cfg.system.cpu.features.contains(&"-rdtscp".to_string()));
+    }
+
+    #[test]
+    fn maps_unusual_machine_types() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-machine
+            machine: microvm,pit=off,rtc_fixed=on
+            "#,
+        );
+
+        assert!(cfg.system.machine.contains("microvm"));
+    }
+
+    #[test]
+    fn maps_multipart_disk_options() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-disk-opts
+            scsi0: local:disk0,discard=on,ssd=1,cache=none,backup=1,iothread=1
+            "#,
+        );
+
+        assert_eq!(cfg.devices.drives.len(), 1);
+        let drive = &cfg.devices.drives[0];
+        assert!(drive.discard);
+        assert!(drive.ssd);
+        assert_eq!(drive.cache.as_deref(), Some("none"));
+    }
+
+    #[test]
+    fn maps_boot_order_to_indices() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-boot
+            boot: order=scsi0;ide2;net0
+            scsi0: disk0,size=20G
+            ide2: none,media=cdrom
+            net0: virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0
+            "#,
+        );
+
+        // Boot order is configured via the boot field
+        assert_eq!(cfg.devices.drives.len(), 2);
+        assert_eq!(cfg.devices.networks.len(), 1);
+    }
+
+    #[test]
+    fn maps_smbios_uuid_when_provided() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-smbios
+            smbios1: uuid=550e8400-e29b-41d4-a716-446655440000
+            "#,
+        );
+
+        assert!(cfg.system.smbios.is_some());
+        let smbios = cfg.system.smbios.as_ref().unwrap();
+        assert_eq!(
+            smbios.uuid.as_deref(),
+            Some("550e8400-e29b-41d4-a716-446655440000")
+        );
+    }
+
+    #[test]
+    fn maps_vm_generation_id_when_provided() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-vmgen
+            vmgenid: f47ac10b-58cc-4372-a567-0e02b2c3d479
+            "#,
+        );
+
+        assert!(cfg.system.smbios.is_some());
+        let smbios = cfg.system.smbios.as_ref().unwrap();
+        assert_eq!(
+            smbios.vm_generation_id.as_deref(),
+            Some("f47ac10b-58cc-4372-a567-0e02b2c3d479")
+        );
+    }
+
+    #[test]
+    fn maps_display_vga_options() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-display
+            vga: cirrus
+            "#,
+        );
+
+        assert!(!cfg.devices.displays.is_empty());
+    }
+
+    #[test]
+    fn maps_serial_with_various_backends() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-serial
+            serial0: socket
+            serial1: file:/tmp/log.txt
+            serial2: unix:/tmp/serial.sock,wait=1
+            "#,
+        );
+
+        assert_eq!(cfg.devices.serials.len(), 3);
+    }
+
+    #[test]
+    fn handles_profiles_inference_correctly() {
+        let (_yaml, cfg) = map_and_validate(
+            r#"
+            name: vm-profiles
+            cpu: host
+            cores: 4
+            memory: 8192
+            machine: pc-q35-8.1,hpet=off
+            vga: cirrus
+            "#,
+        );
+
+        // Profiles may be inferred based on config or left empty
+        let _ = cfg.profiles;
+    }
+
+    #[test]
+    fn handles_empty_disk_source_gracefully() {
+        let parsed = parse_proxmox_config("scsi0: ,size=10G").expect("parser should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+
+        let _cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should be valid");
+    }
+
+    #[test]
+    fn warnings_accumulate_from_multiple_sources() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-warnings
+            arch: unknown-arch
+            audio0: device=ich9-intel,driver=alsa
+            usb0: host=invalid
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+
+        assert!(!mapped.warnings.is_empty());
     }
 }

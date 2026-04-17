@@ -113,8 +113,9 @@ impl NetworkBackendConfig {
 /// Network configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
-    /// Unique identifier for the network device
-    #[serde(default)]
+    /// Unique identifier for the network device.
+    /// When empty, an ID is auto-generated from "net" + index at load time.
+    #[serde(default, skip_serializing_if = "str::is_empty")]
     pub id: String,
 
     /// Network model (virtio-net, e1000, etc.)

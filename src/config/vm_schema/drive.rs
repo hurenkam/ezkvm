@@ -11,8 +11,9 @@ fn is_false(value: &bool) -> bool {
 /// argument emission are tightly coupled and should evolve together.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriveConfig {
-    /// Unique identifier for the drive
-    #[serde(default)]
+    /// Unique identifier for the drive.
+    /// When empty, an ID is auto-generated from interface + index at load time.
+    #[serde(default, skip_serializing_if = "str::is_empty")]
     pub id: String,
 
     /// Path to the disk image.

@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// SCSI controller configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScsiControllerConfig {
-    /// Unique identifier for the controller
+    /// Unique identifier for the controller.
+    /// When empty, auto-generated as "scsihw{index}" at load time.
+    #[serde(default, skip_serializing_if = "str::is_empty")]
     pub id: String,
 
     /// Controller type (pvscsi, virtio-scsi, lsi, etc.)
@@ -31,10 +34,28 @@ fn default_scsi_controller_type() -> String {
     "virtio-scsi-pci".to_string()
 }
 
+impl ScsiControllerConfig {
+    pub fn assign_default_id(&mut self, index: usize, reserved_ids: &mut HashSet<String>) {
+        if self.id.trim().is_empty() {
+            let mut candidate_index = index;
+            loop {
+                let candidate = format!("scsihw{}", candidate_index);
+                if reserved_ids.insert(candidate.clone()) {
+                    self.id = candidate;
+                    break;
+                }
+                candidate_index += 1;
+            }
+        }
+    }
+}
+
 /// SATA controller configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SataControllerConfig {
-    /// Unique identifier for the controller
+    /// Unique identifier for the controller.
+    /// When empty, auto-generated as "sata{index}" at load time.
+    #[serde(default, skip_serializing_if = "str::is_empty")]
     pub id: String,
 
     /// Controller type (currently ahci)
@@ -52,6 +73,22 @@ pub struct SataControllerConfig {
 
 fn default_sata_controller_type() -> String {
     "ahci".to_string()
+}
+
+impl SataControllerConfig {
+    pub fn assign_default_id(&mut self, index: usize, reserved_ids: &mut HashSet<String>) {
+        if self.id.trim().is_empty() {
+            let mut candidate_index = index;
+            loop {
+                let candidate = format!("sata{}", candidate_index);
+                if reserved_ids.insert(candidate.clone()) {
+                    self.id = candidate;
+                    break;
+                }
+                candidate_index += 1;
+            }
+        }
+    }
 }
 
 /// iSCSI disk configuration

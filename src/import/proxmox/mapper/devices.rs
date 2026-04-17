@@ -41,15 +41,9 @@ pub(super) fn map_host_pci_entries(
         }
     });
 
-    let base_id = if should_expand_pair {
-        format!("{}.0", entry.key)
-    } else {
-        entry.key.clone()
-    };
-
     let mut mapped = vec![super::HostPciConfig {
         device: base_device.clone(),
-        id: base_id,
+        id: String::new(),
         pcie,
         x_vga,
         bus: base_bus.clone(),
@@ -70,7 +64,7 @@ pub(super) fn map_host_pci_entries(
 
         mapped.push(super::HostPciConfig {
             device: function_one,
-            id: format!("{}.1", entry.key),
+            id: String::new(),
             pcie: false,
             x_vga: false,
             bus: base_bus,
@@ -131,7 +125,7 @@ pub(super) fn map_usb(entry: &ProxmoxUsbEntry, place_on_xhci: bool) -> UsbDevice
     };
 
     UsbDeviceConfig {
-        id: entry.key.clone(),
+        id: String::new(),
         host: mapped_host,
         hostbus: hostbus.or_else(|| entry.options.get("hostbus").cloned()),
         hostport: hostport.or_else(|| entry.options.get("hostport").cloned()),

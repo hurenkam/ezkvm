@@ -1,4 +1,8 @@
-# Configuration
+# Field Reference
+
+This document provides comprehensive field tables for all top-level configuration sections.
+
+## Configuration Search Paths
 
 Configuration files are YAML and are searched in this order:
 
@@ -6,41 +10,24 @@ Configuration files are YAML and are searched in this order:
 2. `~/.ezkvm`
 3. `/etc/ezkvm`
 
-This document is organized as chapters and includes field reference tables for each top-level section.
+## Top-Level Schema (Compatibility Reference)
 
-## Table of Contents
+**Note**: This section documents historical and compatibility-oriented shapes collected from earlier configuration docs. For new configurations, use the canonical schema documented in [vm-structure.md](vm-structure.md), [system-and-boot.md](system-and-boot.md), [devices.md](devices.md), and [platform-features.md](platform-features.md).
 
-- [Chapter 1: Top-Level Schema](#chapter-1-top-level-schema)
-- [Chapter 2: general](#chapter-2-general)
-- [Chapter 3: system](#chapter-3-system)
-- [Chapter 4: gpu](#chapter-4-gpu)
-- [Chapter 5: display](#chapter-5-display)
-- [Chapter 6: spice](#chapter-6-spice)
-- [Chapter 7: vnc](#chapter-7-vnc)
-- [Chapter 8: host](#chapter-8-host)
-- [Chapter 9: storage](#chapter-9-storage)
-- [Chapter 10: network](#chapter-10-network)
-- [Chapter 11: extras](#chapter-11-extras)
-- [Chapter 12: Comprehensive Examples](#chapter-12-comprehensive-examples)
-- [Chapter 13: Troubleshooting](#chapter-13-troubleshooting)
-- [Chapter 14: Proxmox Import Mapping](#chapter-14-proxmox-import-mapping)
-- [Chapter 15: Code-Backed Shape Examples](#chapter-15-code-backed-shape-examples)
+Legacy top-level sections:
+- `general`
+- `profiles`
+- `system`
+- `gpu`
+- `display`
+- `spice`
+- `vnc`
+- `host`
+- `storage`
+- `network`
+- `extras`
 
-## Chapter 1: Top-Level Schema
-
-Top-level sections:
-
-1. `general`
-2. `profiles`
-3. `system`
-4. `gpu`
-5. `display`
-6. `spice`
-7. `vnc`
-8. `host`
-9. `storage`
-10. `network`
-11. `extras`
+### Legacy Top-Level Fields
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -56,30 +43,7 @@ Top-level sections:
 | `network` | sequence | empty | NIC entries | `network: [ { type: bridge } ]` |
 | `extras` | sequence of strings | empty | raw QEMU args | `extras: [ "-overcommit mem-lock=on" ]` |
 
-Profile layering behavior:
-
-- Profiles are loaded from the configured profile directory before VM-local values are applied.
-- VM-local values override profile values on conflict.
-- Profile names map to YAML files in the profile directory. For example `windows-11` resolves to `windows-11.yaml`.
-- The central config field `locations.profile_dir` controls the directory, with `/etc/ezkvm/profiles.d` as the default.
-- Profile layering is applied both when loading VM configs from files and when loading from YAML strings.
-
-Current built-in layered profile names in this repo include:
-
-- `proxmox-q35-uefi`
-- `storage-virtio-scsi-single`
-- `storage-virtio-scsi-pci`
-- `windows-common`
-- `windows-10`
-- `windows-11`
-- `linux-l26-common`
-- `macos-kvm`
-- `remote-viewer-spice`
-- `looking-glass`
-- `gpu-passthrough`
-- `headless-serial`
-
-## Chapter 2: general
+## Legacy general
 
 VM identity and control-plane sockets.
 
@@ -90,7 +54,7 @@ VM identity and control-plane sockets.
 | `monitor` | yes/no | `no` | `yes`, `no` | `monitor: yes` |
 | `agent` | yes/no | `no` | `yes`, `no` | `agent: yes` |
 
-## Chapter 3: system
+## Legacy system
 
 Core machine, firmware, CPU/memory, TPM, and optional devices.
 
@@ -108,7 +72,7 @@ Core machine, firmware, CPU/memory, TPM, and optional devices.
 | `numa_nodes` | sequence | empty | node entries | see NUMA example |
 | `numa_distances` | sequence | empty | distance entries | `- { src: 0, dst: 1, val: 20 }` |
 
-### system.chipset
+### Legacy system.chipset
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -119,7 +83,7 @@ Core machine, firmware, CPU/memory, TPM, and optional devices.
 | `xhci_bus` (q35) | string | `pci.1` | bus name | `xhci_bus: pci.1` |
 | `xhci_addr` (q35) | string | `0x1b` | hex-like slot | `xhci_addr: 0x1b` |
 
-### system.bios
+### Legacy system.bios
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -135,7 +99,7 @@ Core machine, firmware, CPU/memory, TPM, and optional devices.
 | `boot_order` | string | none | QEMU boot order string | `boot_order: cd` |
 | `boot_once` | string | none | QEMU one-shot boot string | `boot_once: c` |
 
-### system.memory
+### Legacy system.memory
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -145,12 +109,11 @@ Core machine, firmware, CPU/memory, TPM, and optional devices.
 | `prealloc` | bool | unset | `true`, `false` | `prealloc: true` |
 | `mem_path` | string | unset | path | `mem_path: /run/hugepages/kvm/1048576kB` |
 
-NUMA backend behavior:
-
+**NUMA backend behavior:**
 - If `memory.hugepages: true` and `numa_nodes` is not empty, ezkvm emits per-node `memory-backend-file` objects and `-numa node,...,memdev=...`.
 - Otherwise, ezkvm emits flat memory arguments such as `-m`, optional `-mem-path`, and optional `-mem-prealloc`.
 
-### system.cpu
+### Legacy system.cpu
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -162,7 +125,7 @@ NUMA backend behavior:
 | `threads` | integer | `1` | positive integer | `threads: 2` |
 | `flags` | string | `+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce` | CPU flag list | `flags: "+aes,enforce"` |
 
-### system.tpm
+### Legacy system.tpm
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -170,14 +133,14 @@ NUMA backend behavior:
 | `disk` (swtpm) | string | required for swtpm | path | `disk: /dev/vm1/vm-108-tpmstate` |
 | `socket` (swtpm) | string | required for swtpm | path | `socket: /var/ezkvm/wakiza-tpm.socket` |
 
-### system.serial
+### Legacy system.serial
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
 | `type` | string | none | `socket` | `type: socket` |
 | `path` | string | none | unix path | `path: /var/run/qemu-server/301.serial0` |
 
-### system.numa_nodes and system.numa_distances
+### Legacy system.numa_nodes and system.numa_distances
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -190,7 +153,7 @@ NUMA backend behavior:
 | `dst` | integer | none | node id | `dst: 1` |
 | `val` | integer | none | distance value | `val: 20` |
 
-## Chapter 4: gpu
+## Legacy gpu
 
 Selects guest GPU model or passthrough profile.
 
@@ -203,7 +166,7 @@ Selects guest GPU model or passthrough profile.
 | `pci` or `pcie` address (virtio) | mapping | optional | bus/address pair | `pcie: { bus: 0, address: 2 }` |
 | `pci_address` (vmware-svga) | string | `0x1` | slot string | `pci_address: 0x2` |
 
-## Chapter 5: display
+## Legacy display
 
 Selects local/remote presentation behavior.
 
@@ -221,7 +184,7 @@ Selects local/remote presentation behavior.
 
 When `display.type: remote-viewer` and `usb_tablet: true`, ezkvm adds `-device usb-tablet`.
 
-## Chapter 6: spice
+## Legacy spice
 
 SPICE transport, optional GL display path, and security options.
 
@@ -240,7 +203,7 @@ SPICE transport, optional GL display path, and security options.
 | `seamless_migration` | bool | unset | `true`, `false` | `seamless_migration: true` |
 | `websocket_port` | integer | unset | TCP port | `websocket_port: 6100` |
 
-## Chapter 7: vnc
+## Legacy vnc
 
 VNC endpoint and optional auth/transport flags.
 
@@ -253,9 +216,9 @@ VNC endpoint and optional auth/transport flags.
 | `websocket_port` | integer | unset | TCP port | `websocket_port: 6101` |
 | `sasl` | bool | unset | `true`, `false` | `sasl: true` |
 
-Note: TCP `port: 5900` maps to VNC display `:0` in emitted QEMU args.
+**Note**: TCP `port: 5900` maps to VNC display `:0` in emitted QEMU args.
 
-## Chapter 8: host
+## Legacy host
 
 Host passthrough devices.
 
@@ -264,7 +227,7 @@ Host passthrough devices.
 | `pci` | sequence | empty | PCI passthrough entries | `pci: [ { vm_id: "0", host_id: "01:00" } ]` |
 | `usb` | sequence | empty | USB passthrough entries | `usb: [ { vendor_id: "0451", product_id: "16a0" } ]` |
 
-### host.pci entry
+### Legacy host.pci entry
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -273,11 +236,11 @@ Host passthrough devices.
 | `port` | string | `1` (implicit bus fallback) | root port suffix | `port: "2"` |
 | `multi_function` | bool | unset | `true`, `false` | `multi_function: true` |
 
-### host.usb entry
+### Legacy host.usb entry
 
 Two forms are supported.
 
-Bus/port form:
+**Bus/port form:**
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -285,7 +248,7 @@ Bus/port form:
 | `host_bus` | string | none | host bus number string | `host_bus: "1"` |
 | `host_port` | string | none | host port path string | `host_port: "7.6"` |
 
-Vendor/product form:
+**Vendor/product form:**
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -294,8 +257,7 @@ Vendor/product form:
 
 ### Controller-centric shorthand (compatibility)
 
-The parser also accepts a controller-centric shorthand where devices are nested under
-controllers and then normalized into canonical sections.
+The parser also accepts a controller-centric shorthand where devices are nested under controllers and then normalized into canonical sections.
 
 Example:
 
@@ -317,7 +279,7 @@ controllers:
           hostport: "2.2"
 ```
 
-Normalization rules:
+**Normalization rules:**
 - `controllers.scsi[].drives[]` is moved to `devices.drives[]`.
 - Missing drive `controller` is inferred from the enclosing SCSI controller id.
 - `controllers.xhci[].usb[]` is moved to `host.usb[]`.
@@ -337,15 +299,13 @@ During load/normalization, ezkvm assigns deterministic defaults before validatio
 - `host.pci[].id`: `hostpci${index}`
 - `host.usb[].id`: `usb${index}`
 
-When these fields remain empty, serializer output omits them for compact YAML,
-and load-time normalization regenerates deterministic IDs from device type and
-list position before validation.
+When these fields remain empty, serializer output omits them for compact YAML, and load-time normalization regenerates deterministic IDs from device type and list position before validation.
 
-## Chapter 9: storage
+## Legacy storage
 
 List of controller blocks. Each controller carries a `drives` array.
 
-### storage controller entry
+### Legacy storage controller entry
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -353,7 +313,7 @@ List of controller blocks. Each controller carries a `drives` array.
 | `offset` | integer | `0` | non-negative integer | `offset: 1` |
 | `drives` | sequence | empty | drive entries | see drive table |
 
-### storage drive entry
+### Legacy storage drive entry
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -375,7 +335,7 @@ List of controller blocks. Each controller carries a `drives` array.
 | `extra_drive_options` | sequence | empty | raw drive options | `extra_drive_options: [ "detect-zeroes=off" ]` |
 | `extra_device_options` | sequence | empty | raw device options | `extra_device_options: [ "share-rw=on" ]` |
 
-### storage.throttle entry
+### Legacy storage.throttle entry
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -386,13 +346,13 @@ List of controller blocks. Each controller carries a `drives` array.
 | `iops_read` | integer | unset | IOPS | `iops_read: 500` |
 | `iops_write` | integer | unset | IOPS | `iops_write: 500` |
 
-## Chapter 10: network
+## Legacy network
 
 List of NIC entries composed of a payload (`type`) plus footer options.
 
-Supported payload types: `bridge`, `user`, `tap`, `socket`, `macvtap`, `vhost_user`, `proxmox_tap`, `x550vf`.
+**Supported payload types**: `bridge`, `user`, `tap`, `socket`, `macvtap`, `vhost_user`, `proxmox_tap`, `x550vf`.
 
-### network entry
+### Legacy network entry
 
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
@@ -402,7 +362,7 @@ Supported payload types: `bridge`, `user`, `tap`, `socket`, `macvtap`, `vhost_us
 | `extra_netdev_options` | sequence | empty | raw netdev options | `extra_netdev_options: [ "vhost=on" ]` |
 | `extra_device_options` | sequence | empty | raw device options | `extra_device_options: [ "romfile=" ]` |
 
-### network type-specific field examples
+### Legacy network type-specific field examples
 
 | Type | Key fields |
 | --- | --- |
@@ -415,7 +375,7 @@ Supported payload types: `bridge`, `user`, `tap`, `socket`, `macvtap`, `vhost_us
 | `proxmox_tap` | Proxmox-compatible tap fields |
 | `x550vf` | Intel x550 VF-specific fields |
 
-## Chapter 11: extras
+## Legacy extras
 
 Raw QEMU arguments appended after generated arguments.
 
@@ -425,362 +385,10 @@ Raw QEMU arguments appended after generated arguments.
 
 Use this section for advanced options not yet modeled in schema.
 
-## Chapter 12: Comprehensive Examples
-
-### Example A: Desktop with Remote Viewer + SPICE TLS
-
-```yaml
-general:
-  name: ubuntu-desktop
-  monitor: yes
-  agent: yes
-
-system:
-  chipset: { type: q35 }
-  bios:
-    type: ovmf
-    file: /dev/vm1/ubuntu-desktop-efi
-    uuid: c0e240a5-859a-4378-a2d9-95088f531142
-  cpu: { model: host, sockets: 1, cores: 8, threads: 1 }
-  memory: { max: 16384, balloon: true }
-  tpm: { type: swtpm, disk: /dev/vm1/ubuntu-desktop-tpmstate, socket: /var/ezkvm/ubuntu-desktop-tpm.socket }
-
-gpu:
-  type: virtio
-  gl: yes
-
-display:
-  type: remote-viewer
-  auto_resize: true
-  full_screen: false
-  usb_tablet: true
-
-spice:
-  addr: 127.0.0.1
-  port: 5900
-  tls_port: 61000
-  tls_ciphers: HIGH
-  x509_dir: /etc/pki/qemu
-  seamless_migration: true
-  disable_ticketing: true
-
-storage:
-  - controller: pvscsi
-    drives:
-      - { type: hd, file: /dev/vm1/ubuntu-root, discard: on, boot_index: 0 }
-
-network:
-  - { type: bridge, bridge: vmbr0, mac: BC:24:11:FF:76:89 }
-```
-
-### Example B: Headless Serial + VNC
-
-```yaml
-general:
-  name: build-runner
-
-system:
-  chipset: { type: q35, xhci_enabled: false }
-  bios: { type: seabios, uuid: e7f0f0f1-0000-4e4a-a999-111111111111 }
-  cpu: { model: qemu64, sockets: 1, cores: 4, threads: 1 }
-  memory: { max: 8192, hugepages: false }
-  serial: { type: socket, path: /var/run/qemu-server/301.serial0 }
-
-gpu:
-  type: no_gpu
-
-display:
-  type: no_display
-
-vnc:
-  addr: 127.0.0.1
-  port: 5901
-  password: true
-
-storage:
-  - controller: sata
-    drives:
-      - { type: hd, file: /dev/vm2/build-root, format: raw, cache: none, boot_index: 0 }
-
-network:
-  - { type: user }
-```
-
-### Example C: PCI/USB Passthrough Workstation
-
-```yaml
-general:
-  name: windows-gaming
-
-system:
-  chipset: { type: q35 }
-  bios:
-    type: ovmf
-    file: /dev/vm3/windows-gaming-efi
-  cpu: { model: host, sockets: 1, cores: 12, threads: 2 }
-  memory: { max: 32768 }
-  vmgenid: b42d5b83-fee2-47dc-98a8-7856b18542ec
-
-gpu:
-  type: passthrough
-  pci:
-    - { vm_id: "0", host_id: "01:00", port: "1", multi_function: true }
-    - { vm_id: "1", host_id: "01:00", port: "1" }
-
-display:
-  type: no_display
-
-host:
-  usb:
-    - { vendor_id: "0451", product_id: "16a0" }
-    - { vm_port: "1", host_bus: "1", host_port: "7.6" }
-
-storage:
-  - controller: virtio-scsi-single
-    drives:
-      - { type: hd, file: /dev/vm3/windows-disk0, discard: on, boot_index: 0 }
-
-network:
-  - { type: bridge, bridge: vmbr0 }
-```
-
-### Example D: NUMA + Hugepages
-
-```yaml
-general:
-  name: numa-linux
-
-system:
-  chipset: { type: q35 }
-  bios: { type: ovmf, file: /dev/vm4/numa-efi }
-  cpu: { model: host, sockets: 2, dies: 1, clusters: 1, cores: 12, threads: 1 }
-  memory:
-    max: 65536
-    hugepages: true
-    mem_path: /run/hugepages/kvm/1048576kB
-  numa_nodes:
-    - nodeid: 0
-      cpus: "0-11"
-      mem: 32768
-      host_nodes: 0
-      policy: bind
-    - nodeid: 1
-      cpus: "12-23"
-      mem: 32768
-      host_nodes: 1
-      policy: bind
-  numa_distances:
-    - { src: 0, dst: 1, val: 20 }
-    - { src: 1, dst: 0, val: 20 }
-
-gpu:
-  type: no_gpu
-
-display:
-  type: no_display
-
-network:
-  - { type: bridge, bridge: vmbr1 }
-
-storage:
-  - controller: pvscsi
-    drives:
-      - { type: hd, file: /dev/vm4/root, cache: none, discard: on, boot_index: 0 }
-```
-
-## Chapter 13: Troubleshooting
-
-Common issues and quick checks.
-
-### VM fails with memory backend or hugepages errors
-
-Symptoms:
-
-- QEMU reports memory backend creation errors.
-- Startup fails when `hugepages` and `numa_nodes` are enabled.
-
-Likely causes:
-
-- `system.memory.mem_path` does not exist on host.
-- Hugepages are enabled but host hugepage mount is not available.
-- `numa_nodes[].mem` values do not align with intended node sizing.
-
-Checks:
-
-- Confirm configured path exists and is mounted for hugepages.
-- Temporarily disable `hugepages` to validate basic NUMA shape.
-- Start with one NUMA node, then expand.
-
-### No remote display appears
-
-Symptoms:
-
-- No viewer window appears.
-- Viewer opens but cannot connect.
-
-Likely causes:
-
-- `display.type` is `no_display`.
-- Missing or conflicting `spice`/`vnc` endpoint config.
-- Local environment cannot launch remote-viewer binary.
-
-Checks:
-
-- For SPICE flow, use `display.type: remote-viewer` and a valid `spice` section.
-- For headless operation, use `display.type: no_display` and connect via serial/VNC intentionally.
-- If using VNC TCP mode, verify expected display/port mapping.
-
-### Imported Proxmox VM boots from wrong disk
-
-Symptoms:
-
-- Guest enters firmware menu.
-- Wrong drive selected as first boot target.
-
-Likely causes:
-
-- Proxmox `boot: order=...` did not map to expected `boot_index` values.
-- Controller translation changed device naming.
-
-Checks:
-
-- Verify `storage[].drives[].boot_index` ordering.
-- Ensure target root disk has the lowest valid boot index.
-
-### PCI passthrough does not attach
-
-Symptoms:
-
-- Device missing inside guest.
-- QEMU rejects VFIO device arguments.
-
-Likely causes:
-
-- Host device id is wrong or missing function suffix.
-- `host.pci[].port` / `vm_id` combination conflicts.
-
-Checks:
-
-- Validate `host.pci[].host_id` format and function suffix.
-- Start with one passthrough device, then add multi-function siblings.
-
-### USB passthrough ignored
-
-Symptoms:
-
-- USB device not visible in guest.
-
-Likely causes:
-
-- Wrong selector format for the chosen mode.
-- Device re-enumerates on host and bus/port changed.
-
-Checks:
-
-- Bus/port mode requires `vm_port`, `host_bus`, and `host_port`.
-- Vendor/product mode requires `vendor_id` and `product_id` as hex text.
-
-## Chapter 14: Proxmox Import Mapping
-
-This section summarizes how Proxmox VM config fields map into ezkvm YAML during import.
-
-### Scalar and section mapping
-
-| Proxmox input | ezkvm output | Notes |
-| --- | --- | --- |
-| `name` | `general.name` | Can be overridden by import CLI name argument. |
-| extracted VM UUID | `general.uuid` | If available from Proxmox input. |
-| `agent` | `general.agent` | Mapped to yes/no form. |
-| `monitor` | `general.monitor` | Mapped to yes/no form. |
-| `cores`, `sockets`, `cpu` | `system.cpu.*` | `cpu.flags` converted from semicolon to comma list. |
-| `memory` | `system.memory.max` | MiB value preserved. |
-| `balloon` | `system.memory.balloon` | bool-ish parsing. |
-| `hugepages` | `system.memory.hugepages` | Non-zero numeric values map to enabled. |
-| `machine: q35...` | `system.chipset.type: q35` | Unsupported machine values are skipped with warning. |
-| `bios` / `efidisk0` | `system.bios.*` | `efidisk0` implies ovmf when bios absent. |
-| `tpmstate0` | `system.tpm` (`swtpm`) | Requires resolvable absolute source path. |
-| `rng0` | `system.virtio_rng.filename` | `max_bytes` and `period` are warned as unmapped. |
-| `serial0: socket` | `system.serial` | Path inferred from vmid or VM name. |
-| `numa` + `hugepages` | `system.numa_nodes` | Nodes derived from sockets/cores/memory. |
-| `vmgenid` | `system.vmgenid` | Passed through directly. |
-| `vga` and passthrough grouping | `gpu`, `display`, `spice`, `vnc` | Display path inferred; remote-viewer path defaults to SPICE. |
-| `boot: order=...` | `storage[].drives[].boot_index` | Converted to 1-based order position. |
-| `scsihw: virtio-scsi-single` | storage controller type | SCSI bus maps to `virtio-scsi-single` instead of `pvscsi`. |
-| `netN` with `bridge` | `network[]` | Uses `proxmox_tap` when vmid is known, else `bridge`. |
-| `hostpciN` | `gpu.pci` or `host.pci` | `x-vga` devices grouped into GPU passthrough. |
-| `usbN` | `host.usb` | Supports `<bus>-<port>` and `<vendor>:<product>` host selectors. |
-| `args` | `extras[]` | Shell-split raw tokens appended to extras. |
-
-### Import caveats and migration checklist
-
-- Import output is profile-aware and compacted: importer-inferred `profiles` are emitted and redundant VM-local fields already provided by those profiles may be omitted.
-- For merge-safe list paths (for example id-merged controller/host device lists and append-unique option lists), redundant overlay entries may be pruned while preserving the same merged runtime result.
-- Re-parsing imported YAML therefore requires profile resolution to remain available via `locations.profile_dir` (or `EZKVM_CONFIG`).
-- `virtio` disk bus is currently skipped during typed controller mapping.
-- Non-absolute storage references may require manual path translation.
-- Some Proxmox CPU options are not represented in typed schema and may need manual `extras` entries.
-- VGA models without direct typed mapping can be preserved as raw `extras`.
-- After import, validate: boot order, display path, passthrough device identity, and network backend type.
-
-## Chapter 15: Code-Backed Shape Examples
-
-These minimal examples are derived from active serde-backed shapes in the implementation.
-
-### Shape 1: system.serial socket
-
-```yaml
-system:
-  serial:
-    type: socket
-    path: /var/run/qemu-server/301.serial0
-```
-
-### Shape 2: host.usb vendor/product
-
-```yaml
-host:
-  usb:
-    - vendor_id: "0451"
-      product_id: "16a0"
-```
-
-### Shape 3: display.remote-viewer
-
-```yaml
-display:
-  type: remote-viewer
-  auto_resize: true
-  full_screen: false
-  usb_tablet: true
-```
-
-### Shape 4: system.numa_nodes with hugepages memory
-
-```yaml
-system:
-  memory:
-    max: 32768
-    hugepages: true
-    mem_path: /run/hugepages/kvm/1048576kB
-  numa_nodes:
-    - nodeid: 0
-      cpus: "0-11"
-      mem: 32768
-      host_nodes: 0
-      policy: bind
-```
-
-### Shape 5: storage controller + drive throttle
-
-```yaml
-storage:
-  - controller: pvscsi
-    drives:
-      - type: hd
-        file: /dev/vm1/root
-        cache: none
-        format: raw
-        throttle:
-          bps_read: 52428800
-          iops_write: 500
-```
+## See Also
+
+- [VM Structure](vm-structure.md)
+- [System and Boot](system-and-boot.md)
+- [Devices, Controllers, and Host Passthrough](devices.md)
+- [Profiles and Merge](profiles-and-merge.md)
+- [Platform Features and Options](platform-features.md)

@@ -372,4 +372,244 @@ mod tests {
             Some("4096")
         );
     }
+
+    // Comprehensive edge case tests for parser robustness
+    #[test]
+    fn parses_empty_input() {
+        let parsed = parse_proxmox_config("").expect("empty input should parse");
+        assert!(parsed.scalars.is_empty());
+        assert!(parsed.disks.is_empty());
+        assert!(parsed.networks.is_empty());
+        assert!(parsed.host_pci.is_empty());
+        assert!(parsed.usb.is_empty());
+    }
+
+    #[test]
+    fn parses_only_comments_and_whitespace() {
+        let parsed = parse_proxmox_config(
+            r#"
+            # comment
+            # another comment
+
+            # trailing comment
+            "#,
+        )
+        .expect("only comments should parse");
+        assert!(parsed.scalars.is_empty());
+    }
+
+    #[test]
+    fn handles_extreme_device_indices() {
+        let parsed = parse_proxmox_config(
+            r#"
+            scsi99: disk99,size=10G
+            net255: virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0
+            hostpci15: 0000:10:00.0
+            usb20: host=1-20
+            "#,
+        )
+        .expect("extreme indices should parse");
+
+        assert_eq!(parsed.disks[0].index, 99);
+        assert_eq!(parsed.networks[0].index, 255);
+        assert_eq!(parsed.host_pci[0].index, 15);
+        assert_eq!(parsed.usb[0].index, 20);
+    }
+
+    #[test]
+    fn parses_disk_with_empty_option_value() {
+        let parsed = parse_proxmox_config("scsi0: local-lvm:disk0,discard=,size=10G")
+            .expect("parse should succeed");
+
+        assert_eq!(parsed.disks.len(), 1);
+        assert_eq!(parsed.disks[0].index, 0);
+        assert_eq!(
+            parsed.disks[0].options.get("discard").map(String::as_str),
+            Some("")
+        );
+    }
+
+    #[test]
+    fn parses_disk_options_with_special_characters() {
+        let parsed = parse_proxmox_config(
+            "scsi0: local-lvm:vm-100/disk-0,cache=none,notes=test-notes"
+        )
+        .expect("parse should succeed");
+
+        assert_eq!(parsed.disks.len(), 1);
+        assert_eq!(
+            parsed.disks[0].options.get("notes").map(String::as_str),
+            Some("test-notes")
+        );
+    }
+
+    #[test]
+    fn parses_network_with_ipv6_style_mac() {
+        let parsed = parse_proxmox_config("net0: e1000=52:54:00:FF:FF:FF,bridge=vmbr0")
+            .expect("parse should succeed");
+
+        assert_eq!(parsed.networks[0].mac.as_deref(), Some("52:54:00:FF:FF:FF"));
+    }
+
+    #[test]
+    fn parses_hostpci_with_function_notation() {
+        let parsed = parse_proxmox_config("hostpci0: 0000:08:10.7,pcie=0")
+            .expect("parse should succeed");
+
+        assert_eq!(parsed.host_pci[0].host, "0000:08:10.7");
+    }
+
+    #[test]
+    fn parses_scalar_with_whitespace_padding_in_value() {
+        let parsed = parse_proxmox_config("name:   vm-with-padding   ")
+            .expect("parse should succeed");
+
+        assert_eq!(
+            parsed.scalars.get("name").map(String::as_str),
+            Some("vm-with-padding")
+        );
+    }
+
+    #[test]
+    fn parses_key_with_numeric_suffix_that_could_confuse_device_detection() {
+        let parsed = parse_proxmox_config("scsi100_meta: some-value")
+            .expect("parse should succeed");
+
+        // scsi100_meta should NOT be parsed as a device since there's non-numeric after index
+        assert_eq!(parsed.disks.len(), 0);
+        assert_eq!(
+            parsed.scalars.get("scsi100_meta").map(String::as_str),
+            Some("some-value")
+        );
+    }
+
+    #[test]
+    fn parses_ide_bus_device() {
+        let parsed = parse_proxmox_config(
+            r#"
+            ide0: local:iso/debian.iso,media=cdrom
+            ide1: none,media=cdrom
+            "#,
+        )
+        .expect("parse should succeed");
+
+        assert_eq!(parsed.disks.len(), 2);
+        assert_eq!(parsed.disks[0].bus, "ide");
+        assert_eq!(parsed.disks[1].bus, "ide");
+    }
+
+    #[test]
+    fn parses_virtio_disk_device() {
+        let parsed = parse_proxmox_config("virtio0: local-lvm:vm-disk,discard=on")
+            .expect("parse should succeed");
+
+        assert_eq!(parsed.disks.len(), 1);
+        assert_eq!(parsed.disks[0].bus, "virtio");
+        assert_eq!(parsed.disks[0].index, 0);
+    }
+
+    #[test]
+    fn handles_malformed_net_entry_without_equals_in_options() {
+        let parsed =
+            parse_proxmox_config("net0: virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0,malformed_option")
+                .expect("parse should succeed");
+
+        assert_eq!(parsed.networks.len(), 1);
+        // The malformed option without = should be silently skipped by parse_key_value_tokens
+        assert_eq!(parsed.networks[0].model, "virtio");
+    }
+
+    #[test]
+    fn parses_usb_with_vendor_and_device_id_style_host() {
+        let parsed = parse_proxmox_config("usb0: host=1234:5678,usb3=1")
+            .expect("parse should succeed");
+
+        assert_eq!(parsed.usb.len(), 1);
+        assert_eq!(parsed.usb[0].host, "host=1234:5678");
+    }
+
+    #[test]
+    fn parses_multiple_devices_of_same_bus_unsorted_then_sorts_them() {
+        let parsed = parse_proxmox_config(
+            r#"
+            scsi5: disk5
+            scsi2: disk2
+            scsi0: disk0
+            scsi10: disk10
+            "#,
+        )
+        .expect("parse should succeed");
+
+        assert_eq!(parsed.disks.len(), 4);
+        // Should be sorted by index: 0, 2, 5, 10
+        assert_eq!(parsed.disks[0].index, 0);
+        assert_eq!(parsed.disks[1].index, 2);
+        assert_eq!(parsed.disks[2].index, 5);
+        assert_eq!(parsed.disks[3].index, 10);
+    }
+
+    #[test]
+    fn rejects_invalid_line_with_value_containing_colon() {
+        // This should still parse successfully since only the first colon is the separator
+        let parsed =
+            parse_proxmox_config("args: -machine type=pc-q35-8.1,hpet=off")
+                .expect("parse should succeed");
+
+        assert_eq!(
+            parsed.scalars.get("args").map(String::as_str),
+            Some("-machine type=pc-q35-8.1,hpet=off")
+        );
+    }
+
+    #[test]
+    fn parses_disk_source_with_multiple_colons() {
+        let parsed = parse_proxmox_config("scsi0: local-lvm:vm-100-disk-0:backup,size=10G")
+            .expect("parse should succeed");
+
+        // The entire "local-lvm:vm-100-disk-0:backup" should be treated as the source
+        assert_eq!(parsed.disks[0].source, "local-lvm:vm-100-disk-0:backup");
+    }
+
+    #[test]
+    fn handles_cpu_and_cores_scalars() {
+        let parsed = parse_proxmox_config(
+            r#"
+            cpu: host,hv_ipi,hv_relaxed
+            cores: 8
+            sockets: 2
+            numa: 1
+            "#,
+        )
+        .expect("parse should succeed");
+
+        assert_eq!(parsed.scalars.get("cpu").map(String::as_str), Some("host,hv_ipi,hv_relaxed"));
+        assert_eq!(parsed.scalars.get("cores").map(String::as_str), Some("8"));
+        assert_eq!(parsed.scalars.get("sockets").map(String::as_str), Some("2"));
+        assert_eq!(parsed.scalars.get("numa").map(String::as_str), Some("1"));
+    }
+
+    #[test]
+    fn parses_disk_with_no_source() {
+        // "none" disks are typically CDROM drives
+        let parsed = parse_proxmox_config("ide2: none,media=cdrom").expect("parse should succeed");
+
+        assert_eq!(parsed.disks.len(), 1);
+        assert_eq!(parsed.disks[0].source, "none");
+        assert_eq!(
+            parsed.disks[0].options.get("media").map(String::as_str),
+            Some("cdrom")
+        );
+    }
+
+    #[test]
+    fn parses_network_options_with_equals_in_value() {
+        let parsed = parse_proxmox_config("net0: bridge=vmbr0,rate=1G,mtu=1500,firewall=0")
+            .expect("parse should succeed");
+
+        assert_eq!(parsed.networks.len(), 1);
+        assert_eq!(
+            parsed.networks[0].options.get("rate").map(String::as_str),
+            Some("1G")
+        );
+    }
 }

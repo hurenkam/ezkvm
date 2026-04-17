@@ -76,9 +76,10 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
         "script=/usr/libexec/qemu-server/pve-bridge",
         "downscript=/usr/libexec/qemu-server/pve-bridgedown",
         "vhost=on",
-        "vfio-pci,host=0000:03:00.0,id=hostpci0.0",
+        "vfio-pci,host=0000:03:00.0",
         "multifunction=on",
-        "vfio-pci,host=0000:03:00.1,id=hostpci0.1,bus=ich9-pcie-port-1,addr=0x0.1",
+        "vfio-pci,host=0000:03:00.1",
+        "bus=ich9-pcie-port-1,addr=0x0.1",
         "-spice port=5903,addr=0.0.0.0,disable-ticketing=on",
         "virtio-mouse",
         "virtio-keyboard",
@@ -102,7 +103,11 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
         );
     }
 
-    let generated_only_fragments = ["virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8"];
+    let generated_only_fragments = [
+        "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8",
+        "vfio-pci,host=0000:03:00.0,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
+        "vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1",
+    ];
     for fragment in generated_only_fragments {
         assert!(
             generated.contains(fragment),

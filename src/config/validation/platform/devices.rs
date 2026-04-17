@@ -117,9 +117,8 @@ pub(crate) fn validate_sata_controller_config(
         ));
     }
 
-    if sata_controller.id.trim().is_empty() {
-        return Err(anyhow!("SATA controller id cannot be empty"));
-    }
+    // Allow empty IDs: they are auto-generated during runtime deserialization (VmConfig::from_str).
+    // Empty IDs are intentionally preserved in import output YAML to match the original mapper output.
 
     if let Some(bus) = &sata_controller.bus
         && bus.trim().is_empty()

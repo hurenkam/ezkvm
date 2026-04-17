@@ -49,9 +49,8 @@ pub(crate) fn validate_usb_device_config(usb_device: &UsbDeviceConfig) -> Result
 pub(crate) fn validate_xhci_controller_config(
     xhci_controller: &XhciControllerConfig,
 ) -> Result<()> {
-    if xhci_controller.id.trim().is_empty() {
-        return Err(anyhow!("XHCI controller id cannot be empty"));
-    }
+    // Allow empty IDs: they are auto-generated during runtime deserialization (VmConfig::from_str).
+    // Empty IDs are intentionally preserved in import output YAML to match the original mapper output.
 
     if let Some(p2) = xhci_controller.p2
         && p2 == 0

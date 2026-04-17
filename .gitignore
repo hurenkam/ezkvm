@@ -1,0 +1,9 @@
+Cargo.lock
+.github/**
+.vscode/**
+bak/**
+diff/**
+etc/**
+target/**
+usr/**
+var/**

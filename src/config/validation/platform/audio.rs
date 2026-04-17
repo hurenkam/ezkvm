@@ -62,9 +62,8 @@ fn validate_spice_audio_requirement(
 }
 
 fn validate_audio_controller(audio_device: &AudioDeviceConfig) -> Result<()> {
-    if audio_device.id.trim().is_empty() {
-        return Err(anyhow!("Audio controller ID cannot be empty"));
-    }
+    // Allow empty IDs: they are auto-generated during runtime deserialization (VmConfig::from_str).
+    // Empty IDs are intentionally preserved in import output YAML to match the original mapper output.
 
     if audio_device.cad.is_some() {
         return Err(anyhow!(

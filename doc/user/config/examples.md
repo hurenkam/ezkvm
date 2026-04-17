@@ -85,10 +85,143 @@ options:
 
 Both `${VAR}` and `$VAR` are supported.
 
-## See also
+## Desktop with SPICE
 
-- [VM structure](vm-structure.md)
-- [Profiles and merge](profiles-and-merge.md)
-- [System and boot](system-and-boot.md)
-- [Devices, controllers, and host passthrough](devices.md)
-- [Platform features and options](platform-features.md)
+```yaml
+name: "ubuntu-desktop"
+backend: "qemu"
+profiles:
+  - "proxmox-q35-uefi"
+  - "remote-viewer-spice"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  cpu:
+    model: "host"
+    vcpus: 8
+  memory:
+    size: 16384
+
+devices:
+  displays:
+    - type: "virtio-gpu"
+      vram: 256
+  drives:
+    - path: "/dev/vm1/ubuntu-root"
+      interface: "virtio"
+      type: "disk"
+      format: "raw"
+      boot_index: 0
+  networks:
+    - model: "virtio-net"
+      backend:
+        type: "bridge"
+        bridge: "vmbr0"
+
+spice:
+  enabled: true
+  addr: "127.0.0.1"
+  port: 5900
+  disable_ticketing: false
+  audio: true
+  vdagent: true
+
+options:
+  enable_kvm: true
+  daemonize: false
+```
+
+## GPU Passthrough Workstation
+
+```yaml
+name: "gaming-01"
+backend: "qemu"
+profiles:
+  - "proxmox-q35-uefi"
+  - "gpu-passthrough"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  cpu:
+    model: "host"
+    vcpus: 12
+  memory:
+    size: 32768
+
+devices:
+  drives:
+    - path: "/dev/vm3/gaming-disk0"
+      interface: "virtio"
+      type: "disk"
+      format: "raw"
+      boot_index: 0
+  displays:
+    - type: "none"
+
+host:
+  pci:
+    - device: "0000:01:00.0"
+      x_vga: true
+      pcie: true
+    - device: "0000:01:00.1"
+  usb:
+    - host: "1-7.6"
+    - host: "0451:16a0"
+
+options:
+  enable_kvm: true
+  daemonize: false
+```
+
+## NUMA and Hugepages
+
+```yaml
+name: "numa-hpc"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  cpu:
+    model: "host"
+    vcpus: 24
+    numa:
+      - id: 0
+        memory: 32768
+        cpus: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      - id: 1
+        memory: 32768
+        cpus: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+  memory:
+    size: 65536
+    hugepages:
+      enabled: true
+      size_kib: 1048576
+
+devices:
+  drives:
+    - path: "/dev/vm4/root"
+      interface: "scsi"
+      type: "disk"
+      format: "raw"
+      boot_index: 0
+
+controllers:
+  scsi:
+    - type: "virtio-scsi-pci"
+
+options:
+  enable_kvm: true
+  daemonize: false
+```
+
+## See Also
+
+- [VM Structure](vm-structure.md)
+- [Profiles and Merge](profiles-and-merge.md)
+- [System and Boot](system-and-boot.md)
+- [Devices, Controllers, and Host Passthrough](devices.md)
+- [Platform Features and Options](platform-features.md)
+- [Code-Backed Schema Examples](code-backed-shapes.md)

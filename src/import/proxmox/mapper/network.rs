@@ -136,7 +136,7 @@ pub(super) fn map_network(
     });
 
     NetworkConfig {
-        id: network.key.clone(),
+        id: String::new(),
         model,
         backend: Some(backend),
         mac: network.mac.clone(),
