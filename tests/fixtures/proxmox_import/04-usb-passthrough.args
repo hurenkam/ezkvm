@@ -11,7 +11,7 @@ cpus=2
 -device
 virtio-balloon-pci
 -device
-qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b
+qemu-xhci,id=xhci
 -device
 usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1
 -device

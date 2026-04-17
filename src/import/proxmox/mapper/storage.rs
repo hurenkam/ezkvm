@@ -76,33 +76,25 @@ pub(super) fn map_drive(
 
     let boot_index = disk.options.get("boot").and_then(|v| v.parse::<u32>().ok());
 
-    let is_block_device = path.starts_with("/dev/");
-    let cache = disk.options.get("cache").cloned().or_else(|| {
-        if is_block_device {
-            Some("none".to_string())
-        } else {
-            None
-        }
-    });
-    let aio = disk.options.get("aio").cloned().or_else(|| {
-        if is_block_device {
-            Some("io_uring".to_string())
-        } else {
-            None
-        }
-    });
+    let cache = disk.options.get("cache").cloned();
+    let aio = disk.options.get("aio").cloned();
     let detect_zeroes = disk
         .options
         .get("detect_zeroes")
         .cloned()
-        .or_else(|| disk.options.get("detect-zeroes").cloned())
-        .or_else(|| {
-            if is_block_device {
-                Some("unmap".to_string())
-            } else {
-                None
-            }
-        });
+        .or_else(|| disk.options.get("detect-zeroes").cloned());
+
+    let scsi_id = disk
+        .options
+        .get("scsi_id")
+        .or_else(|| disk.options.get("scsi-id"))
+        .and_then(|value| value.parse::<u32>().ok());
+
+    let rotation_rate = disk
+        .options
+        .get("rotation_rate")
+        .or_else(|| disk.options.get("rotation-rate"))
+        .and_then(|value| value.parse::<u32>().ok());
 
     DriveConfig {
         id: String::new(),
@@ -126,16 +118,8 @@ pub(super) fn map_drive(
             None
         },
         boot_index,
-        scsi_id: if disk.bus == "scsi" {
-            Some(disk.index as u32)
-        } else {
-            None
-        },
-        rotation_rate: if ssd && disk.bus == "scsi" {
-            Some(1)
-        } else {
-            None
-        },
+        scsi_id: if disk.bus == "scsi" { scsi_id } else { None },
+        rotation_rate,
         bus: if disk.bus == "sata" {
             Some(format!("sata0.{}", disk.index))
         } else {

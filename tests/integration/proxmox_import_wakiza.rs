@@ -73,10 +73,6 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
 
     let shared_fragments = [
         "if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-108-efidisk,size=540672",
-        "type=tap,id=net0",
-        "script=/usr/libexec/qemu-server/pve-bridge",
-        "downscript=/usr/libexec/qemu-server/pve-bridgedown",
-        "vhost=on",
         "vfio-pci,host=0000:03:00.0",
         "multifunction=on",
         "vfio-pci,host=0000:03:00.1",
@@ -105,7 +101,8 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
     }
 
     let generated_only_fragments = [
-        "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x8",
+        "type=bridge,id=net0,br=vmbr0",
+        "virtio-serial-pci,id=virtio-serial0",
         "vfio-pci,host=0000:03:00.0,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on",
         "vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1",
     ];

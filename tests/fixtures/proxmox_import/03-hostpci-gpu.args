@@ -11,7 +11,7 @@ cpus=8
 -readconfig
 /usr/share/qemu-server/pve-q35-4.0.cfg
 -netdev
-type=tap,id=net0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
+type=bridge,id=net0,br=vmbr1
 -device
 virtio-net,netdev=net0,mac=52:54:00:de:ad:01
 -device

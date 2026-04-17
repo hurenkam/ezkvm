@@ -222,11 +222,11 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             xhci: if use_explicit_xhci {
                 vec![XhciControllerConfig {
                     id: String::new(),
-                    p2: Some(15),
-                    p3: Some(15),
+                    p2: None,
+                    p3: None,
                     usb: Vec::new(),
-                    bus: Some("pci.1".to_string()),
-                    addr: Some("0x1b".to_string()),
+                    bus: None,
+                    addr: None,
                 }]
             } else {
                 Vec::new()
@@ -371,6 +371,25 @@ mod tests {
             cfg.profiles
                 .contains(&"storage-virtio-scsi-single".to_string())
         );
+    }
+
+    #[test]
+    fn does_not_inject_drive_defaults_or_scsi_id_without_explicit_options() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-storage-compact
+            scsi0: /dev/vm1/vm-108-boot,format=raw
+            "#,
+        );
+
+        assert_eq!(cfg.devices.drives.len(), 1);
+        let drive = &cfg.devices.drives[0];
+        assert_eq!(drive.interface, "scsi");
+        assert_eq!(drive.cache, None);
+        assert_eq!(drive.aio, None);
+        assert_eq!(drive.detect_zeroes, None);
+        assert_eq!(drive.scsi_id, None);
+        assert_eq!(drive.rotation_rate, None);
     }
 
     #[test]
@@ -522,22 +541,16 @@ mod tests {
         assert_eq!(net.model, "virtio-net");
         assert_eq!(net.mac.as_deref(), Some("52:54:00:12:34:56"));
         let backend = net.backend.as_ref().expect("backend must be set");
-        assert_eq!(backend.backend_type, "tap");
+        assert_eq!(backend.backend_type, "bridge");
         assert_eq!(backend.bridge.as_deref(), Some("vmbr0"));
         assert_eq!(backend.queues, Some(4));
-        assert_eq!(
-            backend.script.as_deref(),
-            Some("/usr/libexec/qemu-server/pve-bridge")
-        );
-        assert_eq!(
-            backend.downscript.as_deref(),
-            Some("/usr/libexec/qemu-server/pve-bridgedown")
-        );
-        assert_eq!(backend.vhost, Some(true));
+        assert_eq!(backend.script, None);
+        assert_eq!(backend.downscript, None);
+        assert_eq!(backend.vhost, None);
     }
 
     #[test]
-    fn infers_tap_ifname_from_vmid_for_bridge_networks() {
+    fn does_not_infer_tap_ifname_for_bridge_networks() {
         let (_, cfg) = map_and_validate(
             r#"
             name: vm-net-ifname
@@ -548,7 +561,7 @@ mod tests {
 
         let net = &cfg.devices.networks[0];
         let backend = net.backend.as_ref().expect("backend must be set");
-        assert_eq!(backend.ifname.as_deref(), Some("tap108i0"));
+        assert_eq!(backend.ifname, None);
     }
 
     #[test]
@@ -753,8 +766,8 @@ mod tests {
             agent.socket_path.as_deref(),
             Some("/var/run/qemu-server/qga.sock")
         );
-        assert_eq!(agent.bus.as_deref(), Some("pci.0"));
-        assert_eq!(agent.addr.as_deref(), Some("0x8"));
+        assert_eq!(agent.bus, None);
+        assert_eq!(agent.addr, None);
     }
 
     #[test]
@@ -1301,6 +1314,10 @@ mod tests {
 
         assert_eq!(cfg.host.usb.len(), 4);
         assert_eq!(cfg.controllers.xhci.len(), 1);
+        assert_eq!(cfg.controllers.xhci[0].p2, None);
+        assert_eq!(cfg.controllers.xhci[0].p3, None);
+        assert_eq!(cfg.controllers.xhci[0].bus, None);
+        assert_eq!(cfg.controllers.xhci[0].addr, None);
     }
 
     #[test]

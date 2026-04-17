@@ -11,11 +11,11 @@ cpus=2
 -device
 virtio-scsi-pci,id=scsihw0
 -drive
-file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap
+file=/dev/zvol/rpool/data/vm-500-disk-0,if=none,id=drive-scsi0,format=raw,discard=unmap
 -device
-scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,scsi-id=0
+scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0
 -netdev
-type=tap,id=net0,ifname=tap500i0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on
+type=bridge,id=net0,br=vmbr9
 -device
 virtio-net,netdev=net0,mac=52:54:00:fe:ed:01
 -device
@@ -23,7 +23,7 @@ virtio-gpu,vram=33554432
 -device
 virtio-balloon-pci
 -device
-qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b
+qemu-xhci,id=xhci
 -device
 usb-host,hostbus=3,hostport=1.4,id=usb0,bus=xhci.0,port=1
 -pidfile

@@ -341,20 +341,20 @@ pub(super) fn map_guest_agent(
         enabled: true,
         socket_path,
         freeze_cpu: false,
-        bus: Some("pci.0".to_string()),
-        addr: Some("0x8".to_string()),
+        bus: None,
+        addr: None,
     })
 }
 
 pub(super) fn parse_boot_order(scalars: &BTreeMap<String, String>) -> BTreeMap<String, u32> {
     let mut boot_indices = BTreeMap::new();
-    if let Some(boot_str) = scalars.get("boot") {
-        if let Some(order) = boot_str.strip_prefix("order=") {
-            for (index, device_key) in order.split(';').enumerate() {
-                let dev_key = device_key.trim();
-                if !dev_key.is_empty() {
-                    boot_indices.insert(dev_key.to_string(), 100 + index as u32);
-                }
+    if let Some(boot_str) = scalars.get("boot")
+        && let Some(order) = boot_str.strip_prefix("order=")
+    {
+        for (index, device_key) in order.split(';').enumerate() {
+            let dev_key = device_key.trim();
+            if !dev_key.is_empty() {
+                boot_indices.insert(dev_key.to_string(), 100 + index as u32);
             }
         }
     }

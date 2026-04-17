@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 pub(super) fn map_network(
     network: &ProxmoxNetEntry,
-    vmid: Option<u32>,
+    _vmid: Option<u32>,
     is_windows: bool,
     warnings: &mut Vec<MappingWarning>,
 ) -> NetworkConfig {
@@ -39,41 +39,18 @@ pub(super) fn map_network(
 
     let has_bridge = network.options.contains_key("bridge");
     let backend_type = if has_bridge {
-        "tap".to_string()
+        "bridge".to_string()
     } else {
         "user".to_string()
     };
 
-    let ifname = network.options.get("ifname").cloned().or_else(|| {
-        if has_bridge {
-            vmid.map(|id| format!("tap{}i{}", id, network.index))
-        } else {
-            None
-        }
-    });
-    let script = if has_bridge {
-        network
-            .options
-            .get("script")
-            .cloned()
-            .or_else(|| Some("/usr/libexec/qemu-server/pve-bridge".to_string()))
-    } else {
-        network.options.get("script").cloned()
-    };
-    let downscript = if has_bridge {
-        network
-            .options
-            .get("downscript")
-            .cloned()
-            .or_else(|| Some("/usr/libexec/qemu-server/pve-bridgedown".to_string()))
-    } else {
-        network.options.get("downscript").cloned()
-    };
+    let ifname = network.options.get("ifname").cloned();
+    let script = network.options.get("script").cloned();
+    let downscript = network.options.get("downscript").cloned();
     let vhost = network
         .options
         .get("vhost")
-        .map(|value| is_enabled(Some(value)))
-        .or(if has_bridge { Some(true) } else { None });
+        .map(|value| is_enabled(Some(value)));
 
     let backend = NetworkBackendConfig {
         backend_type,
@@ -98,42 +75,16 @@ pub(super) fn map_network(
         .options
         .get("rx_queue_size")
         .or_else(|| network.options.get("rxqueuesz"))
-        .and_then(|v| v.parse::<u32>().ok())
-        .or_else(|| {
-            if is_windows && model == "virtio-net-pci" {
-                Some(1024)
-            } else {
-                None
-            }
-        });
+        .and_then(|v| v.parse::<u32>().ok());
 
     let tx_queue_size = network
         .options
         .get("tx_queue_size")
         .or_else(|| network.options.get("txqueuesz"))
-        .and_then(|v| v.parse::<u32>().ok())
-        .or_else(|| {
-            if is_windows && model == "virtio-net-pci" {
-                Some(256)
-            } else {
-                None
-            }
-        });
+        .and_then(|v| v.parse::<u32>().ok());
 
-    let bus = network.options.get("bus").cloned().or_else(|| {
-        if is_windows && model == "virtio-net-pci" {
-            Some("pci.0".to_string())
-        } else {
-            None
-        }
-    });
-    let addr = network.options.get("addr").cloned().or_else(|| {
-        if is_windows && model == "virtio-net-pci" {
-            Some(format!("0x{:x}", 0x12 + network.index as u32))
-        } else {
-            None
-        }
-    });
+    let bus = network.options.get("bus").cloned();
+    let addr = network.options.get("addr").cloned();
 
     NetworkConfig {
         id: String::new(),
