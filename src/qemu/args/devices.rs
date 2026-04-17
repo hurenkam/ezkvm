@@ -131,6 +131,12 @@ impl QemuArgs {
         self.push(controller_spec);
     }
 
+    /// Add Apple SMC device (used by macOS guests)
+    pub fn add_isa_applesmc(&mut self, osk: &str) {
+        self.push_str("-device");
+        self.push(format!("isa-applesmc,osk={}", osk));
+    }
+
     /// Add Intel IOMMU or AMD IOMMU device
     pub fn add_iommu(
         &mut self,

@@ -4,6 +4,14 @@ fn default_true() -> bool {
     true
 }
 
+fn default_smbios_type() -> u8 {
+    1
+}
+
+fn is_default_smbios_type(value: &u8) -> bool {
+    *value == 1
+}
+
 /// QMP monitoring configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QmpConfig {
@@ -32,6 +40,13 @@ pub enum QmpSocketType {
 /// SMBIOS system information configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SmbiosConfig {
+    /// SMBIOS table type (commonly 1, macOS often uses 2)
+    #[serde(
+        default = "default_smbios_type",
+        skip_serializing_if = "is_default_smbios_type"
+    )]
+    pub smbios_type: u8,
+
     /// Manufacturer name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manufacturer: Option<String>,

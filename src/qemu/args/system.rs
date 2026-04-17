@@ -26,6 +26,7 @@ impl QemuArgs {
     #[allow(clippy::too_many_arguments)]
     pub fn add_smbios(
         &mut self,
+        smbios_type: u8,
         manufacturer: Option<&str>,
         product: Option<&str>,
         version: Option<&str>,
@@ -34,8 +35,16 @@ impl QemuArgs {
         sku: Option<&str>,
         family: Option<&str>,
     ) {
-        let smbios_spec =
-            build_smbios_spec(manufacturer, product, version, serial, uuid, sku, family);
+        let smbios_spec = build_smbios_spec(
+            smbios_type,
+            manufacturer,
+            product,
+            version,
+            serial,
+            uuid,
+            sku,
+            family,
+        );
 
         self.push_str("-smbios");
         self.push(smbios_spec);
@@ -132,7 +141,9 @@ impl QemuArgs {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_smbios_spec(
+    smbios_type: u8,
     manufacturer: Option<&str>,
     product: Option<&str>,
     version: Option<&str>,
@@ -141,7 +152,7 @@ fn build_smbios_spec(
     sku: Option<&str>,
     family: Option<&str>,
 ) -> String {
-    let mut smbios_spec = "type=1".to_string();
+    let mut smbios_spec = format!("type={}", smbios_type);
     push_smbios_field(&mut smbios_spec, "manufacturer", manufacturer);
     push_smbios_field(&mut smbios_spec, "product", product);
     push_smbios_field(&mut smbios_spec, "version", version);

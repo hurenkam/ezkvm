@@ -38,7 +38,7 @@ Source: doc/backlog/BACKLOG.md
 - A-03 Create convergence tracking board
 - B-01 Port Proxmox parser into dedicated module (start)
 
-## Ticket Registry (A-01 to E-03)
+## Ticket Registry (A-01 to E-03, plus B-21 to B-25)
 
 | ID | Title | Epic | Milestone | Labels | Depends On | Assignee | Status |
 |---|---|---|---|---|---|---|---|
@@ -65,6 +65,11 @@ Source: doc/backlog/BACKLOG.md
 | B-18 | Serial port configuration | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
+| B-21 | Materialize hugepages profile layer end-to-end | B | Phase-1-Features | epic:proxmox, phase:1-features | B-20 | unassigned | Todo |
+| B-22 | Add canonical VNC profile schema and headless-vnc layer | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02, B-05 | unassigned | Todo |
+| B-23 | Add viommu and hidden-hypervisor tuning profile assignment | B | Phase-1-Features | epic:proxmox, phase:1-features | B-10, B-19 | unassigned | Todo |
+| B-24 | Tighten profile-aware compaction ownership boundaries | B | Phase-1-Features | epic:proxmox, phase:1-features | B-21, B-22, B-23 | unassigned | Todo |
+| B-25 | Expand profile-stack corpus and edge-case coverage | B | Phase-1-Features | epic:proxmox, phase:1-features | B-24 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -101,6 +106,11 @@ Source: doc/backlog/BACKLOG.md
 - B-02 -> B-18
 - B-02 -> B-19
 - B-02 -> B-20
+- B-20 -> B-21
+- (B-02 and B-05) -> B-22
+- (B-10 and B-19) -> B-23
+- (B-21 and B-22 and B-23) -> B-24
+- B-24 -> B-25
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

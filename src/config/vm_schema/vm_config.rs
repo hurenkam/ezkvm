@@ -9,8 +9,8 @@ use super::super::{
 };
 
 use super::super::{
-    AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig,
-    InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig,
+    AppleSmcConfig, AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig,
+    HypervConfig, InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig,
     SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig,
     UsbDeviceConfig, VmOptions, XhciControllerConfig,
 };
@@ -106,6 +106,10 @@ impl VmConfig {
 
     pub fn system_smbios(&self) -> Option<&SmbiosConfig> {
         self.system.smbios.as_ref()
+    }
+
+    pub fn system_applesmc(&self) -> Option<&AppleSmcConfig> {
+        self.system.applesmc.as_ref()
     }
 
     pub fn system_memory_ballooning(&self) -> Option<&BallooningConfig> {

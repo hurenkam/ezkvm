@@ -238,6 +238,61 @@ Acceptance Criteria:
 - Tests cover default hugepages, custom sizes (2M, 1G), and NUMA-bound hugepage allocation.
 Estimate: 2 days
 
+### B-21 Materialize hugepages profile layer end-to-end
+Scope:
+- Add and standardize canonical `hugepages` profile defaults in `etc/profiles.d` aligned with `system.memory.hugepages` schema.
+- Extend importer profile inference to emit `hugepages` profile when source config/runtime indicates hugepages usage.
+- Tighten compaction ownership for hugepages so profile-backed defaults are not redundantly re-emitted in VM-local config.
+Dependencies: B-20
+Acceptance Criteria:
+- Imported hugepages-backed VMs include `hugepages` in inferred profile stacks.
+- Profile-aware compaction removes redundant hugepages fields when profile defaults match effective values.
+- Fixture tests verify inferred profile stack and resulting command parity.
+Estimate: 2 days
+
+### B-22 Add canonical VNC profile schema and `headless-vnc` layer
+Scope:
+- Extend profile-oriented canonical schema to represent VNC settings needed for layered profile materialization.
+- Add `headless-vnc` profile definition and map importer assignment rules for VNC plus headless runtime mode.
+Dependencies: B-02, B-05
+Acceptance Criteria:
+- Canonical schema supports VNC settings used by profile layering.
+- `headless-vnc` profile can be emitted by importer for qualifying Proxmox workloads.
+- Integration fixtures cover VNC headless profile inference and dry-run argument output.
+Estimate: 3 days
+
+### B-23 Add `viommu` and `hidden-hypervisor` tuning profile assignment
+Scope:
+- Add importer rules to infer `viommu` profile from machine options and/or mapped IOMMU settings.
+- Add importer rules to infer `hidden-hypervisor` profile from effective CPU feature patterns (for example `kvm=off` and related hiding strategies).
+- Materialize profile files and align compaction ownership for both tuning layers.
+Dependencies: B-10, B-19
+Acceptance Criteria:
+- Imported configs that carry vIOMMU settings emit `viommu` profile.
+- Imported configs that carry hypervisor-hiding CPU semantics emit `hidden-hypervisor` profile.
+- Fixture tests validate inference, compaction behavior, and generated QEMU args.
+Estimate: 2 days
+
+### B-24 Tighten profile-aware compaction ownership boundaries
+Scope:
+- Refine ownership boundaries for list-shaped and tuning sections so profile-aware compaction can safely remove redundant VM-local fields.
+- Keep compaction deterministic and semantics-preserving across profile stacks.
+Dependencies: B-21, B-22, B-23
+Acceptance Criteria:
+- Compaction removes redundant profile-owned fields for hugepages, access-mode, and tuning layers without changing effective runtime config.
+- Regression tests cover ownership-boundary edge cases and ensure stable YAML output.
+Estimate: 3 days
+
+### B-25 Expand profile-stack corpus and edge-case coverage
+Scope:
+- Add fixture coverage for nested virtualization, multiple display backends, mixed storage buses, and macOS-specific AppleSMC/SMBIOS type behavior.
+- Expand profile-stack integration tests to cover new deferred-layer materializations.
+Dependencies: B-24
+Acceptance Criteria:
+- Profile-stack test corpus includes representative edge fixtures for all newly materialized layers.
+- Snapshot and integration tests pass deterministically and catch profile inference regressions.
+Estimate: 3 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy

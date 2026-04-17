@@ -1,3 +1,4 @@
+mod applesmc;
 mod hugepages;
 mod hyperv;
 mod iommu;
@@ -7,6 +8,7 @@ mod peripherals;
 mod storage;
 mod tpm_guest;
 
+pub use applesmc::AppleSmcConfig;
 pub use hugepages::HugepagesConfig;
 pub use hyperv::HypervConfig;
 pub use iommu::IommuConfig;

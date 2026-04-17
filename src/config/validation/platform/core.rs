@@ -1,8 +1,8 @@
 use anyhow::{Result, anyhow};
 
 use crate::config::{
-    BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig, QmpConfig, SmbiosConfig,
-    SpiceConfig, TpmConfig,
+    AppleSmcConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig, QmpConfig,
+    SmbiosConfig, SpiceConfig, TpmConfig,
 };
 
 use super::helpers::is_valid_pci_address;
@@ -143,6 +143,13 @@ pub(crate) fn validate_qmp_config(qmp: &QmpConfig) -> Result<()> {
 }
 
 pub(crate) fn validate_smbios_config(smbios: &SmbiosConfig) -> Result<()> {
+    if smbios.smbios_type != 1 && smbios.smbios_type != 2 {
+        return Err(anyhow!(
+            "SMBIOS type must be either 1 or 2, got {}",
+            smbios.smbios_type
+        ));
+    }
+
     if let Some(uuid) = &smbios.uuid
         && (uuid.len() != 36 || !uuid.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
     {
@@ -157,6 +164,14 @@ pub(crate) fn validate_smbios_config(smbios: &SmbiosConfig) -> Result<()> {
         return Err(anyhow!(
             "VM generation ID must be in format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
         ));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn validate_applesmc_config(applesmc: &AppleSmcConfig) -> Result<()> {
+    if applesmc.enabled && applesmc.osk.trim().is_empty() {
+        return Err(anyhow!("AppleSMC OSK cannot be empty when enabled"));
     }
 
     Ok(())
@@ -178,4 +193,62 @@ pub(crate) fn validate_hyperv_config(hyperv: &HypervConfig) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_applesmc_config, validate_smbios_config};
+    use crate::config::{AppleSmcConfig, SmbiosConfig};
+
+    #[test]
+    fn smbios_type_rejects_unsupported_values() {
+        let smbios = SmbiosConfig {
+            smbios_type: 3,
+            manufacturer: None,
+            product: None,
+            version: None,
+            serial: None,
+            uuid: None,
+            sku: None,
+            family: None,
+            vm_generation_id: None,
+        };
+
+        let err = validate_smbios_config(&smbios).expect_err("must fail");
+        assert!(
+            err.to_string()
+                .contains("SMBIOS type must be either 1 or 2")
+        );
+    }
+
+    #[test]
+    fn smbios_type_accepts_type_2() {
+        let smbios = SmbiosConfig {
+            smbios_type: 2,
+            manufacturer: None,
+            product: None,
+            version: None,
+            serial: None,
+            uuid: None,
+            sku: None,
+            family: None,
+            vm_generation_id: None,
+        };
+
+        validate_smbios_config(&smbios).expect("must succeed");
+    }
+
+    #[test]
+    fn applesmc_requires_non_empty_osk() {
+        let applesmc = AppleSmcConfig {
+            enabled: true,
+            osk: "   ".to_string(),
+        };
+
+        let err = validate_applesmc_config(&applesmc).expect_err("must fail");
+        assert!(
+            err.to_string()
+                .contains("AppleSMC OSK cannot be empty when enabled")
+        );
+    }
 }

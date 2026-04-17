@@ -4,12 +4,12 @@ use super::model::{
     ProxmoxVmConfig,
 };
 use crate::config::{
-    AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig, DeviceConfig,
-    DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig, HugepagesConfig,
-    InputDeviceConfig, IommuConfig, IvshmemConfig, MemoryConfig, NetworkBackendConfig,
-    NetworkConfig, NumaConfig, RtcConfig, SataControllerConfig, ScsiControllerConfig, SerialConfig,
-    SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig, UsbDeviceConfig, VmConfig, VmOptions,
-    XhciControllerConfig,
+    AppleSmcConfig, AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig,
+    DeviceConfig, DisplayConfig, DriveConfig, GuestAgentConfig, HostConfig, HostPciConfig,
+    HugepagesConfig, InputDeviceConfig, IommuConfig, IvshmemConfig, MemoryConfig,
+    NetworkBackendConfig, NetworkConfig, NumaConfig, RtcConfig, SataControllerConfig,
+    ScsiControllerConfig, SerialConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig,
+    UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -110,11 +110,15 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let (audio, mut spice) = map_audio_and_spice(&proxmox.scalars, &mut warnings);
     let mut input_devices = Vec::new();
     let mut ivshmem = None;
+    let mut applesmc = None;
+    let mut smbios_type = 1u8;
     apply_args_passthrough_subset(
         &proxmox.scalars,
         &mut spice,
         &mut input_devices,
         &mut ivshmem,
+        &mut applesmc,
+        &mut smbios_type,
         &mut warnings,
     );
     let explicit_host_functions = proxmox
@@ -165,16 +169,22 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let tpm = map_tpm(&proxmox.scalars, storage_config, inferred_vmid);
     let guest_agent = map_guest_agent(&proxmox.scalars, inferred_vmid);
 
-    let smbios = smbios_uuid.map(|uuid| SmbiosConfig {
-        manufacturer: None,
-        product: None,
-        version: None,
-        serial: None,
-        uuid: Some(uuid),
-        sku: None,
-        family: None,
-        vm_generation_id: proxmox.scalars.get("vmgenid").cloned(),
-    });
+    let vm_generation_id = proxmox.scalars.get("vmgenid").cloned();
+    let smbios = if smbios_uuid.is_some() || vm_generation_id.is_some() || smbios_type != 1 {
+        Some(SmbiosConfig {
+            smbios_type,
+            manufacturer: None,
+            product: None,
+            version: None,
+            serial: None,
+            uuid: smbios_uuid,
+            sku: None,
+            family: None,
+            vm_generation_id,
+        })
+    } else {
+        None
+    };
 
     let mut vm_config = VmConfig {
         name,
@@ -203,6 +213,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             boot,
             tpm,
             smbios,
+            applesmc,
             readconfig,
         },
         devices: DeviceConfig {
@@ -1654,6 +1665,8 @@ fn apply_args_passthrough_subset(
     spice: &mut Option<SpiceConfig>,
     input_devices: &mut Vec<InputDeviceConfig>,
     ivshmem: &mut Option<IvshmemConfig>,
+    applesmc: &mut Option<AppleSmcConfig>,
+    smbios_type: &mut u8,
     warnings: &mut Vec<MappingWarning>,
 ) {
     let Some(raw_args) = scalars.get("args") else {
@@ -1720,6 +1733,10 @@ fn apply_args_passthrough_subset(
                             ivshmem_memdev = options.get("memdev").cloned();
                             ivshmem_bus = options.get("bus").cloned();
                         }
+                        "isa-applesmc" => {
+                            let osk = options.get("osk").cloned().unwrap_or_default();
+                            *applesmc = Some(AppleSmcConfig { enabled: true, osk });
+                        }
                         _ => {}
                     }
                     index += 2;
@@ -1747,6 +1764,25 @@ fn apply_args_passthrough_subset(
                     warnings.push(MappingWarning {
                         source_field: "args".to_string(),
                         message: "-object missing argument".to_string(),
+                    });
+                    index += 1;
+                }
+            }
+            "-smbios" => {
+                if let Some(spec) = tokens.get(index + 1) {
+                    for token in spec.split(',').map(str::trim).filter(|t| !t.is_empty()) {
+                        if let Some((k, v)) = token.split_once('=')
+                            && k.trim() == "type"
+                            && let Ok(parsed) = v.trim().parse::<u8>()
+                        {
+                            *smbios_type = parsed;
+                        }
+                    }
+                    index += 2;
+                } else {
+                    warnings.push(MappingWarning {
+                        source_field: "args".to_string(),
+                        message: "-smbios missing argument".to_string(),
                     });
                     index += 1;
                 }
@@ -2470,6 +2506,11 @@ mod tests {
 
         assert!(cfg.profiles.contains(&"macos-kvm".to_string()));
         assert!(cfg.profiles.contains(&"gpu-passthrough".to_string()));
+        assert_eq!(cfg.system.smbios.as_ref().map(|s| s.smbios_type), Some(2));
+        assert_eq!(
+            cfg.system.applesmc.as_ref().map(|a| a.osk.as_str()),
+            Some("dummy")
+        );
     }
 
     #[test]

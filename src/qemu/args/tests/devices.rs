@@ -144,3 +144,12 @@ fn test_sata_controller_with_bus_and_addr() {
             .any(|arg| arg == "ahci,id=sata0,bus=pci.0,addr=0x1f")
     );
 }
+
+#[test]
+fn test_applesmc_device_emission() {
+    let mut args = QemuArgs::new();
+    args.add_isa_applesmc("dummy-osk");
+
+    let built = args.build();
+    assert!(built.iter().any(|arg| arg == "isa-applesmc,osk=dummy-osk"));
+}

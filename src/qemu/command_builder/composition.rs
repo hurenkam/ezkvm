@@ -213,6 +213,7 @@ impl QemuManager {
 
         if let Some(smbios) = self.config.system_smbios() {
             args.add_smbios(
+                smbios.smbios_type,
                 smbios.manufacturer.as_deref(),
                 smbios.product.as_deref(),
                 smbios.version.as_deref(),
@@ -225,6 +226,12 @@ impl QemuManager {
             if let Some(vm_gen_id) = &smbios.vm_generation_id {
                 args.add_vm_generation_id(vm_gen_id);
             }
+        }
+
+        if let Some(applesmc) = self.config.system_applesmc()
+            && applesmc.enabled
+        {
+            args.add_isa_applesmc(&applesmc.osk);
         }
     }
 }

@@ -66,6 +66,16 @@ fn test_qmp_uses_listening_unix_socket() {
 }
 
 #[test]
+fn test_smbios_type_2_emission() {
+    let mut args = QemuArgs::new();
+    args.add_smbios(2, None, None, None, None, None, None, None);
+
+    let built = args.build();
+    assert_eq!(built[0], "-smbios");
+    assert_eq!(built[1], "type=2");
+}
+
+#[test]
 fn test_iscsi_disk_with_initiator_and_auth() {
     let mut args = QemuArgs::new();
     args.add_iscsi_disk(

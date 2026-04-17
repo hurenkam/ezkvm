@@ -278,7 +278,7 @@ This is a strongly differentiated virtualization pattern with guest-specific con
 - UEFI boot
 - Intel-compatible CPU model and feature policy
 - AppleSMC enablement
-- SMBIOS type 2 extra argument
+- SMBIOS type 2 configuration
 - no emulated VGA by default
 
 ### What must remain per-VM
@@ -451,15 +451,15 @@ system:
   machine: "pc-q35-5.2+pve0"
   boot:
     firmware: "uefi"
+  smbios:
+    smbios_type: 2
+  applesmc:
+    osk: "REPLACE_WITH_APPLE_OSK"
   cpu:
     model: "Penryn"
     features:
       - "vendor=GenuineIntel"
       - "+invtsc"
-
-extras:
-  - "-device isa-applesmc,osk=${APPLE_OSK}"
-  - "-smbios type=2"
 ```
 
 ## `remote-viewer-spice`
@@ -517,8 +517,9 @@ controllers:
 ```yaml
 system:
   memory:
-    hugepages: true
-    prealloc: true
+    hugepages:
+      enabled: true
+      prealloc: true
 ```
 
 ## Example Profile Stacks
@@ -690,7 +691,7 @@ Importer status update:
 
 ## Deferred Or Partially Represented Profiles
 
-Some profile ideas from this analysis are not fully materialized yet because the current canonical schema does not model them directly.
+Some profile ideas from this analysis are not fully materialized yet. In some cases this is a schema gap; in others the schema support exists but profile assignment and compaction ownership are not fully wired yet.
 
 ### `headless-vnc`
 
@@ -702,35 +703,59 @@ Reason:
 
 ### `hugepages`
 
+Partially materialized.
+
+Reason:
+
+- hugepages are now represented in canonical schema (`system.memory.hugepages`) and imported from Proxmox `hugepages:` values
+- QEMU emission now generates `-object memory-backend-file` and `-numa ... memdev=` wiring for hugepages-backed memory
+- profile-layer materialization remains incomplete because `hugepages` profile inference and canonical profile file adoption are not yet fully integrated into compaction behavior
+
+### `macos-kvm` raw AppleSMC and SMBIOS extras
+
+No longer deferred as raw extras; now represented natively.
+
+Reason:
+
+- AppleSMC is now represented in canonical schema (`system.applesmc`) and emitted as `-device isa-applesmc,osk=...`
+- SMBIOS type selection is now represented in canonical schema (`system.smbios.smbios_type`) and emitted as `-smbios type=...`
+- importer arg mapping now parses `-device isa-applesmc,osk=...` and `-smbios type=2` into native schema fields
+
+Remaining gap:
+
+- profile compaction and profile inference can be further refined so more macOS-specific per-VM settings are safely lifted into profile defaults.
+
+### `viommu`
+
+Partially materialized.
+
+Reason:
+
+- IOMMU/vIOMMU device representation exists in canonical schema and QEMU emission
+- importer assignment as a dedicated tuning profile layer is not yet consistently materialized across profile inference and compaction
+
+### `hidden-hypervisor`
+
 Deferred.
 
 Reason:
 
-- the current canonical `system.memory` schema supports `size`, `ballooning`, and `ivshmem`, but not hugepages or preallocation controls in the profile path currently used here
-
-### `macos-kvm` raw AppleSMC and SMBIOS extras
-
-Partially represented.
-
-Reason:
-
-- the current canonical profile schema used here does not expose a raw `extras` or equivalent passthrough argument list for profile layering
-- because of that, the concrete `macos-kvm.yaml` file currently captures the machine and CPU baseline but not the full AppleSMC and SMBIOS type 2 raw argument strategy seen in the Proxmox source corpus
-
-Those gaps should be treated as implementation backlog, not as evidence against the profile taxonomy itself.
+- source signals can be detected from CPU feature flags (`kvm=off`, hypervisor-hiding patterns)
+- a dedicated canonical profile layer with importer assignment and compaction ownership is not yet fully defined
 
 ## Recommended Next Steps
 
-1. Continue narrowing profile ownership boundaries (especially list-shaped sections) so compaction can safely remove more redundant fields over time.
-2. Add explicit fixture coverage for remaining deferred profile families (`headless-vnc`, `hugepages`) once schema support lands.
-3. Extend profile-stack corpus tests with more edge cases (nested virtualization, multiple display backends, and mixed storage buses).
+1. Complete `hugepages` profile materialization end-to-end by adding canonical profile file coverage plus importer profile inference/compaction ownership for `system.memory.hugepages`.
+2. Materialize `headless-vnc` by extending the profile-oriented schema with explicit VNC settings and adding a corresponding layered profile.
+3. Continue narrowing profile ownership boundaries (especially list-shaped sections) so compaction can safely remove redundant VM-local fields when profile defaults already provide them.
+4. Extend profile-stack corpus tests with more edge cases (nested virtualization, multiple display backends, mixed storage buses, and macOS-specific AppleSMC/SMBIOS type handling).
 
 ## Recommended Rollout Order
 
-1. Introduce `proxmox-q35-uefi`, `windows-common`, `windows-11`, `linux-l26-common`, and `macos-kvm`.
-2. Split storage controller behavior into `storage-virtio-scsi-single` and `storage-virtio-scsi-pci`.
-3. Split display behavior into `remote-viewer-spice`, `headless-vnc`, and `looking-glass`.
-4. Add `gpu-passthrough` and `hugepages` as opt-in layers.
-5. Teach the importer to map source signals to this layered profile stack.
+1. Keep current base stack (`proxmox-q35-uefi`, storage profiles, OS-family profiles, `remote-viewer-spice`, `looking-glass`, `gpu-passthrough`, `headless-serial`) as the default emitted taxonomy.
+2. Finalize `hugepages` as a first-class opt-in layer (profile file + importer assignment + compaction alignment).
+3. Add `headless-vnc` as a first-class access-mode layer once VNC is represented in the profile-oriented schema.
+4. Expand opt-in tuning layers (`viommu`, `hidden-hypervisor`) with explicit importer assignment rules and fixture coverage.
+5. Tighten profile-aware compaction boundaries so emitted VM YAML consistently prefers profile stacks over repeated inline defaults.
 
-This order gives immediate compaction wins while keeping the importer logic understandable.
+This order reflects what is already landed and focuses the remaining work on deferred profile layers and compaction quality.

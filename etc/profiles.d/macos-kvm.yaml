@@ -1,5 +1,9 @@
 system:
   machine: "pc-q35-5.2+pve0"
+  smbios:
+    smbios_type: 2
+  applesmc:
+    osk: "REPLACE_WITH_APPLE_OSK"
 
 devices:
   displays:

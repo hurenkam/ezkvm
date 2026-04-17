@@ -2,7 +2,8 @@ use crate::qemu::types::QemuArgs;
 use serde::{Deserialize, Serialize};
 
 use super::super::{
-    BallooningConfig, HugepagesConfig, IvshmemConfig, NumaConfig, SmbiosConfig, TpmConfig,
+    AppleSmcConfig, BallooningConfig, HugepagesConfig, IvshmemConfig, NumaConfig, SmbiosConfig,
+    TpmConfig,
 };
 use super::BootConfig;
 
@@ -37,6 +38,10 @@ pub struct SystemConfig {
     /// Canonical SMBIOS configuration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub smbios: Option<SmbiosConfig>,
+
+    /// Optional Apple SMC device configuration for macOS guests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub applesmc: Option<AppleSmcConfig>,
 
     /// Optional QEMU config file(s) to load via -readconfig.
     /// Use this to supply machine topology files such as

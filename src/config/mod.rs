@@ -17,9 +17,9 @@ mod vm_schema;
 pub use central::{CentralConfig, LocationsConfig, LookingGlassOptions, ToolsConfig};
 #[allow(unused_imports)]
 pub use platform::{
-    AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HugepagesConfig,
-    HypervConfig, InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, NumaConfig,
-    QmpConfig, QmpSocketType, SataControllerConfig, ScsiControllerConfig, SmbiosConfig,
+    AppleSmcConfig, AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig,
+    HugepagesConfig, HypervConfig, InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig,
+    NumaConfig, QmpConfig, QmpSocketType, SataControllerConfig, ScsiControllerConfig, SmbiosConfig,
     SpiceConfig, TpmConfig, UsbDeviceConfig, XhciControllerConfig,
 };
 #[allow(unused_imports)]
