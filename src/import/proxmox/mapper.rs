@@ -1,3 +1,6 @@
+// Temporary over-size rationale (B-29): this file still carries orchestration plus
+// a large regression-test block after B-26. Keep this as transitional debt only;
+// closure target is <=250 lines for orchestration/public entrypoints.
 use super::error::ImportError;
 use super::model::{ProxmoxStorageConfig, ProxmoxVmConfig};
 use crate::config::{
@@ -263,7 +266,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
 mod tests {
     use super::{map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage};
     use crate::config::{VmConfig, validation};
-    use crate::import::proxmox::{parse_proxmox_config, parse_proxmox_storage_config};
+    use crate::import::proxmox::parser::parse_proxmox_config;
+    use crate::import::proxmox::storage_parser::parse_proxmox_storage_config;
 
     fn map_and_validate(input: &str) -> (String, VmConfig) {
         let parsed = parse_proxmox_config(input).expect("parser should succeed");

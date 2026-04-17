@@ -152,6 +152,34 @@ Acceptance:
 - Add module-level comments to oversized files that are intentionally temporary.
 - Link rationale to backlog tasks so size debt is tracked and not normalized.
 
+### B-29 Execution Update (2026-04-17)
+
+Status snapshot after B-26, B-27, and B-28:
+
+- `mapper.rs` was reduced from 2844 to 1106 lines (tests still co-located).
+- `profile_compact.rs` was reduced from 732 to 334 lines (core logic extracted to submodules).
+- Low-level root re-exports were removed from `proxmox::mod.rs`; high-level API remains:
+    - `ImportRunOptions`
+    - `run_import_from_files`
+    - `ImportError`
+
+Guardrail targets for cleanup closure:
+
+| File | Current Lines | Closure Target | Backlog Link |
+|------|---------------|----------------|--------------|
+| `mapper.rs` | 1106 | <=250 (orchestration-only) | B-29 follow-up |
+| `mapper/devices.rs` | 666 | <=250 | B-29 follow-up |
+| `mapper/system.rs` | 394 | <=250 | B-29 follow-up |
+| `parser.rs` | 372 | <=250 | B-29 follow-up |
+| `profile_compact.rs` | 334 | <=250 | B-29 follow-up |
+| `io.rs` | 310 | <=250 | B-29 follow-up |
+
+Short-term closure checklist:
+
+- Keep temporary over-size rationale comments in each hotspot until target is met.
+- Require each hardening phase to retire at least one hotspot above 250 lines.
+- Treat new public re-exports of parser/mapper internals as a regression.
+
 ---
 
 ## Risks and Mitigations

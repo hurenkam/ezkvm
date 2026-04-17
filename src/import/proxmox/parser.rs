@@ -1,3 +1,6 @@
+// Temporary over-size rationale (B-29): parser coverage and legacy key handling are
+// still co-located. Closure target is <=250 lines after extracting keyed-field
+// handlers by domain while preserving parse compatibility.
 use super::error::ImportError;
 use super::model::{
     ProxmoxDiskEntry, ProxmoxHostPciEntry, ProxmoxNetEntry, ProxmoxUsbEntry, ProxmoxVmConfig,

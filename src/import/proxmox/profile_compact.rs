@@ -1,3 +1,6 @@
+// Temporary over-size rationale (B-29): compaction orchestration and tests are still
+// in one file after B-27 extraction. Closure target is <=250 lines by moving the
+// integration-style test harness to dedicated test modules.
 use super::ImportError;
 use serde_yaml::{Mapping, Value};
 

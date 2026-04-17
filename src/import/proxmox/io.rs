@@ -1,7 +1,15 @@
+// Temporary over-size rationale (B-29): high-level import flow and its test suite
+// remain in one module. Closure target is <=250 lines by extracting validation/
+// write-output helpers and moving heavy test setup into dedicated test modules.
 use super::{
-    ImportError, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
-    mapper::MappingWarning, parse_proxmox_config, parse_proxmox_storage_config,
-    profile_compact::compact_profile_owned_fields, yaml_compact::compact_sequence_mappings,
+    ImportError,
+    mapper::{
+        MappingWarning, map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage,
+    },
+    parser::parse_proxmox_config,
+    profile_compact::compact_profile_owned_fields,
+    storage_parser::parse_proxmox_storage_config,
+    yaml_compact::compact_sequence_mappings,
 };
 use crate::config::{VmConfig, validation};
 use std::path::Path;

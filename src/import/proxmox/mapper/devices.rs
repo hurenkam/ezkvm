@@ -1,3 +1,6 @@
+// Temporary over-size rationale (B-29): device policy mapping is still concentrated
+// here after B-26. Closure target is <=250 lines by extracting display/audio/input
+// policy helpers without changing generated YAML semantics.
 use super::helpers::{
     parse_options, parse_prefixed_options, parse_human_size_to_bytes, shell_split,
 };

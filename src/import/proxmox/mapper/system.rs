@@ -1,3 +1,6 @@
+// Temporary over-size rationale (B-29): system-path mapping still combines several
+// ownership areas (cpu/memory/boot/firmware). Closure target is <=250 lines by
+// splitting memory and boot helpers while keeping behavior stable.
 use super::helpers::{
     is_enabled, parse_human_size_to_bytes, parse_options, parse_source_and_options,
 };

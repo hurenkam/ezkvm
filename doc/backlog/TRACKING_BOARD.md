@@ -72,8 +72,8 @@ Source: doc/backlog/BACKLOG.md
 | B-25 | Expand profile-stack corpus and edge-case coverage | B | Phase-1-Features | epic:proxmox, phase:1-features | B-24 | unassigned | Done |
 | B-26 | Decompose mapper orchestration and module boundaries | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening, ready | B-25 | unassigned | Done |
 | B-27 | Split profile-aware compaction by domain ownership | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Done |
-| B-28 | Restrict Proxmox importer public surface to high-level API | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Todo |
-| B-29 | Add temporary over-size rationale and cleanup guardrails | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26, B-27, B-28 | unassigned | Todo |
+| B-28 | Restrict Proxmox importer public surface to high-level API | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Done |
+| B-29 | Add temporary over-size rationale and cleanup guardrails | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26, B-27, B-28 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
