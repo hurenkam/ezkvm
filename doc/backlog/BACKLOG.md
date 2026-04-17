@@ -409,7 +409,6 @@ Estimate: 2 days
 ### B-35 Update schema to attach drives to controllers which belong to devices
 Scope:
 - Allow for controllers to reside under devices, and drives under controllers, and make this the default for generated vm yaml files.
-- Allow for pci bus to reside under host
 Example yaml:
 ```
 devices:

@@ -36,12 +36,43 @@ Import output is profile-aware and compacted:
 
 By default, `import-proxmox` uses `--output-mode compact`.
 
+Generated YAML now prefers `devices.controllers` for typed storage controllers:
+
+- SCSI and SATA controllers are emitted under `devices.controllers.scsi[]` and `devices.controllers.sata[]`
+- IDE media drives (for example `ide2: none,media=cdrom`) are emitted under `devices.controllers.ide[]`
+- drives that do not belong to a typed storage controller remain directly under `devices.drives`
+- nested controller-owned drive entries may omit `interface`; ezkvm infers it from the controller family during load
+- media-less cdrom entries omit `path` when it is the empty-string default
+- the runtime canonical shape still normalizes to top-level `controllers` plus `devices.drives`
+
+Example imported shape:
+
+```yaml
+devices:
+  controllers:
+    scsi:
+      - type: "pvscsi"
+        drives:
+          - path: "/dev/vm1/vm-108-boot"
+            type: "disk"
+            format: "raw"
+            scsi_id: 0
+          - path: "/dev/vm1/vm-108-tmp"
+            type: "disk"
+            format: "raw"
+            scsi_id: 1
+    ide:
+      - drives:
+          - type: "cdrom"
+            format: "raw"
+```
+
 ### Export Modes
 
 `import-proxmox` supports explicit output modes:
 
 - `--output-mode compact` (default): profile-overlay form with profile-owned fields omitted
-- `--output-mode canonical`: full explicit mapped YAML before profile compaction
+- `--output-mode canonical`: full explicit mapped YAML using the `devices.controllers` storage layout
 - `--output-mode debug`: canonical output plus deterministic IDs and source comments
 
 Examples:

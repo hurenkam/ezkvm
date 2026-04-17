@@ -217,6 +217,38 @@ options:
   daemonize: false
 ```
 
+## Controller-Owned Storage Layout
+
+```yaml
+name: "storage-layout"
+backend: "qemu"
+
+devices:
+  drives:
+    - path: ""
+      interface: "ide"
+      type: "cdrom"
+      format: "raw"
+  controllers:
+    scsi:
+      - id: "scsihw0"
+        type: "virtio-scsi-pci"
+        drives:
+          - path: "/dev/vm5/root"
+            type: "disk"
+            format: "raw"
+            scsi_id: 0
+            boot_index: 0
+          - path: "/dev/vm5/data"
+            type: "disk"
+            format: "raw"
+            scsi_id: 1
+
+options:
+  enable_kvm: true
+  daemonize: false
+```
+
 ## See Also
 
 - [VM Structure](vm-structure.md)

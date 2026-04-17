@@ -257,7 +257,22 @@ Two forms are supported.
 
 ### Controller-centric shorthand (compatibility)
 
-The parser also accepts a controller-centric shorthand where devices are nested under controllers and then normalized into canonical sections.
+The parser accepts three controller-centric shorthand forms and normalizes all of them into canonical sections.
+
+Generated importer YAML now defaults to the `devices.controllers` form:
+
+```yaml
+devices:
+  controllers:
+    scsi:
+      - type: pvscsi
+        drives:
+          - path: "/dev/vm1/vm-108-boot"
+            type: disk
+            format: raw
+```
+
+The parser also accepts a `devices:` sequence controller shorthand and a top-level `controllers:` form:
 
 Example:
 
@@ -280,6 +295,9 @@ controllers:
 ```
 
 **Normalization rules:**
+- `devices.controllers.*[].drives[]` is converted into canonical `controllers.*[]` plus `devices.drives[]`.
+- `devices.controllers.ide[].drives[]` is converted into canonical `devices.drives[]` with inferred `interface: ide`.
+- `devices[].controller + drives[]` is also accepted and converted into canonical `controllers.*[]` plus `devices.drives[]`.
 - `controllers.scsi[].drives[]` is moved to `devices.drives[]`.
 - Missing drive `controller` is inferred from the enclosing SCSI controller id.
 - `controllers.xhci[].usb[]` is moved to `host.usb[]`.

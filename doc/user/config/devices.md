@@ -2,6 +2,37 @@
 
 ## devices
 
+`devices.drives` remains supported as the canonical runtime shape, but generated importer YAML now prefers nested storage controllers under `devices.controllers`. Both shapes deserialize to the same runtime config.
+
+### devices.controllers
+
+Generated import YAML prefers controller-owned storage in this form:
+
+```yaml
+devices:
+  displays:
+    - type: "none"
+  controllers:
+    scsi:
+      - type: "pvscsi"
+        drives:
+          - path: "/dev/vm1/vm-108-boot"
+            type: "disk"
+            format: "raw"
+            scsi_id: 0
+    ide:
+      - drives:
+          - type: "cdrom"
+            format: "raw"
+```
+
+In this form:
+
+- `devices.controllers.scsi[]` and `devices.controllers.sata[]` carry typed storage controllers and their attached drives
+- `devices.controllers.ide[]` is used by importer output for IDE media drives; IDE controllers are implicit and normalize back into `devices.drives`
+- nested drive entries may omit `interface`; it is inferred from the enclosing controller family during load
+- ordinary device sections such as `drives`, `networks`, `displays`, `input`, and `audio` stay directly under `devices`
+
 ### devices.drives
 
 Common fields:
@@ -13,6 +44,21 @@ Common fields:
 - `format`
 - `readonly`
 - optional advanced fields: `discard`, `ssd`, `controller`, `cache`, `aio`, `detect_zeroes`, `scsi_id`, `boot_index`, `bus`, `unit`
+
+Flat `devices.drives` is still the right shape for drives that do not belong to a typed storage controller, such as `virtio`, `ide`, or `nvme` devices.
+
+When a cdrom has no backing file (`none,media=cdrom` from Proxmox), exporter output omits `path` because the empty string is the schema default.
+
+Example:
+
+```yaml
+devices:
+  drives:
+    - path: "/var/lib/ezkvm/data.qcow2"
+      interface: "virtio"
+      type: "disk"
+      format: "qcow2"
+```
 
 ### devices.networks
 
@@ -47,6 +93,12 @@ Common fields:
 ### controllers.scsi
 
 - entries match SCSI controller schema: `id`, `type`, optional `iothread`, `max_targets`, `bus`, `addr`
+- generated import YAML no longer uses top-level `controllers.scsi[].drives[]` by default; it emits `devices.controllers.scsi[].drives[]` instead
+
+### controllers.sata
+
+- entries match SATA controller schema: `id`, `type`, optional `bus`, `addr`
+- generated import YAML no longer uses top-level `controllers.sata[].drives[]` by default; it emits `devices.controllers.sata[].drives[]` instead
 
 ### controllers.xhci
 

@@ -73,9 +73,13 @@ fn render_sequence_block(seq: &[serde_yaml::Value], indent: usize, out: &mut Str
         out.push_str("- ");
 
         match item {
-            serde_yaml::Value::Mapping(_) => {
-                out.push_str(&flow_inline(item));
-                out.push('\n');
+            serde_yaml::Value::Mapping(map) => {
+                if has_nested_nonempty_sequence(map) {
+                    render_sequence_mapping_expanded(map, indent, out);
+                } else {
+                    out.push_str(&flow_inline(item));
+                    out.push('\n');
+                }
             }
             serde_yaml::Value::Sequence(_) => {
                 out.push_str(&flow_inline(item));
@@ -83,6 +87,55 @@ fn render_sequence_block(seq: &[serde_yaml::Value], indent: usize, out: &mut Str
             }
             _ => {
                 out.push_str(&scalar_inline(item));
+                out.push('\n');
+            }
+        }
+    }
+}
+
+fn has_nested_nonempty_sequence(map: &serde_yaml::Mapping) -> bool {
+    map.values()
+        .any(|v| matches!(v, serde_yaml::Value::Sequence(s) if !s.is_empty()))
+}
+
+/// Render a sequence mapping item in expanded block form.
+/// The first key appears on the same line as the `- ` prefix already written by the
+/// caller; subsequent keys are indented at `indent + 2`.
+fn render_sequence_mapping_expanded(
+    map: &serde_yaml::Mapping,
+    indent: usize,
+    out: &mut String,
+) {
+    let inner_indent = indent + 2;
+    for (i, (key, value)) in map.iter().enumerate() {
+        if i > 0 {
+            push_indent(out, inner_indent);
+        }
+        out.push_str(&key_inline(key));
+        match value {
+            serde_yaml::Value::Mapping(child) => {
+                if child.is_empty() {
+                    out.push_str(": {}\n");
+                } else if should_inline_nested_mapping(inner_indent) {
+                    out.push_str(": ");
+                    out.push_str(&flow_inline(value));
+                    out.push('\n');
+                } else {
+                    out.push_str(":\n");
+                    render_mapping_block(child, inner_indent + 2, out);
+                }
+            }
+            serde_yaml::Value::Sequence(seq) => {
+                if seq.is_empty() {
+                    out.push_str(": []\n");
+                } else {
+                    out.push_str(":\n");
+                    render_sequence_block(seq, inner_indent + 2, out);
+                }
+            }
+            _ => {
+                out.push_str(": ");
+                out.push_str(&scalar_inline(value));
                 out.push('\n');
             }
         }
@@ -158,5 +211,15 @@ mod tests {
 
         assert!(compacted.contains("ballooning: {model: virtio-balloon-pci}"));
         assert!(compacted.contains("ivshmem: {enabled: true, size: 128, id: ivshmem0}"));
+    }
+
+    #[test]
+    fn keeps_sequence_items_with_nested_sequences_in_block_style() {
+        let input = "devices:\n  controllers:\n    scsi:\n      - type: virtio-scsi-pci\n        drives:\n          - path: /dev/vm0/disk0\n            type: disk\n            format: raw\n";
+
+        let compacted = compact_sequence_mappings(input).expect("compaction should succeed");
+
+        assert!(compacted.contains("- type: virtio-scsi-pci"));
+        assert!(compacted.contains("drives:\n          - {path: /dev/vm0/disk0, type: disk, format: raw}"));
     }
 }

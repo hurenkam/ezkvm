@@ -18,7 +18,7 @@ pub struct DriveConfig {
 
     /// Path to the disk image.
     /// Defaults to an empty string so media-less cdrom definitions can omit it.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "str::is_empty")]
     pub path: String,
 
     /// Interface type (virtio, scsi, ide, nvme)
