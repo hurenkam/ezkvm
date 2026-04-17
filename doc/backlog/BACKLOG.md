@@ -293,6 +293,50 @@ Acceptance Criteria:
 - Snapshot and integration tests pass deterministically and catch profile inference regressions.
 Estimate: 3 days
 
+### B-26 Decompose mapper orchestration and module boundaries
+Scope:
+- Introduce `src/import/proxmox/mapper/` submodules and keep `mapper.rs` as orchestration plus public entry points.
+- Move helper parsing and domain-specific mapping logic behind focused internal modules.
+Dependencies: B-25
+Acceptance Criteria:
+- `mapper.rs` contains orchestration and entry points only.
+- Mapper domains are split into focused modules (system, storage, network, display, devices, helpers or equivalent).
+- No behavioral regressions in existing Proxmox import fixtures and snapshots.
+Estimate: 4 days
+
+### B-27 Split profile-aware compaction by domain ownership
+Scope:
+- Refactor `profile_compact.rs` into domain-focused modules aligned to ownership paths (for example system/devices/network/storage).
+- Keep compaction deterministic and profile-aware for current profile stack semantics.
+Dependencies: B-26
+Acceptance Criteria:
+- Profile compaction logic is split into smaller focused files.
+- Existing profile-stack integration tests stay green with unchanged effective output.
+- Compaction ownership behavior remains stable for mixed profile stacks.
+Estimate: 3 days
+
+### B-28 Restrict Proxmox importer public surface to high-level API
+Scope:
+- Keep only `ImportRunOptions`, `run_import_from_files`, and `ImportError` as public importer API.
+- Remove public re-exports of low-level parser/mapper entry points and update internal tests/imports accordingly.
+Dependencies: B-26
+Acceptance Criteria:
+- No repository consumer outside importer internals depends on low-level parser/mapper exports.
+- CLI and integration tests continue to use only high-level import API.
+- Build and tests pass after export tightening.
+Estimate: 1.5 days
+
+### B-29 Add temporary over-size rationale and cleanup guardrails
+Scope:
+- Add module-level comments in still-oversized files with explicit rationale and cleanup references.
+- Record line-count and public-surface targets for mapper/compaction cleanup closure.
+Dependencies: B-26, B-27, B-28
+Acceptance Criteria:
+- Oversized modules include short rationale plus linked backlog IDs.
+- Cleanup checklist captures target thresholds and remaining hotspots.
+- Technical debt is explicitly tracked until files return to guideline range.
+Estimate: 1 day
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
