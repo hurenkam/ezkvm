@@ -61,7 +61,14 @@ Serialization policy for YAML/JSON config output:
 - Use serde defaults and `skip_serializing_if` consistently for `Option`, empty collections, and default scalar values when omission preserves behavior.
 - Treat omission semantics as part of the schema contract: absence must deserialize to the same runtime behavior as explicit defaults.
 - Preserve explicit values only when they are required to override profile/merge defaults.
+- Preserve explicit values only when they are required to override profile/merge defaults.
 - For any serialization compactness change, add or update tests for roundtrip equivalence and merge/override behavior.
+
+Import output compactness rule:
+- A field may be omitted from import output only when a profile assigned during import guarantees its restoration at runtime.
+- Import-specific defaults must not live in mapper code. Proxmox runtime values not stored in `.conf` files belong in dedicated Proxmox profiles (`proxmox-base`, `proxmox-windows`, `proxmox-q35-uefi`).
+- Device IDs (drives, networks) must be set from the Proxmox source key (e.g. `"scsi0"`, `"net0"`) to preserve boot-order lookup semantics.
+- See ADR-0002 for the full single-defaults contract.
 
 ## 8. Concurrency and Safety
 

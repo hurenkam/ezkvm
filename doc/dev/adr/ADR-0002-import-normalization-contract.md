@@ -56,6 +56,30 @@ Proxmox .conf file
 - If field maps to multiple canonical paths: choose primary path, document secondary as comment
 - If Proxmox provides both old and new syntax: prefer new syntax, warn on old
 - If canonical has required field, import defaults use sensible values (e.g., `format: qcow2` if not specified)
+- If canonical has required field, import defaults use sensible values (e.g., `format: qcow2` if not specified)
+
+### Single Defaults Principle
+
+**There is exactly one set of defaults — the data model and its profiles.**
+
+The import pipeline must not maintain a separate set of defaults that diverge from what the runtime uses. When Proxmox applies a runtime value that is not stored in the `.conf` file (e.g. boot menu, CPU flags, drive cache policy), that value must be supplied by a profile assigned during import — not hardcoded in the mapper — so the same value is applied at both import time and run time.
+
+**Profile responsibilities:**
+| Profile | Assigned when | Provides |
+|---|---|---|
+| `proxmox-base` | Always (all Proxmox imports) | Boot menu settings, `kvm-pit.lost_tick_policy=discard`, SCSI drive tuning (`cache=none`, `aio=io_uring`, `detect-zeroes=unmap`), SCSI id placement (`scope: controller, start: 0`), tap network vhost/queue sizes/scripts |
+| `proxmox-windows` | OS type `win10` or `win11` | Proxmox HV CPU flags (`hv_ipi`, `hv_spinlocks=0x1fff`, `kvm=off`, etc.) |
+| `proxmox-q35-uefi` | Machine type Q35 + UEFI firmware | `hpet=off`, UEFI firmware path |
+
+Updating a Proxmox runtime default means updating the relevant profile file, not the mapper.
+
+### Device ID Preservation
+
+Drive and network IDs **must** be set from the Proxmox source key (e.g. `disk.key` → `"scsi0"`, `network.key` → `"net0"`). This is required so that boot-order lookup (`"scsi0" → boot_index`) functions correctly at import time.
+
+### Import Output Compactness
+
+Mapper output may omit fields that equal the assigned profile defaults — but only because the compaction pass (`compact_profile_owned_fields`) will verify that the profile restores them at runtime. A field must never be silently dropped without a profile guarantee.
 
 ## Validation Rules
 
@@ -68,15 +92,19 @@ Proxmox .conf file
 ## Consequences
 
 **Positive:**
+
 - Clean normalization with no schema duplication
 - Current validation gates apply immediately to imports
 - Debugging import issues uses current config tools
 - Future schema improvements apply to imports automatically
+- Profile-supplied Proxmox defaults are visible, versioned, and overridable (not hidden in mapper code)
+- Changing a Proxmox default means updating a profile file, not hunting through mapper logic
 
 **Negative:**
 - Some Proxmox configs may be inexpressible without new canonical fields
 - Requires iterative mapper expansion as new fields are discovered
 - Import failures block import (no partial mode without --force)
+- New Proxmox runtime defaults discovered after initial import require a profile update (not a re-import)
 
 ## Example Output
 
@@ -111,6 +139,16 @@ devices:
       backend:
         type: bridge
         bridge: vmbr0
+
+      ## Correctness Validation
+
+      The standard correctness check for an import is a **dry-run diff** against a captured Proxmox reference command:
+
+      ```
+      ./target/debug/ezkvm start <vm.yaml> --dry-run | diff - input/<host>/<id>.qemu.cmd
+      ```
+
+      Expected intentional differences: QMP sockets, `-daemonize`, binary path (`/usr/bin/kvm` vs `qemu-system-x86_64`), runtime-generated tap `ifname`, and argument ordering. Any other substantive difference is a potential bug.
 ```
 
 ## Related ADRs
