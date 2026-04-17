@@ -85,6 +85,7 @@ fn linux_desktop_import_emits_expected_profile_stack() {
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
     assert!(profiles.contains(&"linux-l26-common".to_string()));
     assert!(profiles.contains(&"gpu-passthrough".to_string()));
+    assert!(profiles.contains(&"hugepages".to_string()));
 }
 
 #[test]

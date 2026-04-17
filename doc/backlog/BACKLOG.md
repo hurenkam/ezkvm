@@ -277,7 +277,7 @@ Estimate: 2 days
 Scope:
 - Refine ownership boundaries for list-shaped and tuning sections so profile-aware compaction can safely remove redundant VM-local fields.
 - Keep compaction deterministic and semantics-preserving across profile stacks.
-Dependencies: B-21, B-22, B-23
+Dependencies: B-21
 Acceptance Criteria:
 - Compaction removes redundant profile-owned fields for hugepages, access-mode, and tuning layers without changing effective runtime config.
 - Regression tests cover ownership-boundary edge cases and ensure stable YAML output.

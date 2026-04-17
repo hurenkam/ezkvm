@@ -308,6 +308,7 @@ fn is_id_merge_list_path(path: &[String]) -> bool {
     matches!(path, [first, second] if first == "host" && second == "pci")
         || matches!(path, [first, second] if first == "host" && second == "usb")
         || matches!(path, [first, second] if first == "controllers" && second == "scsi")
+        || matches!(path, [first, second] if first == "controllers" && second == "sata")
         || matches!(path, [first, second] if first == "controllers" && second == "xhci")
         || matches!(path, [first, second] if first == "devices" && second == "audio")
 }
@@ -315,6 +316,7 @@ fn is_id_merge_list_path(path: &[String]) -> bool {
 fn is_append_unique_list_path(path: &[String]) -> bool {
     matches!(path, [first, second, third] if first == "system" && second == "cpu" && third == "features")
         || matches!(path, [first, second] if first == "system" && second == "machine_options")
+        || matches!(path, [first, second] if first == "devices" && second == "input")
         || matches!(path, [first, second] if first == "options" && second == "global_options")
 }
 
@@ -636,6 +638,95 @@ system:
 
             assert_eq!(features.len(), 1);
             assert_eq!(features[0].as_str(), Some("+svm"));
+        });
+    }
+
+    #[test]
+    fn compacts_hugepages_profile_owned_defaults_but_keeps_vm_specific_fields() {
+        with_test_profiles(|profile_dir| {
+            std::fs::write(
+                profile_dir.join("hugepages.yaml"),
+                "system:\n  memory:\n    hugepages:\n      enabled: true\n      prealloc: true\n",
+            )
+            .expect("write profile");
+
+            let input = r#"
+name: vm
+backend: qemu
+profiles:
+  - hugepages
+system:
+  memory:
+    hugepages:
+      enabled: true
+      prealloc: true
+      size_kib: 1048576
+"#;
+
+            let compacted = compact_profile_owned_fields(input).expect("compact");
+            let value: Value = serde_yaml::from_str(&compacted).expect("parse compacted");
+
+            let hugepages = value
+                .as_mapping()
+                .and_then(|m| m.get(Value::String("system".to_string())))
+                .and_then(Value::as_mapping)
+                .and_then(|m| m.get(Value::String("memory".to_string())))
+                .and_then(Value::as_mapping)
+                .and_then(|m| m.get(Value::String("hugepages".to_string())))
+                .and_then(Value::as_mapping)
+                .expect("hugepages should remain with vm-specific fields");
+
+            assert!(!hugepages.contains_key(Value::String("enabled".to_string())));
+            assert!(!hugepages.contains_key(Value::String("prealloc".to_string())));
+            assert_eq!(
+                hugepages
+                    .get(Value::String("size_kib".to_string()))
+                    .and_then(Value::as_u64),
+                Some(1048576)
+            );
+        });
+    }
+
+    #[test]
+    fn compacts_input_devices_append_unique_to_new_entries_only() {
+        with_test_profiles(|profile_dir| {
+            std::fs::write(
+                profile_dir.join("remote-viewer-spice.yaml"),
+                "devices:\n  input:\n    - {type: virtio-mouse}\n    - {type: virtio-keyboard}\n",
+            )
+            .expect("write profile");
+
+            let input = r#"
+name: vm
+backend: qemu
+profiles:
+  - remote-viewer-spice
+devices:
+  input:
+    - type: virtio-mouse
+    - type: virtio-keyboard
+    - type: usb-tablet
+"#;
+
+            let compacted = compact_profile_owned_fields(input).expect("compact");
+            let value: Value = serde_yaml::from_str(&compacted).expect("parse compacted");
+
+            let input_devices = value
+                .as_mapping()
+                .and_then(|m| m.get(Value::String("devices".to_string())))
+                .and_then(Value::as_mapping)
+                .and_then(|m| m.get(Value::String("input".to_string())))
+                .and_then(Value::as_sequence)
+                .expect("input sequence should remain with new entries");
+
+            assert_eq!(input_devices.len(), 1);
+            assert_eq!(
+                input_devices[0]
+                    .as_mapping()
+                    .and_then(|m| m.get(Value::String("type".to_string())))
+                    .and_then(Value::as_str),
+                Some("usb-tablet")
+            );
         });
     }
 }

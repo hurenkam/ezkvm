@@ -1326,6 +1326,10 @@ fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<Stri
         profiles.push("gpu-passthrough".to_string());
     }
 
+    if config.system.memory.hugepages.is_some() {
+        profiles.push("hugepages".to_string());
+    }
+
     if proxmox.scalars.contains_key("serial0")
         && config.spice.is_none()
         && config
@@ -2511,6 +2515,23 @@ mod tests {
             cfg.system.applesmc.as_ref().map(|a| a.osk.as_str()),
             Some("dummy")
         );
+    }
+
+    #[test]
+    fn infers_hugepages_profile() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-huge
+            ostype: l26
+            bios: ovmf
+            machine: pc-q35-8.1+pve0
+            hugepages: 1024
+            memory: 8192
+            cores: 4
+            "#,
+        );
+
+        assert!(cfg.profiles.contains(&"hugepages".to_string()));
     }
 
     #[test]
