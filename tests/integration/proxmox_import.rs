@@ -128,6 +128,20 @@ fn fixture_cases() -> &'static [ImportFixtureCase] {
             snapshot_fixture: "proxmox_import/09-hugepages-1g.args",
             warning_fields: &[],
         },
+        ImportFixtureCase {
+            name: "headless vnc mixed buses",
+            conf_fixture: "proxmox_import/10-headless-vnc.conf",
+            storage_fixture: None,
+            snapshot_fixture: "proxmox_import/10-headless-vnc.args",
+            warning_fields: &[],
+        },
+        ImportFixtureCase {
+            name: "nested viommu hidden",
+            conf_fixture: "proxmox_import/11-nested-viommu-hidden.conf",
+            storage_fixture: None,
+            snapshot_fixture: "proxmox_import/11-nested-viommu-hidden.args",
+            warning_fields: &["args"],
+        },
     ]
 }
 

@@ -8,7 +8,7 @@ pub(crate) use audio::validate_audio_devices;
 pub(crate) use core::{
     validate_applesmc_config, validate_ballooning_config, validate_guest_agent_config,
     validate_hostpci_config, validate_hyperv_config, validate_qmp_config, validate_smbios_config,
-    validate_spice_config, validate_tpm_config,
+    validate_spice_config, validate_tpm_config, validate_vnc_config,
 };
 pub(crate) use devices::{
     validate_hugepages_config, validate_input_devices, validate_iommu_config,

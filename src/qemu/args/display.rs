@@ -50,6 +50,16 @@ impl QemuArgs {
         }
     }
 
+    /// Add VNC display server
+    pub fn add_vnc(&mut self, display: &str, password: bool) {
+        self.push_str("-vnc");
+        let mut spec = display.to_string();
+        if password {
+            spec.push_str(",password=on");
+        }
+        self.push(spec);
+    }
+
     /// Add a SPICE audiodev backend
     pub fn add_spice_audiodev(&mut self, id: &str) {
         self.push_str("-audiodev");

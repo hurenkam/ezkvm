@@ -119,3 +119,15 @@ fn test_spice_without_display_device_for_passthrough_vm() {
             .any(|arg| arg == "spicevmc,id=vdagent,name=vdagent")
     );
 }
+
+#[test]
+fn test_vnc_endpoint_with_password() {
+    let mut args = QemuArgs::new();
+    args.add_vnc("unix:/var/run/qemu-server/405.vnc", true);
+
+    let built = args.build();
+    assert_eq!(
+        built,
+        vec!["-vnc", "unix:/var/run/qemu-server/405.vnc,password=on"]
+    );
+}

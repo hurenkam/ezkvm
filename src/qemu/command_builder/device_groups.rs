@@ -29,6 +29,12 @@ impl QemuManager {
     }
 
     pub(super) fn add_spice_and_audio_args(&self, args: &mut QemuArgs) {
+        if let Some(vnc) = &self.config.vnc
+            && vnc.enabled
+        {
+            args.add_vnc(&vnc.display, vnc.password);
+        }
+
         if let Some(spice) = &self.config.spice
             && spice.enabled
         {

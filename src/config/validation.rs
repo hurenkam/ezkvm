@@ -19,7 +19,7 @@ use platform::{
     validate_hyperv_config, validate_input_devices, validate_iommu_config,
     validate_iscsi_disk_config, validate_ivshmem_config, validate_numa_config, validate_qmp_config,
     validate_sata_controller_config, validate_scsi_controller_config, validate_smbios_config,
-    validate_spice_config, validate_tpm_config, validate_usb_device_config,
+    validate_spice_config, validate_tpm_config, validate_usb_device_config, validate_vnc_config,
     validate_xhci_controller_config,
 };
 use system::validate_system_config;
@@ -66,6 +66,9 @@ fn validate_optional_platform_sections(config: &VmConfig) -> Result<()> {
     }
     if let Some(spice) = &config.spice {
         validate_spice_config(spice)?;
+    }
+    if let Some(vnc) = &config.vnc {
+        validate_vnc_config(vnc)?;
     }
     if let Some(ivshmem) = &config.system.memory.ivshmem {
         validate_ivshmem_config(ivshmem)?;

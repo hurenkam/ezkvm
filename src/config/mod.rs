@@ -20,7 +20,7 @@ pub use platform::{
     AppleSmcConfig, AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig,
     HugepagesConfig, HypervConfig, InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig,
     NumaConfig, QmpConfig, QmpSocketType, SataControllerConfig, ScsiControllerConfig, SmbiosConfig,
-    SpiceConfig, TpmConfig, UsbDeviceConfig, XhciControllerConfig,
+    SpiceConfig, TpmConfig, UsbDeviceConfig, VncConfig, XhciControllerConfig,
 };
 #[allow(unused_imports)]
 pub use vm_options::{RtcConfig, VmOptions};

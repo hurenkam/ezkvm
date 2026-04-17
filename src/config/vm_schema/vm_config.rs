@@ -12,7 +12,7 @@ use super::super::{
     AppleSmcConfig, AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig,
     HypervConfig, InputDeviceConfig, IommuConfig, IscsiDiskConfig, IvshmemConfig, QmpConfig,
     SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig,
-    UsbDeviceConfig, VmOptions, XhciControllerConfig,
+    UsbDeviceConfig, VmOptions, VncConfig, XhciControllerConfig,
 };
 use super::{BootConfig, DeviceConfig, SystemConfig};
 
@@ -68,6 +68,10 @@ pub struct VmConfig {
     /// SPICE display configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spice: Option<SpiceConfig>,
+
+    /// VNC display configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vnc: Option<VncConfig>,
 
     /// iSCSI storage configuration
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -1,0 +1,7 @@
+vnc:
+  enabled: true
+  display: "127.0.0.1:0"
+
+devices:
+  displays:
+    - type: "none"

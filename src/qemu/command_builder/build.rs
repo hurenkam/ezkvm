@@ -49,10 +49,23 @@ impl QemuManager {
     }
 
     fn add_display_options(&self, args: &mut QemuArgs) {
-        if self.has_primary_passthrough_gpu() {
+        if self.has_primary_passthrough_gpu() || self.uses_headless_vnc() {
             args.add_vga_none();
             args.add_nographic();
         }
+    }
+
+    fn uses_headless_vnc(&self) -> bool {
+        let has_vnc = self.config.vnc.as_ref().is_some_and(|vnc| vnc.enabled);
+        let has_only_none_displays = !self.config.devices.displays.is_empty()
+            && self
+                .config
+                .devices
+                .displays
+                .iter()
+                .all(|display| display.r#type == "none");
+
+        has_vnc && has_only_none_displays
     }
 
     fn add_global_and_rtc_options(&self, args: &mut QemuArgs) {

@@ -103,3 +103,32 @@ fn macos_import_emits_expected_profile_stack() {
     assert!(profiles.contains(&"macos-kvm".to_string()));
     assert!(profiles.contains(&"gpu-passthrough".to_string()));
 }
+
+#[test]
+fn nested_vm_import_emits_viommu_and_hidden_hypervisor_profiles() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let profiles = imported_profiles(
+        "input/coruscant/194.conf",
+        Some("input/coruscant/storage.cfg"),
+    );
+
+    assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
+    assert!(profiles.contains(&"linux-l26-common".to_string()));
+    assert!(profiles.contains(&"viommu".to_string()));
+    assert!(profiles.contains(&"hidden-hypervisor".to_string()));
+}
+
+#[test]
+fn headless_vnc_fixture_emits_headless_vnc_profile() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let profiles = imported_profiles("tests/fixtures/proxmox_import/10-headless-vnc.conf", None);
+
+    assert!(profiles.contains(&"headless-vnc".to_string()));
+    assert!(!profiles.contains(&"headless-serial".to_string()));
+}

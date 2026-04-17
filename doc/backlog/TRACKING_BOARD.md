@@ -66,10 +66,10 @@ Source: doc/backlog/BACKLOG.md
 | B-19 | Support IOMMU/vIOMMU device definitions | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-20 | Full mapping of hugepages settings | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02 | unassigned | Done |
 | B-21 | Materialize hugepages profile layer end-to-end | B | Phase-1-Features | epic:proxmox, phase:1-features | B-20 | unassigned | Done |
-| B-22 | Add canonical VNC profile schema and headless-vnc layer | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02, B-05 | unassigned | Todo |
-| B-23 | Add viommu and hidden-hypervisor tuning profile assignment | B | Phase-1-Features | epic:proxmox, phase:1-features | B-10, B-19 | unassigned | Todo |
+| B-22 | Add canonical VNC profile schema and headless-vnc layer | B | Phase-1-Features | epic:proxmox, phase:1-features | B-02, B-05 | unassigned | Done |
+| B-23 | Add viommu and hidden-hypervisor tuning profile assignment | B | Phase-1-Features | epic:proxmox, phase:1-features | B-10, B-19 | unassigned | Done |
 | B-24 | Tighten profile-aware compaction ownership boundaries | B | Phase-1-Features | epic:proxmox, phase:1-features | B-21 | unassigned | Done |
-| B-25 | Expand profile-stack corpus and edge-case coverage | B | Phase-1-Features | epic:proxmox, phase:1-features | B-24 | unassigned | Todo |
+| B-25 | Expand profile-stack corpus and edge-case coverage | B | Phase-1-Features | epic:proxmox, phase:1-features | B-24 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |

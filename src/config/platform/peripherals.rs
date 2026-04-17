@@ -48,6 +48,26 @@ fn default_spice_addr() -> String {
     "127.0.0.1".to_string()
 }
 
+fn default_vnc_display() -> String {
+    "127.0.0.1:0".to_string()
+}
+
+/// VNC display server configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VncConfig {
+    /// Enable VNC display server
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub enabled: bool,
+
+    /// VNC display endpoint (for example 127.0.0.1:0 or unix:/path)
+    #[serde(default = "default_vnc_display")]
+    pub display: String,
+
+    /// Enable VNC password requirement
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub password: bool,
+}
+
 /// Audio device configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioDeviceConfig {

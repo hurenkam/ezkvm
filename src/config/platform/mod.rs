@@ -14,6 +14,8 @@ pub use hyperv::HypervConfig;
 pub use iommu::IommuConfig;
 pub use monitoring::{NumaConfig, QmpConfig, QmpSocketType, SmbiosConfig};
 pub use passthrough::{HostPciConfig, UsbDeviceConfig, XhciControllerConfig};
-pub use peripherals::{AudioDeviceConfig, InputDeviceConfig, IvshmemConfig, SpiceConfig};
+pub use peripherals::{
+    AudioDeviceConfig, InputDeviceConfig, IvshmemConfig, SpiceConfig, VncConfig,
+};
 pub use storage::{IscsiDiskConfig, SataControllerConfig, ScsiControllerConfig};
 pub use tpm_guest::{BallooningConfig, GuestAgentConfig, TpmConfig};

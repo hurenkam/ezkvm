@@ -9,7 +9,7 @@ use crate::config::{
     HugepagesConfig, InputDeviceConfig, IommuConfig, IvshmemConfig, MemoryConfig,
     NetworkBackendConfig, NetworkConfig, NumaConfig, RtcConfig, SataControllerConfig,
     ScsiControllerConfig, SerialConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig,
-    UsbDeviceConfig, VmConfig, VmOptions, XhciControllerConfig,
+    UsbDeviceConfig, VmConfig, VmOptions, VncConfig, XhciControllerConfig,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -108,17 +108,21 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let displays = map_displays(&proxmox.scalars, &mut warnings);
     let serials = map_serials(&proxmox.scalars, inferred_vmid, &mut warnings);
     let (audio, mut spice) = map_audio_and_spice(&proxmox.scalars, &mut warnings);
+    let mut vnc = None;
     let mut input_devices = Vec::new();
     let mut ivshmem = None;
     let mut applesmc = None;
     let mut smbios_type = 1u8;
     apply_args_passthrough_subset(
         &proxmox.scalars,
-        &mut spice,
-        &mut input_devices,
-        &mut ivshmem,
-        &mut applesmc,
-        &mut smbios_type,
+        &mut ArgsPassthroughOutput {
+            spice: &mut spice,
+            vnc: &mut vnc,
+            input_devices: &mut input_devices,
+            ivshmem: &mut ivshmem,
+            applesmc: &mut applesmc,
+            smbios_type: &mut smbios_type,
+        },
         &mut warnings,
     );
     let explicit_host_functions = proxmox
@@ -244,6 +248,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             usb: host_usb,
         },
         spice,
+        vnc,
         iscsi_disks: Vec::new(),
         hyperv: None,
         iommu,
@@ -1330,19 +1335,46 @@ fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<Stri
         profiles.push("hugepages".to_string());
     }
 
+    if config.iommu.is_some() {
+        profiles.push("viommu".to_string());
+    }
+
+    if has_hidden_hypervisor_signals(proxmox, config) {
+        profiles.push("hidden-hypervisor".to_string());
+    }
+
+    let has_headless_display = config
+        .devices
+        .displays
+        .iter()
+        .all(|display| display.r#type == "none");
+
+    if config.vnc.as_ref().is_some_and(|vnc| vnc.enabled) && has_headless_display {
+        profiles.push("headless-vnc".to_string());
+    }
+
     if proxmox.scalars.contains_key("serial0")
+        && config.vnc.is_none()
         && config.spice.is_none()
-        && config
-            .devices
-            .displays
-            .iter()
-            .all(|display| display.r#type == "none")
+        && has_headless_display
     {
         profiles.push("headless-serial".to_string());
     }
 
     profiles.dedup();
     profiles
+}
+
+fn has_hidden_hypervisor_signals(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
+    config
+        .system
+        .cpu
+        .features
+        .iter()
+        .any(|feature| matches!(feature.as_str(), "kvm=off" | "-hypervisor" | "hidden=1"))
+        || proxmox.scalars.get("args").is_some_and(|args| {
+            args.contains("kvm=off") || args.contains("-hypervisor") || args.contains("hidden=1")
+        })
 }
 
 fn has_remote_viewer_input_devices(input_devices: &[InputDeviceConfig]) -> bool {
@@ -1664,13 +1696,18 @@ fn map_guest_agent(
     })
 }
 
+struct ArgsPassthroughOutput<'a> {
+    spice: &'a mut Option<SpiceConfig>,
+    vnc: &'a mut Option<VncConfig>,
+    input_devices: &'a mut Vec<InputDeviceConfig>,
+    ivshmem: &'a mut Option<IvshmemConfig>,
+    applesmc: &'a mut Option<AppleSmcConfig>,
+    smbios_type: &'a mut u8,
+}
+
 fn apply_args_passthrough_subset(
     scalars: &BTreeMap<String, String>,
-    spice: &mut Option<SpiceConfig>,
-    input_devices: &mut Vec<InputDeviceConfig>,
-    ivshmem: &mut Option<IvshmemConfig>,
-    applesmc: &mut Option<AppleSmcConfig>,
-    smbios_type: &mut u8,
+    out: &mut ArgsPassthroughOutput<'_>,
     warnings: &mut Vec<MappingWarning>,
 ) {
     let Some(raw_args) = scalars.get("args") else {
@@ -1690,7 +1727,7 @@ fn apply_args_passthrough_subset(
         match tokens[index].as_str() {
             "-spice" => {
                 if let Some(spec) = tokens.get(index + 1) {
-                    apply_spice_spec(spec, spice);
+                    apply_spice_spec(spec, out.spice);
                     index += 2;
                 } else {
                     warnings.push(MappingWarning {
@@ -1700,10 +1737,22 @@ fn apply_args_passthrough_subset(
                     index += 1;
                 }
             }
+            "-vnc" => {
+                if let Some(spec) = tokens.get(index + 1) {
+                    apply_vnc_spec(spec, out.vnc);
+                    index += 2;
+                } else {
+                    warnings.push(MappingWarning {
+                        source_field: "args".to_string(),
+                        message: "-vnc missing argument".to_string(),
+                    });
+                    index += 1;
+                }
+            }
             "-chardev" => {
                 if let Some(spec) = tokens.get(index + 1) {
                     if is_vdagent_spicevmc(spec) {
-                        ensure_spice(spice).vdagent = true;
+                        ensure_spice(out.spice).vdagent = true;
                     }
                     index += 2;
                 } else {
@@ -1719,8 +1768,8 @@ fn apply_args_passthrough_subset(
                     let (device_type, options) = parse_prefixed_options(spec);
                     match device_type.as_str() {
                         "virtio-mouse" | "virtio-keyboard" => {
-                            if !input_devices.iter().any(|d| d.r#type == device_type) {
-                                input_devices.push(InputDeviceConfig {
+                            if !out.input_devices.iter().any(|d| d.r#type == device_type) {
+                                out.input_devices.push(InputDeviceConfig {
                                     r#type: device_type,
                                 });
                             }
@@ -1730,7 +1779,7 @@ fn apply_args_passthrough_subset(
                                 && options.get("name").map(String::as_str)
                                     == Some("com.redhat.spice.0")
                             {
-                                ensure_spice(spice).vdagent = true;
+                                ensure_spice(out.spice).vdagent = true;
                             }
                         }
                         "ivshmem-plain" => {
@@ -1739,7 +1788,7 @@ fn apply_args_passthrough_subset(
                         }
                         "isa-applesmc" => {
                             let osk = options.get("osk").cloned().unwrap_or_default();
-                            *applesmc = Some(AppleSmcConfig { enabled: true, osk });
+                            *out.applesmc = Some(AppleSmcConfig { enabled: true, osk });
                         }
                         _ => {}
                     }
@@ -1779,7 +1828,7 @@ fn apply_args_passthrough_subset(
                             && k.trim() == "type"
                             && let Ok(parsed) = v.trim().parse::<u8>()
                         {
-                            *smbios_type = parsed;
+                            *out.smbios_type = parsed;
                         }
                     }
                     index += 2;
@@ -1814,7 +1863,7 @@ fn apply_args_passthrough_subset(
             .is_none_or(|(memdev, id)| memdev == id);
 
         if memdev_matches {
-            *ivshmem = Some(IvshmemConfig {
+            *out.ivshmem = Some(IvshmemConfig {
                 enabled: true,
                 size: ivshmem_size.unwrap_or(32),
                 vectors: 1,
@@ -1899,6 +1948,34 @@ fn ensure_spice(spice: &mut Option<SpiceConfig>) -> &mut SpiceConfig {
         disable_ticketing: false,
         audio: false,
         vdagent: false,
+    })
+}
+
+fn apply_vnc_spec(spec: &str, vnc: &mut Option<VncConfig>) {
+    let vnc_cfg = ensure_vnc(vnc);
+    let mut parts = spec
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty());
+
+    if let Some(display) = parts.next() {
+        vnc_cfg.display = display.to_string();
+    }
+
+    for token in parts {
+        if let Some((k, val)) = token.split_once('=')
+            && k.trim() == "password"
+        {
+            vnc_cfg.password = matches!(val.trim(), "on" | "1" | "yes" | "true");
+        }
+    }
+}
+
+fn ensure_vnc(vnc: &mut Option<VncConfig>) -> &mut VncConfig {
+    vnc.get_or_insert(VncConfig {
+        enabled: true,
+        display: "127.0.0.1:0".to_string(),
+        password: false,
     })
 }
 
@@ -2532,6 +2609,38 @@ mod tests {
         );
 
         assert!(cfg.profiles.contains(&"hugepages".to_string()));
+    }
+
+    #[test]
+    fn maps_vnc_from_args_and_infers_headless_vnc_profile() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-headless-vnc
+            vga: none
+            args: -vnc unix:/var/run/qemu-server/405.vnc,password=on
+            "#,
+        );
+
+        let vnc = cfg.vnc.as_ref().expect("vnc should be configured");
+        assert!(vnc.enabled);
+        assert_eq!(vnc.display, "unix:/var/run/qemu-server/405.vnc");
+        assert!(vnc.password);
+        assert!(cfg.profiles.contains(&"headless-vnc".to_string()));
+        assert!(!cfg.profiles.contains(&"headless-serial".to_string()));
+    }
+
+    #[test]
+    fn infers_viommu_and_hidden_hypervisor_profiles() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-hidden
+            machine: q35,viommu=intel
+            cpu: host,hidden=1
+            "#,
+        );
+
+        assert!(cfg.profiles.contains(&"viommu".to_string()));
+        assert!(cfg.profiles.contains(&"hidden-hypervisor".to_string()));
     }
 
     #[test]

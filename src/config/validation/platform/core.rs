@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 
 use crate::config::{
     AppleSmcConfig, BallooningConfig, GuestAgentConfig, HostPciConfig, HypervConfig, QmpConfig,
-    SmbiosConfig, SpiceConfig, TpmConfig,
+    SmbiosConfig, SpiceConfig, TpmConfig, VncConfig,
 };
 
 use super::helpers::is_valid_pci_address;
@@ -124,6 +124,18 @@ pub(crate) fn validate_spice_config(spice: &SpiceConfig) -> Result<()> {
 
     if spice.addr.is_empty() {
         return Err(anyhow!("SPICE address cannot be empty"));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn validate_vnc_config(vnc: &VncConfig) -> Result<()> {
+    if !vnc.enabled {
+        return Ok(());
+    }
+
+    if vnc.display.trim().is_empty() {
+        return Err(anyhow!("VNC display cannot be empty when enabled"));
     }
 
     Ok(())
