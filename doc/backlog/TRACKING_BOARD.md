@@ -70,8 +70,8 @@ Source: doc/backlog/BACKLOG.md
 | B-23 | Add viommu and hidden-hypervisor tuning profile assignment | B | Phase-1-Features | epic:proxmox, phase:1-features | B-10, B-19 | unassigned | Done |
 | B-24 | Tighten profile-aware compaction ownership boundaries | B | Phase-1-Features | epic:proxmox, phase:1-features | B-21 | unassigned | Done |
 | B-25 | Expand profile-stack corpus and edge-case coverage | B | Phase-1-Features | epic:proxmox, phase:1-features | B-24 | unassigned | Done |
-| B-26 | Decompose mapper orchestration and module boundaries | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening, ready | B-25 | unassigned | Todo |
-| B-27 | Split profile-aware compaction by domain ownership | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Todo |
+| B-26 | Decompose mapper orchestration and module boundaries | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening, ready | B-25 | unassigned | Done |
+| B-27 | Split profile-aware compaction by domain ownership | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Done |
 | B-28 | Restrict Proxmox importer public surface to high-level API | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Todo |
 | B-29 | Add temporary over-size rationale and cleanup guardrails | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26, B-27, B-28 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
