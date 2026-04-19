@@ -104,6 +104,8 @@ The preferred place for portability-related defaults is `host_capabilities`. The
 - `ezkvm start` and `ezkvm start --dry-run` execute the same preflight validation pass before runtime orchestration.
 - `host_capabilities.tpm.swtpm_binary` or legacy `tools.swtpm` + `system.tpm.backend: emulator`: ezkvm can launch swtpm.
 - TPM socket path precedence: `--tpm-socket-path` -> `system.tpm.state_path` -> `host_capabilities.tpm.socket_dir/<vm>.swtpm` -> runtime root `<vm>.swtpm`.
+- Bridge helper precedence for `backend.type: bridge`: VM `backend.helper` -> `host_capabilities.network.bridge_helper` -> `PATH` `qemu-bridge-helper` -> distro defaults.
+- If bridge helper resolution fails (or preferred backend is set to `user`/`user-mode`), ezkvm downgrades the NIC to user-mode and emits a warning.
 - `host_capabilities.integrations.remote_viewer.program` or legacy `tools.remote_viewer` + `spice.enabled`: ezkvm can launch remote-viewer.
 - VM/profile `options.looking_glass.program` is used unless a CLI override is provided.
 - If no CLI or VM/profile value is set, ezkvm falls back to `host_capabilities.integrations.looking_glass.program`, then legacy central `looking_glass.program`, then legacy `tools.looking_glass`.
@@ -125,9 +127,10 @@ Preflight behavior:
   - QEMU binary availability.
   - swtpm binary availability when `system.tpm.backend: emulator` is configured in `socket` placement mode, except when `system.tpm.state_path` is explicitly provided (externally managed parity socket).
   - OVMF/UEFI firmware file availability when `system.boot.firmware` is `uefi` or `ovmf`.
-  - Bridge helper path availability when a bridge backend helper is configured.
   - Permission-sensitive runtime and socket parent directories are writable/creatable.
 - Optional capability checks (warning-only degradation):
+  - Bridge helper fallback warnings for bridge NICs downgraded to user-mode.
+  - `/dev/net/tun` accessibility warnings when bridge-helper networking is selected.
   - remote-viewer launcher prerequisites for SPICE workflows.
   - Looking Glass client launcher prerequisites and shared-memory path presence.
 - Preflight output order is deterministic across `start` and `start --dry-run`, so failure and warning ordering remains stable.

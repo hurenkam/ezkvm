@@ -33,7 +33,16 @@ impl QemuManager {
     }
 
     pub(super) fn add_devices_and_boot_args(&self, args: &mut QemuArgs) -> Result<()> {
-        args.extend(QemuArgs::from(self.config.devices.clone()));
+        let mut devices = self.config.devices.clone();
+        for warning in crate::state::resolve_networks_for_vm(
+            &self.config.name,
+            &mut devices,
+            &self.central_config,
+        ) {
+            println!("Warning: {}", warning);
+        }
+
+        args.extend(QemuArgs::from(devices));
         args.extend(self.build_boot_args());
         self.add_tpm_args(args)?;
         self.add_guest_agent_args(args);

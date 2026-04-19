@@ -4,6 +4,7 @@
 
 mod cache;
 mod logs;
+mod network_resolver;
 mod paths;
 mod pid;
 mod runtime_resolver;
@@ -13,6 +14,11 @@ mod tpm_resolver;
 pub use cache::{cache_config, delete_cached_config, load_cached_config};
 #[allow(unused_imports)]
 pub use logs::{cleanup_old_logs, cleanup_old_logs_at};
+#[allow(unused_imports)]
+pub use network_resolver::{
+    CentralNetworkCapabilityResolver, NetworkCapabilityResolver, NetworkResolutionMode,
+    ResolvedNetworkOutcome, resolve_network_outcome, resolve_networks_for_vm,
+};
 #[allow(unused_imports)]
 pub use paths::{
     create_session_log_file, get_config_cache, get_log_file, get_log_file_at, get_logs_dir,

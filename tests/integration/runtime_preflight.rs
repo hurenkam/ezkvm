@@ -86,8 +86,14 @@ devices: {}
         .output()
         .expect("command should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        stdout,
+        stderr
+    );
     assert!(stdout.contains("Runtime preflight checks passed"));
     assert!(stdout.contains("Dry run mode - would execute:"));
 
@@ -187,6 +193,40 @@ spice:
 
     assert!(output.status.success());
     assert!(stdout.contains("Preflight warning: remote-viewer integration disabled"));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn dry_run_network_bridge_falls_back_to_user_when_helper_missing() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let temp_dir = unique_temp_dir("network-fallback");
+    std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+
+    write_fake_qemu(&temp_dir);
+
+    let vm_path = temp_dir.join("vm.yaml");
+    write_file(
+        &vm_path,
+        "name: preflight-network-fallback\nbackend: qemu\nsystem:\n  architecture: x86_64\n  machine: q35\n  memory:\n    size: 1024\n  cpu:\n    model: host\n    vcpus: 2\ndevices:\n  networks:\n    - id: net0\n      model: virtio-net-pci\n      backend:\n        type: bridge\n        bridge: vmbr0\n        helper: /definitely/missing/qemu-bridge-helper\n",
+    );
+
+    let output = run_start_dry_run(&vm_path, &temp_dir);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        stdout,
+        stderr
+    );
+    assert!(stdout.contains("network 'net0' downgraded to user-mode"));
+    assert!(stdout.contains("type=user,id=net0,hostname=preflight-network-fallback"));
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }

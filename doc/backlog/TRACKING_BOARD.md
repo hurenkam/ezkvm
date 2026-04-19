@@ -90,7 +90,7 @@ Source: doc/backlog/BACKLOG.md
 | B-43 | Implement runtime directory capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-42 | unassigned | Done |
 | B-44 | Implement firmware locator capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-43 | unassigned | Done |
 | B-45 | Implement swtpm capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-44 | unassigned | Done |
-| B-46 | Implement network backend helper capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-45 | unassigned | Todo |
+| B-46 | Implement network backend helper capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-45 | unassigned | Done |
 | B-47 | Add optional Looking Glass capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-46 | unassigned | Todo |
 | B-48 | Implement capability precedence contract and validation | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-47 | unassigned | Todo |
 | B-49 | Add integration tests for host capability resolution | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-48 | unassigned | Todo |

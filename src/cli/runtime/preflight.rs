@@ -31,7 +31,6 @@ pub(crate) fn run_runtime_preflight(
     ensure_socket_dir_access(config)?;
     ensure_tpm_capabilities(config, central_config, runtime_overrides)?;
     ensure_firmware_capabilities(config, central_config, runtime_overrides)?;
-    ensure_network_helper_capabilities(config, central_config)?;
 
     let mut report = RuntimePreflightReport::default();
     collect_optional_warnings(config, central_config, runtime_overrides, &mut report);
@@ -61,12 +60,6 @@ fn ensure_host_capability_policy(central_config: &crate::config::CentralConfig) 
             return Err(anyhow!(
                 "preflight failed: host_capabilities.network.preferred_backend '{}' is invalid (expected bridge, bridge-helper, user, or user-mode)",
                 preferred_backend
-            ));
-        }
-
-        if normalized == "bridge-helper" && central_config.bridge_helper().is_none() {
-            return Err(anyhow!(
-                "preflight failed: host_capabilities.network.preferred_backend=bridge-helper requires host_capabilities.network.bridge_helper"
             ));
         }
     }
@@ -202,32 +195,14 @@ fn ensure_firmware_capabilities(
     ))
 }
 
-fn ensure_network_helper_capabilities(
-    config: &crate::config::VmConfig,
-    central_config: &crate::config::CentralConfig,
-) -> Result<()> {
-    for network in &config.devices.networks {
-        let Some(backend) = network.backend.as_ref() else {
-            continue;
-        };
-        if backend.backend_type != "bridge" {
-            continue;
-        }
-
-        if let Some(helper_path) = backend.helper.as_deref().or(central_config.bridge_helper()) {
-            ensure_program_available("network bridge helper", helper_path)?;
-        }
-    }
-
-    Ok(())
-}
-
 fn collect_optional_warnings(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
     report: &mut RuntimePreflightReport,
 ) {
+    collect_network_capability_warnings(config, central_config, report);
+
     if should_launch_remote_viewer(config)
         && let Some(program) =
             central_config.remote_viewer_program_with_overrides(runtime_overrides)
@@ -280,6 +255,46 @@ fn collect_optional_warnings(
             "Looking Glass shared memory path '{}' does not exist on this host",
             ivshmem.mem_path
         ));
+    }
+}
+
+fn collect_network_capability_warnings(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    report: &mut RuntimePreflightReport,
+) {
+    for network in &config.devices.networks {
+        let outcome = crate::state::resolve_network_outcome(&config.name, network, central_config);
+        if let Some(warning) = outcome.warning {
+            report.push_warning(warning);
+        }
+
+        if outcome.mode == crate::state::NetworkResolutionMode::BridgeHelper {
+            warn_if_bridge_socket_unavailable(report);
+        }
+    }
+}
+
+fn warn_if_bridge_socket_unavailable(report: &mut RuntimePreflightReport) {
+    let tun = Path::new("/dev/net/tun");
+    if !tun.exists() {
+        report.push_warning(
+            "bridge backend requested but /dev/net/tun is missing; install or enable tuntap support"
+                .to_string(),
+        );
+        return;
+    }
+
+    if std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(tun)
+        .is_err()
+    {
+        report.push_warning(
+            "bridge backend requested but /dev/net/tun is not writable; configure permissions or run with required capabilities"
+                .to_string(),
+        );
     }
 }
 

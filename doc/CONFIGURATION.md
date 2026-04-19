@@ -101,6 +101,17 @@ Notes:
 | `bridge_helper` | string | `/usr/lib/qemu/qemu-bridge-helper` |
 | `bridge_name` | string | `br0` |
 
+Network capability resolver behavior:
+- Bridge-helper resolution precedence: VM `devices.networks[].backend.helper` -> `host_capabilities.network.bridge_helper` -> `PATH` `qemu-bridge-helper` -> distro paths (`/usr/lib/qemu/qemu-bridge-helper`, `/usr/libexec/qemu-bridge-helper`, `/usr/lib64/qemu-bridge-helper`).
+- If a bridge backend cannot resolve a helper, ezkvm downgrades that NIC to user-mode (`-netdev user`) and emits a deterministic preflight warning.
+- `host_capabilities.network.preferred_backend: user` (or `user-mode`) forces bridge backends to downgrade to user-mode with warning.
+- When a bridge backend resolves successfully, ezkvm checks `/dev/net/tun` availability and write access during preflight and warns with remediation guidance if host permissions are insufficient.
+
+Bridge setup quick reference (portable mode):
+- Debian/Ubuntu: install `qemu-system-common` (or `qemu-system-x86`) and allow bridge helper in `/etc/qemu/bridge.conf` (for example: `allow br0`), then ensure `qemu-bridge-helper` is setuid if required by your distro policy.
+- Arch Linux: install `qemu-base`, configure `/etc/qemu/bridge.conf`, and verify `/usr/lib/qemu/qemu-bridge-helper` exists.
+- For all distros: create/bring up your bridge (`ip link`, NetworkManager, or netctl/systemd-networkd) before `ezkvm start`.
+
 #### `host_capabilities.tpm`
 
 | Field | Type | Example |
