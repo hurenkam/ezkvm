@@ -46,7 +46,9 @@ fn run_start_dry_run(config_path: &Path, bin_dir: &Path) -> std::process::Output
 
 #[test]
 fn dry_run_preflight_success_path() {
-    let _guard = env_lock().lock().expect("env lock should not be poisoned");
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let temp_dir = unique_temp_dir("success");
     std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
@@ -83,7 +85,9 @@ devices: {}
 
 #[test]
 fn dry_run_preflight_required_tpm_capability_failure() {
-    let _guard = env_lock().lock().expect("env lock should not be poisoned");
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let temp_dir = unique_temp_dir("required-failure");
     std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
@@ -123,7 +127,9 @@ devices: {}
 
 #[test]
 fn dry_run_preflight_optional_remote_viewer_downgrade() {
-    let _guard = env_lock().lock().expect("env lock should not be poisoned");
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let temp_dir = unique_temp_dir("optional-warning");
     std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");

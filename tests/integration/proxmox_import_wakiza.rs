@@ -38,7 +38,7 @@ fn test_wakiza_import_preserves_key_proxmox_fragments() {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ezkvm::import::proxmox::ImportOutputMode::Compact,
-                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::ProxmoxParity,
             },
         )
         .expect("wakiza import should succeed")
