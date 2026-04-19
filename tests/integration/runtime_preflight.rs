@@ -73,7 +73,18 @@ devices: {}
 "#,
     );
 
-    let output = run_start_dry_run(&vm_path, &temp_dir);
+    let base_path = std::env::var("PATH").unwrap_or_default();
+    let path_env = format!("{}:{}", temp_dir.display(), base_path);
+    let output = Command::new(env!("CARGO_BIN_EXE_ezkvm"))
+        .arg("start")
+        .arg(&vm_path)
+        .arg("--dry-run")
+        .arg("--swtpm-binary")
+        .arg("/definitely/missing/swtpm")
+        .env("PATH", path_env)
+        .env("EZKVM_CONFIG", "/tmp/ezkvm-config-does-not-exist.yaml")
+        .output()
+        .expect("command should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(output.status.success());
@@ -116,11 +127,24 @@ devices: {}
 "#,
     );
 
-    let output = run_start_dry_run(&vm_path, &temp_dir);
+    let base_path = std::env::var("PATH").unwrap_or_default();
+    let path_env = format!("{}:{}", temp_dir.display(), base_path);
+    let output = Command::new(env!("CARGO_BIN_EXE_ezkvm"))
+        .arg("start")
+        .arg(&vm_path)
+        .arg("--dry-run")
+        .arg("--swtpm-binary")
+        .arg("/definitely/missing/swtpm")
+        .env("PATH", path_env)
+        .env("EZKVM_CONFIG", "/tmp/ezkvm-config-does-not-exist.yaml")
+        .output()
+        .expect("command should run");
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(!output.status.success());
-    assert!(stderr.contains("preflight failed: TPM emulator backend requires --swtpm-binary"));
+    assert!(stderr.contains(
+        "preflight failed: required swtpm binary '/definitely/missing/swtpm' is not available"
+    ));
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }

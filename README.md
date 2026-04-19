@@ -118,6 +118,7 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm start <config.yaml> --dry-run` - Show the QEMU command without executing
 - `ezkvm start ...` and `ezkvm start ... --dry-run` run the same deterministic preflight checks in the same order before execution/preview
 - Required preflight failures stop startup with actionable diagnostics (QEMU/swtpm binaries, OVMF availability for UEFI, bridge helper paths when configured, and runtime/socket directory access)
+- TPM capability checks honor `host_capabilities.tpm.placement_mode`: `socket` mode validates swtpm binary discovery while `state-file` mode validates TPM state directory resolution
 - Optional integrations (remote-viewer, Looking Glass) emit deterministic warnings and degrade without blocking VM start
 - `ezkvm start <config.yaml> --daemon` - Start VM in background
 - `ezkvm start <config.yaml> --run-dir <path> --swtpm-binary <path> --tpm-socket-path <path> --remote-viewer-program <path> --looking-glass-program <path> --ovmf-dir <path>` - Override runtime host defaults used by preflight capability checks and runtime resolution

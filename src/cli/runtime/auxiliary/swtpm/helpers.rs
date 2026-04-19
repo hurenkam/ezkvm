@@ -73,23 +73,17 @@ pub(super) fn resolve_tpm_socket_path(
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> String {
-    if let Some(socket_path) = runtime_overrides
-        .tpm_socket_path
-        .as_deref()
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-    {
-        return socket_path.to_string();
-    }
+    let vm_state_path = config
+        .system_tpm()
+        .and_then(|tpm| tpm.state_path.as_deref());
 
-    if let Some(tpm) = config.system_tpm()
-        && let Some(state_path) = &tpm.state_path
-    {
-        return state_path.clone();
-    }
-
-    crate::state::resolve_runtime_tpm_socket(&config.name, central_config, runtime_overrides)
-        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", config.name))
+    crate::state::resolve_tpm_socket_path(
+        &config.name,
+        vm_state_path,
+        central_config,
+        runtime_overrides,
+    )
+    .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", config.name))
 }
 
 pub(super) fn build_tpmstate_arg(

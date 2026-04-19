@@ -114,6 +114,12 @@ Notes:
 - `socket`
 - `state-file`
 
+TPM capability resolver behavior:
+- `swtpm_binary` resolution precedence (socket mode): CLI `--swtpm-binary` -> `host_capabilities.tpm.swtpm_binary` / legacy `tools.swtpm` -> `PATH` `swtpm` -> distro fallbacks (`/usr/bin/swtpm`, `/usr/sbin/swtpm`).
+- `placement_mode: socket` resolves socket path as CLI `--tpm-socket-path` -> VM `system.tpm.state_path` -> `host_capabilities.tpm.socket_dir/<vm>.swtpm` -> runtime root `<vm>.swtpm`.
+- In socket mode, swtpm binary availability is required unless the VM already provides an explicit `system.tpm.state_path` (parity/external-managed socket).
+- `placement_mode: state-file` skips socket launch and resolves state storage from `system.tpm.state_dir` -> `host_capabilities.tpm.state_dir` -> `XDG_STATE_HOME/ezkvm/tpm` -> `~/.local/state/ezkvm/tpm` -> `/tmp/ezkvm/tpm-state`.
+
 #### `host_capabilities.integrations`
 
 | Field | Type | Example |

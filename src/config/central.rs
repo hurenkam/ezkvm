@@ -135,6 +135,7 @@ impl CentralConfig {
     }
 
     /// Resolve the effective swtpm binary path, including CLI overrides.
+    #[allow(dead_code)]
     pub fn swtpm_program_with_overrides<'a>(
         &'a self,
         overrides: &'a RuntimeCliOverrides,

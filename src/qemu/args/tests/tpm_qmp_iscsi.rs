@@ -6,7 +6,7 @@ fn test_tpm_uses_server_mode_for_internal_emulator() {
     let tpm_sock_str = tpm_sock.to_string_lossy().to_string();
 
     let mut args = QemuArgs::new();
-    let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", false);
+    let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", false, false);
     assert!(result.is_ok());
 
     let built = args.build();
@@ -21,7 +21,7 @@ fn test_tpm_omits_wait_for_external_swtpm_client_mode() {
     let tpm_sock_str = tpm_sock.to_string_lossy().to_string();
 
     let mut args = QemuArgs::new();
-    let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", true);
+    let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", true, false);
     assert!(result.is_ok());
 
     let built = args.build();
@@ -44,9 +44,24 @@ fn test_tpm_rejects_unsupported_backend() {
         &tpm_sock_str,
         "tpm-tis",
         false,
+        false,
     );
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Unsupported TPM backend"));
+}
+
+#[test]
+fn test_tpm_state_file_mode_uses_tpmemu_chardev() {
+    let tpm_sock = std::env::temp_dir().join("ezkvm-test-state-file.sock");
+    let tpm_sock_str = tpm_sock.to_string_lossy().to_string();
+
+    let mut args = QemuArgs::new();
+    let result = args.add_tpm("2.0", "emulator", &tpm_sock_str, "tpm-tis", false, true);
+    assert!(result.is_ok());
+
+    let built = args.build();
+    assert_eq!(built[0], "-chardev");
+    assert_eq!(built[1], "tpmemu,id=tpmchar");
 }
 
 #[test]

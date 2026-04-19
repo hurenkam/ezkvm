@@ -52,12 +52,15 @@ impl QemuManager {
         if let Some(tpm) = self.config.system_tpm() {
             let socket_path = self.resolve_tpm_socket_path();
             let external_swtpm = self.uses_external_swtpm();
+            let state_file_mode =
+                self.tpm_placement_mode() == crate::state::TpmPlacementMode::StateFile;
             args.add_tpm(
                 &tpm.version,
                 &tpm.backend,
                 &socket_path,
                 &tpm.model,
                 external_swtpm,
+                state_file_mode,
             )
             .map_err(|e| anyhow!("Failed to configure TPM: {}", e))?;
         }

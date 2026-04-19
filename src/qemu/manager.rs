@@ -42,14 +42,27 @@ impl QemuManager {
     }
 
     pub(super) fn uses_external_swtpm(&self) -> bool {
+        let explicit_state_path = self
+            .config
+            .system_tpm()
+            .and_then(|tpm| tpm.state_path.as_deref())
+            .is_some();
+
         self.config
             .system_tpm()
             .map(|tpm| tpm.backend == "emulator")
             .unwrap_or(false)
-            && self
-                .central_config
-                .swtpm_program_with_overrides(&self.runtime_overrides)
+            && !explicit_state_path
+            && crate::state::resolve_tpm_placement_mode(
+                &self.central_config,
+                &self.runtime_overrides,
+            ) == crate::state::TpmPlacementMode::Socket
+            && crate::state::resolve_swtpm_binary(&self.central_config, &self.runtime_overrides)
                 .is_some()
+    }
+
+    pub(super) fn tpm_placement_mode(&self) -> crate::state::TpmPlacementMode {
+        crate::state::resolve_tpm_placement_mode(&self.central_config, &self.runtime_overrides)
     }
 
     pub(super) fn has_primary_passthrough_gpu(&self) -> bool {
@@ -60,24 +73,14 @@ impl QemuManager {
     }
 
     pub(super) fn resolve_tpm_socket_path(&self) -> String {
-        if let Some(socket_path) = self
-            .runtime_overrides
-            .tpm_socket_path
-            .as_deref()
-            .map(str::trim)
-            .filter(|path| !path.is_empty())
-        {
-            return socket_path.to_string();
-        }
+        let vm_state_path = self
+            .config
+            .system_tpm()
+            .and_then(|tpm| tpm.state_path.as_deref());
 
-        if let Some(tpm) = self.config.system_tpm()
-            && let Some(state_path) = &tpm.state_path
-        {
-            return state_path.clone();
-        }
-
-        crate::state::resolve_runtime_tpm_socket(
+        crate::state::resolve_tpm_socket_path(
             &self.config.name,
+            vm_state_path,
             &self.central_config,
             &self.runtime_overrides,
         )

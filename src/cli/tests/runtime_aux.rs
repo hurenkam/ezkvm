@@ -26,7 +26,10 @@ system:
     let err = runtime::start_swtpm_if_configured(
         &config,
         &crate::config::CentralConfig::default(),
-        &crate::config::RuntimeCliOverrides::default(),
+        &crate::config::RuntimeCliOverrides {
+            swtpm_binary: Some("/definitely/missing/swtpm".to_string()),
+            ..Default::default()
+        },
     )
     .unwrap_err();
     assert!(err.to_string().contains("swtpm"));
@@ -50,7 +53,6 @@ system:
     tpm:
         version: "2.0"
         backend: "emulator"
-        state_path: "/vm-local/socket.swtpm"
         model: "tpm-tis"
 "#,
     )
@@ -83,6 +85,50 @@ system:
     .expect("swtpm preview should be generated");
 
     assert!(preview.contains("path=/cli/socket.swtpm"));
+}
+
+#[test]
+fn test_swtpm_preview_skips_when_vm_uses_explicit_state_path() {
+    let config = crate::config::VmConfig::from_str(
+        r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory:
+        size: 1024
+    cpu:
+        vcpus: 1
+        model: "host"
+    tpm:
+        version: "2.0"
+        backend: "emulator"
+        state_path: "/var/run/qemu-server/200.swtpm"
+        model: "tpm-tis"
+"#,
+    )
+    .unwrap();
+
+    let central_config = crate::config::CentralConfig {
+        tools: crate::config::ToolsConfig {
+            qemu: None,
+            swtpm: Some("/usr/bin/swtpm".to_string()),
+            remote_viewer: None,
+            looking_glass: None,
+        },
+        ..Default::default()
+    };
+
+    let preview = runtime::build_swtpm_launch_preview(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap();
+
+    assert!(preview.is_none());
 }
 
 #[test]

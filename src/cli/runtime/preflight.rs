@@ -123,19 +123,33 @@ fn ensure_tpm_capabilities(
         return Ok(());
     };
 
-    let swtpm_binary = central_config
-        .swtpm_program_with_overrides(runtime_overrides)
-        .ok_or_else(|| {
-            anyhow!(
-                "preflight failed: TPM emulator backend requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, or legacy tools.swtpm"
-            )
-        })?;
-    ensure_program_available("swtpm binary", swtpm_binary)?;
+    let placement_mode =
+        crate::state::resolve_tpm_placement_mode(central_config, runtime_overrides);
+    let explicit_socket_managed = tpm.state_path.is_some();
 
-    let tpm_socket = resolve_tpm_socket_path(config, central_config, runtime_overrides);
-    ensure_parent_dir_is_writable_or_creatable(&tpm_socket, "TPM socket")?;
+    if placement_mode == crate::state::TpmPlacementMode::Socket && !explicit_socket_managed {
+        let swtpm_binary = crate::state::resolve_swtpm_binary(central_config, runtime_overrides)
+            .ok_or_else(|| {
+                anyhow!(
+                    "preflight failed: TPM emulator backend in socket mode requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, PATH swtpm, or legacy tools.swtpm"
+                )
+            })?;
+        ensure_program_available("swtpm binary", &swtpm_binary)?;
+    }
 
-    if let Some(state_dir) = tpm.state_dir.as_deref() {
+    if placement_mode == crate::state::TpmPlacementMode::Socket {
+        let tpm_socket = resolve_tpm_socket_path(config, central_config, runtime_overrides);
+        ensure_parent_dir_is_writable_or_creatable(&tpm_socket, "TPM socket")?;
+    }
+
+    if placement_mode == crate::state::TpmPlacementMode::StateFile {
+        let state_dir = crate::state::resolve_tpm_state_dir(
+            tpm.state_dir.as_deref(),
+            central_config,
+            runtime_overrides,
+        )?;
+        ensure_dir_is_writable_or_creatable(&state_dir, "TPM state directory")?;
+    } else if let Some(state_dir) = tpm.state_dir.as_deref() {
         ensure_dir_is_writable_or_creatable(Path::new(state_dir), "TPM state directory")?;
     }
 
@@ -474,14 +488,17 @@ devices: {}
         let err = run_runtime_preflight(
             &config,
             &CentralConfig::default(),
-            &RuntimeCliOverrides::default(),
+            &RuntimeCliOverrides {
+                swtpm_binary: Some("/definitely/missing/swtpm".to_string()),
+                ..Default::default()
+            },
             "/bin/sh",
         )
         .expect_err("preflight should fail");
 
         assert!(
             err.to_string()
-                .contains("TPM emulator backend requires --swtpm-binary")
+                .contains("required swtpm binary '/definitely/missing/swtpm' is not available")
         );
     }
 

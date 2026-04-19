@@ -103,6 +103,7 @@ The preferred place for portability-related defaults is `host_capabilities`. The
 - Runtime precedence contract: `CLI overrides > VM-local explicit values > profile defaults > central host defaults > built-in fallback`.
 - `ezkvm start` and `ezkvm start --dry-run` execute the same preflight validation pass before runtime orchestration.
 - `host_capabilities.tpm.swtpm_binary` or legacy `tools.swtpm` + `system.tpm.backend: emulator`: ezkvm can launch swtpm.
+- TPM socket path precedence: `--tpm-socket-path` -> `system.tpm.state_path` -> `host_capabilities.tpm.socket_dir/<vm>.swtpm` -> runtime root `<vm>.swtpm`.
 - `host_capabilities.integrations.remote_viewer.program` or legacy `tools.remote_viewer` + `spice.enabled`: ezkvm can launch remote-viewer.
 - VM/profile `options.looking_glass.program` is used unless a CLI override is provided.
 - If no CLI or VM/profile value is set, ezkvm falls back to `host_capabilities.integrations.looking_glass.program`, then legacy central `looking_glass.program`, then legacy `tools.looking_glass`.
@@ -122,7 +123,7 @@ Preflight behavior:
 
 - Required capability checks (fail fast):
   - QEMU binary availability.
-  - swtpm binary availability when `system.tpm.backend: emulator` is configured.
+  - swtpm binary availability when `system.tpm.backend: emulator` is configured in `socket` placement mode, except when `system.tpm.state_path` is explicitly provided (externally managed parity socket).
   - OVMF/UEFI firmware file availability when `system.boot.firmware` is `uefi` or `ovmf`.
   - Bridge helper path availability when a bridge backend helper is configured.
   - Permission-sensitive runtime and socket parent directories are writable/creatable.

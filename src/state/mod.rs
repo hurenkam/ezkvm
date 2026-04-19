@@ -7,6 +7,7 @@ mod logs;
 mod paths;
 mod pid;
 mod runtime_resolver;
+mod tpm_resolver;
 
 #[allow(unused_imports)]
 pub use cache::{cache_config, delete_cached_config, load_cached_config};
@@ -23,6 +24,11 @@ pub use pid::{delete_pid, delete_pid_at, read_pid, read_pid_at, save_pid, save_p
 pub use runtime_resolver::{
     CentralRuntimeCapabilityResolver, RuntimeCapabilityResolver, resolve_runtime_root,
     resolve_runtime_tpm_socket,
+};
+#[allow(unused_imports)]
+pub use tpm_resolver::{
+    CentralTpmCapabilityResolver, TpmCapabilityResolver, TpmPlacementMode, resolve_swtpm_binary,
+    resolve_tpm_placement_mode, resolve_tpm_socket_path, resolve_tpm_state_dir,
 };
 
 #[cfg(test)]

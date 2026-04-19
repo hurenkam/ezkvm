@@ -50,11 +50,22 @@ fn proxmox_import_fixtures_generate_expected_dry_run_snapshots() {
     let _guard = env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let old_path = std::env::var_os("PATH");
+    unsafe {
+        std::env::set_var("PATH", "/usr/empty");
+    }
     let mut mismatches = Vec::new();
 
     for case in fixture_cases() {
         if let Some(mismatch) = check_fixture_case(case) {
             mismatches.push(mismatch);
+        }
+    }
+
+    unsafe {
+        match old_path {
+            Some(path) => std::env::set_var("PATH", path),
+            None => std::env::remove_var("PATH"),
         }
     }
 

@@ -12,8 +12,9 @@ impl QemuArgs {
         socket_path: &str,
         model: &str,
         external_swtpm: bool,
+        state_file_mode: bool,
     ) -> Result<(), String> {
-        add_tpm_backend_args(self, backend, socket_path, external_swtpm)?;
+        add_tpm_backend_args(self, backend, socket_path, external_swtpm, state_file_mode)?;
 
         self.push_str("-device");
         self.push(format!("{},tpmdev=tpmdev", model));
@@ -27,16 +28,21 @@ fn add_tpm_backend_args(
     backend: &str,
     socket_path: &str,
     external_swtpm: bool,
+    state_file_mode: bool,
 ) -> Result<(), String> {
     match backend {
         "emulator" => {
             let chardev_id = "tpmchar";
             args.push_str("-chardev");
-            args.push(build_tpm_chardev_spec(
-                chardev_id,
-                socket_path,
-                external_swtpm,
-            ));
+            if state_file_mode {
+                args.push(format!("tpmemu,id={}", chardev_id));
+            } else {
+                args.push(build_tpm_chardev_spec(
+                    chardev_id,
+                    socket_path,
+                    external_swtpm,
+                ));
+            }
             args.push_str("-tpmdev");
             args.push(format!("emulator,id=tpmdev,chardev={}", chardev_id));
             Ok(())

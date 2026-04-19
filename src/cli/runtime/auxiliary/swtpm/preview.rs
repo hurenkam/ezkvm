@@ -13,11 +13,21 @@ pub(crate) fn build_swtpm_launch_preview(
         _ => return Ok(None),
     };
 
-    let swtpm_path = match central_config.swtpm_program_with_overrides(runtime_overrides) {
+    if tpm.state_path.is_some() {
+        return Ok(None);
+    }
+
+    let placement_mode =
+        crate::state::resolve_tpm_placement_mode(central_config, runtime_overrides);
+    if placement_mode == crate::state::TpmPlacementMode::StateFile {
+        return Ok(None);
+    }
+
+    let swtpm_path = match crate::state::resolve_swtpm_binary(central_config, runtime_overrides) {
         Some(path) => path,
         None => {
             return Err(anyhow!(
-                "TPM emulator backend requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, or legacy tools.swtpm"
+                "TPM emulator backend in socket mode requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, PATH swtpm, or legacy tools.swtpm"
             ));
         }
     };
@@ -42,7 +52,7 @@ pub(crate) fn build_swtpm_launch_preview(
     let log_arg = format!("file={},level=1", log_path.display());
 
     let rendered = vec![
-        swtpm_path.to_string(),
+        swtpm_path,
         "socket".to_string(),
         tpm_flag.to_string(),
         "--tpmstate".to_string(),

@@ -48,6 +48,17 @@ pub(crate) fn start_swtpm_if_configured(
         return Ok(());
     };
 
+    // Parity mode: explicit TPM socket paths are assumed to be externally managed.
+    if tpm.state_path.is_some() {
+        return Ok(());
+    }
+
+    let placement_mode =
+        crate::state::resolve_tpm_placement_mode(central_config, runtime_overrides);
+    if placement_mode == crate::state::TpmPlacementMode::StateFile {
+        return Ok(());
+    }
+
     let swtpm_path = swtpm_path(central_config, runtime_overrides)?;
     let startup = prepare_swtpm_startup(config, central_config, runtime_overrides, tpm)?;
     let rendered_cmd = render_swtpm_command(&swtpm_path, &startup);
@@ -71,14 +82,11 @@ fn swtpm_path(
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<String> {
-    central_config
-        .swtpm_program_with_overrides(runtime_overrides)
-        .map(str::to_owned)
-        .ok_or_else(|| {
-            anyhow!(
-                "TPM emulator backend requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, or legacy tools.swtpm"
-            )
-        })
+    crate::state::resolve_swtpm_binary(central_config, runtime_overrides).ok_or_else(|| {
+        anyhow!(
+            "TPM emulator backend in socket mode requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, PATH swtpm, or legacy tools.swtpm"
+        )
+    })
 }
 
 fn prepare_swtpm_startup(
@@ -146,11 +154,11 @@ fn spawn_swtpm(swtpm_path: &str, startup: &SwtpmStartup) -> Result<()> {
         .stderr(Stdio::null());
 
     if let Err(err) = cmd.spawn() {
-        println!(
-            "Warning: failed to start swtpm at '{}': {}",
-            swtpm_path, err
-        );
-        return Ok(());
+        return Err(anyhow!(
+            "failed to start swtpm at '{}': {}",
+            swtpm_path,
+            err
+        ));
     }
 
     wait_for_unix_socket(&startup.socket_path, Duration::from_secs(3), "swtpm socket")?;
