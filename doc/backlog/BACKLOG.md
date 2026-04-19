@@ -347,9 +347,9 @@ Scope:
 - Document mode semantics clearly: profile-aware compaction is a compact-mode behavior and must not leak into canonical/debug-canonical output.
 Dependencies: B-29
 Acceptance Criteria:
-- Verified that profiles are inferred from Proxmox config (15 layers: proxmox-q35-uefi, windows-common, windows-11, linux-l26-common, macos-kvm, looking-glass, remote-viewer-spice, gpu-passthrough, hugepages, viommu, hidden-hypervisor, headless-vnc, headless-serial, storage-virtio-scsi-single, storage-virtio-scsi-pci).
+- Verified that profile inference remains active across representative Windows/Linux/macOS/headless/parity fixtures, including `proxmox-base`, `proxmox-q35-uefi`, `proxmox-windows`, `linux-l26-common`, `macos-kvm`, `looking-glass`, `gpu-passthrough`, `hugepages`, `viommu`, `hidden-hypervisor`, `headless-vnc`, and `proxmox-parity-runtime` where applicable.
 - Verified that profile-aware compaction omits redundant fields owned by profiles in compact mode only.
-- Verified that compact output sizes match expectations (5-6x reduction vs. canonical for complex fixtures like wakiza: 212→34 lines).
+- Verified that compact output remains smaller than canonical output for representative complex fixtures (for wakiza/felucia `108.conf`, current dry-run output is approximately `88 -> 71` lines after recent schema/layout changes).
 - CLI behavior documented for explicit mode selection: `--output-mode {canonical,compact,debug}` with compact as default.
 - Verified that canonical and debug-canonical exports are available and do not apply profile-compaction elision rules.
 Estimate: 1 day

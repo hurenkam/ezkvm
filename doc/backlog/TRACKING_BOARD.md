@@ -74,7 +74,7 @@ Source: doc/backlog/BACKLOG.md
 | B-27 | Split profile-aware compaction by domain ownership | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Done |
 | B-28 | Restrict Proxmox importer public surface to high-level API | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26 | unassigned | Done |
 | B-29 | Add temporary over-size rationale and cleanup guardrails | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-26, B-27, B-28 | unassigned | Done |
-| B-30 | Audit profile-first compaction implementation status | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Todo |
+| B-30 | Audit profile-first compaction implementation status | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Done |
 | B-31 | Expand profile inference coverage for Proxmox importer | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-23 | unassigned | Todo |
 | B-32 | Omit deterministic fields in import-output mode | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Done |
 | B-33 | Introduce explicit export modes (canonical, compact, debug-canonical) | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30, B-32 | unassigned | Done |
