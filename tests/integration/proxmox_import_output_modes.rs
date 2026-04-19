@@ -49,6 +49,7 @@ fn proxmox_import_output_modes_preserve_runtime_equivalence() {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ImportOutputMode::Canonical,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
             },
         )
         .expect("canonical import should succeed")
@@ -64,6 +65,7 @@ fn proxmox_import_output_modes_preserve_runtime_equivalence() {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ImportOutputMode::Compact,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
             },
         )
         .expect("compact import should succeed")
@@ -79,6 +81,7 @@ fn proxmox_import_output_modes_preserve_runtime_equivalence() {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ImportOutputMode::DebugCanonical,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
             },
         )
         .expect("debug import should succeed")

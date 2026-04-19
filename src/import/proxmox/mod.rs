@@ -8,4 +8,4 @@ pub mod storage_parser;
 mod yaml_compact;
 
 pub use error::ImportError;
-pub use io::{ImportOutputMode, ImportRunOptions, run_import_from_files};
+pub use io::{ImportOutputMode, ImportRunOptions, RuntimeTarget, run_import_from_files};

@@ -2,6 +2,7 @@
 // a large regression-test block after B-26. Keep this as transitional debt only;
 // closure target is <=250 lines for orchestration/public entrypoints.
 use super::error::ImportError;
+use super::io::RuntimeTarget;
 use super::model::{ProxmoxStorageConfig, ProxmoxVmConfig};
 use crate::config::{
     AppleSmcConfig, AudioDeviceConfig, BallooningConfig, BootConfig, ControllersConfig,
@@ -34,13 +35,15 @@ pub struct CanonicalMappingResult {
 
 pub fn map_proxmox_to_canonical_yaml(
     proxmox: &ProxmoxVmConfig,
+    runtime_target: RuntimeTarget,
 ) -> Result<CanonicalMappingResult, ImportError> {
-    map_proxmox_to_canonical_yaml_with_storage(proxmox, None)
+    map_proxmox_to_canonical_yaml_with_storage(proxmox, None, runtime_target)
 }
 
 pub fn map_proxmox_to_canonical_yaml_with_storage(
     proxmox: &ProxmoxVmConfig,
     storage_config: Option<&ProxmoxStorageConfig>,
+    runtime_target: RuntimeTarget,
 ) -> Result<CanonicalMappingResult, ImportError> {
     let mut warnings = Vec::new();
 
@@ -259,7 +262,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         },
     };
 
-    vm_config.profiles = profiles::infer_profile_names(proxmox, &vm_config);
+    vm_config.profiles = profiles::infer_profile_names(proxmox, &vm_config, runtime_target);
 
     let yaml = serde_yaml::to_string(&vm_config)
         .map_err(|e| ImportError::ParseError(format!("failed to serialize mapped config: {e}")))?;
@@ -271,13 +274,15 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
 mod tests {
     use super::{map_proxmox_to_canonical_yaml, map_proxmox_to_canonical_yaml_with_storage};
     use crate::config::{VmConfig, validation};
+    use crate::import::proxmox::RuntimeTarget;
     use crate::import::proxmox::model::ProxmoxVmConfig;
     use crate::import::proxmox::parser::parse_proxmox_config;
     use crate::import::proxmox::storage_parser::parse_proxmox_storage_config;
 
     fn map_and_validate(input: &str) -> (String, VmConfig) {
         let parsed = parse_proxmox_config(input).expect("parser should succeed");
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
         let mut config: VmConfig =
             serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         config.assign_default_device_ids();
@@ -289,8 +294,12 @@ mod tests {
         let parsed = parse_proxmox_config(input).expect("parser should succeed");
         let storage =
             parse_proxmox_storage_config(storage_input).expect("storage parser should succeed");
-        let mapped = map_proxmox_to_canonical_yaml_with_storage(&parsed, Some(&storage))
-            .expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml_with_storage(
+            &parsed,
+            Some(&storage),
+            RuntimeTarget::PortableLinux,
+        )
+        .expect("mapper should succeed");
         let mut config: VmConfig =
             serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         config.assign_default_device_ids();
@@ -771,7 +780,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
         let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         validation::validate_config(&cfg).expect("config should validate");
 
@@ -878,7 +888,6 @@ mod tests {
             cfg.profiles,
             vec![
                 "proxmox-base".to_string(),
-                "proxmox-parity-runtime".to_string(),
                 "proxmox-q35-uefi".to_string(),
                 "storage-virtio-scsi-pci".to_string(),
                 "proxmox-windows".to_string(),
@@ -973,7 +982,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
         assert!(mapped.warnings.iter().any(|w| {
             w.source_field == "args" && w.message.contains("unsupported args token '-foo'")
         }));
@@ -1020,7 +1030,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
         assert_eq!(mapped.warnings.len(), 1);
         assert_eq!(mapped.warnings[0].source_field, "arch");
         assert!(
@@ -1112,7 +1123,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
         let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         validation::validate_config(&cfg).expect("config should validate");
 
@@ -1135,7 +1147,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
         let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         validation::validate_config(&cfg).expect("config should validate");
 
@@ -1166,7 +1179,8 @@ mod tests {
     #[test]
     fn maps_empty_proxmox_config_with_defaults() {
         let parsed = ProxmoxVmConfig::default();
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("empty config should map");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("empty config should map");
         let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
 
         assert_eq!(cfg.name, "imported-vm");
@@ -1514,7 +1528,8 @@ mod tests {
     #[test]
     fn handles_empty_disk_source_gracefully() {
         let parsed = parse_proxmox_config("scsi0: ,size=10G").expect("parser should succeed");
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
 
         let _cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should be valid");
     }
@@ -1531,7 +1546,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_proxmox_to_canonical_yaml(&parsed).expect("mapper should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
 
         assert!(!mapped.warnings.is_empty());
     }

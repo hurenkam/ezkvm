@@ -3,6 +3,7 @@ use anyhow::Result;
 use super::{
     DeviceCommands, ImportOutputModeArg, NetworkCommands, PciCommands, StorageCommands, UsbCommands,
 };
+use crate::cli::types::RuntimeTargetArg;
 
 pub(crate) async fn handle_create(config_path: &str, validate_only: bool) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
@@ -33,6 +34,7 @@ pub(crate) async fn handle_create(config_path: &str, validate_only: bool) -> Res
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_import_proxmox(
     input: &str,
     proxmox_storage: Option<&str>,
@@ -41,11 +43,17 @@ pub(crate) async fn handle_import_proxmox(
     strict: bool,
     no_compact: bool,
     output_mode: ImportOutputModeArg,
+    runtime_target: RuntimeTargetArg,
 ) -> Result<()> {
     let output_mode = match output_mode {
         ImportOutputModeArg::Canonical => crate::import::proxmox::ImportOutputMode::Canonical,
         ImportOutputModeArg::Compact => crate::import::proxmox::ImportOutputMode::Compact,
         ImportOutputModeArg::Debug => crate::import::proxmox::ImportOutputMode::DebugCanonical,
+    };
+
+    let runtime_target = match runtime_target {
+        RuntimeTargetArg::PortableLinux => crate::import::proxmox::RuntimeTarget::PortableLinux,
+        RuntimeTargetArg::ProxmoxParity => crate::import::proxmox::RuntimeTarget::ProxmoxParity,
     };
 
     let options = crate::import::proxmox::ImportRunOptions {
@@ -55,6 +63,7 @@ pub(crate) async fn handle_import_proxmox(
         dry_run,
         compact_lists: !no_compact,
         output_mode,
+        runtime_target,
     };
 
     let result = crate::import::proxmox::run_import_from_files(input, &options)

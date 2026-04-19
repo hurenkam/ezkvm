@@ -7,6 +7,15 @@ pub enum ImportOutputModeArg {
     Debug,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum, Default)]
+pub enum RuntimeTargetArg {
+    /// Portable Linux: host-independent semantics, no Proxmox host paths
+    #[default]
+    PortableLinux,
+    /// Proxmox Parity: strict byte-close parity with Proxmox runtime behavior (explicit opt-in only)
+    ProxmoxParity,
+}
+
 /// ezkvm - Easy KVM virtual machine manager
 #[derive(Parser)]
 #[command(name = "ezkvm")]
@@ -144,6 +153,15 @@ pub enum Commands {
             help = "Output mode: canonical (full), compact (profile-overlay), debug (canonical + deterministic ids + source comments)"
         )]
         output_mode: ImportOutputModeArg,
+
+        /// Runtime target for normalization behavior
+        #[arg(
+            long,
+            value_enum,
+            default_value_t = RuntimeTargetArg::PortableLinux,
+            help = "Target runtime model: portable-linux (default, host-independent) or proxmox-parity (explicit opt-in for strict Proxmox parity)"
+        )]
+        runtime_target: RuntimeTargetArg,
     },
 
     /// Storage management commands

@@ -23,6 +23,15 @@ pub enum ImportOutputMode {
     DebugCanonical,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeTarget {
+    /// Portable Linux target: host-independent semantics, no Proxmox paths
+    #[default]
+    PortableLinux,
+    /// Proxmox Parity target: strict Proxmox runtime behavior (explicit opt-in)
+    ProxmoxParity,
+}
+
 #[derive(Debug, Clone)]
 pub struct ImportRunOptions {
     pub output_path: Option<String>,
@@ -31,6 +40,7 @@ pub struct ImportRunOptions {
     pub dry_run: bool,
     pub compact_lists: bool,
     pub output_mode: ImportOutputMode,
+    pub runtime_target: RuntimeTarget,
 }
 
 #[derive(Debug, Clone)]
@@ -62,10 +72,12 @@ pub fn run_import_from_files(
 
     let parsed = parse_proxmox_config(&input)?;
     let mapped = match storage_config.as_ref() {
-        Some(storage_config) => {
-            map_proxmox_to_canonical_yaml_with_storage(&parsed, Some(storage_config))?
-        }
-        None => map_proxmox_to_canonical_yaml(&parsed)?,
+        Some(storage_config) => map_proxmox_to_canonical_yaml_with_storage(
+            &parsed,
+            Some(storage_config),
+            options.runtime_target,
+        )?,
+        None => map_proxmox_to_canonical_yaml(&parsed, options.runtime_target)?,
     };
 
     let config = VmConfig::from_str(&mapped.yaml).map_err(|e| {
@@ -454,7 +466,7 @@ fn build_debug_source_comments(parsed: &ProxmoxVmConfig, warnings: &[MappingWarn
 
 #[cfg(test)]
 mod tests {
-    use super::{ImportRunOptions, run_import_from_files};
+    use super::{ImportRunOptions, RuntimeTarget, run_import_from_files};
     use crate::test_support::env_lock;
     use serde_yaml::Value;
     use std::path::PathBuf;
@@ -512,6 +524,7 @@ mod tests {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: super::ImportOutputMode::Compact,
+                runtime_target: RuntimeTarget::PortableLinux,
             };
 
             let result =
@@ -539,6 +552,7 @@ mod tests {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: super::ImportOutputMode::Compact,
+                runtime_target: RuntimeTarget::PortableLinux,
             };
 
             let err = run_import_from_files(&input_path.to_string_lossy(), &options)
@@ -567,6 +581,7 @@ mod tests {
                 dry_run: false,
                 compact_lists: false,
                 output_mode: super::ImportOutputMode::Compact,
+                runtime_target: RuntimeTarget::PortableLinux,
             };
 
             let result =
@@ -601,6 +616,7 @@ mod tests {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: super::ImportOutputMode::Compact,
+                runtime_target: RuntimeTarget::PortableLinux,
             };
 
             let result =
@@ -634,6 +650,7 @@ mod tests {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: super::ImportOutputMode::Compact,
+                runtime_target: RuntimeTarget::PortableLinux,
             };
 
             let result =
@@ -666,6 +683,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::Canonical,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("canonical import");
@@ -679,6 +697,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("compact import");
@@ -708,6 +727,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("compact import");
@@ -766,6 +786,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("compact import");
@@ -804,6 +825,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("compact import");
@@ -876,6 +898,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::Canonical,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("canonical import");
@@ -889,6 +912,7 @@ mod tests {
                     dry_run: true,
                     compact_lists: false,
                     output_mode: super::ImportOutputMode::DebugCanonical,
+                    runtime_target: RuntimeTarget::PortableLinux,
                 },
             )
             .expect("debug import");

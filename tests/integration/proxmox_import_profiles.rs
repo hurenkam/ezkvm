@@ -34,6 +34,7 @@ fn imported_profiles(conf_path: &str, storage_path: Option<&str>) -> Vec<String>
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ezkvm::import::proxmox::ImportOutputMode::Compact,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
             },
         )
         .expect("import should succeed")
@@ -64,7 +65,6 @@ fn wakiza_import_emits_expected_profile_stack() {
         profiles,
         vec![
             "proxmox-base",
-            "proxmox-parity-runtime",
             "proxmox-q35-uefi",
             "proxmox-windows",
             "windows-common",

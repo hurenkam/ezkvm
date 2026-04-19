@@ -1,7 +1,12 @@
 use super::helpers::is_q35_machine;
 use super::{InputDeviceConfig, ProxmoxVmConfig, VmConfig};
+use crate::import::proxmox::RuntimeTarget;
 
-pub(super) fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> Vec<String> {
+pub(super) fn infer_profile_names(
+    proxmox: &ProxmoxVmConfig,
+    config: &VmConfig,
+    runtime_target: RuntimeTarget,
+) -> Vec<String> {
     let mut profiles = Vec::new();
     let ostype = proxmox.scalars.get("ostype").map(String::as_str);
 
@@ -10,12 +15,15 @@ pub(super) fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) 
     // that are not stored in the Proxmox .conf file but are applied by Proxmox at launch time.
     profiles.push("proxmox-base".to_string());
 
-    // Always assign the parity-runtime profile to provide Proxmox host-specific runtime
-    // path literals (boot splash asset, pve-bridge helper scripts) that are required for
-    // strict Proxmox parity. This profile is assigned unconditionally here because explicit
-    // runtime target selection (B-40) is not yet implemented. Once B-40 lands, this profile
-    // will only be assigned for proxmox-parity target imports.
-    profiles.push("proxmox-parity-runtime".to_string());
+    // Conditionally assign parity-runtime profile based on target
+    if runtime_target == RuntimeTarget::ProxmoxParity {
+        // For strict Proxmox parity, include host-specific runtime path literals
+        // (boot splash asset, pve-bridge helper scripts) that enable byte-close
+        // parity with Proxmox QEMU commands.
+        profiles.push("proxmox-parity-runtime".to_string());
+    }
+    // For portable-linux target, parity-runtime is omitted; host-specific paths
+    // will be resolved at runtime via B-41 capability resolution.
 
     if config.system.architecture == "x86_64"
         && config.system.boot.firmware.as_deref() == Some("uefi")

@@ -172,6 +172,7 @@ fn check_fixture_case(case: &ImportFixtureCase) -> Option<String> {
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ezkvm::import::proxmox::ImportOutputMode::Compact,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
             },
         )
         .unwrap_or_else(|err| panic!("fixture '{}' import failed: {err}", case.name))
