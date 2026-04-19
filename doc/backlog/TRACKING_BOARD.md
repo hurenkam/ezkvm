@@ -83,7 +83,7 @@ Source: doc/backlog/BACKLOG.md
 | B-36 | Add central host capability schema for portable runtime | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-33, D-01 | unassigned | Done |
 | B-37 | Define and implement runtime precedence contract | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36 | unassigned | Done |
 | B-38 | Add portability preflight validation and error model | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36, B-37 | unassigned | Done |
-| B-39 | Separate parity-only defaults from portable semantics | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-38 | unassigned | Todo |
+| B-39 | Separate parity-only defaults from portable semantics | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-38 | unassigned | Done |
 | B-40 | Add explicit runtime target selection for Proxmox import | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39 | unassigned | Todo |
 | B-41 | Implement portable-linux runtime normalization for host-only literals | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39, B-40 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |

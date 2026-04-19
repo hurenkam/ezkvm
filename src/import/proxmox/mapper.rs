@@ -878,6 +878,7 @@ mod tests {
             cfg.profiles,
             vec![
                 "proxmox-base".to_string(),
+                "proxmox-parity-runtime".to_string(),
                 "proxmox-q35-uefi".to_string(),
                 "storage-virtio-scsi-pci".to_string(),
                 "proxmox-windows".to_string(),

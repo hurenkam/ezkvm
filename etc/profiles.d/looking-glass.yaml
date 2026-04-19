@@ -32,8 +32,14 @@ system:
       vectors: 1
       id: "ivshmem0"
       bus: "pcie.0"
-      mem_path: "/dev/kvmfr0"
+      # mem_path is host-runtime-specific (e.g. /dev/kvmfr0 via the kvmfr kernel module).
+      # It is not set here because it must be resolved per host capability (B-41).
+      # For Proxmox imports the mapper sets mem_path from the Proxmox args.
+      # For manually created VM configs, set mem_path explicitly in the VM YAML.
 
 options:
   looking_glass:
+    # program path is host-runtime-specific and not a portable default.
+    # It will be resolved via host capability resolution in B-41.
+    # Set this explicitly in the VM YAML or central host config.
     program: "/usr/local/bin/looking-glass-client"

@@ -64,6 +64,7 @@ fn wakiza_import_emits_expected_profile_stack() {
         profiles,
         vec![
             "proxmox-base",
+            "proxmox-parity-runtime",
             "proxmox-q35-uefi",
             "proxmox-windows",
             "windows-common",

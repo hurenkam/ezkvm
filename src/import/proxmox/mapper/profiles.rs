@@ -5,10 +5,17 @@ pub(super) fn infer_profile_names(proxmox: &ProxmoxVmConfig, config: &VmConfig) 
     let mut profiles = Vec::new();
     let ostype = proxmox.scalars.get("ostype").map(String::as_str);
 
-    // Always assign the Proxmox base profile to provide Proxmox runtime defaults
-    // (boot menu, kvm-pit, drive tuning, tap network scripts) that are not stored
-    // in the Proxmox .conf file but are applied by Proxmox at launch time.
+    // Always assign the Proxmox base profile to provide guest-semantic defaults
+    // (boot menu, kvm-pit, drive tuning, tap network device model, queue sizes, placement)
+    // that are not stored in the Proxmox .conf file but are applied by Proxmox at launch time.
     profiles.push("proxmox-base".to_string());
+
+    // Always assign the parity-runtime profile to provide Proxmox host-specific runtime
+    // path literals (boot splash asset, pve-bridge helper scripts) that are required for
+    // strict Proxmox parity. This profile is assigned unconditionally here because explicit
+    // runtime target selection (B-40) is not yet implemented. Once B-40 lands, this profile
+    // will only be assigned for proxmox-parity target imports.
+    profiles.push("proxmox-parity-runtime".to_string());
 
     if config.system.architecture == "x86_64"
         && config.system.boot.firmware.as_deref() == Some("uefi")

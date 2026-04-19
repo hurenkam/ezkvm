@@ -1,0 +1,25 @@
+# Profile: proxmox-parity-runtime
+#
+# Isolates Proxmox host-specific runtime path literals that are required for strict
+# Proxmox parity but are NOT portable across non-Proxmox Linux hosts.
+#
+# Boundary: ALL fields in this profile are host-runtime-specific. Guest-visible
+# semantics belong in proxmox-base, proxmox-q35-uefi, or proxmox-windows.
+#
+# This profile is assigned alongside proxmox-base for all Proxmox imports while
+# B-40 (explicit runtime target selection) is not yet implemented. Once B-40 lands,
+# this profile will only be included for proxmox-parity target imports; it will be
+# omitted for portable-linux imports.
+
+system:
+  boot:
+    splash: /usr/share/qemu-server/bootsplash.jpg
+
+policies:
+  networks:
+    - match:
+        backend_type: tap
+      defaults:
+        backend:
+          script: /usr/libexec/qemu-server/pve-bridge
+          downscript: /usr/libexec/qemu-server/pve-bridgedown
