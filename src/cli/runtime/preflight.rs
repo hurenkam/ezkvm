@@ -1,3 +1,4 @@
+use crate::qemu::firmware_locator::FirmwareCapabilityResolver;
 use anyhow::{Result, anyhow};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -166,50 +167,24 @@ fn ensure_firmware_capabilities(
         ));
     }
 
-    let search_dirs = central_config.ovmf_search_dirs_with_overrides(runtime_overrides);
-    if !search_dirs.is_empty() {
-        let secure_boot = config.system_boot().secure_boot;
-        for ovmf_dir in &search_dirs {
-            if ensure_ovmf_file_available(ovmf_dir, secure_boot).is_ok() {
-                return Ok(());
-            }
-        }
+    let secure_boot = config.system_boot().secure_boot;
+    let resolver =
+        crate::qemu::CentralFirmwareCapabilityResolver::new(central_config, runtime_overrides);
 
-        return Err(anyhow!(
-            "preflight failed: no OVMF firmware file found in configured search paths: {}",
-            search_dirs.join(", ")
-        ));
-    }
-
-    let fallback = Path::new("/usr/share/ovmf/OVMF.fd");
-    if fallback.exists() {
+    if resolver.resolve_ovmf_code(secure_boot).is_some() {
         return Ok(());
     }
 
-    Err(anyhow!(
-        "preflight failed: UEFI firmware requested but no OVMF directory is configured and '{}' does not exist",
-        fallback.display()
-    ))
-}
-
-fn ensure_ovmf_file_available(ovmf_dir: &str, secure_boot: bool) -> Result<()> {
-    let candidates = if secure_boot {
-        ["OVMF_CODE_4M.secboot.fd", "OVMF_CODE.secboot.fd", "OVMF.fd"]
+    let search_dirs = central_config.ovmf_search_dirs_with_overrides(runtime_overrides);
+    let searched = if search_dirs.is_empty() {
+        "/usr/share/ovmf, /usr/share/OVMF".to_string()
     } else {
-        ["OVMF_CODE_4M.fd", "OVMF_CODE.fd", "OVMF.fd"]
+        search_dirs.join(", ")
     };
 
-    for file in candidates {
-        let candidate = Path::new(ovmf_dir).join(file);
-        if candidate.exists() {
-            return Ok(());
-        }
-    }
-
     Err(anyhow!(
-        "preflight failed: no OVMF firmware file found in '{}' (checked: {})",
-        ovmf_dir,
-        candidates.join(", ")
+        "preflight failed: UEFI firmware requested but no OVMF file found in: {}",
+        searched
     ))
 }
 

@@ -46,7 +46,7 @@ ezkvm start examples/basic-vm.yaml
 ezkvm start examples/basic-vm.yaml --dry-run
 ```
 
-Both `start` and `start --dry-run` now run the same portable-runtime preflight checks before launching or rendering commands.
+Both `start` and `start --dry-run` now run the same portable-runtime preflight checks before launching or rendering commands, including firmware discovery validation for UEFI/OVMF paths.
 
 ## Configuration
 

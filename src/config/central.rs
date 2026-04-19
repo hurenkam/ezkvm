@@ -78,6 +78,7 @@ impl CentralConfig {
     }
 
     /// Resolve the effective OVMF firmware directory, including CLI overrides.
+    #[allow(dead_code)]
     pub fn ovmf_dir_with_overrides<'a>(
         &'a self,
         overrides: &'a RuntimeCliOverrides,

@@ -1,5 +1,7 @@
+use super::firmware_locator::{
+    CentralFirmwareCapabilityResolver, FirmwareCapabilityResolver, resolve_ovmf_code_from_dir,
+};
 use super::{QemuManager, types::QemuArgs};
-use std::path::Path;
 
 impl QemuManager {
     /// Build boot-related arguments
@@ -89,6 +91,9 @@ impl QemuManager {
     }
 
     fn resolve_uefi_code_path(&self) -> Option<String> {
+        let secure_boot = self.config.system_boot().secure_boot;
+
+        // 1. CLI --ovmf-dir override: use that directory directly (always yields a path).
         if let Some(override_path) = self
             .runtime_overrides
             .ovmf_dir
@@ -96,38 +101,18 @@ impl QemuManager {
             .map(str::trim)
             .filter(|path| !path.is_empty())
         {
-            return Some(resolve_ovmf_code_from_dir(
-                override_path,
-                self.config.system_boot().secure_boot,
-            ));
+            return Some(resolve_ovmf_code_from_dir(override_path, secure_boot));
         }
 
-        self.config.system_boot().uefi_code.clone().or_else(|| {
-            self.central_config
-                .ovmf_dir_with_overrides(&self.runtime_overrides)
-                .map(|ovmf_dir| {
-                    resolve_ovmf_code_from_dir(ovmf_dir, self.config.system_boot().secure_boot)
-                })
-        })
-    }
-}
-
-fn resolve_ovmf_code_from_dir(ovmf_dir: &str, secure_boot: bool) -> String {
-    let preferred_files = if secure_boot {
-        ["OVMF_CODE_4M.secboot.fd", "OVMF_CODE.secboot.fd", "OVMF.fd"]
-    } else {
-        ["OVMF_CODE_4M.fd", "OVMF_CODE.fd", "OVMF.fd"]
-    };
-
-    for file in preferred_files {
-        let candidate = format!("{}/{}", ovmf_dir, file);
-        if Path::new(&candidate).exists() {
-            return candidate;
+        // 2. VM-level explicit firmware code path.
+        if let Some(explicit) = self.config.system_boot().uefi_code.as_deref() {
+            return Some(explicit.to_string());
         }
-    }
 
-    // Fall back to the most compatible default path even if it is missing.
-    format!("{}/OVMF.fd", ovmf_dir)
+        // 3. Multi-dir resolver: central config dirs + platform defaults.
+        CentralFirmwareCapabilityResolver::new(&self.central_config, &self.runtime_overrides)
+            .resolve_ovmf_code(secure_boot)
+    }
 }
 
 fn map_boot_device(device: &str) -> String {
@@ -142,9 +127,9 @@ fn map_boot_device(device: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_ovmf_code_from_dir;
-    use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
+    use crate::config::{CentralConfig, LocationsConfig, RuntimeCliOverrides, VmConfig};
     use crate::qemu::QemuManager;
+    use crate::qemu::resolve_ovmf_code_from_dir;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -256,10 +241,15 @@ system:
 
     #[test]
     fn uefi_precedence_uses_central_ovmf_dir_before_builtin_fallback() {
+        let dir = unique_temp_dir("central-ovmf");
+        std::fs::create_dir_all(&dir).expect("temp dir should be creatable");
+        let file = dir.join("OVMF_CODE_4M.fd");
+        std::fs::write(&file, b"mock").expect("mock firmware file should be writable");
+
         let vm = base_uefi_vm();
         let central = CentralConfig {
-            locations: crate::config::LocationsConfig {
-                ovmf_dir: Some("/central/ovmf".to_string()),
+            locations: LocationsConfig {
+                ovmf_dir: Some(dir.to_string_lossy().into_owned()),
                 ..Default::default()
             },
             ..Default::default()
@@ -267,7 +257,14 @@ system:
 
         let manager = QemuManager::new_with_overrides(vm, central, RuntimeCliOverrides::default());
         let arg = extract_uefi_code_arg(&manager).expect("uefi code arg should be present");
-        assert!(arg.contains("file=/central/ovmf/OVMF.fd"));
+        assert!(
+            arg.contains(&file.to_string_lossy().into_owned()),
+            "expected '{}' in arg '{}'",
+            file.display(),
+            arg
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -279,7 +276,14 @@ system:
             RuntimeCliOverrides::default(),
         );
 
+        // When no sources are configured, the firmware arg must still be emitted.
+        // The actual path comes from platform defaults (if OVMF is installed)
+        // or the hardcoded add_uefi fallback — either way a path must be present.
         let arg = extract_uefi_code_arg(&manager).expect("uefi code arg should be present");
-        assert!(arg.contains("file=/usr/share/ovmf/OVMF.fd"));
+        assert!(
+            arg.contains("file=/usr/share/"),
+            "expected a /usr/share/ path, got: {}",
+            arg
+        );
     }
 }

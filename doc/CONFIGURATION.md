@@ -90,6 +90,8 @@ Notes:
 Notes:
 - `search_paths` are checked in order after CLI and explicit `ovmf_dir` sources.
 - `secure_boot_code_files` and `code_files` document host packaging variants and preferred filenames.
+- Effective OVMF discovery precedence is: CLI `--ovmf-dir` -> VM `system.boot.uefi_code` -> configured `search_paths` -> built-in platform defaults (`/usr/share/ovmf`, `/usr/share/OVMF`).
+- If no firmware file is found, preflight fails with an actionable error that lists the searched locations.
 
 #### `host_capabilities.network`
 
