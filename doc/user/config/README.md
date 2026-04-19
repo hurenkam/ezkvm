@@ -20,7 +20,7 @@ This directory contains the user-facing configuration reference for ezkvm.
 9. [field-reference.md](field-reference.md) — Complete field tables (legacy schema reference)
 
 **Special Topics:**
-10. [import-proxmox.md](import-proxmox.md) — Proxmox import mapping and post-import validation
+10. [import-proxmox.md](import-proxmox.md) — Proxmox import plus portable runtime operator guidance
 11. [troubleshooting.md](troubleshooting.md) — Common issues and diagnostic checks
 
 ## Canonical First

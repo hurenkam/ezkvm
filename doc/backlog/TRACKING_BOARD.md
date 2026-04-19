@@ -94,7 +94,7 @@ Source: doc/backlog/BACKLOG.md
 | B-47 | Add optional Looking Glass capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-46 | unassigned | Done |
 | B-48 | Implement capability precedence contract and validation | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-47 | unassigned | Done |
 | B-49 | Add integration tests for host capability resolution | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-48 | unassigned | Done |
-| B-50 | Document portable mode operator guidance | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-49 | unassigned | Todo |
+| B-50 | Document portable mode operator guidance | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-49 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
