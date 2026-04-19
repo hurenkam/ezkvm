@@ -23,7 +23,11 @@ fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
     result
 }
 
-fn imported_profiles(conf_path: &str, storage_path: Option<&str>) -> Vec<String> {
+fn imported_profiles(
+    conf_path: &str,
+    storage_path: Option<&str>,
+    runtime_target: ezkvm::import::proxmox::RuntimeTarget,
+) -> Vec<String> {
     let result = with_repo_profiles(|| {
         run_import_from_files(
             conf_path,
@@ -34,7 +38,7 @@ fn imported_profiles(conf_path: &str, storage_path: Option<&str>) -> Vec<String>
                 dry_run: true,
                 compact_lists: false,
                 output_mode: ezkvm::import::proxmox::ImportOutputMode::Compact,
-                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+                runtime_target,
             },
         )
         .expect("import should succeed")
@@ -59,7 +63,11 @@ fn wakiza_import_emits_expected_profile_stack() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-    let profiles = imported_profiles("input/felucia/108.conf", Some("input/felucia/storage.cfg"));
+    let profiles = imported_profiles(
+        "input/felucia/108.conf",
+        Some("input/felucia/storage.cfg"),
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+    );
 
     assert_eq!(
         profiles,
@@ -73,6 +81,7 @@ fn wakiza_import_emits_expected_profile_stack() {
             "gpu-passthrough",
         ]
     );
+    assert!(!profiles.contains(&"proxmox-parity-runtime".to_string()));
 }
 
 #[test]
@@ -84,6 +93,7 @@ fn linux_desktop_import_emits_expected_profile_stack() {
     let profiles = imported_profiles(
         "input/zbp-server-mh2/301.conf",
         Some("input/zbp-server-mh2/storage.cfg"),
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
     );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
@@ -101,6 +111,7 @@ fn macos_import_emits_expected_profile_stack() {
     let profiles = imported_profiles(
         "input/coruscant/401.conf",
         Some("input/coruscant/storage.cfg"),
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
     );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
@@ -117,6 +128,7 @@ fn nested_vm_import_emits_viommu_and_hidden_hypervisor_profiles() {
     let profiles = imported_profiles(
         "input/coruscant/194.conf",
         Some("input/coruscant/storage.cfg"),
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
     );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
@@ -131,8 +143,27 @@ fn headless_vnc_fixture_emits_headless_vnc_profile() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-    let profiles = imported_profiles("tests/fixtures/proxmox_import/10-headless-vnc.conf", None);
+    let profiles = imported_profiles(
+        "tests/fixtures/proxmox_import/10-headless-vnc.conf",
+        None,
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+    );
 
     assert!(profiles.contains(&"headless-vnc".to_string()));
     assert!(!profiles.contains(&"headless-serial".to_string()));
+}
+
+#[test]
+fn parity_target_includes_proxmox_parity_runtime_profile() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let profiles = imported_profiles(
+        "input/felucia/108.conf",
+        Some("input/felucia/storage.cfg"),
+        ezkvm::import::proxmox::RuntimeTarget::ProxmoxParity,
+    );
+
+    assert!(profiles.contains(&"proxmox-parity-runtime".to_string()));
 }

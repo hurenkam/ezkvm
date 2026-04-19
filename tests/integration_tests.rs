@@ -10,6 +10,8 @@ fn env_lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
+#[path = "integration/capability_resolution_matrix.rs"]
+mod capability_resolution_matrix;
 #[path = "integration/command_regression.rs"]
 mod command_regression;
 #[path = "integration/parsing.rs"]

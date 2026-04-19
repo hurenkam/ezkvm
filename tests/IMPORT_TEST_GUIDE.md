@@ -6,6 +6,66 @@ This document describes the comprehensive test suite for Proxmox VM import funct
 
 **Total Tests:** 121 (66 original + 55 new comprehensive edge case tests)
 
+## Host Capability Resolution Matrix (B-49)
+
+The integration suite now includes explicit precedence and runtime-target checks for host capability resolution.
+
+Matrix dimensions covered:
+
+- Runtime path and capability diagnostics in `start --dry-run`
+- CLI override precedence over VM/profile/central/built-in defaults
+- Central-config capability defaults for runtime/TPM/firmware/network
+- Portable vs parity target behavior (`portable-linux` enforces capability resolution; `proxmox-parity` bypasses capability gates)
+- Import dry-run diagnostics for precedence reporting
+- Portable import command generation without Proxmox host-only literals
+
+Dimension-to-test mapping:
+
+- Import dry-run precedence/parity reporting:
+   - `import_dry_run_reports_capability_precedence_for_portable_and_parity_targets`
+- Portable import host-literal exclusion:
+   - `portable_import_generated_args_omit_proxmox_host_literals`
+- Runtime diagnostics CLI-over-central precedence:
+   - `runtime_diagnostics_show_cli_override_precedence_over_central_defaults`
+- Runtime diagnostics central-over-built-in path resolution:
+   - `runtime_diagnostics_show_central_defaults_when_cli_is_absent`
+- Optional capability downgrade behavior:
+   - `runtime_diagnostics_show_optional_looking_glass_auto_downgrade`
+
+Profile interaction notes:
+
+- Runtime-target profile assignment behavior (`portable-linux` vs `proxmox-parity`) is validated in `tests/integration/proxmox_import_profiles.rs`.
+- Capability diagnostics are conditional by VM shape (for example TPM diagnostics only when TPM emulator backend is configured).
+
+Primary integration files:
+
+- `tests/integration/capability_resolution_matrix.rs`
+- `tests/integration/runtime_preflight.rs`
+- `tests/integration/proxmox_import_profiles.rs`
+
+### Emulated distro matrix
+
+For deterministic CI, capability layouts are validated with temporary central config files and synthetic binaries rather than depending on host packages.
+
+- The current matrix validates precedence and mode behavior in an environment-independent way.
+- Distro-specific path sets can be layered on top of this harness as host fixtures evolve.
+
+### Running B-49 coverage locally
+
+Run full required validation:
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --quiet
+```
+
+Run only the new matrix integration tests:
+
+```bash
+cargo test --quiet capability_resolution_matrix
+```
+
 ### Breakdown by Module
 
 | Module | Original Tests | New Tests | Total | Coverage Areas |
