@@ -190,6 +190,7 @@ pub(super) fn map_serials(
     scalars: &BTreeMap<String, String>,
     vmid: Option<u32>,
     warnings: &mut Vec<MappingWarning>,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
 ) -> Vec<SerialConfig> {
     let mut serials = Vec::new();
 
@@ -207,7 +208,7 @@ pub(super) fn map_serials(
         }
 
         if raw == "socket" {
-            serials.push(default_socket_serial(port, vmid));
+            serials.push(default_socket_serial(port, vmid, runtime_target));
             continue;
         }
 
@@ -260,7 +261,7 @@ pub(super) fn map_serials(
         }
 
         if raw.starts_with("socket,") {
-            serials.push(parse_socket_serial(raw, port, vmid));
+            serials.push(parse_socket_serial(raw, port, vmid, runtime_target));
             continue;
         }
 
@@ -271,18 +272,28 @@ pub(super) fn map_serials(
                 raw
             ),
         });
-        serials.push(default_socket_serial(port, vmid));
+        serials.push(default_socket_serial(port, vmid, runtime_target));
     }
 
     serials
 }
 
-fn default_socket_serial(port: u32, vmid: Option<u32>) -> SerialConfig {
+fn default_socket_serial(
+    port: u32,
+    vmid: Option<u32>,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
+) -> SerialConfig {
     SerialConfig {
         r#type: "socket".to_string(),
         id: Some(format!("serial{}", port)),
         port: Some(port),
-        path: vmid.map(|id| format!("/var/run/qemu-server/{}.serial{}", id, port)),
+        path: match (runtime_target, vmid) {
+            (crate::import::proxmox::RuntimeTarget::ProxmoxParity, Some(id)) => {
+                Some(format!("/var/run/qemu-server/{}.serial{}", id, port))
+            }
+            (_, Some(id)) => Some(format!("/var/run/ezkvm/{}-serial{}.socket", id, port)),
+            _ => None,
+        },
         host: if vmid.is_none() {
             Some("127.0.0.1".to_string())
         } else {
@@ -299,8 +310,13 @@ fn default_socket_serial(port: u32, vmid: Option<u32>) -> SerialConfig {
     }
 }
 
-fn parse_socket_serial(raw: &str, port: u32, vmid: Option<u32>) -> SerialConfig {
-    let mut serial = default_socket_serial(port, vmid);
+fn parse_socket_serial(
+    raw: &str,
+    port: u32,
+    vmid: Option<u32>,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
+) -> SerialConfig {
+    let mut serial = default_socket_serial(port, vmid, runtime_target);
 
     for token in raw.split(',').skip(1).map(str::trim) {
         if let Some((key, value)) = token.split_once('=') {

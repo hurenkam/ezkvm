@@ -175,6 +175,7 @@ pub(super) fn map_tpm(
     scalars: &BTreeMap<String, String>,
     storage_config: Option<&ProxmoxStorageConfig>,
     vmid: Option<u32>,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
 ) -> Option<TpmConfig> {
     let (key, raw) = scalars
         .iter()
@@ -207,9 +208,11 @@ pub(super) fn map_tpm(
     Some(TpmConfig {
         version,
         backend: "emulator".to_string(),
-        state_path: Some(match vmid {
-            Some(id) => format!("/var/run/qemu-server/{}.swtpm", id),
-            None => format!("/var/run/ezkvm/{}-tpm.socket", key),
+        state_path: Some(match (runtime_target, vmid) {
+            (crate::import::proxmox::RuntimeTarget::ProxmoxParity, Some(id)) => {
+                format!("/var/run/qemu-server/{}.swtpm", id)
+            }
+            _ => format!("/var/run/ezkvm/{}-tpm.socket", key),
         }),
         state_dir: None,
         state_backend_uri,
@@ -317,6 +320,7 @@ fn map_efidisk_vars_size(options: &BTreeMap<String, String>) -> Option<u64> {
 pub(super) fn map_guest_agent(
     scalars: &BTreeMap<String, String>,
     vmid: Option<u32>,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
 ) -> Option<GuestAgentConfig> {
     let raw = scalars.get("agent")?.trim();
     if raw.is_empty() {
@@ -340,8 +344,15 @@ pub(super) fn map_guest_agent(
         .get("path")
         .or_else(|| options.get("socket"))
         .cloned()
-        .or_else(|| vmid.map(|id| format!("/var/run/qemu-server/{}.qga", id)))
-        .or_else(|| Some("/var/run/qemu-server/qga.sock".to_string()));
+        .or_else(|| match runtime_target {
+            crate::import::proxmox::RuntimeTarget::ProxmoxParity => Some(match vmid {
+                Some(id) => format!("/var/run/qemu-server/{}.qga", id),
+                None => "/var/run/qemu-server/qga.sock".to_string(),
+            }),
+            crate::import::proxmox::RuntimeTarget::PortableLinux => {
+                Some("/var/run/ezkvm/qga.sock".to_string())
+            }
+        });
 
     Some(GuestAgentConfig {
         enabled: true,

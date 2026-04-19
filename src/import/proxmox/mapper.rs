@@ -104,7 +104,15 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let mut networks = proxmox
         .networks
         .iter()
-        .map(|network| network::map_network(network, inferred_vmid, is_windows, &mut warnings))
+        .map(|network| {
+            network::map_network(
+                network,
+                inferred_vmid,
+                is_windows,
+                runtime_target,
+                &mut warnings,
+            )
+        })
         .collect::<Vec<_>>();
 
     // Apply boot indices from parsed boot order
@@ -119,7 +127,12 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         }
     }
     let displays = devices::map_displays(&proxmox.scalars, &mut warnings);
-    let serials = devices::map_serials(&proxmox.scalars, inferred_vmid, &mut warnings);
+    let serials = devices::map_serials(
+        &proxmox.scalars,
+        inferred_vmid,
+        &mut warnings,
+        runtime_target,
+    );
     let (audio, mut spice) = devices::map_audio_and_spice(&proxmox.scalars, &mut warnings);
     let mut vnc = None;
     let mut input_devices = Vec::new();
@@ -164,8 +177,13 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
 
     let ballooning = system::map_ballooning(is_windows);
 
-    let tpm = system::map_tpm(&proxmox.scalars, storage_config, inferred_vmid);
-    let guest_agent = system::map_guest_agent(&proxmox.scalars, inferred_vmid);
+    let tpm = system::map_tpm(
+        &proxmox.scalars,
+        storage_config,
+        inferred_vmid,
+        runtime_target,
+    );
+    let guest_agent = system::map_guest_agent(&proxmox.scalars, inferred_vmid, runtime_target);
 
     let vm_generation_id = proxmox.scalars.get("vmgenid").cloned();
     let smbios = if smbios_uuid.is_some() || vm_generation_id.is_some() || smbios_type != 1 {
@@ -256,7 +274,12 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             } else {
                 None
             },
-            pid_file: inferred_vmid.map(|id| format!("/var/run/qemu-server/{}.pid", id)),
+            pid_file: match (runtime_target, inferred_vmid) {
+                (RuntimeTarget::ProxmoxParity, Some(id)) => {
+                    Some(format!("/var/run/qemu-server/{}.pid", id))
+                }
+                _ => None,
+            },
             guest_agent,
             ..VmOptions::default()
         },
@@ -300,6 +323,17 @@ mod tests {
             RuntimeTarget::PortableLinux,
         )
         .expect("mapper should succeed");
+        let mut config: VmConfig =
+            serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        config.assign_default_device_ids();
+        validation::validate_config(&config).expect("config should validate");
+        (mapped.yaml, config)
+    }
+
+    fn map_and_validate_parity(input: &str) -> (String, VmConfig) {
+        let parsed = parse_proxmox_config(input).expect("parser should succeed");
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::ProxmoxParity)
+            .expect("mapper should succeed");
         let mut config: VmConfig =
             serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         config.assign_default_device_ids();
@@ -489,7 +523,7 @@ mod tests {
         assert_eq!(serial0.r#type, "socket");
         assert_eq!(
             serial0.path.as_deref(),
-            Some("/var/run/qemu-server/108.serial0")
+            Some("/var/run/ezkvm/108-serial0.socket")
         );
         assert_eq!(serial0.host, None);
         assert_eq!(serial0.socket_port, None);
@@ -504,6 +538,20 @@ mod tests {
             "#,
         );
 
+        // Portable mode: pid_file is None, resolved at runtime by get_pid_file_at
+        assert_eq!(cfg.options.pid_file.as_deref(), None);
+    }
+
+    #[test]
+    fn parity_maps_pid_file_from_vmid() {
+        let (_, cfg) = map_and_validate_parity(
+            r#"
+            name: vm-pid-parity
+            scsi0: local-lvm:vm-108-disk-0,size=10G
+            "#,
+        );
+
+        // ProxmoxParity mode: explicit Proxmox path
         assert_eq!(
             cfg.options.pid_file.as_deref(),
             Some("/var/run/qemu-server/108.pid")
@@ -571,9 +619,11 @@ mod tests {
         assert_eq!(net.model, "virtio-net");
         assert_eq!(net.mac.as_deref(), Some("52:54:00:12:34:56"));
         let backend = net.backend.as_ref().expect("backend must be set");
-        assert_eq!(backend.backend_type, "tap");
+        // Portable mode uses bridge backend (kernel bridge helper)
+        assert_eq!(backend.backend_type, "bridge");
         assert_eq!(backend.bridge.as_deref(), Some("vmbr0"));
         assert_eq!(backend.queues, Some(4));
+        // Portable mode omits parity-only host scripts
         assert_eq!(backend.script, None);
         assert_eq!(backend.downscript, None);
         assert_eq!(backend.vhost, None);
@@ -581,6 +631,7 @@ mod tests {
 
     #[test]
     fn infers_tap_ifname_for_bridge_networks_from_vmid() {
+        // Portable mode: bridge backend without ifname
         let (_, cfg) = map_and_validate(
             r#"
             name: vm-net-ifname
@@ -591,7 +642,49 @@ mod tests {
 
         let net = &cfg.devices.networks[0];
         let backend = net.backend.as_ref().expect("backend must be set");
+        // Portable mode uses bridge backend (no ifname)
+        assert_eq!(backend.backend_type, "bridge");
+        assert_eq!(backend.ifname.as_deref(), None);
+    }
+
+    #[test]
+    fn parity_uses_tap_ifname_for_bridge_networks() {
+        // ProxmoxParity mode: tap backend with ifname
+        let (_, cfg) = map_and_validate_parity(
+            r#"
+            name: vm-net-tap
+            scsi0: local-lvm:vm-108-disk-0
+            net0: virtio=52:54:00:12:34:56,bridge=vmbr0
+            "#,
+        );
+
+        let net = &cfg.devices.networks[0];
+        let backend = net.backend.as_ref().expect("backend must be set");
+        assert_eq!(backend.backend_type, "tap");
         assert_eq!(backend.ifname.as_deref(), Some("tap108i0"));
+    }
+
+    #[test]
+    fn parity_includes_bridge_scripts_in_network() {
+        // ProxmoxParity mode: includes pve-bridge scripts
+        let (_, cfg) = map_and_validate_parity(
+            r#"
+            name: vm-net-scripts
+            scsi0: local-lvm:vm-108-disk-0
+            net0: virtio=52:54:00:12:34:56,bridge=vmbr0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown
+            "#,
+        );
+
+        let net = &cfg.devices.networks[0];
+        let backend = net.backend.as_ref().expect("backend must be set");
+        assert_eq!(
+            backend.script.as_deref(),
+            Some("/usr/libexec/qemu-server/pve-bridge")
+        );
+        assert_eq!(
+            backend.downscript.as_deref(),
+            Some("/usr/libexec/qemu-server/pve-bridgedown")
+        );
     }
 
     #[test]
@@ -809,7 +902,7 @@ mod tests {
         assert!(agent.enabled);
         assert_eq!(
             agent.socket_path.as_deref(),
-            Some("/var/run/qemu-server/qga.sock")
+            Some("/var/run/ezkvm/qga.sock")
         );
         assert_eq!(agent.bus.as_deref(), Some("pci.0"));
         assert_eq!(agent.addr.as_deref(), Some("0x8"));

@@ -85,7 +85,7 @@ Source: doc/backlog/BACKLOG.md
 | B-38 | Add portability preflight validation and error model | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36, B-37 | unassigned | Done |
 | B-39 | Separate parity-only defaults from portable semantics | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-38 | unassigned | Done |
 | B-40 | Add explicit runtime target selection for Proxmox import | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39 | unassigned | Done |
-| B-41 | Implement portable-linux runtime normalization for host-only literals | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39, B-40 | unassigned | Todo |
+| B-41 | Implement portable-linux runtime normalization for host-only literals | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39, B-40 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
