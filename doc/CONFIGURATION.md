@@ -10,6 +10,7 @@ This document is organized as chapters and includes field reference tables for e
 
 ## Table of Contents
 
+- [Central Config](#central-config)
 - [Chapter 1: Top-Level Schema](#chapter-1-top-level-schema)
 - [Chapter 2: general](#chapter-2-general)
 - [Chapter 3: system](#chapter-3-system)
@@ -25,6 +26,94 @@ This document is organized as chapters and includes field reference tables for e
 - [Chapter 13: Troubleshooting](#chapter-13-troubleshooting)
 - [Chapter 14: Proxmox Import Mapping](#chapter-14-proxmox-import-mapping)
 - [Chapter 15: Code-Backed Shape Examples](#chapter-15-code-backed-shape-examples)
+
+## Central Config
+
+The central config is distinct from VM config.
+
+Use it for:
+
+- host tool paths
+- shared directory locations
+- host capability defaults and deployment policy
+
+Do not use it for:
+
+- guest-visible topology
+- per-VM semantics that belong in VM YAML or profiles
+- importer-specific semantic overrides
+
+Current central config top-level fields:
+
+| Field | Type | Purpose |
+| --- | --- | --- |
+| `tools` | mapping | legacy-compatible tool paths and generic executables |
+| `locations` | mapping | shared directories such as VM config and profile directories |
+| `looking_glass` | mapping | legacy-compatible central defaults for Looking Glass client options |
+| `host_capabilities` | mapping | host capability defaults used by portable runtime resolution |
+
+### Central Config: `host_capabilities`
+
+`host_capabilities` stores host environment facts and deployment policy. It is the preferred place for portability-related defaults.
+
+| Field | Type | Purpose |
+| --- | --- | --- |
+| `runtime` | mapping | runtime directory layout |
+| `firmware` | mapping | firmware discovery defaults |
+| `network` | mapping | network backend/helper policy |
+| `tpm` | mapping | swtpm binary and TPM state/socket placement |
+| `integrations` | mapping | optional host integration programs and devices |
+
+#### `host_capabilities.runtime`
+
+| Field | Type | Example |
+| --- | --- | --- |
+| `run_dir` | string | `/var/run/ezkvm` |
+| `pid_dir` | string | `/var/run/ezkvm/pids` |
+| `socket_dir` | string | `/var/run/ezkvm/sockets` |
+| `log_dir` | string | `/var/log/ezkvm` |
+
+#### `host_capabilities.firmware`
+
+| Field | Type | Example |
+| --- | --- | --- |
+| `ovmf_dir` | string | `/usr/share/OVMF` |
+
+#### `host_capabilities.network`
+
+| Field | Type | Example |
+| --- | --- | --- |
+| `preferred_backend` | string | `bridge` |
+| `bridge_helper` | string | `/usr/lib/qemu/qemu-bridge-helper` |
+| `bridge_name` | string | `br0` |
+
+#### `host_capabilities.tpm`
+
+| Field | Type | Example |
+| --- | --- | --- |
+| `swtpm_binary` | string | `/usr/bin/swtpm` |
+| `state_dir` | string | `/var/lib/ezkvm/tpm` |
+| `socket_dir` | string | `/var/run/ezkvm/tpm` |
+
+#### `host_capabilities.integrations`
+
+| Field | Type | Example |
+| --- | --- | --- |
+| `remote_viewer.program` | string | `/usr/bin/remote-viewer` |
+| `looking_glass.program` | string | `/usr/bin/looking-glass-client` |
+| `looking_glass.shared_memory_device` | string | `/dev/kvmfr0` |
+
+### Central Config precedence inside host capability resolution
+
+For fields that exist in both the new capability sections and older compatibility sections, the capability section wins.
+
+Examples:
+
+- `host_capabilities.tpm.swtpm_binary` overrides legacy `tools.swtpm`
+- `host_capabilities.runtime.run_dir` overrides legacy `locations.run_dir`
+- `host_capabilities.integrations.remote_viewer.program` overrides legacy `tools.remote_viewer`
+
+This precedence is limited to central-config-internal compatibility. Broader runtime precedence between CLI, VM-local config, profiles, and central config is defined separately by the runtime precedence contract.
 
 ## Chapter 1: Top-Level Schema
 

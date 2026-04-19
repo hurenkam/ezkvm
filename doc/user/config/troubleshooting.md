@@ -38,6 +38,7 @@ Common issues and quick checks for VM configuration and startup.
 - `display.type` is `no_display`
 - Missing or conflicting `spice`/`vnc` endpoint config
 - Local environment cannot launch remote-viewer binary
+- Central config points at the wrong viewer path for this host
 
 ### Checks
 
@@ -48,6 +49,10 @@ Common issues and quick checks for VM configuration and startup.
 3. If using VNC TCP mode, verify expected display/port mapping:
    - TCP `port: 5900` maps to VNC display `:0`
    - TCP `port: 5901` maps to VNC display `:1`, etc.
+
+4. Verify the configured viewer path in central config:
+   - Preferred key: `host_capabilities.integrations.remote_viewer.program`
+   - Compatibility key: `tools.remote_viewer`
 
 ## Imported Proxmox VM boots from wrong disk
 

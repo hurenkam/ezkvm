@@ -509,8 +509,8 @@ impl VmConfig {
     fn resolve_profile_dir() -> anyhow::Result<String> {
         let central_config = CentralConfig::load()?;
         Ok(central_config
-            .locations
-            .profile_dir
+            .profile_dir()
+            .map(str::to_owned)
             .unwrap_or_else(|| DEFAULT_PROFILE_DIR.to_string()))
     }
 

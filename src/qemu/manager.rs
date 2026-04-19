@@ -30,7 +30,7 @@ impl QemuManager {
             .system_tpm()
             .map(|tpm| tpm.backend == "emulator")
             .unwrap_or(false)
-            && self.central_config.tools.swtpm.is_some()
+            && self.central_config.swtpm_program().is_some()
     }
 
     pub(super) fn has_primary_passthrough_gpu(&self) -> bool {
@@ -47,7 +47,7 @@ impl QemuManager {
             return state_path.clone();
         }
 
-        if let Some(run_dir) = &self.central_config.locations.run_dir {
+        if let Some(run_dir) = self.central_config.runtime_run_dir() {
             return format!("{}/{}.swtpm", run_dir, self.config.name);
         }
 

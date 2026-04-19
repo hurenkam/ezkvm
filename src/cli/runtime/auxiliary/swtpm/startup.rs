@@ -66,9 +66,14 @@ struct SwtpmStartup {
 }
 
 fn swtpm_path(central_config: &crate::config::CentralConfig) -> Result<String> {
-    central_config.tools.swtpm.clone().ok_or_else(|| {
-        anyhow!("TPM emulator backend requires tools.swtpm to be configured in the central config")
-    })
+    central_config
+        .swtpm_program()
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            anyhow!(
+                "TPM emulator backend requires host_capabilities.tpm.swtpm_binary or legacy tools.swtpm to be configured in the central config"
+            )
+        })
 }
 
 fn prepare_swtpm_startup(

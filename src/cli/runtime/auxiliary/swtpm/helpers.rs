@@ -5,9 +5,7 @@ use std::time::{Duration, Instant};
 
 pub(super) fn ensure_run_dir(central_config: &crate::config::CentralConfig) -> Result<PathBuf> {
     let run_dir = central_config
-        .locations
-        .run_dir
-        .as_ref()
+        .runtime_run_dir()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/var/run/ezkvm"));
 
@@ -80,7 +78,7 @@ pub(super) fn resolve_tpm_socket_path(
         return state_path.clone();
     }
 
-    if let Some(run_dir) = &central_config.locations.run_dir {
+    if let Some(run_dir) = central_config.runtime_run_dir() {
         return format!("{}/{}.swtpm", run_dir, config.name);
     }
 

@@ -1,15 +1,33 @@
 tools:
   qemu: "/usr/bin/qemu-system-x86_64"
+  # Legacy compatibility keys remain supported for now.
   swtpm: "/usr/bin/swtpm"
   remote_viewer: "/usr/bin/remote-viewer"
 
 locations:
-  vms_dir: "/etc/ezkvm/vms.d"
+  vm_dir: "/etc/ezkvm/vms.d"
   profile_dir: "/etc/ezkvm/profiles.d"
-  #ovmf_dir: "/usr/share/OVMF"
-  ovmf_dir: "/usr/share/pve-edk2-firmware"
-  run_dir: "/var/run/ezkvm"
-  pid_dir: "/var/run/ezkvm/pids"
-  socket_dir: "/var/run/ezkvm/sockets"
-  log_dir: "/var/log/ezkvm"
+
+host_capabilities:
+  runtime:
+    run_dir: "/var/run/ezkvm"
+    pid_dir: "/var/run/ezkvm/pids"
+    socket_dir: "/var/run/ezkvm/sockets"
+    log_dir: "/var/log/ezkvm"
+  firmware:
+    ovmf_dir: "/usr/share/pve-edk2-firmware"
+  network:
+    preferred_backend: "bridge"
+    bridge_helper: "/usr/lib/qemu/qemu-bridge-helper"
+    bridge_name: "br0"
+  tpm:
+    swtpm_binary: "/usr/bin/swtpm"
+    state_dir: "/var/lib/ezkvm/tpm"
+    socket_dir: "/var/run/ezkvm/tpm"
+  integrations:
+    remote_viewer:
+      program: "/usr/bin/remote-viewer"
+    looking_glass:
+      program: "/usr/bin/looking-glass-client"
+      shared_memory_device: "/dev/kvmfr0"
 

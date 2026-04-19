@@ -31,12 +31,14 @@ fn test_remote_viewer_is_suppressed_for_primary_passthrough_gpu() {
 
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
+            qemu: None,
             swtpm: None,
             remote_viewer: Some("remote-viewer".to_string()),
             looking_glass: None,
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions::default(),
+        host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
     assert!(runtime::build_remote_viewer_launch(&config, &central_config).is_none());
@@ -72,12 +74,14 @@ fn test_remote_viewer_is_suppressed_for_hostpci0_without_x_vga() {
 
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
+            qemu: None,
             swtpm: None,
             remote_viewer: Some("remote-viewer".to_string()),
             looking_glass: None,
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions::default(),
+        host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
     assert!(runtime::build_remote_viewer_launch(&config, &central_config).is_none());

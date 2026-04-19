@@ -14,7 +14,11 @@ mod vm_options;
 mod vm_schema;
 
 #[allow(unused_imports)]
-pub use central::{CentralConfig, LocationsConfig, LookingGlassOptions, ToolsConfig};
+pub use central::{
+    CentralConfig, FirmwareHostCapabilities, HostCapabilitiesConfig, IntegrationHostCapabilities,
+    LocationsConfig, LookingGlassCapability, LookingGlassOptions, NetworkHostCapabilities,
+    ProgramCapability, RuntimeHostCapabilities, ToolsConfig, TpmHostCapabilities,
+};
 #[allow(unused_imports)]
 pub use platform::{
     AppleSmcConfig, AudioDeviceConfig, BallooningConfig, GuestAgentConfig, HostPciConfig,

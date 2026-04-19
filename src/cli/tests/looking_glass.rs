@@ -5,6 +5,7 @@ fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
     let config = base_config();
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
+            qemu: None,
             swtpm: None,
             remote_viewer: None,
             looking_glass: Some("looking-glass-client".to_string()),
@@ -17,6 +18,7 @@ fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
             grab_keyboard: Some(true),
             escape_key: Some("KEY_F12".to_string()),
         },
+        host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
     let launch = runtime::build_looking_glass_launch(&config, &central_config)
@@ -75,12 +77,14 @@ system:
 
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
+            qemu: None,
             swtpm: None,
             remote_viewer: None,
             looking_glass: Some("looking-glass-client".to_string()),
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions::default(),
+        host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
     let launch = runtime::build_looking_glass_launch(&config, &central_config).unwrap();
@@ -92,12 +96,14 @@ fn test_build_looking_glass_launch_rejects_empty_tool_path() {
     let config = base_config();
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
+            qemu: None,
             swtpm: None,
             remote_viewer: None,
             looking_glass: Some("   ".to_string()),
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions::default(),
+        host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
     let err = runtime::build_looking_glass_launch(&config, &central_config).unwrap_err();

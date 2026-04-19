@@ -62,7 +62,7 @@ Each document focuses on a specific area:
 | Document | Focus |
 | --- | --- |
 | [vm-structure.md](vm-structure.md) | Top-level keys and required fields |
-| [central-config.md](central-config.md) | `-E EZKVM_CONFIG` resolution and locations |
+| [central-config.md](central-config.md) | `EZKVM_CONFIG`, shared locations, and `host_capabilities` |
 | [profiles-and-merge.md](profiles-and-merge.md) | Profile stacking and merge rules |
 | [system-and-boot.md](system-and-boot.md) | CPU, memory, boot, TPM, NUMA |
 | [devices.md](devices.md) | Drives, networks, controllers, passthrough |

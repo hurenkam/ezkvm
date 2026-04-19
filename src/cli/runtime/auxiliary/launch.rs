@@ -82,7 +82,7 @@ pub(crate) fn build_remote_viewer_launch(
         _ => return None,
     };
 
-    let remote_viewer_path = central_config.tools.remote_viewer.as_ref()?;
+    let remote_viewer_path = central_config.remote_viewer_program()?;
     let uri = format!(
         "spice://{}:{}",
         resolve_client_host(&spice.addr),
@@ -91,7 +91,7 @@ pub(crate) fn build_remote_viewer_launch(
 
     Some(AuxiliaryLaunch {
         label: "remote-viewer for SPICE session",
-        program: remote_viewer_path.clone(),
+        program: remote_viewer_path.to_string(),
         args: vec![uri],
         inherit_output: false,
         verify_running: false,
@@ -119,8 +119,8 @@ pub(crate) fn build_looking_glass_launch(
 
     let looking_glass_path = match looking_glass_options
         .program
-        .as_ref()
-        .or(central_config.tools.looking_glass.as_ref())
+        .as_deref()
+        .or(central_config.looking_glass_program())
     {
         Some(path) if !path.trim().is_empty() => path,
         Some(_) => return Err(anyhow!("Looking Glass client path is empty")),
@@ -158,7 +158,7 @@ pub(crate) fn build_looking_glass_launch(
 
     Ok(Some(AuxiliaryLaunch {
         label: "Looking Glass client for ivshmem session",
-        program: looking_glass_path.clone(),
+        program: looking_glass_path.to_string(),
         args,
         inherit_output: true,
         verify_running: true,

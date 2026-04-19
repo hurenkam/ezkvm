@@ -104,6 +104,8 @@ In sparse sections, repeated values may also be omitted when profile base data o
 
 Re-parsing imported YAML requires profile resolution to remain available via `locations.profile_dir` (or `EZKVM_CONFIG`).
 
+Portable-runtime host defaults belong in central config under `host_capabilities`, but profile discovery remains under `locations.profile_dir`.
+
 ### Known Limitations
 
 - `virtio` disk bus is currently skipped during typed controller mapping

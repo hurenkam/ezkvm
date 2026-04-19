@@ -15,6 +15,7 @@ fn unique_test_dir(prefix: &str) -> std::path::PathBuf {
     dir
 }
 
+mod central_config_schema;
 mod compact_serialization;
 mod controller_owned_devices;
 mod path_behavior;

@@ -43,7 +43,7 @@ pub(super) fn extract_profile_names(vm_value: &Value) -> Result<Vec<String>, Imp
 pub(super) fn resolve_profile_dir() -> String {
     CentralConfig::load()
         .ok()
-        .and_then(|cfg| cfg.locations.profile_dir)
+        .and_then(|cfg| cfg.profile_dir().map(str::to_owned))
         .unwrap_or_else(|| DEFAULT_PROFILE_DIR_FALLBACK.to_string())
 }
 
