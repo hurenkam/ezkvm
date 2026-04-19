@@ -221,9 +221,26 @@ For example:
 
 This is the strongest architectural foundation, but it should be introduced incrementally and paired with an explicit portable target.
 
-## Recommendation
+## Status Summary
 
-The recommended direction is a combination of Approach 4 and Approach 5:
+**Phase 1**: ✅ COMPLETE (2026-04-19)
+- Profile ownership boundaries established
+- Runtime target selection implemented (CLI flag, portable-linux default)
+- Host-only literal isolation in parity-runtime profile
+- Mapper normalization for portable target operational
+- All 282+ tests passing
+
+**Phase 2**: 🔄 IN PROGRESS
+- Mapper normalization complete
+- Central host config schema pending
+- Runtime capability resolution pending
+
+**Phase 3**: ⏳ READY TO START
+- Host capability resolution layer design defined
+- Can proceed once Phase 2 central config schema is in place
+
+**Phase 4**: ⏳ PLANNED
+- Distro-specific validation matrix for Debian Trixie, Ubuntu 26.04, Arch Linux
 
 1. Keep a `proxmox-parity` import target for validation, regression testing, and users who want exact Proxmox-style runtime behavior. This target requires explicit opt-in; it is not the default.
 2. Add a `portable-linux` import target as the default import mode for all non-parity workflows.
@@ -471,18 +488,45 @@ Portable mode should either:
 
 ## Recommended Delivery Plan
 
-### Phase 1: Separate Parity-Only Defaults From Portable Semantics
+### Phase 1: Separate Parity-Only Defaults From Portable Semantics ✅ COMPLETE
 
-- audit current Proxmox profiles and mark each field as guest-semantic or host-runtime-specific
-- move Proxmox-only paths and helper assumptions into parity-only runtime profiles
-- keep canonical output compatible with existing parity tests
+**Status**: Completed 2026-04-19
 
-### Phase 2: Add Portable Linux Runtime Target
+**Achievements**:
+- ✅ Audit complete: Proxmox profiles audited and classified (B-39)
+- ✅ Profile split: `proxmox-parity-runtime.yaml` isolates host-runtime-specific paths
+- ✅ Canonical output preserved: Existing parity tests remain byte-close
+- ✅ Runtime target selection: CLI and import pipeline support explicit target selection (B-40)
+- ✅ Portable normalization: Mapper normalizes host-only literals for `portable-linux` target (B-41)
 
-- introduce a `portable-linux` import target as the default; `proxmox-parity` requires explicit opt-in
-- normalize runtime paths, helper paths, and host integrations away from Proxmox-specific literals
-- parity fixtures remain byte-close under `proxmox-parity`; portable mode asserts guest-topology invariance only
-- preserve guest-visible topology and device semantics
+**Implementation details**:
+- Proxmox-specific paths isolated into `proxmox-parity-runtime.yaml`:
+  - boot splash: `/usr/share/qemu-server/bootsplash.jpg`
+  - network scripts: `/usr/libexec/qemu-server/pve-bridge`, `pve-bridgedown`
+- Runtime target selection via `--runtime-target` CLI flag (default: `portable-linux`)
+- Mapper functions thread `RuntimeTarget` to conditionally emit host paths:
+  - **ProxmoxParity**: Preserves Proxmox paths for parity validation
+  - **PortableLinux**: Normalizes to ezkvm-managed paths below
+
+### Phase 2: Add Portable Linux Runtime Target (In Progress)
+
+**Current Status**: Mapper implementation complete; host capability resolution pending
+
+**Remaining work**:
+- implement host capability resolution for paths not yet normalized:
+  - device runtime directory (sockets, logs)
+  - firmware file discovery and override handling
+  - swtpm binary location and socket placement
+  - VNC, QMP, and agent socket placement
+  - optional Looking Glass dependency handling
+- add central config schema for host capabilities
+- implement precedence contract (CLI > explicit config > profile > central host > built-in)
+- extend test matrix coverage for capability resolution
+
+**Behavior**:
+- parity fixtures remain byte-close under `proxmox-parity` target
+- portable mode asserts guest-topology invariance only, not literal host-path equivalence
+- test regressions guard against host-literal reintroduction
 
 ### Phase 3: Add Host Capability Resolution
 
@@ -556,6 +600,59 @@ The checklist below maps the central-host-config integration work to existing ba
 	4. validation matrix and regression hardening
 
 This keeps the selected approach intact while making central host config a first-class integration mechanism rather than a replacement architecture.
+
+## Implementation Progress (as of 2026-04-19)
+
+### Phase 1 Complete: Profile & Runtime Target Split
+
+**What was done:**
+- Split Proxmox profiles into guest-semantic and host-runtime-specific layers (B-39)
+  - `proxmox-base.yaml`: guest-visible device/boot semantics (stable across targets)
+  - `proxmox-parity-runtime.yaml`: Proxmox-only host paths (parity target only)
+- Implemented explicit runtime target selection (B-40):
+  - CLI flag `--runtime-target` with portable-linux as default
+  - Import pipeline threads RuntimeTarget through mapper calls
+  - ProxmoxParity requires explicit opt-in
+- Implemented host-literal normalization for portable-linux (B-41):
+  - Network backend: bridge (kernel helper) instead of tap + script
+  - Runtime paths: ezkvm-managed instead of /var/run/qemu-server
+  - TPM socket: /var/run/ezkvm instead of Proxmox path
+  - Agent socket: /var/run/ezkvm instead of Proxmox path
+  - Serial sockets: /var/run/ezkvm instead of Proxmox path
+  - PID file: resolved at runtime via XDG_RUNTIME_DIR instead of hardcoded
+
+**Test coverage:**
+- All 282+ library and integration tests passing
+- Parity fixtures remain byte-close under ProxmoxParity target
+- Portable mode regressions verify guest topology invariance
+- New parity-specific tests assert tap/ifname/script preservation
+
+### Phase 2 In Progress: Central Host Config Schema
+
+**What still needs to be done:**
+- Central config schema sections for host capabilities:
+  - runtime_directory: base path for ezkvm sockets/logs
+  - firmware_locator: OVMF discovery policy
+  - swtpm_binary: path to swtpm executable
+  - network_backend: bridge helper path and preference
+  - optional integrations: Looking Glass (client binary, shared-mem device)
+- Precedence contract implementation:
+  - CLI override > explicit VM config > profile defaults > central config > built-in
+  - Validation gates for required capabilities in portable mode
+- Host capability resolver backed by central config
+- Integration with existing profile/compaction system
+
+**Suggested implementation order:**
+1. Add central config host capabilities schema (existing B-36 framework)
+2. Build runtime provider layer (runtime_dir, firmware, swtpm, network backends)
+3. Wire providers into mapper calls where normalization now hard-codes paths
+4. Add integration tests for capability resolution and CLI overrides
+5. Document precedence and operator guidance
+
+**Why this unblocks Phase 3:**
+- Phase 3 trait-based extensibility (D-02, D-03) should be designed after portable paths are capability-backed
+- Currently portable paths are normalized but still somewhat hard-coded by target
+- Capability layer makes extension points clear for future backends (passt networking, custom firmware discovery, etc.)
 
 ## Non-Goals
 
