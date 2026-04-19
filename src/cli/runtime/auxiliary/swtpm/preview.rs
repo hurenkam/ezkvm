@@ -22,15 +22,15 @@ pub(crate) fn build_swtpm_launch_preview(
         }
     };
 
-    let run_dir = central_config
-        .runtime_run_dir_with_overrides(runtime_overrides)
-        .unwrap_or("/var/run/ezkvm");
+    let run_dir = crate::state::resolve_runtime_root(None, central_config, runtime_overrides)
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|_| "/tmp/ezkvm".to_string());
 
     let socket_path = resolve_tpm_socket_path(config, central_config, runtime_overrides);
-    let pid_path = Path::new(run_dir).join(format!("{}.swtpm.pid", config.name));
-    let log_path = Path::new(run_dir).join(format!("{}-swtpm.log", config.name));
+    let pid_path = Path::new(&run_dir).join(format!("{}.swtpm.pid", config.name));
+    let log_path = Path::new(&run_dir).join(format!("{}-swtpm.log", config.name));
 
-    let tpmstate_arg = build_tpmstate_arg(tpm, Path::new(run_dir), false)?;
+    let tpmstate_arg = build_tpmstate_arg(tpm, Path::new(&run_dir), false)?;
 
     let tpm_flag = if tpm.version == "2.0" {
         "--tpm2"

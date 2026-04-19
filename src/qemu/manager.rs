@@ -76,13 +76,11 @@ impl QemuManager {
             return state_path.clone();
         }
 
-        if let Some(run_dir) = self
-            .central_config
-            .runtime_run_dir_with_overrides(&self.runtime_overrides)
-        {
-            return format!("{}/{}.swtpm", run_dir, self.config.name);
-        }
-
-        format!("/var/run/qemu-server/{}.swtpm", self.config.name)
+        crate::state::resolve_runtime_tpm_socket(
+            &self.config.name,
+            &self.central_config,
+            &self.runtime_overrides,
+        )
+        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", self.config.name))
     }
 }

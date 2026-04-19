@@ -5,13 +5,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Default directory for storing VM state (PID files, configs, logs)
 pub fn get_state_dir() -> Result<PathBuf> {
-    let state_dir = if let Ok(xdg_runtime) = std::env::var("XDG_RUNTIME_DIR") {
-        PathBuf::from(xdg_runtime).join("ezkvm")
-    } else {
-        let home =
-            std::env::var("HOME").map_err(|_| anyhow!("HOME environment variable not set"))?;
-        PathBuf::from(home).join(".local/run/ezkvm")
-    };
+    let state_dir = super::resolve_runtime_root(
+        None,
+        &crate::config::CentralConfig::default(),
+        &crate::config::RuntimeCliOverrides::default(),
+    )?;
 
     fs::create_dir_all(&state_dir)?;
     Ok(state_dir)

@@ -337,11 +337,8 @@ fn resolve_tpm_socket_path(
         return state_path.clone();
     }
 
-    if let Some(run_dir) = central_config.runtime_run_dir_with_overrides(runtime_overrides) {
-        return format!("{}/{}.swtpm", run_dir, config.name);
-    }
-
-    format!("/var/run/qemu-server/{}.swtpm", config.name)
+    crate::state::resolve_runtime_tpm_socket(&config.name, central_config, runtime_overrides)
+        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", config.name))
 }
 
 fn ensure_parent_dir_is_writable_or_creatable(path: &str, label: &str) -> Result<()> {

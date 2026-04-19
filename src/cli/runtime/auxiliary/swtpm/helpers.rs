@@ -7,10 +7,7 @@ pub(super) fn ensure_run_dir(
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<PathBuf> {
-    let run_dir = central_config
-        .runtime_run_dir_with_overrides(runtime_overrides)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/var/run/ezkvm"));
+    let run_dir = crate::state::resolve_runtime_root(None, central_config, runtime_overrides)?;
 
     std::fs::create_dir_all(&run_dir)?;
     Ok(run_dir)
@@ -91,11 +88,8 @@ pub(super) fn resolve_tpm_socket_path(
         return state_path.clone();
     }
 
-    if let Some(run_dir) = central_config.runtime_run_dir_with_overrides(runtime_overrides) {
-        return format!("{}/{}.swtpm", run_dir, config.name);
-    }
-
-    format!("/var/run/qemu-server/{}.swtpm", config.name)
+    crate::state::resolve_runtime_tpm_socket(&config.name, central_config, runtime_overrides)
+        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", config.name))
 }
 
 pub(super) fn build_tpmstate_arg(

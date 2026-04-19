@@ -6,6 +6,7 @@ mod cache;
 mod logs;
 mod paths;
 mod pid;
+mod runtime_resolver;
 
 #[allow(unused_imports)]
 pub use cache::{cache_config, delete_cached_config, load_cached_config};
@@ -18,6 +19,11 @@ pub use paths::{
 };
 #[allow(unused_imports)]
 pub use pid::{delete_pid, delete_pid_at, read_pid, read_pid_at, save_pid, save_pid_at};
+#[allow(unused_imports)]
+pub use runtime_resolver::{
+    CentralRuntimeCapabilityResolver, RuntimeCapabilityResolver, resolve_runtime_root,
+    resolve_runtime_tpm_socket,
+};
 
 #[cfg(test)]
 mod tests {
