@@ -68,16 +68,28 @@ Current central config top-level fields:
 
 | Field | Type | Example |
 | --- | --- | --- |
+| `root_directory` | string | `/var/run/ezkvm` |
 | `run_dir` | string | `/var/run/ezkvm` |
 | `pid_dir` | string | `/var/run/ezkvm/pids` |
 | `socket_dir` | string | `/var/run/ezkvm/sockets` |
 | `log_dir` | string | `/var/log/ezkvm` |
+
+Notes:
+- `root_directory` is the preferred naming for new configs.
+- `run_dir` remains supported for backward compatibility and is treated as the same setting.
 
 #### `host_capabilities.firmware`
 
 | Field | Type | Example |
 | --- | --- | --- |
 | `ovmf_dir` | string | `/usr/share/OVMF` |
+| `search_paths` | sequence[string] | `[/usr/share/ovmf, /usr/share/OVMF]` |
+| `secure_boot_code_files` | sequence[string] | `[OVMF_CODE_4M.secboot.fd, OVMF_CODE.secboot.fd, OVMF.fd]` |
+| `code_files` | sequence[string] | `[OVMF_CODE_4M.fd, OVMF_CODE.fd, OVMF.fd]` |
+
+Notes:
+- `search_paths` are checked in order after CLI and explicit `ovmf_dir` sources.
+- `secure_boot_code_files` and `code_files` document host packaging variants and preferred filenames.
 
 #### `host_capabilities.network`
 
@@ -92,8 +104,13 @@ Current central config top-level fields:
 | Field | Type | Example |
 | --- | --- | --- |
 | `swtpm_binary` | string | `/usr/bin/swtpm` |
+| `placement_mode` | string | `socket` |
 | `state_dir` | string | `/var/lib/ezkvm/tpm` |
 | `socket_dir` | string | `/var/run/ezkvm/tpm` |
+
+`placement_mode` allowed values:
+- `socket`
+- `state-file`
 
 #### `host_capabilities.integrations`
 
@@ -112,6 +129,65 @@ Examples:
 - `host_capabilities.tpm.swtpm_binary` overrides legacy `tools.swtpm`
 - `host_capabilities.runtime.run_dir` overrides legacy `locations.run_dir`
 - `host_capabilities.integrations.remote_viewer.program` overrides legacy `tools.remote_viewer`
+
+Migration note:
+- Prefer `host_capabilities.runtime.root_directory` in new configs. `run_dir` remains supported to keep existing deployments working.
+
+### Central Config Host Capability Examples By Distro
+
+Debian Trixie:
+
+```yaml
+host_capabilities:
+  runtime:
+    root_directory: /var/run/ezkvm
+  firmware:
+    search_paths:
+      - /usr/share/ovmf
+      - /usr/share/OVMF
+  network:
+    preferred_backend: bridge-helper
+    bridge_helper: /usr/lib/qemu/qemu-bridge-helper
+  tpm:
+    swtpm_binary: /usr/bin/swtpm
+    placement_mode: socket
+```
+
+Ubuntu 26.04 LTS:
+
+```yaml
+host_capabilities:
+  runtime:
+    root_directory: /run/ezkvm
+  firmware:
+    search_paths:
+      - /usr/share/OVMF
+      - /usr/share/ovmf
+  network:
+    preferred_backend: bridge-helper
+    bridge_helper: /usr/lib/qemu/qemu-bridge-helper
+  tpm:
+    swtpm_binary: /usr/bin/swtpm
+    placement_mode: socket
+```
+
+Arch Linux:
+
+```yaml
+host_capabilities:
+  runtime:
+    root_directory: /run/ezkvm
+  firmware:
+    search_paths:
+      - /usr/share/edk2/ovmf
+      - /usr/share/OVMF
+  network:
+    preferred_backend: user-mode
+  tpm:
+    swtpm_binary: /usr/bin/swtpm
+    placement_mode: state-file
+    state_dir: /var/lib/ezkvm/tpm
+```
 
 This precedence is limited to central-config-internal compatibility. Broader runtime precedence between CLI, VM-local config, profiles, and central config is defined separately by the runtime precedence contract.
 

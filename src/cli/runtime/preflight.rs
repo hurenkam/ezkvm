@@ -25,6 +25,7 @@ pub(crate) fn run_runtime_preflight(
 ) -> Result<RuntimePreflightReport> {
     crate::qemu::executor::check_qemu_available(qemu_binary)
         .map_err(|err| anyhow!("preflight failed: {}", err))?;
+    ensure_host_capability_policy(central_config)?;
     ensure_runtime_dir_access(central_config, runtime_overrides)?;
     ensure_socket_dir_access(config)?;
     ensure_tpm_capabilities(config, central_config, runtime_overrides)?;
@@ -46,6 +47,40 @@ fn ensure_program_available(label: &str, program: &str) -> Result<()> {
         label,
         program.trim()
     ))
+}
+
+fn ensure_host_capability_policy(central_config: &crate::config::CentralConfig) -> Result<()> {
+    if let Some(preferred_backend) = central_config.network_backend_preference() {
+        let normalized = preferred_backend.trim();
+        let valid = matches!(
+            normalized,
+            "bridge" | "bridge-helper" | "user" | "user-mode"
+        );
+        if !valid {
+            return Err(anyhow!(
+                "preflight failed: host_capabilities.network.preferred_backend '{}' is invalid (expected bridge, bridge-helper, user, or user-mode)",
+                preferred_backend
+            ));
+        }
+
+        if normalized == "bridge-helper" && central_config.bridge_helper().is_none() {
+            return Err(anyhow!(
+                "preflight failed: host_capabilities.network.preferred_backend=bridge-helper requires host_capabilities.network.bridge_helper"
+            ));
+        }
+    }
+
+    if let Some(placement_mode) = central_config.tpm_placement_mode() {
+        let normalized = placement_mode.trim();
+        if !matches!(normalized, "socket" | "state-file") {
+            return Err(anyhow!(
+                "preflight failed: host_capabilities.tpm.placement_mode '{}' is invalid (expected socket or state-file)",
+                placement_mode
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 fn ensure_runtime_dir_access(
@@ -131,9 +166,19 @@ fn ensure_firmware_capabilities(
         ));
     }
 
-    if let Some(ovmf_dir) = central_config.ovmf_dir_with_overrides(runtime_overrides) {
+    let search_dirs = central_config.ovmf_search_dirs_with_overrides(runtime_overrides);
+    if !search_dirs.is_empty() {
         let secure_boot = config.system_boot().secure_boot;
-        return ensure_ovmf_file_available(ovmf_dir, secure_boot);
+        for ovmf_dir in &search_dirs {
+            if ensure_ovmf_file_available(ovmf_dir, secure_boot).is_ok() {
+                return Ok(());
+            }
+        }
+
+        return Err(anyhow!(
+            "preflight failed: no OVMF firmware file found in configured search paths: {}",
+            search_dirs.join(", ")
+        ));
     }
 
     let fallback = Path::new("/usr/share/ovmf/OVMF.fd");
@@ -513,6 +558,90 @@ host:
                 .optional_warnings()
                 .iter()
                 .any(|warning| warning.contains("shared memory path"))
+        );
+    }
+
+    #[test]
+    fn preflight_fails_for_invalid_network_backend_policy() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-network-policy
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 1024
+  cpu:
+    model: host
+    vcpus: 2
+devices: {}
+"#,
+        )
+        .expect("vm config should parse");
+
+        let central: CentralConfig = serde_yaml::from_str(
+            r#"
+host_capabilities:
+  network:
+    preferred_backend: invalid-backend
+"#,
+        )
+        .expect("central config should parse");
+
+        let err = run_runtime_preflight(
+            &config,
+            &central,
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        )
+        .expect_err("preflight should fail");
+
+        assert!(
+            err.to_string()
+                .contains("host_capabilities.network.preferred_backend")
+        );
+    }
+
+    #[test]
+    fn preflight_fails_for_invalid_tpm_placement_mode() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-tpm-policy
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 1024
+  cpu:
+    model: host
+    vcpus: 2
+devices: {}
+"#,
+        )
+        .expect("vm config should parse");
+
+        let central: CentralConfig = serde_yaml::from_str(
+            r#"
+host_capabilities:
+  tpm:
+    placement_mode: invalid
+"#,
+        )
+        .expect("central config should parse");
+
+        let err = run_runtime_preflight(
+            &config,
+            &central,
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        )
+        .expect_err("preflight should fail");
+
+        assert!(
+            err.to_string()
+                .contains("host_capabilities.tpm.placement_mode")
         );
     }
 }

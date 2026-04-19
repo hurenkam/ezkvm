@@ -93,6 +93,34 @@ impl CentralConfig {
         })
     }
 
+    /// Resolve ordered OVMF search directories including fallback locations.
+    pub fn ovmf_search_dirs_with_overrides(&self, overrides: &RuntimeCliOverrides) -> Vec<String> {
+        let mut resolved = Vec::new();
+
+        Self::push_non_empty_unique(&mut resolved, overrides.ovmf_dir.as_deref());
+        Self::push_non_empty_unique(
+            &mut resolved,
+            self.host_capabilities.firmware.ovmf_dir.as_deref(),
+        );
+        Self::push_non_empty_unique(&mut resolved, self.locations.ovmf_dir.as_deref());
+
+        for path in &self.host_capabilities.firmware.search_paths {
+            Self::push_non_empty_unique(&mut resolved, Some(path.as_str()));
+        }
+
+        resolved
+    }
+
+    fn push_non_empty_unique(values: &mut Vec<String>, candidate: Option<&str>) {
+        let Some(trimmed) = Self::non_empty(candidate) else {
+            return;
+        };
+
+        if !values.iter().any(|existing| existing == trimmed) {
+            values.push(trimmed.to_string());
+        }
+    }
+
     /// Resolve the effective OVMF firmware directory.
     #[allow(dead_code)]
     pub fn ovmf_dir(&self) -> Option<&str> {
@@ -225,6 +253,12 @@ impl CentralConfig {
         self.host_capabilities.tpm.socket_dir.as_deref()
     }
 
+    /// Resolve TPM placement policy.
+    #[allow(dead_code)]
+    pub fn tpm_placement_mode(&self) -> Option<&str> {
+        self.host_capabilities.tpm.placement_mode.as_deref()
+    }
+
     /// Resolve the configured Looking Glass shared-memory device.
     #[allow(dead_code)]
     pub fn looking_glass_shared_memory_device(&self) -> Option<&str> {
@@ -328,6 +362,10 @@ pub struct HostCapabilitiesConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct RuntimeHostCapabilities {
     /// Root runtime directory used for sockets, pid files, and logs.
+    ///
+    /// Migration note: `root_directory` is accepted as an alias to ease
+    /// rollout from the Phase-2 backlog wording.
+    #[serde(alias = "root_directory")]
     pub run_dir: Option<String>,
 
     /// Directory used for pid files.
@@ -346,6 +384,15 @@ pub struct RuntimeHostCapabilities {
 pub struct FirmwareHostCapabilities {
     /// Directory containing OVMF firmware files.
     pub ovmf_dir: Option<String>,
+
+    /// Additional fallback directories used for OVMF discovery.
+    pub search_paths: Vec<String>,
+
+    /// Optional preferred OVMF file candidates for secure-boot mode.
+    pub secure_boot_code_files: Vec<String>,
+
+    /// Optional preferred OVMF file candidates for non-secure mode.
+    pub code_files: Vec<String>,
 }
 
 /// Network backend and helper defaults.
@@ -368,6 +415,9 @@ pub struct NetworkHostCapabilities {
 pub struct TpmHostCapabilities {
     /// Path to the swtpm executable.
     pub swtpm_binary: Option<String>,
+
+    /// TPM state placement mode (`socket` or `state-file`).
+    pub placement_mode: Option<String>,
 
     /// Default directory for TPM state.
     pub state_dir: Option<String>,

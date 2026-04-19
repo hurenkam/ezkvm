@@ -86,6 +86,15 @@ Source: doc/backlog/BACKLOG.md
 | B-39 | Separate parity-only defaults from portable semantics | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-38 | unassigned | Done |
 | B-40 | Add explicit runtime target selection for Proxmox import | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39 | unassigned | Done |
 | B-41 | Implement portable-linux runtime normalization for host-only literals | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39, B-40 | unassigned | Done |
+| B-42 | Extend central config schema with host capability sections | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-41 | unassigned | Done |
+| B-43 | Implement runtime directory capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-42 | unassigned | Todo |
+| B-44 | Implement firmware locator capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-43 | unassigned | Todo |
+| B-45 | Implement swtpm capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-44 | unassigned | Todo |
+| B-46 | Implement network backend helper capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-45 | unassigned | Todo |
+| B-47 | Add optional Looking Glass capability provider | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-46 | unassigned | Todo |
+| B-48 | Implement capability precedence contract and validation | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-47 | unassigned | Todo |
+| B-49 | Add integration tests for host capability resolution | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-48 | unassigned | Todo |
+| B-50 | Document portable mode operator guidance | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-49 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -143,6 +152,7 @@ Source: doc/backlog/BACKLOG.md
 - B-38 -> B-39
 - B-39 -> B-40
 - (B-39 and B-40) -> B-41
+- B-41 -> B-42 -> B-43 -> B-44 -> B-45 -> B-46 -> B-47 -> B-48 -> B-49 -> B-50
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

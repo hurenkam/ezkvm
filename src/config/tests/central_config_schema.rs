@@ -9,18 +9,26 @@ locations:
   profile_dir: "/etc/ezkvm/profiles.d"
 host_capabilities:
   runtime:
-    run_dir: "/var/run/ezkvm"
+    root_directory: "/var/run/ezkvm"
     pid_dir: "/var/run/ezkvm/pids"
     socket_dir: "/var/run/ezkvm/sockets"
     log_dir: "/var/log/ezkvm"
   firmware:
     ovmf_dir: "/usr/share/OVMF"
+    search_paths:
+      - "/usr/share/edk2/ovmf"
+      - "/usr/share/OVMF"
+    secure_boot_code_files:
+      - "OVMF_CODE.secboot.fd"
+    code_files:
+      - "OVMF_CODE.fd"
   network:
     preferred_backend: "bridge"
     bridge_helper: "/usr/lib/qemu/qemu-bridge-helper"
     bridge_name: "br0"
   tpm:
     swtpm_binary: "/usr/bin/swtpm"
+    placement_mode: "socket"
     state_dir: "/var/lib/ezkvm/tpm"
     socket_dir: "/var/run/ezkvm/tpm"
   integrations:
@@ -35,7 +43,15 @@ host_capabilities:
 
     assert_eq!(config.runtime_run_dir(), Some("/var/run/ezkvm"));
     assert_eq!(config.ovmf_dir(), Some("/usr/share/OVMF"));
+    assert_eq!(
+        config.ovmf_search_dirs_with_overrides(&RuntimeCliOverrides::default()),
+        vec![
+            "/usr/share/OVMF".to_string(),
+            "/usr/share/edk2/ovmf".to_string()
+        ]
+    );
     assert_eq!(config.swtpm_program(), Some("/usr/bin/swtpm"));
+    assert_eq!(config.tpm_placement_mode(), Some("socket"));
     assert_eq!(
         config.remote_viewer_program(),
         Some("/usr/bin/remote-viewer")
@@ -87,10 +103,14 @@ fn host_capability_values_override_legacy_locations_and_tools() {
             },
             firmware: FirmwareHostCapabilities {
                 ovmf_dir: Some("/host/ovmf".to_string()),
+                search_paths: Vec::new(),
+                secure_boot_code_files: Vec::new(),
+                code_files: Vec::new(),
             },
             network: NetworkHostCapabilities::default(),
             tpm: TpmHostCapabilities {
                 swtpm_binary: Some("/host/swtpm".to_string()),
+                placement_mode: None,
                 state_dir: None,
                 socket_dir: None,
             },
@@ -137,4 +157,16 @@ host_capabilities:
 
     let err = serde_yaml::from_str::<CentralConfig>(yaml).expect_err("unknown field must fail");
     assert!(err.to_string().contains("unknown field"));
+}
+
+#[test]
+fn runtime_root_directory_alias_is_supported() {
+    let yaml = r#"
+host_capabilities:
+  runtime:
+    root_directory: "/run/alias-root"
+"#;
+
+    let config: CentralConfig = serde_yaml::from_str(yaml).expect("parse central config");
+    assert_eq!(config.runtime_run_dir(), Some("/run/alias-root"));
 }

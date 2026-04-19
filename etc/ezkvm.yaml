@@ -10,18 +10,32 @@ locations:
 
 host_capabilities:
   runtime:
-    run_dir: "/var/run/ezkvm"
+    # `root_directory` is the preferred key; `run_dir` is kept for compatibility.
+    root_directory: "/var/run/ezkvm"
     pid_dir: "/var/run/ezkvm/pids"
     socket_dir: "/var/run/ezkvm/sockets"
     log_dir: "/var/log/ezkvm"
   firmware:
     ovmf_dir: "/usr/share/pve-edk2-firmware"
+    search_paths:
+      - "/usr/share/ovmf"
+      - "/usr/share/OVMF"
+      - "/usr/share/edk2/ovmf"
+    secure_boot_code_files:
+      - "OVMF_CODE_4M.secboot.fd"
+      - "OVMF_CODE.secboot.fd"
+      - "OVMF.fd"
+    code_files:
+      - "OVMF_CODE_4M.fd"
+      - "OVMF_CODE.fd"
+      - "OVMF.fd"
   network:
     preferred_backend: "bridge"
     bridge_helper: "/usr/lib/qemu/qemu-bridge-helper"
     bridge_name: "br0"
   tpm:
     swtpm_binary: "/usr/bin/swtpm"
+    placement_mode: "socket"
     state_dir: "/var/lib/ezkvm/tpm"
     socket_dir: "/var/run/ezkvm/tpm"
   integrations:
