@@ -1,6 +1,7 @@
 mod auxiliary;
 mod inspect;
 mod ops;
+mod preflight;
 mod start;
 
 #[allow(unused_imports)]

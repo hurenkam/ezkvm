@@ -2,6 +2,48 @@
 
 Common issues and quick checks for VM configuration and startup.
 
+## Runtime preflight fails before startup
+
+### Symptoms
+
+- `ezkvm start` or `ezkvm start --dry-run` exits before QEMU launch.
+- Error starts with `preflight failed:`.
+
+### Likely Causes
+
+- Required binary is missing (`qemu-system-*`, `swtpm`, or configured bridge helper path).
+- UEFI/OVMF firmware is requested but no compatible firmware file is available.
+- Runtime/socket parent directory is not writable by the current user.
+
+### Checks
+
+1. Verify required binaries:
+   ```bash
+   which qemu-system-x86_64
+   which swtpm
+   ls -la /usr/lib/qemu/qemu-bridge-helper
+   ```
+
+2. Verify OVMF files if using UEFI/OVMF:
+   ```bash
+   ls -la /usr/share/ovmf
+   ```
+
+3. Validate runtime path permissions:
+   ```bash
+   ls -ld /var/run/ezkvm
+   ```
+
+4. Use runtime overrides to point at host-specific paths:
+   ```bash
+   ezkvm start vm.yaml --run-dir /tmp/ezkvm --swtpm-binary /usr/bin/swtpm --ovmf-dir /usr/share/OVMF
+   ```
+
+### Notes
+
+- Preflight checks run in deterministic order in both `start` and `start --dry-run`.
+- Optional integrations (remote-viewer, Looking Glass) emit warnings and degrade gracefully instead of failing startup.
+
 ## VM fails with memory backend or hugepages errors
 
 ### Symptoms

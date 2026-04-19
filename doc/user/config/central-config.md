@@ -101,6 +101,7 @@ The preferred place for portability-related defaults is `host_capabilities`. The
 ## Runtime Usage
 
 - Runtime precedence contract: `CLI overrides > VM-local explicit values > profile defaults > central host defaults > built-in fallback`.
+- `ezkvm start` and `ezkvm start --dry-run` execute the same preflight validation pass before runtime orchestration.
 - `host_capabilities.tpm.swtpm_binary` or legacy `tools.swtpm` + `system.tpm.backend: emulator`: ezkvm can launch swtpm.
 - `host_capabilities.integrations.remote_viewer.program` or legacy `tools.remote_viewer` + `spice.enabled`: ezkvm can launch remote-viewer.
 - VM/profile `options.looking_glass.program` is used unless a CLI override is provided.
@@ -116,6 +117,28 @@ Supported CLI runtime overrides on `ezkvm start`:
 - `--ovmf-dir`
 
 Looking Glass client settings should be defined in VM/profile config under `options.looking_glass` so profile-specific behavior stays with the profile.
+
+Preflight behavior:
+
+- Required capability checks (fail fast):
+  - QEMU binary availability.
+  - swtpm binary availability when `system.tpm.backend: emulator` is configured.
+  - OVMF/UEFI firmware file availability when `system.boot.firmware` is `uefi` or `ovmf`.
+  - Bridge helper path availability when a bridge backend helper is configured.
+  - Permission-sensitive runtime and socket parent directories are writable/creatable.
+- Optional capability checks (warning-only degradation):
+  - remote-viewer launcher prerequisites for SPICE workflows.
+  - Looking Glass client launcher prerequisites and shared-memory path presence.
+- Preflight output order is deterministic across `start` and `start --dry-run`, so failure and warning ordering remains stable.
+
+CLI override impact on preflight checks:
+
+- `--run-dir`: affects runtime and derived socket directory checks.
+- `--swtpm-binary`: satisfies swtpm required-binary checks.
+- `--tpm-socket-path`: changes TPM socket parent-directory checks.
+- `--remote-viewer-program`: affects remote-viewer optional integration checks.
+- `--looking-glass-program`: affects Looking Glass optional integration checks.
+- `--ovmf-dir`: affects OVMF firmware discovery checks.
 
 ## Practical Defaults
 

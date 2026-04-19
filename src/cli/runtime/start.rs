@@ -3,6 +3,7 @@ use super::auxiliary::{
     ensure_runtime_socket_dirs, format_auxiliary_launch, spawn_looking_glass, spawn_remote_viewer,
     start_swtpm_if_configured,
 };
+use super::preflight::run_runtime_preflight;
 use anyhow::Result;
 use std::path::Path;
 use std::process::Stdio;
@@ -16,10 +17,19 @@ pub(crate) async fn handle_start(
     println!("Loading configuration from: {}", config_path);
 
     let (mut config, central_config) = load_start_configs(config_path)?;
+    config.options.daemonize = daemon;
+
+    let qemu_binary = config.system.qemu_binary();
+    let preflight =
+        run_runtime_preflight(&config, &central_config, &runtime_overrides, &qemu_binary)?;
+    println!("✓ Runtime preflight checks passed");
+    for warning in preflight.optional_warnings() {
+        println!("Preflight warning: {}", warning);
+    }
+
     prepare_auxiliary_runtime(&config, &central_config, &runtime_overrides, dry_run)?;
 
     let central_config_clone = central_config.clone();
-    config.options.daemonize = daemon;
     crate::state::cache_config(&config.name, &config)?;
 
     let pid_file = crate::state::get_pid_file_at(&config.name, config.options.pid_file.as_deref())?;
@@ -34,9 +44,6 @@ pub(crate) async fn handle_start(
 
     println!("Starting VM: {}", manager.config().name);
     println!("QEMU binary: {}", manager.binary_name());
-
-    crate::qemu::executor::check_qemu_available(&manager.binary_name())?;
-    println!("✓ QEMU binary found");
 
     if dry_run {
         print_dry_run(
@@ -139,10 +146,10 @@ fn print_dry_run(
         println!("Log file: {}", log_file.display());
     }
 
-    match build_swtpm_launch_preview(manager.config(), central_config, runtime_overrides) {
-        Ok(Some(cmd)) => println!("Auxiliary launch (swtpm): {}", cmd),
-        Ok(None) => {}
-        Err(err) => println!("swtpm configuration error: {}", err),
+    if let Ok(Some(cmd)) =
+        build_swtpm_launch_preview(manager.config(), central_config, runtime_overrides)
+    {
+        println!("Auxiliary launch (swtpm): {}", cmd);
     }
 
     if let Some(launch) =
@@ -154,21 +161,19 @@ fn print_dry_run(
         );
     }
 
-    match build_looking_glass_launch(manager.config(), central_config, runtime_overrides) {
-        Ok(Some(launch)) => {
+    if let Ok(Some(launch)) =
+        build_looking_glass_launch(manager.config(), central_config, runtime_overrides)
+    {
+        println!(
+            "Auxiliary launch (Looking Glass): {}",
+            format_auxiliary_launch(&launch)
+        );
+        if !Path::new(&manager.config().system_memory_ivshmem().unwrap().mem_path).exists() {
             println!(
-                "Auxiliary launch (Looking Glass): {}",
-                format_auxiliary_launch(&launch)
+                "Looking Glass note: shared memory path '{}' does not exist on this host",
+                manager.config().system_memory_ivshmem().unwrap().mem_path
             );
-            if !Path::new(&manager.config().system_memory_ivshmem().unwrap().mem_path).exists() {
-                println!(
-                    "Looking Glass note: shared memory path '{}' does not exist on this host",
-                    manager.config().system_memory_ivshmem().unwrap().mem_path
-                );
-            }
         }
-        Ok(None) => {}
-        Err(err) => println!("Looking Glass configuration error: {}", err),
     }
 }
 

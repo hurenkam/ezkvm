@@ -46,6 +46,8 @@ ezkvm start examples/basic-vm.yaml
 ezkvm start examples/basic-vm.yaml --dry-run
 ```
 
+Both `start` and `start --dry-run` now run the same portable-runtime preflight checks before launching or rendering commands.
+
 ## Configuration
 
 VMs are configured using YAML files with the following structure:
@@ -114,8 +116,11 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm create <config.yaml>` - Create and validate a VM configuration
 - `ezkvm start <config.yaml>` - Start a VM from configuration
 - `ezkvm start <config.yaml> --dry-run` - Show the QEMU command without executing
+- `ezkvm start ...` and `ezkvm start ... --dry-run` run the same deterministic preflight checks in the same order before execution/preview
+- Required preflight failures stop startup with actionable diagnostics (QEMU/swtpm binaries, OVMF availability for UEFI, bridge helper paths when configured, and runtime/socket directory access)
+- Optional integrations (remote-viewer, Looking Glass) emit deterministic warnings and degrade without blocking VM start
 - `ezkvm start <config.yaml> --daemon` - Start VM in background
-- `ezkvm start <config.yaml> --run-dir <path> --swtpm-binary <path> --tpm-socket-path <path> --remote-viewer-program <path> --looking-glass-program <path> --ovmf-dir <path>` - Override runtime host defaults from the CLI
+- `ezkvm start <config.yaml> --run-dir <path> --swtpm-binary <path> --tpm-socket-path <path> --remote-viewer-program <path> --looking-glass-program <path> --ovmf-dir <path>` - Override runtime host defaults used by preflight capability checks and runtime resolution
 - `ezkvm stop <config.yaml>` - Stop a VM gracefully
 - `ezkvm stop <config.yaml> --force` - Force stop a VM
 - `ezkvm kill <config.yaml>` - Force kill a VM

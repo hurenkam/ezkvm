@@ -24,5 +24,7 @@ mod proxmox_import_output_modes;
 mod proxmox_import_profiles;
 #[path = "integration/proxmox_import_wakiza.rs"]
 mod proxmox_import_wakiza;
+#[path = "integration/runtime_preflight.rs"]
+mod runtime_preflight;
 #[path = "integration/wakiza.rs"]
 mod wakiza;

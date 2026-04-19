@@ -1,0 +1,518 @@
+use anyhow::{Result, anyhow};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+#[derive(Debug, Default)]
+pub(crate) struct RuntimePreflightReport {
+    optional_warnings: Vec<String>,
+}
+
+impl RuntimePreflightReport {
+    pub(crate) fn optional_warnings(&self) -> &[String] {
+        &self.optional_warnings
+    }
+
+    fn push_warning(&mut self, warning: String) {
+        self.optional_warnings.push(warning);
+    }
+}
+
+pub(crate) fn run_runtime_preflight(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+    qemu_binary: &str,
+) -> Result<RuntimePreflightReport> {
+    crate::qemu::executor::check_qemu_available(qemu_binary)
+        .map_err(|err| anyhow!("preflight failed: {}", err))?;
+    ensure_runtime_dir_access(central_config, runtime_overrides)?;
+    ensure_socket_dir_access(config)?;
+    ensure_tpm_capabilities(config, central_config, runtime_overrides)?;
+    ensure_firmware_capabilities(config, central_config, runtime_overrides)?;
+    ensure_network_helper_capabilities(config, central_config)?;
+
+    let mut report = RuntimePreflightReport::default();
+    collect_optional_warnings(config, central_config, runtime_overrides, &mut report);
+    Ok(report)
+}
+
+fn ensure_program_available(label: &str, program: &str) -> Result<()> {
+    if program_available(program) {
+        return Ok(());
+    }
+
+    Err(anyhow!(
+        "preflight failed: required {} '{}' is not available",
+        label,
+        program.trim()
+    ))
+}
+
+fn ensure_runtime_dir_access(
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<()> {
+    let run_dir = central_config
+        .runtime_run_dir_with_overrides(runtime_overrides)
+        .unwrap_or("/var/run/ezkvm");
+
+    ensure_dir_is_writable_or_creatable(Path::new(run_dir), "runtime run directory")
+}
+
+fn ensure_socket_dir_access(config: &crate::config::VmConfig) -> Result<()> {
+    if let Some(guest_agent) = config.options_guest_agent()
+        && guest_agent.enabled
+        && let Some(path) = guest_agent.socket_path.as_deref()
+    {
+        ensure_parent_dir_is_writable_or_creatable(path, "guest agent socket")?;
+    }
+
+    if let Some(qmp) = config.options_qmp()
+        && qmp.enabled
+        && let crate::config::QmpSocketType::Unix = qmp.socket_type
+        && let Some(path) = qmp.socket_path.as_deref()
+    {
+        ensure_parent_dir_is_writable_or_creatable(path, "QMP socket")?;
+    }
+
+    Ok(())
+}
+
+fn ensure_tpm_capabilities(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<()> {
+    let Some(tpm) = config.system_tpm().filter(|tpm| tpm.backend == "emulator") else {
+        return Ok(());
+    };
+
+    let swtpm_binary = central_config
+        .swtpm_program_with_overrides(runtime_overrides)
+        .ok_or_else(|| {
+            anyhow!(
+                "preflight failed: TPM emulator backend requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, or legacy tools.swtpm"
+            )
+        })?;
+    ensure_program_available("swtpm binary", swtpm_binary)?;
+
+    let tpm_socket = resolve_tpm_socket_path(config, central_config, runtime_overrides);
+    ensure_parent_dir_is_writable_or_creatable(&tpm_socket, "TPM socket")?;
+
+    if let Some(state_dir) = tpm.state_dir.as_deref() {
+        ensure_dir_is_writable_or_creatable(Path::new(state_dir), "TPM state directory")?;
+    }
+
+    Ok(())
+}
+
+fn ensure_firmware_capabilities(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<()> {
+    let firmware = config
+        .system_boot()
+        .firmware
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("");
+    if firmware != "uefi" && firmware != "ovmf" {
+        return Ok(());
+    }
+
+    if let Some(explicit_code) = config.system_boot().uefi_code.as_deref() {
+        if Path::new(explicit_code).exists() {
+            return Ok(());
+        }
+        return Err(anyhow!(
+            "preflight failed: UEFI firmware code '{}' does not exist",
+            explicit_code
+        ));
+    }
+
+    if let Some(ovmf_dir) = central_config.ovmf_dir_with_overrides(runtime_overrides) {
+        let secure_boot = config.system_boot().secure_boot;
+        return ensure_ovmf_file_available(ovmf_dir, secure_boot);
+    }
+
+    let fallback = Path::new("/usr/share/ovmf/OVMF.fd");
+    if fallback.exists() {
+        return Ok(());
+    }
+
+    Err(anyhow!(
+        "preflight failed: UEFI firmware requested but no OVMF directory is configured and '{}' does not exist",
+        fallback.display()
+    ))
+}
+
+fn ensure_ovmf_file_available(ovmf_dir: &str, secure_boot: bool) -> Result<()> {
+    let candidates = if secure_boot {
+        ["OVMF_CODE_4M.secboot.fd", "OVMF_CODE.secboot.fd", "OVMF.fd"]
+    } else {
+        ["OVMF_CODE_4M.fd", "OVMF_CODE.fd", "OVMF.fd"]
+    };
+
+    for file in candidates {
+        let candidate = Path::new(ovmf_dir).join(file);
+        if candidate.exists() {
+            return Ok(());
+        }
+    }
+
+    Err(anyhow!(
+        "preflight failed: no OVMF firmware file found in '{}' (checked: {})",
+        ovmf_dir,
+        candidates.join(", ")
+    ))
+}
+
+fn ensure_network_helper_capabilities(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+) -> Result<()> {
+    for network in &config.devices.networks {
+        let Some(backend) = network.backend.as_ref() else {
+            continue;
+        };
+        if backend.backend_type != "bridge" {
+            continue;
+        }
+
+        if let Some(helper_path) = backend.helper.as_deref().or(central_config.bridge_helper()) {
+            ensure_program_available("network bridge helper", helper_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_optional_warnings(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+    report: &mut RuntimePreflightReport,
+) {
+    if should_launch_remote_viewer(config)
+        && let Some(program) =
+            central_config.remote_viewer_program_with_overrides(runtime_overrides)
+    {
+        if !program_available(program) {
+            report.push_warning(format!(
+                "remote-viewer integration disabled because '{}' is not available",
+                program
+            ));
+        }
+    } else if should_launch_remote_viewer(config) {
+        report.push_warning(
+            "remote-viewer integration disabled because no remote-viewer program is configured"
+                .to_string(),
+        );
+    }
+
+    if !should_launch_looking_glass(config) {
+        return;
+    }
+
+    match crate::cli::runtime::build_looking_glass_launch(config, central_config, runtime_overrides)
+    {
+        Ok(Some(launch)) => {
+            if !program_available(&launch.program) {
+                report.push_warning(format!(
+                    "Looking Glass integration disabled because '{}' is not available",
+                    launch.program
+                ));
+            }
+        }
+        Ok(None) => {
+            report.push_warning(
+                "Looking Glass integration disabled because no client program is configured"
+                    .to_string(),
+            );
+        }
+        Err(err) => {
+            report.push_warning(format!(
+                "Looking Glass integration disabled due to configuration error: {}",
+                err
+            ));
+        }
+    }
+
+    if let Some(ivshmem) = config.system_memory_ivshmem()
+        && !Path::new(&ivshmem.mem_path).exists()
+    {
+        report.push_warning(format!(
+            "Looking Glass shared memory path '{}' does not exist on this host",
+            ivshmem.mem_path
+        ));
+    }
+}
+
+fn should_launch_remote_viewer(config: &crate::config::VmConfig) -> bool {
+    if has_primary_passthrough_gpu(config) {
+        return false;
+    }
+
+    matches!(&config.spice, Some(spice) if spice.enabled)
+}
+
+fn should_launch_looking_glass(config: &crate::config::VmConfig) -> bool {
+    if !has_primary_passthrough_gpu(config) {
+        return false;
+    }
+
+    matches!(config.system_memory_ivshmem(), Some(ivshmem) if ivshmem.enabled)
+}
+
+fn has_primary_passthrough_gpu(config: &crate::config::VmConfig) -> bool {
+    config
+        .host_pci()
+        .iter()
+        .any(|device| device.x_vga || device.id.starts_with("hostpci0"))
+}
+
+fn resolve_tpm_socket_path(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> String {
+    if let Some(socket_path) = runtime_overrides
+        .tpm_socket_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+    {
+        return socket_path.to_string();
+    }
+
+    if let Some(tpm) = config.system_tpm()
+        && let Some(state_path) = &tpm.state_path
+    {
+        return state_path.clone();
+    }
+
+    if let Some(run_dir) = central_config.runtime_run_dir_with_overrides(runtime_overrides) {
+        return format!("{}/{}.swtpm", run_dir, config.name);
+    }
+
+    format!("/var/run/qemu-server/{}.swtpm", config.name)
+}
+
+fn ensure_parent_dir_is_writable_or_creatable(path: &str, label: &str) -> Result<()> {
+    let parent = Path::new(path).parent().ok_or_else(|| {
+        anyhow!(
+            "preflight failed: {} '{}' does not have a parent directory",
+            label,
+            path
+        )
+    })?;
+    ensure_dir_is_writable_or_creatable(parent, label)
+}
+
+fn ensure_dir_is_writable_or_creatable(path: &Path, label: &str) -> Result<()> {
+    if path.exists() {
+        let metadata = std::fs::metadata(path).map_err(|err| {
+            anyhow!(
+                "preflight failed: {} '{}' metadata could not be read: {}",
+                label,
+                path.display(),
+                err
+            )
+        })?;
+        if !metadata.is_dir() {
+            return Err(anyhow!(
+                "preflight failed: {} '{}' is not a directory",
+                label,
+                path.display()
+            ));
+        }
+        if metadata.permissions().readonly() {
+            return Err(anyhow!(
+                "preflight failed: {} '{}' is not writable",
+                label,
+                path.display()
+            ));
+        }
+        return Ok(());
+    }
+
+    let ancestor = nearest_existing_ancestor(path).ok_or_else(|| {
+        anyhow!(
+            "preflight failed: {} '{}' has no existing parent directory",
+            label,
+            path.display()
+        )
+    })?;
+    let metadata = std::fs::metadata(&ancestor).map_err(|err| {
+        anyhow!(
+            "preflight failed: {} '{}' metadata could not be read: {}",
+            label,
+            ancestor.display(),
+            err
+        )
+    })?;
+
+    if !metadata.is_dir() {
+        return Err(anyhow!(
+            "preflight failed: {} parent '{}' is not a directory",
+            label,
+            ancestor.display()
+        ));
+    }
+    if metadata.permissions().readonly() {
+        return Err(anyhow!(
+            "preflight failed: {} parent '{}' is not writable",
+            label,
+            ancestor.display()
+        ));
+    }
+
+    Ok(())
+}
+
+fn nearest_existing_ancestor(path: &Path) -> Option<PathBuf> {
+    let mut cursor = path;
+    while !cursor.exists() {
+        cursor = cursor.parent()?;
+    }
+    Some(cursor.to_path_buf())
+}
+
+fn program_available(program: &str) -> bool {
+    let trimmed = program.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if trimmed.contains('/') {
+        return Path::new(trimmed).exists();
+    }
+
+    Command::new("which")
+        .arg(trimmed)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_runtime_preflight;
+    use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
+
+    #[test]
+    fn preflight_succeeds_for_minimal_portable_vm() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-ok
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 1024
+  cpu:
+    model: host
+    vcpus: 2
+devices: {}
+"#,
+        )
+        .expect("vm config should parse");
+
+        let result = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        )
+        .expect("preflight should pass");
+
+        assert!(result.optional_warnings().is_empty());
+    }
+
+    #[test]
+    fn preflight_fails_when_tpm_emulator_has_no_swtpm_binary() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-tpm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 1024
+  cpu:
+    model: host
+    vcpus: 2
+  tpm:
+    version: "2.0"
+    backend: emulator
+    model: tpm-tis
+devices: {}
+"#,
+        )
+        .expect("vm config should parse");
+
+        let err = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        )
+        .expect_err("preflight should fail");
+
+        assert!(
+            err.to_string()
+                .contains("TPM emulator backend requires --swtpm-binary")
+        );
+    }
+
+    #[test]
+    fn preflight_reports_optional_capability_downgrade_for_missing_looking_glass() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-lg
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 1024
+    ivshmem:
+      enabled: true
+      mem_path: /definitely/missing/kvmfr0
+  cpu:
+    model: host
+    vcpus: 2
+devices: {}
+host:
+  pci:
+    - id: hostpci0
+      device: "0000:03:00.0"
+"#,
+        )
+        .expect("vm config should parse");
+
+        let result = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        )
+        .expect("preflight should succeed with optional warnings");
+
+        assert!(
+            result
+                .optional_warnings()
+                .iter()
+                .any(|warning| warning.contains("Looking Glass integration disabled"))
+        );
+        assert!(
+            result
+                .optional_warnings()
+                .iter()
+                .any(|warning| warning.contains("shared memory path"))
+        );
+    }
+}
