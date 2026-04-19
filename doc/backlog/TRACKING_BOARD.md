@@ -1,6 +1,6 @@
 # Convergence Tracking Board
 
-Date: 2026-04-15  
+Date: 2026-04-19  
 Scope: Epics A-E (Phase 0 to Phase 2)  
 Source: doc/backlog/BACKLOG.md
 
@@ -82,7 +82,10 @@ Source: doc/backlog/BACKLOG.md
 | B-35 | Update schema to attach drives to controllers which belong to devices | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30 | unassigned | Done |
 | B-36 | Add central host capability schema for portable runtime | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-33, D-01 | unassigned | Done |
 | B-37 | Define and implement runtime precedence contract | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36 | unassigned | Done |
-| B-38 | Add portability preflight validation and error model | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36, B-37 | unassigned | Todo |
+| B-38 | Add portability preflight validation and error model | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36, B-37 | unassigned | Done |
+| B-39 | Separate parity-only defaults from portable semantics | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-38 | unassigned | Todo |
+| B-40 | Add explicit runtime target selection for Proxmox import | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39 | unassigned | Todo |
+| B-41 | Implement portable-linux runtime normalization for host-only literals | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-39, B-40 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -137,6 +140,9 @@ Source: doc/backlog/BACKLOG.md
 - (B-33 and D-01) -> B-36
 - B-36 -> B-37
 - (B-36 and B-37) -> B-38
+- B-38 -> B-39
+- B-39 -> B-40
+- (B-39 and B-40) -> B-41
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

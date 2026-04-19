@@ -225,8 +225,8 @@ This is the strongest architectural foundation, but it should be introduced incr
 
 The recommended direction is a combination of Approach 4 and Approach 5:
 
-1. Keep a `proxmox-parity` import target for validation, regression testing, and users who want exact Proxmox-style runtime behavior.
-2. Add a `portable-linux` import target as the default non-Proxmox execution mode.
+1. Keep a `proxmox-parity` import target for validation, regression testing, and users who want exact Proxmox-style runtime behavior. This target requires explicit opt-in; it is not the default.
+2. Add a `portable-linux` import target as the default import mode for all non-parity workflows.
 3. Build `portable-linux` on an ezkvm-owned runtime capability layer that replaces host-only Proxmox assumptions.
 4. Preserve guest-visible topology and semantics across both targets.
 
@@ -415,12 +415,13 @@ The exact root can be host-dependent. The important part is that the config mode
 
 ### 3. Replace Proxmox Bridge Scripts With Portable Network Backends
 
-Portable mode should support at least these network strategies:
+Portable mode MVP supports these network strategies:
 
 - user-mode networking for zero-privilege bring-up
 - standard QEMU bridge helper for bridge-backed networking
 - explicit tap creation managed by ezkvm when elevated setup is acceptable
-- optional `passt` for rootless higher-fidelity networking where available
+
+`passt` (rootless higher-fidelity userspace networking) is deferred beyond MVP due to performance and multicast tradeoffs. It may be added as an optional backend in a follow-on ticket.
 
 Debian, Ubuntu, and Arch all support standard QEMU bridge-helper style networking. That is a better portability base than `pve-bridge`.
 
@@ -478,8 +479,9 @@ Portable mode should either:
 
 ### Phase 2: Add Portable Linux Runtime Target
 
-- introduce a `portable-linux` import target
+- introduce a `portable-linux` import target as the default; `proxmox-parity` requires explicit opt-in
 - normalize runtime paths, helper paths, and host integrations away from Proxmox-specific literals
+- parity fixtures remain byte-close under `proxmox-parity`; portable mode asserts guest-topology invariance only
 - preserve guest-visible topology and device semantics
 
 ### Phase 3: Add Host Capability Resolution
@@ -517,7 +519,7 @@ The checklist below maps the central-host-config integration work to existing ba
 
 ### C. Network Capability Resolution
 
-- Integrate host-config-driven network backend selection (bridge helper path, tap strategy, user/passt fallback).
+- Integrate host-config-driven network backend selection (bridge helper path, tap strategy, user-mode fallback). `passt` support is deferred beyond MVP.
 	- Backlog: B-11 (network fidelity).
 	- Gap: Add a new backlog item for host capability resolution policy and precedence for network backends.
 

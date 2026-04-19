@@ -457,6 +457,44 @@ Acceptance Criteria:
 - Integration tests cover success, required-capability failure, and optional-capability downgrade paths.
 Estimate: 3 days
 
+### B-39 Separate parity-only defaults from portable semantics
+Scope:
+- Audit current Proxmox profiles and import defaults and classify each field as guest-semantic or host-runtime-specific.
+- Split mixed profile ownership so Proxmox host literals (for example `qemu-server` runtime paths, `pve-bridge` scripts, Proxmox asset paths) are isolated into parity-only runtime profile layers.
+- Keep guest-visible semantics unchanged and preserve existing Proxmox parity dry-run behavior in parity workflows.
+Dependencies: B-38
+Acceptance Criteria:
+- Proxmox-only host literals are isolated from guest-semantic defaults in profile/runtime layering.
+- Import output for parity workflows remains compatible with current parity fixtures.
+- Documentation records ownership boundaries and migration notes for profile/runtime split.
+Estimate: 3 days
+
+### B-40 Add explicit runtime target selection for Proxmox import
+Scope:
+- Extend import CLI and import pipeline to support explicit runtime targets: `proxmox-parity` and `portable-linux`.
+- `portable-linux` is the default; `proxmox-parity` requires explicit opt-in via flag.
+- Keep canonical schema output unchanged while selecting target-specific runtime normalization/profile assignment behavior.
+- Document runtime target semantics and operator guidance.
+Dependencies: B-39
+Acceptance Criteria:
+- CLI default is `portable-linux`; `proxmox-parity` must be explicitly requested.
+- Integration tests cover target selection and verify parity target preserves current behavior.
+- User docs explain when to use parity vs portable targets.
+Estimate: 2 days
+
+### B-41 Implement portable-linux runtime normalization for host-only literals
+Scope:
+- For `portable-linux` target, normalize host-only Proxmox literals (runtime paths, helper paths, firmware asset paths, optional integration paths) into ezkvm-managed runtime capability resolution.
+- Preserve guest-visible topology/ordering/semantics while allowing host-specific runtime realization.
+- Network backend MVP supports bridge-helper and user-mode networking only; `passt` is deferred to a follow-on ticket.
+- Add/extend tests to assert invariant guest semantics with host-specific runtime differences.
+Dependencies: B-39, B-40
+Acceptance Criteria:
+- Portable target output/runtime no longer requires Proxmox host filesystem conventions.
+- Parity fixtures remain byte-close under `proxmox-parity` target; portable mode asserts guest-topology invariance only, not literal host-path equivalence.
+- Regression tests verify portable normalization behavior and guard against host-literal reintroduction.
+Estimate: 4 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
