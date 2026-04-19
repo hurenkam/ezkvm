@@ -508,39 +508,37 @@ Portable mode should either:
   - **ProxmoxParity**: Preserves Proxmox paths for parity validation
   - **PortableLinux**: Normalizes to ezkvm-managed paths below
 
-### Phase 2: Add Portable Linux Runtime Target (In Progress)
+### Phase 2: Add Portable Linux Runtime Target and Capability Resolution ✅ COMPLETE
 
-**Current Status**: Mapper implementation complete; host capability resolution pending
+**Status**: Completed 2026-04-19 (B-42 through B-50)
 
-**Remaining work**:
-- implement host capability resolution for paths not yet normalized:
-  - device runtime directory (sockets, logs)
-  - firmware file discovery and override handling
-  - swtpm binary location and socket placement
-  - VNC, QMP, and agent socket placement
-  - optional Looking Glass dependency handling
-- add central config schema for host capabilities
-- implement precedence contract (CLI > explicit config > profile > central host > built-in)
-- extend test matrix coverage for capability resolution
+**Delivered scope**:
+- central host capability schema and provider plumbing for portable runtime paths
+- precedence contract implementation and source-aware diagnostics:
+	- CLI override > explicit VM config > profile defaults > central host defaults > built-in fallback
+- portable-mode preflight validation with actionable error reporting
+- import and start path integration for capability-backed runtime resolution
+- expanded integration coverage for capability matrix and target-specific behavior
+- operator documentation for portable import and host-capability configuration
 
 **Behavior**:
 - parity fixtures remain byte-close under `proxmox-parity` target
-- portable mode asserts guest-topology invariance only, not literal host-path equivalence
-- test regressions guard against host-literal reintroduction
+- portable mode enforces guest-topology invariance and host-literal normalization
+- regressions guard against reintroduction of Proxmox-only runtime paths
 
-### Phase 3: Add Host Capability Resolution
-
-- runtime directory provider
-- firmware locator
-- network backend provider
-- TPM backend provider
-- optional Looking Glass capability
-
-### Phase 4: Validate On Real Target Distros
+### Phase 3: Validate On Real Target Distros
 
 - Debian Trixie test matrix
 - Ubuntu 26.04 LTS test matrix
 - Arch Linux test matrix
+- capability-matrix runs with host-config permutations
+- operator-path validation for preflight and diagnostics UX
+
+### Phase 4: Follow-On Hardening
+
+- profile compaction ownership audit completion (B-30)
+- compaction policy and default-omission guardrails completion (B-31)
+- optional networking backend expansion (`passt`) as deferred enhancement
 
 Validation should check both:
 
@@ -627,32 +625,20 @@ This keeps the selected approach intact while making central host config a first
 - Portable mode regressions verify guest topology invariance
 - New parity-specific tests assert tap/ifname/script preservation
 
-### Phase 2 In Progress: Central Host Config Schema
+### Phase 2 Complete: Central Host Config Schema and Capability Resolution
 
-**What still needs to be done:**
-- Central config schema sections for host capabilities:
-  - runtime_directory: base path for ezkvm sockets/logs
-  - firmware_locator: OVMF discovery policy
-  - swtpm_binary: path to swtpm executable
-  - network_backend: bridge helper path and preference
-  - optional integrations: Looking Glass (client binary, shared-mem device)
-- Precedence contract implementation:
-  - CLI override > explicit VM config > profile defaults > central config > built-in
-  - Validation gates for required capabilities in portable mode
-- Host capability resolver backed by central config
-- Integration with existing profile/compaction system
+**What was completed:**
+- Central config schema sections for host capabilities were integrated for portable runtime resolution.
+- Precedence contract was implemented and surfaced in diagnostics:
+	- CLI override > explicit VM config > profile defaults > central config > built-in
+- Validation gates for required capabilities in portable mode were added to runtime preflight.
+- Host capability resolver integration was wired across runtime, TPM, networking, firmware, and optional Looking Glass handling.
+- Integration tests and user/operator documentation were expanded for capability resolution behavior.
 
-**Suggested implementation order:**
-1. Add central config host capabilities schema (existing B-36 framework)
-2. Build runtime provider layer (runtime_dir, firmware, swtpm, network backends)
-3. Wire providers into mapper calls where normalization now hard-codes paths
-4. Add integration tests for capability resolution and CLI overrides
-5. Document precedence and operator guidance
-
-**Why this unblocks Phase 3:**
-- Phase 3 trait-based extensibility (D-02, D-03) should be designed after portable paths are capability-backed
-- Currently portable paths are normalized but still somewhat hard-coded by target
-- Capability layer makes extension points clear for future backends (passt networking, custom firmware discovery, etc.)
+**What remains after Phase 2:**
+1. Execute full real-host distro validation matrix (Debian, Ubuntu, Arch) and capture operator runbooks.
+2. Complete compaction hardening backlog items (B-30, B-31) that remain outside the B-42..B-50 portability chain.
+3. Evaluate deferred optional enhancements such as `passt` networking backend support.
 
 ## Non-Goals
 

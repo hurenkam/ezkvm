@@ -340,29 +340,31 @@ Estimate: 1 day
 ### B-30 Audit profile-first compaction implementation status
 Scope:
 - Verify that mapper profiling inference and profile-aware compaction are working correctly in import output.
-- Confirm that profile-overlay form is the default and only export mode.
-- Document current behavior: profiles are inferred automatically and compaction is mandatory (no canonical export mode currently available).
-- If canonical output is needed, defer to separate backlog item.
+- Confirm explicit export-mode behavior is consistent and documented:
+  - compact mode remains default for import output
+  - canonical mode is available for fully explicit export
+  - debug-canonical mode is available for diagnostics and parity investigations
+- Document mode semantics clearly: profile-aware compaction is a compact-mode behavior and must not leak into canonical/debug-canonical output.
 Dependencies: B-29
 Acceptance Criteria:
 - Verified that profiles are inferred from Proxmox config (15 layers: proxmox-q35-uefi, windows-common, windows-11, linux-l26-common, macos-kvm, looking-glass, remote-viewer-spice, gpu-passthrough, hugepages, viommu, hidden-hypervisor, headless-vnc, headless-serial, storage-virtio-scsi-single, storage-virtio-scsi-pci).
-- Verified that profile-aware compaction omits redundant fields owned by profiles (always enabled, no opt-out).
+- Verified that profile-aware compaction omits redundant fields owned by profiles in compact mode only.
 - Verified that compact output sizes match expectations (5-6x reduction vs. canonical for complex fixtures like wakiza: 212→34 lines).
-- CLI behavior documented: `--no-compact` only affects flow-style, not profile compaction.
-- Decision made: canonical output mode is optional and can be deferred if not needed or added as separate backlog item if required.
+- CLI behavior documented for explicit mode selection: `--output-mode {canonical,compact,debug}` with compact as default.
+- Verified that canonical and debug-canonical exports are available and do not apply profile-compaction elision rules.
 Estimate: 1 day
 
 ### B-31 Expand profile inference coverage for Proxmox importer
 Scope:
-- Extend profile inference heuristics to cover additional Proxmox patterns beyond current 11 layers.
+- Extend profile inference heuristics to cover additional Proxmox patterns beyond current baseline layers.
 - Add inferred profiles for: nested virtualization (l2 profiles), AppleSMC + SMBIOS (macOS-kvm variant), mixed storage buses, specific Hyper-V variants.
-- Document profile inference decision tree and maintainability model.
+- Document profile inference decision tree and maintainability model, including interaction with explicit export modes.
 Dependencies: B-23
 Acceptance Criteria:
 - At least 5 new profile inference rules added and tested.
 - Inference decision tree documented in CONFIGURATION.md profiles section.
-- Representative fixtures validate correct inference across rule set with snapshot tests.
-- No breaking changes to existing profile stack behavior.
+- Representative fixtures validate correct inference across rule set with snapshot tests in compact and canonical/debug-canonical export paths.
+- No breaking changes to existing profile stack behavior or explicit output-mode semantics.
 Estimate: 2.5 days
 
 ### B-32 Omit deterministic fields in import-output mode
