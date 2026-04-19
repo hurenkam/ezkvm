@@ -194,6 +194,7 @@ impl CentralConfig {
     }
 
     /// Resolve the effective Looking Glass program path, including CLI overrides.
+    #[allow(dead_code)]
     pub fn looking_glass_program_with_overrides<'a>(
         &'a self,
         overrides: &'a RuntimeCliOverrides,
@@ -323,6 +324,9 @@ pub struct LocationsConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct LookingGlassOptions {
+    /// Launch policy mode: `explicit`, `auto`, or `disabled`.
+    pub mode: Option<String>,
+
     /// Path to looking-glass-client executable (VM/profile-level preferred).
     pub program: Option<String>,
 

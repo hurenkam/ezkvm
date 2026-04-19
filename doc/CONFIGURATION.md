@@ -139,6 +139,19 @@ TPM capability resolver behavior:
 | `looking_glass.program` | string | `/usr/bin/looking-glass-client` |
 | `looking_glass.shared_memory_device` | string | `/dev/kvmfr0` |
 
+Looking Glass capability resolver behavior:
+- Launch modes come from `options.looking_glass.mode`: `disabled`, `auto`, or `explicit`.
+- Program resolution precedence: CLI `--looking-glass-program` -> VM/profile `options.looking_glass.program` -> `host_capabilities.integrations.looking_glass.program` -> legacy central `looking_glass.program` -> legacy `tools.looking_glass` -> `PATH` `looking-glass-client`.
+- `explicit` mode fails preflight if the client binary is unavailable or the configured path is empty.
+- `auto` mode silently skips client launch when no binary is available, while preserving any shared-memory-path warning if ivshmem is enabled.
+- `disabled` mode suppresses Looking Glass launch entirely even if ivshmem and GPU passthrough are present.
+- Shared-memory device policy remains host-controlled via `host_capabilities.integrations.looking_glass.shared_memory_device`; VM ivshmem paths are still validated before client launch.
+
+Looking Glass setup quick reference:
+- Debian/Ubuntu: install `looking-glass-client` from distro or local package source, verify `/dev/kvmfr0` ownership/permissions, and pair with SPICE for clipboard/input if desired.
+- Arch Linux: install `looking-glass`/`looking-glass-client`, ensure `kvmfr` is loaded, and expose `/dev/kvmfr0` to the desktop user.
+- For all distros: use `mode: explicit` when a VM depends on Looking Glass, and `mode: auto` when it is an optional convenience integration.
+
 ### Central Config precedence inside host capability resolution
 
 For fields that exist in both the new capability sections and older compatibility sections, the capability section wins.

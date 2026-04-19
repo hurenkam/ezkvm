@@ -120,16 +120,12 @@ pub(crate) fn build_looking_glass_launch(
         .as_ref()
         .unwrap_or(&central_config.looking_glass);
 
-    let looking_glass_path = match runtime_overrides
-        .looking_glass_program
-        .as_deref()
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .or(looking_glass_options.program.as_deref())
-        .or(central_config.looking_glass_program_with_overrides(runtime_overrides))
-    {
-        Some(path) if !path.trim().is_empty() => path,
-        Some(_) => return Err(anyhow!("Looking Glass client path is empty")),
+    let looking_glass_path = match crate::state::resolve_looking_glass_program(
+        config.options.looking_glass.as_ref(),
+        central_config,
+        runtime_overrides,
+    )? {
+        Some(path) => path,
         None => return Ok(None),
     };
 
@@ -164,7 +160,7 @@ pub(crate) fn build_looking_glass_launch(
 
     Ok(Some(AuxiliaryLaunch {
         label: "Looking Glass client for ivshmem session",
-        program: looking_glass_path.to_string(),
+        program: looking_glass_path,
         args,
         inherit_output: true,
         verify_running: true,

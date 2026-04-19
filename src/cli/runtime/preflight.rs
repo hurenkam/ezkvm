@@ -31,6 +31,7 @@ pub(crate) fn run_runtime_preflight(
     ensure_socket_dir_access(config)?;
     ensure_tpm_capabilities(config, central_config, runtime_overrides)?;
     ensure_firmware_capabilities(config, central_config, runtime_overrides)?;
+    ensure_looking_glass_capabilities(config, central_config, runtime_overrides)?;
 
     let mut report = RuntimePreflightReport::default();
     collect_optional_warnings(config, central_config, runtime_overrides, &mut report);
@@ -235,10 +236,7 @@ fn collect_optional_warnings(
             }
         }
         Ok(None) => {
-            report.push_warning(
-                "Looking Glass integration disabled because no client program is configured"
-                    .to_string(),
-            );
+            // Auto mode degrades silently when no client is available.
         }
         Err(err) => {
             report.push_warning(format!(
@@ -255,6 +253,25 @@ fn collect_optional_warnings(
             "Looking Glass shared memory path '{}' does not exist on this host",
             ivshmem.mem_path
         ));
+    }
+}
+
+fn ensure_looking_glass_capabilities(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<()> {
+    if !should_launch_looking_glass(config) {
+        return Ok(());
+    }
+
+    match crate::state::resolve_looking_glass_program(
+        config.options.looking_glass.as_ref(),
+        central_config,
+        runtime_overrides,
+    ) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(anyhow!("preflight failed: {}", err)),
     }
 }
 
@@ -518,7 +535,7 @@ devices: {}
     }
 
     #[test]
-    fn preflight_reports_optional_capability_downgrade_for_missing_looking_glass() {
+    fn preflight_keeps_shared_memory_warning_when_looking_glass_auto_mode_skips_client() {
         let config = VmConfig::from_str(
             r#"
 name: preflight-lg
@@ -551,12 +568,6 @@ host:
         )
         .expect("preflight should succeed with optional warnings");
 
-        assert!(
-            result
-                .optional_warnings()
-                .iter()
-                .any(|warning| warning.contains("Looking Glass integration disabled"))
-        );
         assert!(
             result
                 .optional_warnings()

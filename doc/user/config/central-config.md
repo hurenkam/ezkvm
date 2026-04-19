@@ -107,8 +107,9 @@ The preferred place for portability-related defaults is `host_capabilities`. The
 - Bridge helper precedence for `backend.type: bridge`: VM `backend.helper` -> `host_capabilities.network.bridge_helper` -> `PATH` `qemu-bridge-helper` -> distro defaults.
 - If bridge helper resolution fails (or preferred backend is set to `user`/`user-mode`), ezkvm downgrades the NIC to user-mode and emits a warning.
 - `host_capabilities.integrations.remote_viewer.program` or legacy `tools.remote_viewer` + `spice.enabled`: ezkvm can launch remote-viewer.
-- VM/profile `options.looking_glass.program` is used unless a CLI override is provided.
-- If no CLI or VM/profile value is set, ezkvm falls back to `host_capabilities.integrations.looking_glass.program`, then legacy central `looking_glass.program`, then legacy `tools.looking_glass`.
+- Looking Glass launch modes: `options.looking_glass.mode: disabled|auto|explicit`.
+- Looking Glass program precedence: CLI `--looking-glass-program` -> VM/profile `options.looking_glass.program` -> `host_capabilities.integrations.looking_glass.program` -> legacy central `looking_glass.program` -> legacy `tools.looking_glass` -> `PATH` `looking-glass-client`.
+- `mode: explicit` fails preflight when the client cannot be resolved; `mode: auto` silently skips launch when unavailable; `mode: disabled` suppresses launch.
 
 Supported CLI runtime overrides on `ezkvm start`:
 
@@ -132,7 +133,7 @@ Preflight behavior:
   - Bridge helper fallback warnings for bridge NICs downgraded to user-mode.
   - `/dev/net/tun` accessibility warnings when bridge-helper networking is selected.
   - remote-viewer launcher prerequisites for SPICE workflows.
-  - Looking Glass client launcher prerequisites and shared-memory path presence.
+  - Looking Glass shared-memory path presence, plus launcher degradation warnings when an auto-discovered configuration is invalid.
 - Preflight output order is deterministic across `start` and `start --dry-run`, so failure and warning ordering remains stable.
 
 CLI override impact on preflight checks:

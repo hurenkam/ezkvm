@@ -4,6 +4,7 @@
 
 mod cache;
 mod logs;
+mod looking_glass_resolver;
 mod network_resolver;
 mod paths;
 mod pid;
@@ -14,6 +15,11 @@ mod tpm_resolver;
 pub use cache::{cache_config, delete_cached_config, load_cached_config};
 #[allow(unused_imports)]
 pub use logs::{cleanup_old_logs, cleanup_old_logs_at};
+#[allow(unused_imports)]
+pub use looking_glass_resolver::{
+    CentralLookingGlassCapabilityResolver, LookingGlassCapabilityResolver, LookingGlassLaunchMode,
+    resolve_looking_glass_program,
+};
 #[allow(unused_imports)]
 pub use network_resolver::{
     CentralNetworkCapabilityResolver, NetworkCapabilityResolver, NetworkResolutionMode,
