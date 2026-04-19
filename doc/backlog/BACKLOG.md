@@ -495,6 +495,236 @@ Acceptance Criteria:
 - Regression tests verify portable normalization behavior and guard against host-literal reintroduction.
 Estimate: 4 days
 
+## Phase 2: Host Capability Resolution (Portable Runtime Infrastructure)
+
+### B-42 Extend central config schema with host capability sections
+Scope:
+- Add `host_capabilities` top-level section to central config with subsections for:
+  - `runtime`: runtime directory root and socket/log placement policies
+  - `firmware`: OVMF discovery, fallback paths, version handling
+  - `tpm`: swtpm binary location, socket vs state-file placement, socket directory policy
+  - `network`: bridge helper binary path, backend preference (bridge-helper vs user-mode)
+  - `integrations.looking_glass`: optional Looking Glass client binary, shared-mem device policy
+- Support precedence: CLI flags > explicit VM config > profile defaults > central config > built-in fallback
+- Define validation gates for required vs optional capabilities per target mode
+Dependencies: B-41
+Acceptance Criteria:
+- Central config schema updated with all host capability sections
+- Each section includes version comments and migration guidance
+- Schema validates required capabilities for portable-linux target
+- Integration test covers schema parsing and precedence ordering
+- Documentation includes operator examples for each Debian, Ubuntu, Arch variant
+Estimate: 3 days
+
+### B-43 Implement runtime directory capability provider
+Scope:
+- Build host capability resolver layer that replaces hard-coded runtime path generation
+- Runtime directory provider discovers/uses:
+  - `XDG_RUNTIME_DIR` environment variable (preferred for portable)
+  - central config `host_capabilities.runtime.root_directory` (deployment policy override)
+  - built-in fallback: `~/.local/run/ezkvm`
+- Derive and namespace socket/log locations under resolved runtime root:
+  - pid files: `<runtime>/ezkvm/<vmname>.pid`
+  - QMP sockets: `<runtime>/ezkvm/<vmname>.qmp`
+  - guest-agent sockets: `<runtime>/ezkvm/<vmname>.qga`
+  - TPM sockets: `<runtime>/ezkvm/<vmname>.swtpm` (or state dir if state-file policy)
+  - serial sockets: `<runtime>/ezkvm/<vmname>.serial<port>`
+  - VNC unix sockets: `<runtime>/ezkvm/<vmname>.vnc`
+- Add `RuntimeCapabilityResolver` trait and central resolver impl
+- Wire resolver into QemuManager and import mapper pipeline
+- Add precedence evaluation: CLI `--run-dir` > explicit config > central config > env > built-in
+Dependencies: B-42
+Acceptance Criteria:
+- RuntimeCapabilityResolver trait defined with clear interface
+- Runtime directory provider correctly resolves paths in all precedence orders
+- All normalization formerly done by mapper now delegated to resolver
+- Unit tests cover precedence evaluation and path derivation
+- Integration tests verify portable mode uses resolved runtime dir instead of /var/run/qemu-server
+- No mapper hard-coding of /var/run paths remains
+Estimate: 3 days
+
+### B-44 Implement firmware locator capability provider
+Scope:
+- Firmware capability provider discovers OVMF, SeaBIOS, and other firmware assets
+- Discovery strategy (in precedence order):
+  - CLI `--ovmf-dir` flag (if provided)
+  - Explicit VM config firmware overrides
+  - Profile defaults (e.g., from proxmox-q35-uefi)
+  - Central config `host_capabilities.firmware.search_paths`
+  - Built-in platform defaults:
+    - Debian: `/usr/share/ovmf`
+    - Ubuntu: `/usr/share/OVMF`
+    - Arch: `/usr/share/ovmf`
+- Support per-firmware-type configuration (OVMF.fd, OVMF_CODE.fd, etc.)
+- Validate firmware files exist and are readable at runtime
+- Produce actionable error if required firmware not found
+- Support firmware aliasing (e.g., `ovmf/q35` -> resolved path per distro)
+Dependencies: B-43
+Acceptance Criteria:
+- FirmwareCapabilityProvider implemented and wired into boot args generation
+- Discovery correctly prioritizes sources per precedence contract
+- Unit tests cover all discovery paths and fallback order
+- Integration tests verify firmware location resolution for Debian, Ubuntu, Arch
+- Actionable error messages when firmware not found
+- Portable mode no longer depends on Proxmox firmware asset paths
+Estimate: 2 days
+
+### B-45 Implement swtpm capability provider
+Scope:
+- swtpm capability provider handles TPM backend setup for portable mode
+- Provider discovers/resolves:
+  - swtpm binary location (CLI override > central config > `which swtpm` > error)
+  - TPM socket vs state-file placement policy
+  - Socket directory (resolved via runtime directory provider)
+  - State directory for state-file policy (defaults to XDG_STATE_HOME or fallback)
+- Emit conditional QEMU args based on discovered policy:
+  - For socket mode: `-chardev socket,path=<resolved>,server=on,wait=off,id=tpm0`
+  - For state-file mode: `-chardev tpmemu,id=tpm0` with state path handling
+- Preflight validation: check swtpm binary exists and is executable
+- Support for distro-specific swtpm package paths
+Dependencies: B-44
+Acceptance Criteria:
+- swtpmCapabilityProvider implemented with socket and state-file modes
+- swtpm binary discovery works via PATH and central config override
+- TPM socket/state paths resolved correctly per runtime provider
+- Unit tests cover binary discovery, path resolution, and mode selection
+- Integration tests verify swtpm args generated correctly for portable mode
+- Preflight validation produces actionable error if swtpm not found in portable mode
+Estimate: 2 days
+
+### B-46 Implement network backend helper capability provider
+Scope:
+- Network capability provider selects and resolves bridge-helper backend for portable mode
+- Provider discovers/resolves:
+  - Bridge helper binary (qemu-bridge-helper) from standard system paths
+  - Central config override for custom helper path
+  - User-mode fallback if bridge helper not available or disabled
+  - Bridge helper configuration directory (usually /etc/qemu)
+- Emit conditional network backend args:
+  - For bridge helper: `-netdev bridge,br=<bridge>,helper=<helper-path>,id=net<N>`
+  - For user-mode fallback: `-netdev user,id=net<N>,hostname=<vmname>`
+- Preflight validation: check bridge helper exists and network socket writable
+- Support for distro-specific bridge-helper package locations
+- Document bridge setup requirements for operator (netctl, ip link, etc.)
+Dependencies: B-45
+Acceptance Criteria:
+- NetworkCapabilityProvider implemented with bridge-helper and user-mode modes
+- Bridge helper binary discovered via PATH and central config override
+- Fallback to user-mode networking when bridge-helper unavailable
+- Unit tests cover helper discovery, path resolution, and mode selection
+- Integration tests verify network backend args for portable mode
+- Preflight warns about bridge requirement and suggests setup when needed
+- Documentation includes bridge setup steps for each distro
+Estimate: 2 days
+
+### B-47 Add optional Looking Glass capability provider
+Scope:
+- Looking Glass provider handles optional integration for portable mode
+- Provider discovers/resolves:
+  - Looking Glass client binary (user config > central config > PATH > disabled)
+  - Shared-memory device policies (/dev/kvmfr0 vs fallback)
+  - Optional integration: graceful downgrade if not available
+- Behavior modes:
+  - Explicit enable (user config): error if not found, actionable guidance
+  - Auto-discover (profile or central config): use if found, silently skip if not
+  - Disabled (default): no Looking Glass args emitted
+- Emit conditional QEMU args when enabled:
+  - `-device ivshmem-plain,memdev=ivshmem,size=32M` (if OK)
+  - Update display sections for Looking Glass client compatibility
+- Preflight validation: warn if Looking Glass enabled but binary not found
+- Document Looking Glass setup per distro (package installation, device permissions)
+Dependencies: B-46
+Acceptance Criteria:
+- LookingGlassCapabilityProvider implemented with enable/auto/disable modes
+- Graceful downgrade when Looking Glass not available
+- Client binary discovery via PATH and central config override
+- Unit tests cover discovery, mode selection, and graceful downgrade
+- Integration tests verify optional integration behavior
+- Documentation includes Looking Glass setup for Debian, Ubuntu, Arch
+- Existing parity-mode Looking Glass support not affected
+Estimate: 2 days
+
+### B-48 Implement capability precedence contract and validation
+Scope:
+- Build unified precedence evaluation engine for all capability providers
+- Precedence order (highest to lowest):
+  1. CLI flags (--run-dir, --ovmf-dir, --swtpm-binary, etc.)
+  2. Explicit VM config overrides
+  3. Profile defaults
+  4. Central config host_capabilities sections
+  5. Built-in platform defaults
+- Validate and normalize capability resolution results
+- Produce clear diagnostic output showing which source was used for each capability
+- Add validation gates per mode:
+  - portable-linux: required capabilities (runtime, swtpm, network) must resolve
+  - proxmox-parity: skip capability resolution, use parity defaults
+- Wire precedence engine into import and runtime pipelines
+- Add capability resolution diagnostics to --dry-run output
+Dependencies: B-47
+Acceptance Criteria:
+- CapabilityPrecedenceResolver trait and central impl provided
+- Precedence evaluation correctly prioritizes all sources
+- Validation gates work per target mode and produce actionable errors
+- Unit tests cover all precedence combinations and edge cases
+- Integration tests verify precedence in import and start pipelines
+- --dry-run output includes capability resolution diagnostic 
+- Documentation explains precedence and how to use each override point
+Estimate: 3 days
+
+### B-49 Add integration tests for host capability resolution
+Scope:
+- Build test matrix covering capability resolution across Debian Trixie, Ubuntu 26.04, Arch Linux
+- Test scenarios:
+  - Default capability discovery (no config, no CLI flags)
+  - CLI flag overrides for each capability
+  - Central config overrides (create test central.yaml variants)
+  - Profile-based defaults interaction with capabilities
+  - Precedence correctness (CLI wins > explicit > profile > central > built-in)
+  - Optional capabilities (Looking Glass) graceful downgrade
+  - Preflight validation for portable-linux target (required capabilities)
+  - Parity target ignores capability resolution (uses parity profiles)
+- Test both import-time capability selection and runtime-time discovery
+- Verify portable mode no longer generates Proxmox-specific paths
+- Host-specific test fixtures (e.g., mock firmware dirs, mock swtpm binary)
+Dependencies: B-48
+Acceptance Criteria:
+- Integration test suite covers all precedence and mode combinations
+- Tests run on matrix of Debian, Ubuntu, Arch (or emulated equivalents)
+- Portable mode tests verify no Proxmox paths in generated args
+- Parity mode tests verify unchanged behavior from B-41
+- Capability resolution diagnostics validated for correctness
+- All tests pass on actual host systems with real capability discovery
+- Test documentation explains matrix setup and how to run locally
+Estimate: 4 days
+
+### B-50 Document portable mode operator guidance
+Scope:
+- Build comprehensive operator guide for portable-linux mode covering:
+  - When to use portable-linux vs proxmox-parity targets
+  - Host requirements per distro (QEMU, swtpm, bridge-helper, firmware packages)
+  - Network setup guides for bridge-helper (netctl, ip link, udev rules)
+  - Central config examples for common distro setups
+  - CLI flag override examples for custom deployments
+  - Preflight validation error messages and how to resolve them
+  - Looking Glass optional setup
+  - Troubleshooting capability discovery (enable diagnostics, check paths, etc.)
+  - Migration guide: from parity-only imports to portable imports
+- Add operational examples for multi-VM deployments with shared central config
+- Update user docs with portable-linux as new default target
+- Add architecture diagram showing capability precedence flow
+- Create quick-start guides (copy-paste friendly) for each distro
+- Cross-reference central config schema documentation
+Dependencies: B-49
+Acceptance Criteria:
+- Operator guide published in doc/user/import-proxmox.md or equivalent
+- All capability providers documented with examples
+- Network bridge setup steps clear and tested per distro
+- Troubleshooting guide provides common errors and solutions
+- Quick-start guides verified on actual systems
+- Central config examples included for each distro variant
+- Migration guide helps users transition from parity-only workflows
+Estimate: 2 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
