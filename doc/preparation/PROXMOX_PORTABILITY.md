@@ -235,6 +235,108 @@ This gives ezkvm a clean answer to the core conflict:
 - strict parity is still supported
 - portability no longer depends on recreating Proxmox
 
+## Central Host Config As An Integration Layer
+
+An important alternative was considered: capture most host-specific differences in a central host config.
+
+### Is It A Replacement For The Chosen Approach?
+
+No.
+
+Using central host config alone is not a full replacement for the selected direction (dual import targets plus runtime capability abstraction). Central config can store host facts and preferences, but by itself it does not enforce the architectural boundary between:
+
+- guest-visible semantics that must remain stable
+- host realization details that should vary per environment
+
+Without the capability boundary, central config tends to become a growing matrix of low-level path and package toggles, which recreates coupling in a different location.
+
+### Is It A Good Idea To Integrate?
+
+Yes.
+
+Central host config is a strong complement when used as the backing data source for runtime capability resolution.
+
+In this model:
+
+- profiles express semantic intent
+- central config expresses host environment facts and deployment policy
+- runtime capability providers resolve concrete paths, binaries, and backend details
+
+This keeps portability explicit and operator-friendly while preserving clean ownership boundaries.
+
+### Impact Analysis
+
+#### Positive impact
+
+- Faster host adaptation across Debian, Ubuntu, and Arch without changing mapper logic.
+- Cleaner operator overrides for bridge helper paths, firmware lookup, swtpm location, and runtime directory roots.
+- Better packaging/deployment flexibility because host details are configured rather than hard-coded.
+
+#### Risks if done incorrectly
+
+- Config sprawl and unclear ownership if central config starts carrying guest semantics.
+- Behavioral drift if host-level overrides silently alter effective VM behavior.
+- Harder reproducibility if central config is mutable and not validated or versioned.
+- Security and permissions risk if low-level host controls are exposed without strict validation.
+
+#### Net assessment
+
+- Positive when central config is limited to host capability resolution.
+- Negative when central config is used as a direct substitute for portability architecture.
+
+### Integration Pattern In The Current Approach
+
+The chosen approach should stay intact and be extended as follows:
+
+1. Keep dual targets:
+	- `proxmox-parity` for strict parity workflows
+	- `portable-linux` for host-portable execution
+2. Add host capability sections to central config for:
+	- runtime directory policy
+	- network backend preference and helper path
+	- firmware locator policy
+	- swtpm binary/socket/state policy
+	- optional Looking Glass capability
+3. Define deterministic precedence:
+	- CLI flags
+	- VM-local explicit config
+	- profile defaults
+	- central host capability defaults
+	- built-in fallback defaults
+4. Keep profile ownership unchanged:
+	- profiles keep semantic defaults
+	- central config keeps host facts and deployment policy
+	- runtime layer performs final host-specific resolution
+5. Add validation and safety gates:
+	- startup preflight for required binaries and paths
+	- actionable errors for missing required capabilities in portable mode
+	- graceful downgrade for optional integrations
+6. Add test guarantees:
+	- host config variants may change host-specific runtime args
+	- guest-visible topology and semantics must remain invariant
+
+This integration gives the project both portability and operational flexibility, without reintroducing Proxmox-specific coupling.
+
+## Sequencing With Epic D (Trait-Based Extensibility)
+
+Portability should be implemented before the full Epic D rollout, with one important exception: do D-01 first as a guardrail.
+
+Recommended execution order:
+
+1. **D-01 first** (identify extension seams and trait interfaces).
+2. **Portability MVP next** (portable-linux target and profile/runtime split from this document).
+3. **D-02 and D-03 after portability MVP** (compile-time registry and one concrete extension backed by the real portability implementation).
+4. **D-04 docs last** (after real extension behavior is validated in code and tests).
+
+Rationale:
+
+- Doing D-01 first creates explicit boundaries so portability work does not hard-wire accidental abstractions.
+- Doing full Epic D first (especially D-02 and D-03) risks building trait seams around assumptions that portability implementation will later invalidate.
+- The portability path in this document is the highest uncertainty area (runtime directories, helper resolution, network backend strategy, firmware discovery), so extension architecture should be informed by that concrete implementation.
+- Once portability MVP exists, D-02 and D-03 become lower risk and easier to validate with an actual extension use case instead of synthetic examples.
+
+In short: **guardrails first, portability first, extensibility completion second**.
+
 ## Why This Direction Is Better
 
 It respects the real distinction in the current system.
@@ -396,6 +498,60 @@ Validation should check both:
 
 - guest-visible behavior remains correct
 - host runtime does not require Proxmox filesystem layout or helper binaries
+
+## Implementation Checklist Mapped To Backlog
+
+The checklist below maps the central-host-config integration work to existing backlog items where possible. Gaps are explicitly identified as new backlog candidates.
+
+### A. Guardrails and Architectural Seams
+
+- Define capability seams and ownership boundaries before adding host-config resolution logic.
+	- Backlog: D-01 (trait interfaces and extension seams).
+
+### B. Runtime Target and CLI Surface
+
+- Add and document portable-linux mode selection and any required CLI flags.
+	- Backlog: B-03 (import CLI command), B-33 (explicit output/runtime modes).
+
+### C. Network Capability Resolution
+
+- Integrate host-config-driven network backend selection (bridge helper path, tap strategy, user/passt fallback).
+	- Backlog: B-11 (network fidelity).
+	- Gap: Add a new backlog item for host capability resolution policy and precedence for network backends.
+
+### D. Profile Ownership and Compaction Safety
+
+- Ensure central host config does not take over guest-semantic ownership from profiles.
+- Keep compaction deterministic while introducing host-resolved runtime details.
+	- Backlog: B-24 (compaction ownership boundaries), B-30 (profile-first compaction audit).
+
+### E. Central Host Config Schema and Precedence
+
+- Add central config schema sections for host capabilities: runtime directories, firmware locator, swtpm policy, helper paths, optional integrations.
+- Enforce precedence: CLI > VM explicit > profile defaults > central host defaults > built-in fallback.
+	- Gap: Add new backlog items for host-capability schema and precedence contract.
+
+### F. Validation and Preflight
+
+- Add preflight checks that validate required binaries and paths in portable mode.
+- Produce actionable errors for missing required capabilities and graceful downgrade for optional integrations.
+	- Gap: Add new backlog item for portability preflight validation and error model.
+
+### G. Regression and Matrix Testing
+
+- Add test matrix for Debian Trixie, Ubuntu 26.04 LTS, and Arch using host-config variants.
+- Assert invariant guest-visible topology/semantics with host-specific runtime differences only.
+	- Backlog: E-01 (regression expansion).
+
+### H. Sequencing
+
+- Execute in this order:
+	1. D-01
+	2. portability MVP phases 1-2
+	3. host capability resolution plus central host config integration (this checklist)
+	4. validation matrix and regression hardening
+
+This keeps the selected approach intact while making central host config a first-class integration mechanism rather than a replacement architecture.
 
 ## Non-Goals
 
