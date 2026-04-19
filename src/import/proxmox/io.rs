@@ -279,19 +279,18 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
     // The IDE controller is implicit in the chipset; group IDE drives under
     // devices.controllers.ide so they appear alongside scsi/sata controllers.
     let ide_key = Value::String("ide".to_string());
+    let interface_key = Value::String("interface".to_string());
     let mut ide_drives = Vec::new();
     let mut other_leftovers = Vec::new();
     for drive in leftovers {
         let is_ide = if let Value::Mapping(ref map) = drive {
-            map.get(&Value::String("interface".to_string()))
-                .and_then(Value::as_str)
-                .map_or(false, |iface| iface == "ide")
+            map.get(interface_key.clone()).and_then(Value::as_str) == Some("ide")
         } else {
             false
         };
         if is_ide {
             if let Value::Mapping(mut map) = drive {
-                map.remove(&Value::String("interface".to_string()));
+                map.remove(interface_key.clone());
                 ide_drives.push(Value::Mapping(map));
             }
         } else {
@@ -344,12 +343,14 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
 fn controller_effective_ids(controllers: &[serde_yaml::Value], prefix: &str) -> Vec<String> {
     use serde_yaml::Value;
 
+    let id_key = Value::String("id".to_string());
+
     controllers
         .iter()
         .enumerate()
         .map(|(index, controller)| {
             if let Value::Mapping(map) = controller
-                && let Some(Value::String(id)) = map.get(&Value::String("id".to_string()))
+                && let Some(Value::String(id)) = map.get(id_key.clone())
                 && !id.trim().is_empty()
             {
                 return id.to_string();
@@ -366,21 +367,25 @@ fn assign_drive_to_controller(
 ) -> Option<(&'static str, usize, serde_yaml::Value)> {
     use serde_yaml::Value;
 
+    let interface_key = Value::String("interface".to_string());
+    let controller_key = Value::String("controller".to_string());
+    let bus_key = Value::String("bus".to_string());
+
     let Value::Mapping(mut drive_map) = drive else {
         return None;
     };
 
     let interface = drive_map
-        .get(&Value::String("interface".to_string()))
+        .get(interface_key.clone())
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
     let explicit_controller = drive_map
-        .get(&Value::String("controller".to_string()))
+        .get(controller_key.clone())
         .and_then(Value::as_str)
         .map(ToString::to_string);
     let bus = drive_map
-        .get(&Value::String("bus".to_string()))
+        .get(bus_key)
         .and_then(Value::as_str)
         .map(ToString::to_string);
 
@@ -411,10 +416,10 @@ fn assign_drive_to_controller(
         _ => None,
     }?;
 
-    drive_map.remove(&Value::String("controller".to_string()));
+    drive_map.remove(controller_key);
     let expected_interface = target.0;
     if interface == expected_interface {
-        drive_map.remove(&Value::String("interface".to_string()));
+        drive_map.remove(interface_key);
     }
 
     Some((target.0, target.1, Value::Mapping(drive_map)))
@@ -708,15 +713,19 @@ mod tests {
             .expect("compact import");
 
             let root: Value = serde_yaml::from_str(&compact.yaml).expect("yaml should parse");
+            let devices_key = Value::String("devices".to_string());
+            let controllers_key = Value::String("controllers".to_string());
+            let scsi_key = Value::String("scsi".to_string());
+            let drives_key = Value::String("drives".to_string());
             let devices = root
                 .as_mapping()
-                .and_then(|map| map.get(&Value::String("devices".to_string())))
+                .and_then(|map| map.get(devices_key.clone()))
                 .and_then(Value::as_mapping)
                 .expect("devices should be a mapping");
             let nested_scsi = devices
-                .get(&Value::String("controllers".to_string()))
+                .get(controllers_key)
                 .and_then(Value::as_mapping)
-                .and_then(|controllers| controllers.get(&Value::String("scsi".to_string())))
+                .and_then(|controllers| controllers.get(scsi_key))
                 .and_then(Value::as_sequence)
                 .expect("devices.controllers.scsi should exist");
             let first_scsi = nested_scsi
@@ -724,14 +733,12 @@ mod tests {
                 .and_then(Value::as_mapping)
                 .expect("scsi controller should be mapping");
             let nested_drives = first_scsi
-                .get(&Value::String("drives".to_string()))
+                .get(drives_key.clone())
                 .and_then(Value::as_sequence)
                 .expect("nested drives should exist");
             assert_eq!(nested_drives.len(), 1);
 
-            let devices_drives = devices
-                .get(&Value::String("drives".to_string()))
-                .and_then(Value::as_sequence);
+            let devices_drives = devices.get(drives_key).and_then(Value::as_sequence);
             assert!(
                 devices_drives.is_none_or(|items| items.is_empty()),
                 "controller-owned scsi drives should not remain in devices.drives"
@@ -764,11 +771,13 @@ mod tests {
             .expect("compact import");
 
             let root: Value = serde_yaml::from_str(&compact.yaml).expect("yaml should parse");
+            let devices_key = Value::String("devices".to_string());
+            let drives_key = Value::String("drives".to_string());
             let devices_drives = root
                 .as_mapping()
-                .and_then(|map| map.get(&Value::String("devices".to_string())))
+                .and_then(|map| map.get(devices_key))
                 .and_then(Value::as_mapping)
-                .and_then(|devices| devices.get(&Value::String("drives".to_string())))
+                .and_then(|devices| devices.get(drives_key))
                 .and_then(Value::as_sequence)
                 .expect("devices.drives should still exist for virtio drives");
             assert_eq!(devices_drives.len(), 1);
@@ -800,15 +809,21 @@ mod tests {
             .expect("compact import");
 
             let root: Value = serde_yaml::from_str(&compact.yaml).expect("yaml should parse");
+            let devices_key = Value::String("devices".to_string());
+            let controllers_key = Value::String("controllers".to_string());
+            let ide_key = Value::String("ide".to_string());
+            let drives_key = Value::String("drives".to_string());
+            let path_key = Value::String("path".to_string());
+            let interface_key = Value::String("interface".to_string());
             let devices = root
                 .as_mapping()
-                .and_then(|map| map.get(&Value::String("devices".to_string())))
+                .and_then(|map| map.get(devices_key))
                 .and_then(Value::as_mapping)
                 .expect("devices should be a mapping");
             let nested_ide = devices
-                .get(&Value::String("controllers".to_string()))
+                .get(controllers_key)
                 .and_then(Value::as_mapping)
-                .and_then(|c| c.get(&Value::String("ide".to_string())))
+                .and_then(|c| c.get(ide_key))
                 .and_then(Value::as_sequence)
                 .expect("devices.controllers.ide should exist");
             let first_ide = nested_ide
@@ -816,7 +831,7 @@ mod tests {
                 .and_then(Value::as_mapping)
                 .expect("ide controller entry should be a mapping");
             let nested_drives = first_ide
-                .get(&Value::String("drives".to_string()))
+                .get(drives_key.clone())
                 .and_then(Value::as_sequence)
                 .expect("ide controller should have nested drives");
             assert_eq!(nested_drives.len(), 1);
@@ -825,17 +840,15 @@ mod tests {
                 .and_then(Value::as_mapping)
                 .expect("ide drive should be a mapping");
             assert!(
-                !first_drive.contains_key(&Value::String("path".to_string())),
+                !first_drive.contains_key(path_key),
                 "ide cdrom should omit empty path"
             );
             assert!(
-                !first_drive.contains_key(&Value::String("interface".to_string())),
+                !first_drive.contains_key(interface_key),
                 "ide nested drive should omit interface because container implies it"
             );
 
-            let devices_drives = devices
-                .get(&Value::String("drives".to_string()))
-                .and_then(Value::as_sequence);
+            let devices_drives = devices.get(drives_key).and_then(Value::as_sequence);
             assert!(
                 devices_drives.is_none_or(|items| items.is_empty()),
                 "ide drives should not remain in devices.drives"

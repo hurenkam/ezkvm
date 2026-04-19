@@ -203,14 +203,16 @@ impl VmConfig {
         };
 
         let devices_key = Value::String("devices".to_string());
+        let controllers_key = Value::String("controllers".to_string());
+        let legacy_key = Value::String("legacy".to_string());
         let Some(devices_value) = vm_map.remove(&devices_key) else {
             return;
         };
 
-        let mut controllers_map = match vm_map.remove(&Value::String("controllers".to_string())) {
+        let mut controllers_map = match vm_map.remove(controllers_key.clone()) {
             Some(Value::Mapping(map)) => map,
             Some(other) => {
-                vm_map.insert(Value::String("controllers".to_string()), other);
+                vm_map.insert(controllers_key.clone(), other);
                 Mapping::new()
             }
             None => Mapping::new(),
@@ -232,9 +234,7 @@ impl VmConfig {
                         continue;
                     };
 
-                    if let Some(Value::Mapping(legacy_map)) =
-                        block_map.remove(&Value::String("legacy".to_string()))
-                    {
+                    if let Some(Value::Mapping(legacy_map)) = block_map.remove(legacy_key.clone()) {
                         for (legacy_key, legacy_value) in legacy_map {
                             let Value::String(legacy_name) = legacy_key else {
                                 continue;
@@ -750,10 +750,10 @@ impl VmConfig {
 
         vm_map.insert(controllers_key, Value::Mapping(controllers_map));
 
-        if !vm_map.contains_key(&Value::String("devices".to_string())) {
+        if !vm_map.contains_key(Value::String("devices".to_string())) {
             vm_map.insert("devices".into(), Value::Mapping(Mapping::new()));
         }
-        if !vm_map.contains_key(&Value::String("host".to_string())) {
+        if !vm_map.contains_key(Value::String("host".to_string())) {
             vm_map.insert("host".into(), Value::Mapping(Mapping::new()));
         }
     }
