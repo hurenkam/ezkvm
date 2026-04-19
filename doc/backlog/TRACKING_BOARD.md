@@ -85,7 +85,7 @@ Source: doc/backlog/BACKLOG.md
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-04 | Wire hooks into start and stop flow | C | Phase-1-Features | epic:hooks, phase:1-features | C-02, C-03 | unassigned | Todo |
 | C-05 | Hook tests (unit and integration) | C | Phase-1-Features | epic:hooks, phase:1-features | C-04 | unassigned | Todo |
-| D-01 | Identify extension seams and trait interfaces | D | Phase-1-Features | epic:extensibility, phase:1-features | A-02 | unassigned | Todo |
+| D-01 | Identify extension seams and trait interfaces | D | Phase-1-Features | epic:extensibility, phase:1-features | A-02 | unassigned | Done |
 | D-02 | Implement compile-time extension registry | D | Phase-1-Features | epic:extensibility, phase:1-features | D-01 | unassigned | Todo |
 | D-03 | Port one concrete extension from v1 patterns | D | Phase-1-Features | epic:extensibility, phase:1-features | D-02 | unassigned | Todo |
 | D-04 | Extensibility docs and examples | D | Phase-1-Features | epic:extensibility, phase:1-features | D-03 | unassigned | Todo |

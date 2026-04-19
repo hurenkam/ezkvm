@@ -421,6 +421,42 @@ Allow the original devices.drives stansa as well, to maintain backwards compatib
 
 Note: This may already be partially implemented, but as of the time of writing, a generated yaml from proxmox config does not default to the suggested layout. After this task is finished, it should do so.
 
+### B-36 Add central host capability schema for portable runtime
+Scope:
+- Add central config sections for host capability resolution used by portable runtime mode.
+- Cover at minimum: runtime directory policy, firmware locator policy, network helper/backend policy, swtpm policy, optional Looking Glass capability.
+- Keep schema ownership clear: host capability facts/policies only, not guest-semantic VM settings.
+Dependencies: B-33, D-01
+Acceptance Criteria:
+- Central config schema supports host capability sections with validation and documented defaults.
+- Portable runtime can read capability settings without requiring VM-local duplication.
+- Documentation clearly distinguishes host capability config from profile/VM semantic config.
+Estimate: 3 days
+
+### B-37 Define and implement runtime precedence contract
+Scope:
+- Implement deterministic precedence for effective runtime resolution.
+- Required order: CLI flags > VM-local explicit config > profile defaults > central host defaults > built-in fallback.
+- Ensure dry-run and run paths share identical precedence behavior.
+Dependencies: B-36
+Acceptance Criteria:
+- Precedence order is enforced in code and documented.
+- Unit/integration tests cover override scenarios and conflict resolution.
+- No regression in existing Proxmox parity behavior when central host config is absent.
+Estimate: 2 days
+
+### B-38 Add portability preflight validation and error model
+Scope:
+- Add preflight validation for portable runtime requirements (required binaries, helper paths, firmware availability, permission-sensitive runtime directories).
+- Add structured, actionable errors for missing required capabilities and explicit graceful degradation for optional capabilities.
+- Ensure preflight output is deterministic in dry-run and run modes.
+Dependencies: B-36, B-37
+Acceptance Criteria:
+- Portable mode fails fast with actionable diagnostics when required capabilities are missing.
+- Optional capabilities (for example Looking Glass integration) degrade predictably without breaking VM start.
+- Integration tests cover success, required-capability failure, and optional-capability downgrade paths.
+Estimate: 3 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy

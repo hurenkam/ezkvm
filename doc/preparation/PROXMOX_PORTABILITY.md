@@ -328,6 +328,8 @@ Recommended execution order:
 3. **D-02 and D-03 after portability MVP** (compile-time registry and one concrete extension backed by the real portability implementation).
 4. **D-04 docs last** (after real extension behavior is validated in code and tests).
 
+The concrete D-01 seam definitions are documented in `doc/dev/EXTENSIBILITY_SEAMS.md`.
+
 Rationale:
 
 - Doing D-01 first creates explicit boundaries so portability work does not hard-wire accidental abstractions.

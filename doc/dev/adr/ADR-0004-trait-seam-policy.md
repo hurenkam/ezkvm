@@ -177,5 +177,6 @@ Traits must not violate unidirectional dependencies:
 
 - Backlog task: `doc/backlog/BACKLOG.md` - D-01 through D-04
 - Current architecture: `doc/dev/ARCHITECTURE_GUIDELINES.md`
+- Concrete seam map: `doc/dev/EXTENSIBILITY_SEAMS.md`
 - v1 Trait System: `/home/hurenkam/Workspace/ezkvm_v1/src/vm/mod.rs` (QemuDevice trait)
 - Rust best practices: https://www.youtube.com/watch?v=wJZt2LWbsY0 (Trait Object safety patterns)

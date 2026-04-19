@@ -8,6 +8,7 @@ This document defines the minimum workflow for architecture-safe contributions.
 2. `doc/dev/ARCHITECTURE_GUIDELINES.md`
 3. `doc/dev/MODULE_OWNERSHIP.md`
 4. Relevant ADRs in `doc/dev/adr/`
+5. `doc/dev/EXTENSIBILITY_SEAMS.md` when touching import or runtime extension boundaries
 
 ## Standard Workflow
 

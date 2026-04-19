@@ -155,6 +155,8 @@ Major architecture decisions are recorded in `doc/dev/adr/` for visibility and f
 - [ADR-0003: Hooks Policy](adr/ADR-0003-hooks-policy.md) - VM lifecycle hooks design (pre/post start/stop)
 - [ADR-0004: Trait Seam Policy](adr/ADR-0004-trait-seam-policy.md) - Where and how trait-based extensibility is allowed
 
+Concrete seam definitions and examples live in `doc/dev/EXTENSIBILITY_SEAMS.md`.
+
 ### Adding New ADRs
 
 When proposing an architecture decision:
