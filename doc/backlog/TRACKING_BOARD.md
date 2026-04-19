@@ -38,7 +38,7 @@ Source: doc/backlog/BACKLOG.md
 - A-03 Create convergence tracking board
 - B-01 Port Proxmox parser into dedicated module (start)
 
-## Ticket Registry (A-01 to E-03, plus B-21 to B-29)
+## Ticket Registry (A-01 to E-03)
 
 | ID | Title | Epic | Milestone | Labels | Depends On | Assignee | Status |
 |---|---|---|---|---|---|---|---|
@@ -80,6 +80,9 @@ Source: doc/backlog/BACKLOG.md
 | B-33 | Introduce explicit export modes (canonical, compact, debug-canonical) | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30, B-32 | unassigned | Done |
 | B-34 | Extend compaction policies for repeated field omission | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-29 | unassigned | Done |
 | B-35 | Update schema to attach drives to controllers which belong to devices | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-30 | unassigned | Done |
+| B-36 | Add central host capability schema for portable runtime | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-33, D-01 | unassigned | Done |
+| B-37 | Define and implement runtime precedence contract | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36 | unassigned | Done |
+| B-38 | Add portability preflight validation and error model | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-36, B-37 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -131,7 +134,9 @@ Source: doc/backlog/BACKLOG.md
 - (B-30 and B-32) -> B-33
 - B-29 -> B-34
 - B-30 -> B-35
-- B-32 -> B-36
+- (B-33 and D-01) -> B-36
+- B-36 -> B-37
+- (B-36 and B-37) -> B-38
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

@@ -42,6 +42,26 @@ Recommended thresholds:
 - Avoid unnecessary allocations in hot paths.
 - Use references and slices for read-only operations.
 
+When repeatedly accessing structured keys in loops or dense transformation code, prefer a small local key variable over reconstructing the same owned key expression many times.
+
+Desired pattern example:
+
+```rust
+let interface_key = Value::String("interface".to_string());
+let drives_key = Value::String("drives".to_string());
+
+if let Some(Value::Sequence(drives)) = controller_map.get(drives_key.clone()) {
+  for drive in drives {
+    if let Value::Mapping(map) = drive {
+      let is_ide = map.get(interface_key.clone()).and_then(Value::as_str) == Some("ide");
+      // ...
+    }
+  }
+}
+```
+
+Avoid patterns that repeatedly rebuild identical key values inside the same block, especially in config/YAML mapping code.
+
 ## 6. Collections and Iteration
 
 - Prefer iterator adapters over manual loops when clarity improves.
