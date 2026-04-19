@@ -1,6 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use super::{
+    CapabilityPrecedenceResolver, CapabilitySource, CentralCapabilityPrecedenceResolver,
+    StringCapabilityCandidate,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkResolutionMode {
     Unchanged,
@@ -12,6 +17,7 @@ pub enum NetworkResolutionMode {
 pub struct ResolvedNetworkOutcome {
     pub network: crate::config::NetworkConfig,
     pub mode: NetworkResolutionMode,
+    pub source: Option<CapabilitySource>,
     pub warning: Option<String>,
 }
 
@@ -32,17 +38,6 @@ impl<'a> CentralNetworkCapabilityResolver<'a> {
         Self { central_config }
     }
 
-    fn non_empty(value: Option<&str>) -> Option<&str> {
-        value.and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed)
-            }
-        })
-    }
-
     fn find_in_path(program: &str) -> Option<String> {
         let path = std::env::var_os("PATH")?;
         for dir in std::env::split_paths(&path) {
@@ -58,25 +53,32 @@ impl<'a> CentralNetworkCapabilityResolver<'a> {
         Path::new(path).is_file()
     }
 
-    fn resolve_bridge_helper(&self, explicit: Option<&str>) -> Option<String> {
-        if let Some(path) = Self::non_empty(explicit) {
-            return if Self::is_file(path) {
-                Some(path.to_string())
-            } else {
-                None
-            };
-        }
+    fn resolve_bridge_helper_with_source(
+        &self,
+        explicit: Option<&str>,
+    ) -> (Option<String>, Option<CapabilitySource>) {
+        let precedence = CentralCapabilityPrecedenceResolver;
+        let mut resolution = precedence.resolve_non_empty_string(&[
+            StringCapabilityCandidate {
+                source: CapabilitySource::VmOverride,
+                value: explicit,
+            },
+            StringCapabilityCandidate {
+                source: CapabilitySource::CentralConfig,
+                value: self.central_config.bridge_helper(),
+            },
+        ]);
 
-        if let Some(path) = Self::non_empty(self.central_config.bridge_helper()) {
-            return if Self::is_file(path) {
-                Some(path.to_string())
-            } else {
-                None
-            };
+        if let Some(path) = resolution.value.as_deref() {
+            if Self::is_file(path) {
+                return (resolution.value, resolution.source);
+            }
+            resolution.value = None;
+            resolution.source = None;
         }
 
         if let Some(found) = Self::find_in_path("qemu-bridge-helper") {
-            return Some(found);
+            return (Some(found), Some(CapabilitySource::PathLookup));
         }
 
         for candidate in [
@@ -85,11 +87,14 @@ impl<'a> CentralNetworkCapabilityResolver<'a> {
             "/usr/lib64/qemu-bridge-helper",
         ] {
             if Self::is_file(candidate) {
-                return Some(candidate.to_string());
+                return (
+                    Some(candidate.to_string()),
+                    Some(CapabilitySource::PlatformDefault),
+                );
             }
         }
 
-        None
+        (None, None)
     }
 
     fn prefers_user_mode(&self) -> bool {
@@ -123,6 +128,7 @@ impl NetworkCapabilityResolver for CentralNetworkCapabilityResolver<'_> {
             return ResolvedNetworkOutcome {
                 network: network.clone(),
                 mode: NetworkResolutionMode::Unchanged,
+                source: None,
                 warning: None,
             };
         };
@@ -131,6 +137,7 @@ impl NetworkCapabilityResolver for CentralNetworkCapabilityResolver<'_> {
             return ResolvedNetworkOutcome {
                 network: network.clone(),
                 mode: NetworkResolutionMode::Unchanged,
+                source: None,
                 warning: None,
             };
         }
@@ -141,6 +148,7 @@ impl NetworkCapabilityResolver for CentralNetworkCapabilityResolver<'_> {
             return ResolvedNetworkOutcome {
                 network: resolved,
                 mode: NetworkResolutionMode::UserFallback,
+                source: Some(CapabilitySource::CentralConfig),
                 warning: Some(format!(
                     "network '{}' downgraded to user-mode because host_capabilities.network.preferred_backend is set to user/user-mode",
                     network.id
@@ -148,7 +156,9 @@ impl NetworkCapabilityResolver for CentralNetworkCapabilityResolver<'_> {
             };
         }
 
-        if let Some(helper) = self.resolve_bridge_helper(backend.helper.as_deref()) {
+        let (helper_path, helper_source) =
+            self.resolve_bridge_helper_with_source(backend.helper.as_deref());
+        if let Some(helper) = helper_path {
             let mut resolved = network.clone();
             let mut resolved_backend = backend.clone();
             resolved_backend.helper = Some(helper);
@@ -163,6 +173,7 @@ impl NetworkCapabilityResolver for CentralNetworkCapabilityResolver<'_> {
             return ResolvedNetworkOutcome {
                 network: resolved,
                 mode: NetworkResolutionMode::BridgeHelper,
+                source: helper_source,
                 warning: None,
             };
         }
@@ -173,6 +184,7 @@ impl NetworkCapabilityResolver for CentralNetworkCapabilityResolver<'_> {
         ResolvedNetworkOutcome {
             network: resolved,
             mode: NetworkResolutionMode::UserFallback,
+            source: Some(CapabilitySource::BuiltInFallback),
             warning: Some(format!(
                 "network '{}' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper",
                 network.id

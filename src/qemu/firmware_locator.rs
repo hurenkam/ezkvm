@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 
 use crate::config::{CentralConfig, RuntimeCliOverrides};
+use crate::state::{CapabilityResolution, CapabilitySource};
 
 /// Built-in platform default OVMF search directories (Debian, Ubuntu, Arch).
 const PLATFORM_OVMF_DIRS: &[&str] = &[
@@ -85,19 +86,36 @@ impl<'a> CentralFirmwareCapabilityResolver<'a> {
 
 impl FirmwareCapabilityResolver for CentralFirmwareCapabilityResolver<'_> {
     fn resolve_ovmf_code(&self, secure_boot: bool) -> Option<String> {
+        self.resolve_ovmf_code_with_source(secure_boot).value
+    }
+}
+
+impl CentralFirmwareCapabilityResolver<'_> {
+    pub fn resolve_ovmf_code_with_source(&self, secure_boot: bool) -> CapabilityResolution<String> {
         let dirs = self.search_dirs();
         let candidates = self.candidate_files(secure_boot);
+        let configured_dirs = self
+            .central_config
+            .ovmf_search_dirs_with_overrides(self.runtime_overrides);
 
         for dir in &dirs {
             for &file in &candidates {
                 let path = PathBuf::from(dir).join(file);
                 if path.exists() {
-                    return Some(path.to_string_lossy().into_owned());
+                    let source = if configured_dirs.iter().any(|entry| entry == dir) {
+                        CapabilitySource::CentralConfig
+                    } else {
+                        CapabilitySource::PlatformDefault
+                    };
+                    return CapabilityResolution::with_value(
+                        path.to_string_lossy().into_owned(),
+                        source,
+                    );
                 }
             }
         }
 
-        None
+        CapabilityResolution::none()
     }
 }
 

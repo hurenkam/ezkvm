@@ -96,6 +96,8 @@ devices: {}
     );
     assert!(stdout.contains("Runtime preflight checks passed"));
     assert!(stdout.contains("Dry run mode - would execute:"));
+    assert!(stdout.contains("Capability resolution diagnostics:"));
+    assert!(stdout.contains("runtime_root: source="));
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -227,6 +229,57 @@ fn dry_run_network_bridge_falls_back_to_user_when_helper_missing() {
     );
     assert!(stdout.contains("network 'net0' downgraded to user-mode"));
     assert!(stdout.contains("type=user,id=net0,hostname=preflight-network-fallback"));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn dry_run_proxmox_parity_skips_portable_capability_gates() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let temp_dir = unique_temp_dir("parity-bypass");
+    std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+
+    write_fake_qemu(&temp_dir);
+
+    let vm_path = temp_dir.join("vm.yaml");
+    write_file(
+        &vm_path,
+        r#"
+name: preflight-parity-bypass
+backend: qemu
+profiles:
+    - proxmox-parity-runtime
+system:
+    architecture: x86_64
+    machine: q35
+    memory:
+        size: 1024
+    cpu:
+        model: host
+        vcpus: 2
+    tpm:
+        version: "2.0"
+        backend: emulator
+        model: tpm-tis
+devices: {}
+"#,
+    );
+
+    let output = run_start_dry_run(&vm_path, &temp_dir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        stdout,
+        stderr
+    );
+    assert!(stdout.contains("Capability resolution diagnostics:"));
+    assert!(stdout.contains("runtime capabilities: source=parity-bypass"));
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }

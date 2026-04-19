@@ -74,6 +74,19 @@ pub(crate) async fn handle_import_proxmox(
         println!("# input: {}", input);
         println!("# output (not written): {}", result.output_path);
         println!("# output mode: {:?}", output_mode);
+        println!("# runtime target: {:?}", runtime_target);
+        match runtime_target {
+            crate::import::proxmox::RuntimeTarget::PortableLinux => {
+                println!(
+                    "# capability precedence: cli > vm-override > profile-default > central-config > platform-default"
+                );
+            }
+            crate::import::proxmox::RuntimeTarget::ProxmoxParity => {
+                println!(
+                    "# capability precedence: bypassed (proxmox-parity target preserves parity defaults)"
+                );
+            }
+        }
         if !result.warnings.is_empty() {
             println!("# warnings ({}):", result.warnings.len());
             for warning in &result.warnings {

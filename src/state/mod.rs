@@ -3,6 +3,7 @@
 //! Handles PID files, configuration caching, and VM state persistence.
 
 mod cache;
+mod capability_precedence;
 mod logs;
 mod looking_glass_resolver;
 mod network_resolver;
@@ -14,11 +15,18 @@ mod tpm_resolver;
 #[allow(unused_imports)]
 pub use cache::{cache_config, delete_cached_config, load_cached_config};
 #[allow(unused_imports)]
+pub use capability_precedence::{
+    CapabilityPrecedenceResolver, CapabilityResolution, CapabilitySource,
+    CentralCapabilityPrecedenceResolver, RuntimeCapabilityMode, StringCapabilityCandidate,
+    ValueCapabilityCandidate, detect_runtime_capability_mode,
+};
+#[allow(unused_imports)]
 pub use logs::{cleanup_old_logs, cleanup_old_logs_at};
 #[allow(unused_imports)]
 pub use looking_glass_resolver::{
     CentralLookingGlassCapabilityResolver, LookingGlassCapabilityResolver, LookingGlassLaunchMode,
-    resolve_looking_glass_program,
+    LookingGlassProgramResolution, resolve_looking_glass_program,
+    resolve_looking_glass_program_with_source,
 };
 #[allow(unused_imports)]
 pub use network_resolver::{
@@ -35,12 +43,13 @@ pub use pid::{delete_pid, delete_pid_at, read_pid, read_pid_at, save_pid, save_p
 #[allow(unused_imports)]
 pub use runtime_resolver::{
     CentralRuntimeCapabilityResolver, RuntimeCapabilityResolver, resolve_runtime_root,
-    resolve_runtime_tpm_socket,
+    resolve_runtime_root_with_source, resolve_runtime_tpm_socket,
 };
 #[allow(unused_imports)]
 pub use tpm_resolver::{
     CentralTpmCapabilityResolver, TpmCapabilityResolver, TpmPlacementMode, resolve_swtpm_binary,
-    resolve_tpm_placement_mode, resolve_tpm_socket_path, resolve_tpm_state_dir,
+    resolve_swtpm_binary_with_source, resolve_tpm_placement_mode, resolve_tpm_socket_path,
+    resolve_tpm_state_dir,
 };
 
 #[cfg(test)]

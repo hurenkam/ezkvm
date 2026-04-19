@@ -1,5 +1,10 @@
 use anyhow::{Result, anyhow};
 
+use super::{
+    CapabilityPrecedenceResolver, CapabilityResolution, CapabilitySource,
+    CentralCapabilityPrecedenceResolver, StringCapabilityCandidate,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LookingGlassLaunchMode {
     Disabled,
@@ -12,6 +17,12 @@ pub trait LookingGlassCapabilityResolver {
         &self,
         vm_options: Option<&crate::config::LookingGlassOptions>,
     ) -> Result<Option<String>>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LookingGlassProgramResolution {
+    pub mode: LookingGlassLaunchMode,
+    pub resolution: CapabilityResolution<String>,
 }
 
 pub struct CentralLookingGlassCapabilityResolver<'a> {
@@ -124,38 +135,12 @@ impl LookingGlassCapabilityResolver for CentralLookingGlassCapabilityResolver<'_
             }
         }
 
-        let cli_program = self.runtime_overrides.looking_glass_program.as_deref();
-        let vm_program = vm_options.and_then(|opts| opts.program.as_deref());
-        let central_program = self.central_config.looking_glass_program();
-
-        for candidate in [cli_program, vm_program, central_program] {
-            let Some(path) = Self::non_empty(candidate) else {
-                continue;
-            };
-
-            if Self::program_available(path) {
-                return Ok(Some(path.to_string()));
-            }
-
-            if mode == LookingGlassLaunchMode::Explicit {
-                return Err(anyhow!(
-                    "Looking Glass explicit mode requested but program '{}' is not available",
-                    path
-                ));
-            }
-        }
-
-        if let Some(found) = Self::find_in_path("looking-glass-client") {
-            return Ok(Some(found));
-        }
-
-        if mode == LookingGlassLaunchMode::Explicit {
-            return Err(anyhow!(
-                "Looking Glass explicit mode requested but no looking-glass-client binary was found in configured paths or PATH"
-            ));
-        }
-
-        Ok(None)
+        let resolved = resolve_looking_glass_program_with_source(
+            vm_options,
+            self.central_config,
+            self.runtime_overrides,
+        )?;
+        Ok(resolved.resolution.value)
     }
 }
 
@@ -166,6 +151,81 @@ pub fn resolve_looking_glass_program(
 ) -> Result<Option<String>> {
     CentralLookingGlassCapabilityResolver::new(central_config, runtime_overrides)
         .resolve_program(vm_options)
+}
+
+pub fn resolve_looking_glass_program_with_source(
+    vm_options: Option<&crate::config::LookingGlassOptions>,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<LookingGlassProgramResolution> {
+    let resolver = CentralLookingGlassCapabilityResolver::new(central_config, runtime_overrides);
+    let mode = resolver.mode_for(vm_options);
+    if mode == LookingGlassLaunchMode::Disabled {
+        return Ok(LookingGlassProgramResolution {
+            mode,
+            resolution: CapabilityResolution::none(),
+        });
+    }
+
+    let precedence = CentralCapabilityPrecedenceResolver;
+    let mut resolution = precedence.resolve_non_empty_string(&[
+        StringCapabilityCandidate {
+            source: CapabilitySource::CliOverride,
+            value: runtime_overrides.looking_glass_program.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::VmOverride,
+            value: vm_options.and_then(|opts| opts.program.as_deref()),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config
+                .host_capabilities
+                .integrations
+                .looking_glass
+                .program
+                .as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config.looking_glass.program.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config.tools.looking_glass.as_deref(),
+        },
+    ]);
+
+    if let Some(path) = resolution.value.as_deref() {
+        if CentralLookingGlassCapabilityResolver::program_available(path) {
+            return Ok(LookingGlassProgramResolution { mode, resolution });
+        }
+
+        if mode == LookingGlassLaunchMode::Explicit {
+            return Err(anyhow!(
+                "Looking Glass explicit mode requested but program '{}' is not available",
+                path
+            ));
+        }
+
+        resolution = CapabilityResolution::none();
+    }
+
+    if let Some(found) = CentralLookingGlassCapabilityResolver::find_in_path("looking-glass-client")
+    {
+        return Ok(LookingGlassProgramResolution {
+            mode,
+            resolution: CapabilityResolution::with_value(found, CapabilitySource::PathLookup),
+        });
+    }
+
+    if mode == LookingGlassLaunchMode::Explicit {
+        return Err(anyhow!(
+            "Looking Glass explicit mode requested but no looking-glass-client binary was found in configured paths or PATH"
+        ));
+    }
+
+    Ok(LookingGlassProgramResolution { mode, resolution })
 }
 
 #[cfg(test)]

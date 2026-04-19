@@ -1,7 +1,13 @@
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
+use super::{
+    CapabilityPrecedenceResolver, CapabilityResolution, CapabilitySource,
+    CentralCapabilityPrecedenceResolver, StringCapabilityCandidate,
+};
+
 /// Resolves host runtime directory paths using the portable-runtime precedence contract.
+#[allow(dead_code)]
 pub trait RuntimeCapabilityResolver {
     /// Resolve runtime root with precedence:
     /// explicit > CLI/central host capabilities > XDG runtime > HOME fallback > built-in fallback.
@@ -9,12 +15,14 @@ pub trait RuntimeCapabilityResolver {
 }
 
 /// Central-config-backed runtime capability resolver.
+#[allow(dead_code)]
 pub struct CentralRuntimeCapabilityResolver<'a> {
     central_config: &'a crate::config::CentralConfig,
     runtime_overrides: &'a crate::config::RuntimeCliOverrides,
 }
 
 impl<'a> CentralRuntimeCapabilityResolver<'a> {
+    #[allow(dead_code)]
     pub fn new(
         central_config: &'a crate::config::CentralConfig,
         runtime_overrides: &'a crate::config::RuntimeCliOverrides,
@@ -39,29 +47,64 @@ impl<'a> CentralRuntimeCapabilityResolver<'a> {
 
 impl RuntimeCapabilityResolver for CentralRuntimeCapabilityResolver<'_> {
     fn resolve_runtime_root(&self, explicit: Option<&str>) -> Result<PathBuf> {
-        if let Some(explicit_path) = Self::non_empty(explicit) {
-            return Ok(PathBuf::from(explicit_path));
-        }
-
-        if let Some(configured) = self
-            .central_config
-            .runtime_run_dir_with_overrides(self.runtime_overrides)
-        {
-            return Ok(PathBuf::from(configured));
-        }
-
-        if let Some(xdg_runtime) = Self::non_empty(std::env::var("XDG_RUNTIME_DIR").ok().as_deref())
-        {
-            return Ok(PathBuf::from(xdg_runtime).join("ezkvm"));
-        }
-
-        if let Some(home) = Self::non_empty(std::env::var("HOME").ok().as_deref()) {
-            return Ok(PathBuf::from(home).join(".local/run/ezkvm"));
-        }
-
-        // Final built-in fallback for constrained environments where HOME is unavailable.
-        Ok(PathBuf::from("/tmp/ezkvm"))
+        Ok(
+            resolve_runtime_root_with_source(explicit, self.central_config, self.runtime_overrides)
+                .value
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("/tmp/ezkvm")),
+        )
     }
+}
+
+pub fn resolve_runtime_root_with_source(
+    explicit: Option<&str>,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> CapabilityResolution<String> {
+    let resolver = CentralCapabilityPrecedenceResolver;
+    let env_xdg = CentralRuntimeCapabilityResolver::non_empty(
+        std::env::var("XDG_RUNTIME_DIR").ok().as_deref(),
+    )
+    .map(|path| format!("{}/ezkvm", path));
+    let env_home =
+        CentralRuntimeCapabilityResolver::non_empty(std::env::var("HOME").ok().as_deref())
+            .map(|path| format!("{}/.local/run/ezkvm", path));
+
+    let mut resolution = resolver.resolve_non_empty_string(&[
+        StringCapabilityCandidate {
+            source: CapabilitySource::CliOverride,
+            value: runtime_overrides.run_dir.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::VmOverride,
+            value: explicit,
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config.host_capabilities.runtime.run_dir.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config.locations.run_dir.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::PlatformDefault,
+            value: env_xdg.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::PlatformDefault,
+            value: env_home.as_deref(),
+        },
+    ]);
+
+    if resolution.value.is_none() {
+        resolution = CapabilityResolution::with_value(
+            "/tmp/ezkvm".to_string(),
+            CapabilitySource::BuiltInFallback,
+        );
+    }
+
+    resolution
 }
 
 /// Convenience helper for resolving runtime root paths with central defaults.
@@ -70,8 +113,10 @@ pub fn resolve_runtime_root(
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<PathBuf> {
-    CentralRuntimeCapabilityResolver::new(central_config, runtime_overrides)
-        .resolve_runtime_root(explicit)
+    let resolved = resolve_runtime_root_with_source(explicit, central_config, runtime_overrides)
+        .value
+        .ok_or_else(|| anyhow!("failed to resolve runtime root"))?;
+    Ok(PathBuf::from(resolved))
 }
 
 /// Resolve default TPM socket path under runtime root.
@@ -98,10 +143,7 @@ mod tests {
     #[test]
     fn runtime_root_precedence_prefers_explicit_over_all_other_sources() {
         let central = CentralConfig::default();
-        let overrides = RuntimeCliOverrides {
-            run_dir: Some("/cli/run".to_string()),
-            ..Default::default()
-        };
+        let overrides = RuntimeCliOverrides::default();
 
         let resolved = resolve_runtime_root(Some("/explicit/run"), &central, &overrides)
             .expect("runtime root should resolve");

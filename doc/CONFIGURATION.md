@@ -152,6 +152,19 @@ Looking Glass setup quick reference:
 - Arch Linux: install `looking-glass`/`looking-glass-client`, ensure `kvmfr` is loaded, and expose `/dev/kvmfr0` to the desktop user.
 - For all distros: use `mode: explicit` when a VM depends on Looking Glass, and `mode: auto` when it is an optional convenience integration.
 
+### Capability diagnostics and target-mode gates
+
+- `ezkvm start --dry-run` prints capability diagnostics with `source=<...>` and `value=<...>` for resolved runtime capabilities.
+- Diagnostics currently include:
+  - `runtime_root` (always)
+  - `swtpm_binary` (when VM TPM backend is emulator)
+  - `ovmf_code` (when firmware is `uefi`/`ovmf`)
+  - `looking_glass_program` (with launch mode)
+  - per-network lines (`network[<id>]`) with resolved backend mode/source
+- Portable mode enforces capability gates (runtime directories, firmware resolution, TPM and network host requirements).
+- Parity mode (`proxmox-parity-runtime` profile from import with `--runtime-target proxmox-parity`) bypasses portable capability resolution gates and preserves parity defaults.
+- Import dry-run output also reports whether capability precedence is active (`portable-linux`) or bypassed (`proxmox-parity`).
+
 ### Central Config precedence inside host capability resolution
 
 For fields that exist in both the new capability sections and older compatibility sections, the capability section wins.

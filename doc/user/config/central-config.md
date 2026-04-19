@@ -110,6 +110,7 @@ The preferred place for portability-related defaults is `host_capabilities`. The
 - Looking Glass launch modes: `options.looking_glass.mode: disabled|auto|explicit`.
 - Looking Glass program precedence: CLI `--looking-glass-program` -> VM/profile `options.looking_glass.program` -> `host_capabilities.integrations.looking_glass.program` -> legacy central `looking_glass.program` -> legacy `tools.looking_glass` -> `PATH` `looking-glass-client`.
 - `mode: explicit` fails preflight when the client cannot be resolved; `mode: auto` silently skips launch when unavailable; `mode: disabled` suppresses launch.
+- `ezkvm start --dry-run` prints a capability diagnostics section with `source` and `value` for each resolved capability.
 
 Supported CLI runtime overrides on `ezkvm start`:
 
@@ -135,6 +136,7 @@ Preflight behavior:
   - remote-viewer launcher prerequisites for SPICE workflows.
   - Looking Glass shared-memory path presence, plus launcher degradation warnings when an auto-discovered configuration is invalid.
 - Preflight output order is deterministic across `start` and `start --dry-run`, so failure and warning ordering remains stable.
+- Mode gate behavior: `portable-linux` enforces capability checks; `proxmox-parity-runtime` bypasses portable capability gates and keeps parity defaults.
 
 CLI override impact on preflight checks:
 

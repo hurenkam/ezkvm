@@ -45,6 +45,7 @@ impl CentralConfig {
     }
 
     /// Resolve the effective runtime directory root, including CLI overrides.
+    #[allow(dead_code)]
     pub fn runtime_run_dir_with_overrides<'a>(
         &'a self,
         overrides: &'a RuntimeCliOverrides,

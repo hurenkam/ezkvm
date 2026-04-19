@@ -175,6 +175,126 @@ fn print_dry_run(
             );
         }
     }
+
+    print_capability_diagnostics(manager, central_config, runtime_overrides);
+}
+
+fn print_capability_diagnostics(
+    manager: &crate::qemu::QemuManager,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) {
+    let mode = crate::state::detect_runtime_capability_mode(manager.config());
+    println!("Capability resolution diagnostics:");
+    println!("  mode: {:?}", mode);
+
+    if mode == crate::state::RuntimeCapabilityMode::ProxmoxParity {
+        println!(
+            "  runtime capabilities: source={}, value=proxmox-parity defaults",
+            crate::state::CapabilitySource::ParityBypass
+        );
+        return;
+    }
+
+    let runtime_root =
+        crate::state::resolve_runtime_root_with_source(None, central_config, runtime_overrides);
+    println!(
+        "  runtime_root: source={}, value={}",
+        runtime_root
+            .source
+            .map(|source| source.to_string())
+            .unwrap_or_else(|| "unresolved".to_string()),
+        runtime_root.value.as_deref().unwrap_or("<none>")
+    );
+
+    if manager
+        .config()
+        .system_tpm()
+        .is_some_and(|tpm| tpm.backend == "emulator")
+    {
+        let swtpm =
+            crate::state::resolve_swtpm_binary_with_source(central_config, runtime_overrides);
+        println!(
+            "  swtpm_binary: source={}, value={}",
+            swtpm
+                .source
+                .map(|source| source.to_string())
+                .unwrap_or_else(|| "unresolved".to_string()),
+            swtpm.value.as_deref().unwrap_or("<none>")
+        );
+    }
+
+    let firmware = manager.config().system_boot();
+    let firmware_kind = firmware.firmware.as_deref().unwrap_or("bios");
+    if firmware_kind == "uefi" || firmware_kind == "ovmf" {
+        let secure_boot = firmware.secure_boot;
+        let uefi_resolution = if let Some(ovmf_dir) = runtime_overrides
+            .ovmf_dir
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+        {
+            crate::state::CapabilityResolution::with_value(
+                crate::qemu::resolve_ovmf_code_from_dir(ovmf_dir, secure_boot),
+                crate::state::CapabilitySource::CliOverride,
+            )
+        } else if let Some(explicit) = firmware.uefi_code.as_deref() {
+            crate::state::CapabilityResolution::with_value(
+                explicit.to_string(),
+                crate::state::CapabilitySource::VmOverride,
+            )
+        } else {
+            crate::qemu::CentralFirmwareCapabilityResolver::new(central_config, runtime_overrides)
+                .resolve_ovmf_code_with_source(secure_boot)
+        };
+
+        println!(
+            "  ovmf_code: source={}, value={}",
+            uefi_resolution
+                .source
+                .map(|source| source.to_string())
+                .unwrap_or_else(|| "unresolved".to_string()),
+            uefi_resolution.value.as_deref().unwrap_or("<none>")
+        );
+    }
+
+    let looking_glass = crate::state::resolve_looking_glass_program_with_source(
+        manager.config().options.looking_glass.as_ref(),
+        central_config,
+        runtime_overrides,
+    );
+    if let Ok(resolution) = looking_glass {
+        println!(
+            "  looking_glass_program: mode={:?}, source={}, value={}",
+            resolution.mode,
+            resolution
+                .resolution
+                .source
+                .map(|source| source.to_string())
+                .unwrap_or_else(|| "unresolved".to_string()),
+            resolution.resolution.value.as_deref().unwrap_or("<none>")
+        );
+    }
+
+    for network in &manager.config().devices.networks {
+        let resolved =
+            crate::state::resolve_network_outcome(&manager.config().name, network, central_config);
+        println!(
+            "  network[{}]: mode={:?}, source={}, backend={}",
+            network.id,
+            resolved.mode,
+            resolved
+                .source
+                .map(|source| source.to_string())
+                .unwrap_or_else(|| "n/a".to_string()),
+            resolved
+                .network
+                .backend
+                .as_ref()
+                .map(|backend| backend.backend_type.as_str())
+                .unwrap_or("none")
+        );
+    }
 }
 
 fn run_daemon_start(

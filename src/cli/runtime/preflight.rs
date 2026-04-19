@@ -26,15 +26,20 @@ pub(crate) fn run_runtime_preflight(
 ) -> Result<RuntimePreflightReport> {
     crate::qemu::executor::check_qemu_available(qemu_binary)
         .map_err(|err| anyhow!("preflight failed: {}", err))?;
-    ensure_host_capability_policy(central_config)?;
-    ensure_runtime_dir_access(central_config, runtime_overrides)?;
+    let mode = crate::state::detect_runtime_capability_mode(config);
+
+    if mode == crate::state::RuntimeCapabilityMode::PortableLinux {
+        ensure_host_capability_policy(central_config)?;
+        ensure_runtime_dir_access(central_config, runtime_overrides)?;
+        ensure_tpm_capabilities(config, central_config, runtime_overrides)?;
+        ensure_firmware_capabilities(config, central_config, runtime_overrides)?;
+        ensure_looking_glass_capabilities(config, central_config, runtime_overrides)?;
+    }
+
     ensure_socket_dir_access(config)?;
-    ensure_tpm_capabilities(config, central_config, runtime_overrides)?;
-    ensure_firmware_capabilities(config, central_config, runtime_overrides)?;
-    ensure_looking_glass_capabilities(config, central_config, runtime_overrides)?;
 
     let mut report = RuntimePreflightReport::default();
-    collect_optional_warnings(config, central_config, runtime_overrides, &mut report);
+    collect_optional_warnings(config, central_config, runtime_overrides, mode, &mut report);
     Ok(report)
 }
 
@@ -82,11 +87,12 @@ fn ensure_runtime_dir_access(
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
-    let run_dir = central_config
-        .runtime_run_dir_with_overrides(runtime_overrides)
-        .unwrap_or("/var/run/ezkvm");
+    let run_dir =
+        crate::state::resolve_runtime_root_with_source(None, central_config, runtime_overrides)
+            .value
+            .unwrap_or_else(|| "/tmp/ezkvm".to_string());
 
-    ensure_dir_is_writable_or_creatable(Path::new(run_dir), "runtime run directory")
+    ensure_dir_is_writable_or_creatable(Path::new(&run_dir), "runtime run directory")
 }
 
 fn ensure_socket_dir_access(config: &crate::config::VmConfig) -> Result<()> {
@@ -200,9 +206,12 @@ fn collect_optional_warnings(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
+    mode: crate::state::RuntimeCapabilityMode,
     report: &mut RuntimePreflightReport,
 ) {
-    collect_network_capability_warnings(config, central_config, report);
+    if mode == crate::state::RuntimeCapabilityMode::PortableLinux {
+        collect_network_capability_warnings(config, central_config, report);
+    }
 
     if should_launch_remote_viewer(config)
         && let Some(program) =
@@ -221,22 +230,26 @@ fn collect_optional_warnings(
         );
     }
 
-    if !should_launch_looking_glass(config) {
+    if mode != crate::state::RuntimeCapabilityMode::PortableLinux
+        || !should_launch_looking_glass(config)
+    {
         return;
     }
 
-    match crate::cli::runtime::build_looking_glass_launch(config, central_config, runtime_overrides)
-    {
-        Ok(Some(launch)) => {
-            if !program_available(&launch.program) {
+    match crate::state::resolve_looking_glass_program_with_source(
+        config.options.looking_glass.as_ref(),
+        central_config,
+        runtime_overrides,
+    ) {
+        Ok(resolved) => {
+            if let Some(program) = resolved.resolution.value.as_deref()
+                && !program_available(program)
+            {
                 report.push_warning(format!(
                     "Looking Glass integration disabled because '{}' is not available",
-                    launch.program
+                    program
                 ));
             }
-        }
-        Ok(None) => {
-            // Auto mode degrades silently when no client is available.
         }
         Err(err) => {
             report.push_warning(format!(

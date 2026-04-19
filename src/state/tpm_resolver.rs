@@ -1,6 +1,11 @@
 use anyhow::{Result, anyhow};
 use std::path::{Path, PathBuf};
 
+use super::{
+    CapabilityPrecedenceResolver, CapabilityResolution, CapabilitySource,
+    CentralCapabilityPrecedenceResolver, StringCapabilityCandidate,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TpmPlacementMode {
     Socket,
@@ -8,6 +13,7 @@ pub enum TpmPlacementMode {
 }
 
 pub trait TpmCapabilityResolver {
+    #[allow(dead_code)]
     fn resolve_swtpm_binary(&self) -> Option<String>;
     fn resolve_placement_mode(&self) -> TpmPlacementMode;
     fn resolve_socket_path(&self, vm_name: &str, vm_state_path: Option<&str>) -> Result<String>;
@@ -69,15 +75,7 @@ impl<'a> CentralTpmCapabilityResolver<'a> {
 
 impl TpmCapabilityResolver for CentralTpmCapabilityResolver<'_> {
     fn resolve_swtpm_binary(&self) -> Option<String> {
-        if let Some(program) = Self::non_empty(self.runtime_overrides.swtpm_binary.as_deref()) {
-            return Some(program.to_string());
-        }
-
-        if let Some(program) = self.central_config.swtpm_program() {
-            return Some(program.to_string());
-        }
-
-        Self::find_in_path("swtpm").or_else(Self::distro_fallback_swtpm)
+        resolve_swtpm_binary_with_source(self.central_config, self.runtime_overrides).value
     }
 
     fn resolve_placement_mode(&self) -> TpmPlacementMode {
@@ -148,7 +146,42 @@ pub fn resolve_swtpm_binary(
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Option<String> {
-    CentralTpmCapabilityResolver::new(central_config, runtime_overrides).resolve_swtpm_binary()
+    resolve_swtpm_binary_with_source(central_config, runtime_overrides).value
+}
+
+pub fn resolve_swtpm_binary_with_source(
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> CapabilityResolution<String> {
+    let resolver = CentralCapabilityPrecedenceResolver;
+    let mut resolution = resolver.resolve_non_empty_string(&[
+        StringCapabilityCandidate {
+            source: CapabilitySource::CliOverride,
+            value: runtime_overrides.swtpm_binary.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config.host_capabilities.tpm.swtpm_binary.as_deref(),
+        },
+        StringCapabilityCandidate {
+            source: CapabilitySource::CentralConfig,
+            value: central_config.tools.swtpm.as_deref(),
+        },
+    ]);
+
+    if resolution.value.is_none()
+        && let Some(found) = CentralTpmCapabilityResolver::find_in_path("swtpm")
+    {
+        resolution = CapabilityResolution::with_value(found, CapabilitySource::PathLookup);
+    }
+
+    if resolution.value.is_none()
+        && let Some(found) = CentralTpmCapabilityResolver::distro_fallback_swtpm()
+    {
+        resolution = CapabilityResolution::with_value(found, CapabilitySource::PlatformDefault);
+    }
+
+    resolution
 }
 
 pub fn resolve_tpm_placement_mode(

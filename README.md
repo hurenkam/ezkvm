@@ -117,11 +117,13 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm start <config.yaml>` - Start a VM from configuration
 - `ezkvm start <config.yaml> --dry-run` - Show the QEMU command without executing
 - `ezkvm start ...` and `ezkvm start ... --dry-run` run the same deterministic preflight checks in the same order before execution/preview
+- `--dry-run` now prints a capability-resolution diagnostics section showing effective source/value pairs (for example runtime root, swtpm binary, OVMF code path, network backend mode, Looking Glass program)
 - Required preflight failures stop startup with actionable diagnostics (QEMU/swtpm binaries, OVMF availability for UEFI, bridge helper paths when configured, and runtime/socket directory access)
 - Bridge backends auto-downgrade to user-mode with deterministic warnings when bridge-helper resolution fails or host policy prefers user networking
 - TPM capability checks honor `host_capabilities.tpm.placement_mode`: `socket` mode validates swtpm binary discovery while `state-file` mode validates TPM state directory resolution
 - Looking Glass honors `options.looking_glass.mode`: `explicit` fails fast when the client is missing, `auto` degrades silently, and `disabled` suppresses launch
 - Optional integrations (remote-viewer, Looking Glass) emit deterministic warnings and degrade without blocking VM start
+- Runtime mode gates are target-aware: portable mode enforces capability resolution, while imported parity configs (`proxmox-parity-runtime`) bypass portable capability gates and keep parity defaults
 - `ezkvm start <config.yaml> --daemon` - Start VM in background
 - `ezkvm start <config.yaml> --run-dir <path> --swtpm-binary <path> --tpm-socket-path <path> --remote-viewer-program <path> --looking-glass-program <path> --ovmf-dir <path>` - Override runtime host defaults used by preflight capability checks and runtime resolution
 - `ezkvm stop <config.yaml>` - Stop a VM gracefully
