@@ -6,5 +6,5 @@ pub(crate) use launch::{
     format_auxiliary_launch, resolve_client_host,
 };
 pub(super) use launch::{spawn_looking_glass, spawn_remote_viewer};
-pub(crate) use swtpm::start_swtpm_if_configured;
-pub(super) use swtpm::{build_swtpm_launch_preview, ensure_runtime_socket_dirs};
+pub(super) use swtpm::ensure_runtime_socket_dirs;
+pub(crate) use swtpm::{build_swtpm_launch_preview, start_swtpm_if_configured};

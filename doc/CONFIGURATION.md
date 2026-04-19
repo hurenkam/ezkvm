@@ -115,6 +115,27 @@ Examples:
 
 This precedence is limited to central-config-internal compatibility. Broader runtime precedence between CLI, VM-local config, profiles, and central config is defined separately by the runtime precedence contract.
 
+### Runtime precedence contract (implemented)
+
+Effective runtime resolution uses this order:
+
+1. CLI overrides (`ezkvm start` flags)
+2. VM-local explicit config values
+3. Profile defaults (after profile merge)
+4. Central host defaults (`host_capabilities`, then legacy compatibility fields)
+5. Built-in fallback
+
+Current `ezkvm start` runtime override flags:
+
+- `--run-dir`
+- `--swtpm-binary`
+- `--tpm-socket-path`
+- `--remote-viewer-program`
+- `--looking-glass-program`
+- `--ovmf-dir`
+
+This precedence is shared by `start` and `start --dry-run` to keep preview and execution behavior identical.
+
 ## Chapter 1: Top-Level Schema
 
 Top-level sections:

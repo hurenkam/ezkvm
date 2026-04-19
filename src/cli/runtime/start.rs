@@ -7,11 +7,16 @@ use anyhow::Result;
 use std::path::Path;
 use std::process::Stdio;
 
-pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool) -> Result<()> {
+pub(crate) async fn handle_start(
+    config_path: &str,
+    daemon: bool,
+    dry_run: bool,
+    runtime_overrides: crate::config::RuntimeCliOverrides,
+) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
 
     let (mut config, central_config) = load_start_configs(config_path)?;
-    prepare_auxiliary_runtime(&config, &central_config, dry_run)?;
+    prepare_auxiliary_runtime(&config, &central_config, &runtime_overrides, dry_run)?;
 
     let central_config_clone = central_config.clone();
     config.options.daemonize = daemon;
@@ -20,7 +25,11 @@ pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool)
     let pid_file = crate::state::get_pid_file_at(&config.name, config.options.pid_file.as_deref())?;
     let log_file = prepare_log_file(&config, daemon)?;
 
-    let manager = crate::qemu::QemuManager::new(config, central_config);
+    let manager = crate::qemu::QemuManager::new_with_overrides(
+        config,
+        central_config,
+        runtime_overrides.clone(),
+    );
     let args = manager.build_command()?;
 
     println!("Starting VM: {}", manager.config().name);
@@ -36,6 +45,7 @@ pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool)
             &pid_file,
             log_file.as_ref(),
             &central_config_clone,
+            &runtime_overrides,
         );
         return Ok(());
     }
@@ -47,6 +57,7 @@ pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool)
             &executor,
             log_file.as_ref(),
             &central_config_clone,
+            &runtime_overrides,
         )?;
     } else {
         run_interactive_start(
@@ -54,6 +65,7 @@ pub(crate) async fn handle_start(config_path: &str, daemon: bool, dry_run: bool)
             &executor,
             log_file.as_ref(),
             &central_config_clone,
+            &runtime_overrides,
         )?;
     }
 
@@ -75,14 +87,15 @@ fn load_start_configs(
 fn prepare_auxiliary_runtime(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
     dry_run: bool,
 ) -> Result<()> {
     if dry_run {
         return Ok(());
     }
 
-    ensure_runtime_socket_dirs(config, central_config)?;
-    start_swtpm_if_configured(config, central_config)?;
+    ensure_runtime_socket_dirs(config, central_config, runtime_overrides)?;
+    start_swtpm_if_configured(config, central_config, runtime_overrides)?;
     Ok(())
 }
 
@@ -110,6 +123,7 @@ fn print_dry_run(
     pid_file: &std::path::Path,
     log_file: Option<&std::path::PathBuf>,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) {
     println!("Dry run mode - would execute:");
     println!(
@@ -125,20 +139,22 @@ fn print_dry_run(
         println!("Log file: {}", log_file.display());
     }
 
-    match build_swtpm_launch_preview(manager.config(), central_config) {
+    match build_swtpm_launch_preview(manager.config(), central_config, runtime_overrides) {
         Ok(Some(cmd)) => println!("Auxiliary launch (swtpm): {}", cmd),
         Ok(None) => {}
         Err(err) => println!("swtpm configuration error: {}", err),
     }
 
-    if let Some(launch) = build_remote_viewer_launch(manager.config(), central_config) {
+    if let Some(launch) =
+        build_remote_viewer_launch(manager.config(), central_config, runtime_overrides)
+    {
         println!(
             "Auxiliary launch (SPICE): {}",
             format_auxiliary_launch(&launch)
         );
     }
 
-    match build_looking_glass_launch(manager.config(), central_config) {
+    match build_looking_glass_launch(manager.config(), central_config, runtime_overrides) {
         Ok(Some(launch)) => {
             println!(
                 "Auxiliary launch (Looking Glass): {}",
@@ -161,6 +177,7 @@ fn run_daemon_start(
     executor: &crate::qemu::executor::QemuExecutor,
     log_file: Option<&std::path::PathBuf>,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
     println!("Starting in daemon mode...");
     if let Some(log_file) = log_file {
@@ -199,10 +216,10 @@ fn run_daemon_start(
         println!("✓ VM '{}' started (daemonized)", manager.config().name);
     }
 
-    if let Err(err) = spawn_remote_viewer(manager.config(), central_config) {
+    if let Err(err) = spawn_remote_viewer(manager.config(), central_config, runtime_overrides) {
         eprintln!("Warning: {}", err);
     }
-    if let Err(err) = spawn_looking_glass(manager.config(), central_config) {
+    if let Err(err) = spawn_looking_glass(manager.config(), central_config, runtime_overrides) {
         eprintln!("Warning: {}", err);
     }
 
@@ -214,13 +231,14 @@ fn run_interactive_start(
     executor: &crate::qemu::executor::QemuExecutor,
     log_file: Option<&std::path::PathBuf>,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
     println!("Starting interactively...");
 
-    if let Err(err) = spawn_remote_viewer(manager.config(), central_config) {
+    if let Err(err) = spawn_remote_viewer(manager.config(), central_config, runtime_overrides) {
         eprintln!("Warning: {}", err);
     }
-    if let Err(err) = spawn_looking_glass(manager.config(), central_config) {
+    if let Err(err) = spawn_looking_glass(manager.config(), central_config, runtime_overrides) {
         eprintln!("Warning: {}", err);
     }
 

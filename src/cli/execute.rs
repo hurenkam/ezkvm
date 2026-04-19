@@ -20,7 +20,23 @@ pub async fn execute(cli: Cli) -> Result<()> {
             config,
             daemon,
             dry_run,
-        } => handle_start(&config, daemon, dry_run).await,
+            run_dir,
+            swtpm_binary,
+            tpm_socket_path,
+            remote_viewer_program,
+            looking_glass_program,
+            ovmf_dir,
+        } => {
+            let runtime_overrides = crate::config::RuntimeCliOverrides {
+                run_dir,
+                tpm_socket_path,
+                swtpm_binary,
+                remote_viewer_program,
+                looking_glass_program,
+                ovmf_dir,
+            };
+            handle_start(&config, daemon, dry_run, runtime_overrides).await
+        }
         Commands::Stop { config, force } => handle_stop(&config, force).await,
         Commands::Kill { config } => handle_kill(&config).await,
         Commands::List => handle_list().await,

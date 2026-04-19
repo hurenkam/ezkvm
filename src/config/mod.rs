@@ -17,7 +17,8 @@ mod vm_schema;
 pub use central::{
     CentralConfig, FirmwareHostCapabilities, HostCapabilitiesConfig, IntegrationHostCapabilities,
     LocationsConfig, LookingGlassCapability, LookingGlassOptions, NetworkHostCapabilities,
-    ProgramCapability, RuntimeHostCapabilities, ToolsConfig, TpmHostCapabilities,
+    ProgramCapability, RuntimeCliOverrides, RuntimeHostCapabilities, ToolsConfig,
+    TpmHostCapabilities,
 };
 #[allow(unused_imports)]
 pub use platform::{

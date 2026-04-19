@@ -89,11 +89,22 @@ impl QemuManager {
     }
 
     fn resolve_uefi_code_path(&self) -> Option<String> {
+        if let Some(override_path) = self
+            .runtime_overrides
+            .ovmf_dir
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+        {
+            return Some(resolve_ovmf_code_from_dir(
+                override_path,
+                self.config.system_boot().secure_boot,
+            ));
+        }
+
         self.config.system_boot().uefi_code.clone().or_else(|| {
             self.central_config
-                .locations
-                .ovmf_dir
-                .as_ref()
+                .ovmf_dir_with_overrides(&self.runtime_overrides)
                 .map(|ovmf_dir| {
                     resolve_ovmf_code_from_dir(ovmf_dir, self.config.system_boot().secure_boot)
                 })
@@ -132,6 +143,8 @@ fn map_boot_device(device: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::resolve_ovmf_code_from_dir;
+    use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
+    use crate::qemu::QemuManager;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -167,5 +180,106 @@ mod tests {
         assert_eq!(resolved, file.to_string_lossy());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn base_uefi_vm() -> VmConfig {
+        VmConfig::from_str(
+            r#"
+name: "uefi-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+  cpu:
+    vcpus: 1
+    model: "host"
+  boot:
+    firmware: "uefi"
+"#,
+        )
+        .expect("vm config should parse")
+    }
+
+    fn extract_uefi_code_arg(manager: &QemuManager) -> Option<String> {
+        let args = manager.build_boot_args();
+        args.iter()
+            .find(|arg| arg.contains("if=pflash,unit=0,format=raw,readonly=on,file="))
+            .map(|arg| arg.to_string())
+    }
+
+    #[test]
+    fn uefi_precedence_prefers_cli_ovmf_dir_over_vm_and_central() {
+        let mut vm = base_uefi_vm();
+        vm.system.boot.uefi_code = Some("/vm-local/OVMF.fd".to_string());
+
+        let central = CentralConfig {
+            locations: crate::config::LocationsConfig {
+                ovmf_dir: Some("/central/ovmf".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            central,
+            RuntimeCliOverrides {
+                ovmf_dir: Some("/cli/ovmf".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let arg = extract_uefi_code_arg(&manager).expect("uefi code arg should be present");
+        assert!(arg.contains("file=/cli/ovmf/OVMF.fd"));
+    }
+
+    #[test]
+    fn uefi_precedence_prefers_vm_over_central_when_no_cli_override() {
+        let mut vm = base_uefi_vm();
+        vm.system.boot.uefi_code = Some("/vm-local/OVMF.fd".to_string());
+
+        let central = CentralConfig {
+            locations: crate::config::LocationsConfig {
+                ovmf_dir: Some("/central/ovmf".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let manager = QemuManager::new_with_overrides(vm, central, RuntimeCliOverrides::default());
+        let arg = extract_uefi_code_arg(&manager).expect("uefi code arg should be present");
+        assert!(arg.contains("file=/vm-local/OVMF.fd"));
+    }
+
+    #[test]
+    fn uefi_precedence_uses_central_ovmf_dir_before_builtin_fallback() {
+        let vm = base_uefi_vm();
+        let central = CentralConfig {
+            locations: crate::config::LocationsConfig {
+                ovmf_dir: Some("/central/ovmf".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let manager = QemuManager::new_with_overrides(vm, central, RuntimeCliOverrides::default());
+        let arg = extract_uefi_code_arg(&manager).expect("uefi code arg should be present");
+        assert!(arg.contains("file=/central/ovmf/OVMF.fd"));
+    }
+
+    #[test]
+    fn uefi_precedence_falls_back_to_builtin_when_no_sources_defined() {
+        let vm = base_uefi_vm();
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+
+        let arg = extract_uefi_code_arg(&manager).expect("uefi code arg should be present");
+        assert!(arg.contains("file=/usr/share/ovmf/OVMF.fd"));
     }
 }

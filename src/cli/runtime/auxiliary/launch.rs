@@ -72,6 +72,7 @@ fn has_primary_passthrough_gpu(config: &crate::config::VmConfig) -> bool {
 pub(crate) fn build_remote_viewer_launch(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Option<AuxiliaryLaunch> {
     if has_primary_passthrough_gpu(config) {
         return None;
@@ -82,7 +83,8 @@ pub(crate) fn build_remote_viewer_launch(
         _ => return None,
     };
 
-    let remote_viewer_path = central_config.remote_viewer_program()?;
+    let remote_viewer_path =
+        central_config.remote_viewer_program_with_overrides(runtime_overrides)?;
     let uri = format!(
         "spice://{}:{}",
         resolve_client_host(&spice.addr),
@@ -101,6 +103,7 @@ pub(crate) fn build_remote_viewer_launch(
 pub(crate) fn build_looking_glass_launch(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<Option<AuxiliaryLaunch>> {
     if !has_primary_passthrough_gpu(config) {
         return Ok(None);
@@ -117,10 +120,13 @@ pub(crate) fn build_looking_glass_launch(
         .as_ref()
         .unwrap_or(&central_config.looking_glass);
 
-    let looking_glass_path = match looking_glass_options
-        .program
+    let looking_glass_path = match runtime_overrides
+        .looking_glass_program
         .as_deref()
-        .or(central_config.looking_glass_program())
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .or(looking_glass_options.program.as_deref())
+        .or(central_config.looking_glass_program_with_overrides(runtime_overrides))
     {
         Some(path) if !path.trim().is_empty() => path,
         Some(_) => return Err(anyhow!("Looking Glass client path is empty")),
@@ -202,8 +208,9 @@ fn wait_for_tcp_endpoint(host: &str, port: u16, timeout: Duration, label: &str) 
 pub(crate) fn spawn_remote_viewer(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
-    if let Some(launch) = build_remote_viewer_launch(config, central_config) {
+    if let Some(launch) = build_remote_viewer_launch(config, central_config, runtime_overrides) {
         run_auxiliary_launch(&launch)?;
     }
 
@@ -213,8 +220,10 @@ pub(crate) fn spawn_remote_viewer(
 pub(crate) fn spawn_looking_glass(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
-    let Some(launch) = build_looking_glass_launch(config, central_config)? else {
+    let Some(launch) = build_looking_glass_launch(config, central_config, runtime_overrides)?
+    else {
         return Ok(());
     };
 

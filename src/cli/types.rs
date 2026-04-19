@@ -41,6 +41,30 @@ pub enum Commands {
         /// Dry run - show command without executing
         #[arg(long)]
         dry_run: bool,
+
+        /// Override runtime directory root for auxiliary sockets/logs
+        #[arg(long)]
+        run_dir: Option<String>,
+
+        /// Override swtpm binary path
+        #[arg(long)]
+        swtpm_binary: Option<String>,
+
+        /// Override TPM socket path
+        #[arg(long)]
+        tpm_socket_path: Option<String>,
+
+        /// Override remote-viewer binary path
+        #[arg(long)]
+        remote_viewer_program: Option<String>,
+
+        /// Override Looking Glass client binary path
+        #[arg(long)]
+        looking_glass_program: Option<String>,
+
+        /// Override OVMF firmware directory used for code discovery
+        #[arg(long)]
+        ovmf_dir: Option<String>,
     },
 
     /// Stop a virtual machine

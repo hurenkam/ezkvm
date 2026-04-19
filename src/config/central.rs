@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 
+/// Runtime CLI overrides for host-capability resolution.
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeCliOverrides {
+    pub run_dir: Option<String>,
+    pub tpm_socket_path: Option<String>,
+    pub swtpm_binary: Option<String>,
+    pub remote_viewer_program: Option<String>,
+    pub looking_glass_program: Option<String>,
+    pub ovmf_dir: Option<String>,
+}
+
 /// Central tool configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default, deny_unknown_fields)]
@@ -22,13 +33,43 @@ pub struct CentralConfig {
 }
 
 impl CentralConfig {
+    fn non_empty(value: Option<&str>) -> Option<&str> {
+        value.and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        })
+    }
+
+    /// Resolve the effective runtime directory root, including CLI overrides.
+    pub fn runtime_run_dir_with_overrides<'a>(
+        &'a self,
+        overrides: &'a RuntimeCliOverrides,
+    ) -> Option<&'a str> {
+        Self::non_empty(overrides.run_dir.as_deref()).or_else(|| {
+            Self::non_empty(
+                self.host_capabilities
+                    .runtime
+                    .run_dir
+                    .as_deref()
+                    .or(self.locations.run_dir.as_deref()),
+            )
+        })
+    }
+
     /// Resolve the effective runtime directory root.
+    #[allow(dead_code)]
     pub fn runtime_run_dir(&self) -> Option<&str> {
-        self.host_capabilities
-            .runtime
-            .run_dir
-            .as_deref()
-            .or(self.locations.run_dir.as_deref())
+        Self::non_empty(
+            self.host_capabilities
+                .runtime
+                .run_dir
+                .as_deref()
+                .or(self.locations.run_dir.as_deref()),
+        )
     }
 
     /// Resolve the configured profile directory.
@@ -36,44 +77,122 @@ impl CentralConfig {
         self.locations.profile_dir.as_deref()
     }
 
+    /// Resolve the effective OVMF firmware directory, including CLI overrides.
+    pub fn ovmf_dir_with_overrides<'a>(
+        &'a self,
+        overrides: &'a RuntimeCliOverrides,
+    ) -> Option<&'a str> {
+        Self::non_empty(overrides.ovmf_dir.as_deref()).or_else(|| {
+            Self::non_empty(
+                self.host_capabilities
+                    .firmware
+                    .ovmf_dir
+                    .as_deref()
+                    .or(self.locations.ovmf_dir.as_deref()),
+            )
+        })
+    }
+
     /// Resolve the effective OVMF firmware directory.
     #[allow(dead_code)]
     pub fn ovmf_dir(&self) -> Option<&str> {
-        self.host_capabilities
-            .firmware
-            .ovmf_dir
-            .as_deref()
-            .or(self.locations.ovmf_dir.as_deref())
+        Self::non_empty(
+            self.host_capabilities
+                .firmware
+                .ovmf_dir
+                .as_deref()
+                .or(self.locations.ovmf_dir.as_deref()),
+        )
+    }
+
+    /// Resolve the effective swtpm binary path, including CLI overrides.
+    pub fn swtpm_program_with_overrides<'a>(
+        &'a self,
+        overrides: &'a RuntimeCliOverrides,
+    ) -> Option<&'a str> {
+        Self::non_empty(overrides.swtpm_binary.as_deref()).or_else(|| {
+            Self::non_empty(
+                self.host_capabilities
+                    .tpm
+                    .swtpm_binary
+                    .as_deref()
+                    .or(self.tools.swtpm.as_deref()),
+            )
+        })
     }
 
     /// Resolve the effective swtpm binary path.
+    #[allow(dead_code)]
     pub fn swtpm_program(&self) -> Option<&str> {
-        self.host_capabilities
-            .tpm
-            .swtpm_binary
-            .as_deref()
-            .or(self.tools.swtpm.as_deref())
+        Self::non_empty(
+            self.host_capabilities
+                .tpm
+                .swtpm_binary
+                .as_deref()
+                .or(self.tools.swtpm.as_deref()),
+        )
+    }
+
+    /// Resolve the effective remote-viewer program path, including CLI overrides.
+    pub fn remote_viewer_program_with_overrides<'a>(
+        &'a self,
+        overrides: &'a RuntimeCliOverrides,
+    ) -> Option<&'a str> {
+        Self::non_empty(overrides.remote_viewer_program.as_deref()).or_else(|| {
+            Self::non_empty(
+                self.host_capabilities
+                    .integrations
+                    .remote_viewer
+                    .program
+                    .as_deref()
+                    .or(self.tools.remote_viewer.as_deref()),
+            )
+        })
     }
 
     /// Resolve the effective remote-viewer program path.
+    #[allow(dead_code)]
     pub fn remote_viewer_program(&self) -> Option<&str> {
-        self.host_capabilities
-            .integrations
-            .remote_viewer
-            .program
-            .as_deref()
-            .or(self.tools.remote_viewer.as_deref())
+        Self::non_empty(
+            self.host_capabilities
+                .integrations
+                .remote_viewer
+                .program
+                .as_deref()
+                .or(self.tools.remote_viewer.as_deref()),
+        )
+    }
+
+    /// Resolve the effective Looking Glass program path, including CLI overrides.
+    pub fn looking_glass_program_with_overrides<'a>(
+        &'a self,
+        overrides: &'a RuntimeCliOverrides,
+    ) -> Option<&'a str> {
+        Self::non_empty(overrides.looking_glass_program.as_deref()).or_else(|| {
+            Self::non_empty(
+                self.host_capabilities
+                    .integrations
+                    .looking_glass
+                    .program
+                    .as_deref()
+                    .or(self.looking_glass.program.as_deref())
+                    .or(self.tools.looking_glass.as_deref()),
+            )
+        })
     }
 
     /// Resolve the effective Looking Glass program path.
+    #[allow(dead_code)]
     pub fn looking_glass_program(&self) -> Option<&str> {
-        self.host_capabilities
-            .integrations
-            .looking_glass
-            .program
-            .as_deref()
-            .or(self.looking_glass.program.as_deref())
-            .or(self.tools.looking_glass.as_deref())
+        Self::non_empty(
+            self.host_capabilities
+                .integrations
+                .looking_glass
+                .program
+                .as_deref()
+                .or(self.looking_glass.program.as_deref())
+                .or(self.tools.looking_glass.as_deref()),
+        )
     }
 
     /// Resolve the configured network backend preference.

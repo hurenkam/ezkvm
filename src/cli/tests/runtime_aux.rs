@@ -23,9 +23,66 @@ system:
     )
     .unwrap();
 
-    let err = runtime::start_swtpm_if_configured(&config, &crate::config::CentralConfig::default())
-        .unwrap_err();
-    assert!(err.to_string().contains("tools.swtpm"));
+    let err = runtime::start_swtpm_if_configured(
+        &config,
+        &crate::config::CentralConfig::default(),
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("swtpm"));
+}
+
+#[test]
+fn test_swtpm_preview_cli_socket_path_overrides_vm_and_central_defaults() {
+    let config = crate::config::VmConfig::from_str(
+        r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory:
+        size: 1024
+    cpu:
+        vcpus: 1
+        model: "host"
+    tpm:
+        version: "2.0"
+        backend: "emulator"
+        state_path: "/vm-local/socket.swtpm"
+        model: "tpm-tis"
+"#,
+    )
+    .unwrap();
+
+    let central_config = crate::config::CentralConfig {
+        tools: crate::config::ToolsConfig {
+            qemu: None,
+            swtpm: Some("/usr/bin/swtpm".to_string()),
+            remote_viewer: None,
+            looking_glass: None,
+        },
+        locations: crate::config::LocationsConfig {
+            run_dir: Some("/central/run".to_string()),
+            ..Default::default()
+        },
+        looking_glass: crate::config::LookingGlassOptions::default(),
+        host_capabilities: crate::config::HostCapabilitiesConfig::default(),
+    };
+
+    let preview = runtime::build_swtpm_launch_preview(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides {
+            tpm_socket_path: Some("/cli/socket.swtpm".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .expect("swtpm preview should be generated");
+
+    assert!(preview.contains("path=/cli/socket.swtpm"));
 }
 
 #[test]

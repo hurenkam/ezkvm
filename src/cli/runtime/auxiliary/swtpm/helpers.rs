@@ -3,9 +3,12 @@ use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub(super) fn ensure_run_dir(central_config: &crate::config::CentralConfig) -> Result<PathBuf> {
+pub(super) fn ensure_run_dir(
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<PathBuf> {
     let run_dir = central_config
-        .runtime_run_dir()
+        .runtime_run_dir_with_overrides(runtime_overrides)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/var/run/ezkvm"));
 
@@ -71,14 +74,24 @@ pub(super) fn wait_for_unix_socket(
 pub(super) fn resolve_tpm_socket_path(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> String {
+    if let Some(socket_path) = runtime_overrides
+        .tpm_socket_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+    {
+        return socket_path.to_string();
+    }
+
     if let Some(tpm) = config.system_tpm()
         && let Some(state_path) = &tpm.state_path
     {
         return state_path.clone();
     }
 
-    if let Some(run_dir) = central_config.runtime_run_dir() {
+    if let Some(run_dir) = central_config.runtime_run_dir_with_overrides(runtime_overrides) {
         return format!("{}/{}.swtpm", run_dir, config.name);
     }
 

@@ -4,14 +4,30 @@ use crate::config::{CentralConfig, VmConfig};
 pub struct QemuManager {
     pub(super) config: VmConfig,
     pub(super) central_config: CentralConfig,
+    pub(super) runtime_overrides: crate::config::RuntimeCliOverrides,
 }
 
 impl QemuManager {
     /// Create a new QEMU manager for a VM configuration
+    #[allow(dead_code)]
     pub fn new(config: VmConfig, central_config: CentralConfig) -> Self {
+        Self::new_with_overrides(
+            config,
+            central_config,
+            crate::config::RuntimeCliOverrides::default(),
+        )
+    }
+
+    /// Create a new QEMU manager with runtime CLI overrides.
+    pub fn new_with_overrides(
+        config: VmConfig,
+        central_config: CentralConfig,
+        runtime_overrides: crate::config::RuntimeCliOverrides,
+    ) -> Self {
         Self {
             config,
             central_config,
+            runtime_overrides,
         }
     }
 
@@ -30,7 +46,10 @@ impl QemuManager {
             .system_tpm()
             .map(|tpm| tpm.backend == "emulator")
             .unwrap_or(false)
-            && self.central_config.swtpm_program().is_some()
+            && self
+                .central_config
+                .swtpm_program_with_overrides(&self.runtime_overrides)
+                .is_some()
     }
 
     pub(super) fn has_primary_passthrough_gpu(&self) -> bool {
@@ -41,13 +60,26 @@ impl QemuManager {
     }
 
     pub(super) fn resolve_tpm_socket_path(&self) -> String {
+        if let Some(socket_path) = self
+            .runtime_overrides
+            .tpm_socket_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+        {
+            return socket_path.to_string();
+        }
+
         if let Some(tpm) = self.config.system_tpm()
             && let Some(state_path) = &tpm.state_path
         {
             return state_path.clone();
         }
 
-        if let Some(run_dir) = self.central_config.runtime_run_dir() {
+        if let Some(run_dir) = self
+            .central_config
+            .runtime_run_dir_with_overrides(&self.runtime_overrides)
+        {
             return format!("{}/{}.swtpm", run_dir, self.config.name);
         }
 

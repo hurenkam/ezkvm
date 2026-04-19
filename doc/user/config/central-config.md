@@ -100,10 +100,20 @@ The preferred place for portability-related defaults is `host_capabilities`. The
 
 ## Runtime Usage
 
+- Runtime precedence contract: `CLI overrides > VM-local explicit values > profile defaults > central host defaults > built-in fallback`.
 - `host_capabilities.tpm.swtpm_binary` or legacy `tools.swtpm` + `system.tpm.backend: emulator`: ezkvm can launch swtpm.
 - `host_capabilities.integrations.remote_viewer.program` or legacy `tools.remote_viewer` + `spice.enabled`: ezkvm can launch remote-viewer.
-- VM/profile `options.looking_glass.program` remains the most specific Looking Glass client override.
-- If that VM/profile value is absent, ezkvm falls back to `host_capabilities.integrations.looking_glass.program`, then legacy central `looking_glass.program`, then legacy `tools.looking_glass`.
+- VM/profile `options.looking_glass.program` is used unless a CLI override is provided.
+- If no CLI or VM/profile value is set, ezkvm falls back to `host_capabilities.integrations.looking_glass.program`, then legacy central `looking_glass.program`, then legacy `tools.looking_glass`.
+
+Supported CLI runtime overrides on `ezkvm start`:
+
+- `--run-dir`
+- `--swtpm-binary`
+- `--tpm-socket-path`
+- `--remote-viewer-program`
+- `--looking-glass-program`
+- `--ovmf-dir`
 
 Looking Glass client settings should be defined in VM/profile config under `options.looking_glass` so profile-specific behavior stays with the profile.
 
@@ -120,7 +130,7 @@ Looking Glass client settings should be defined in VM/profile config under `opti
 
 - Unknown fields in central config are rejected.
 - The compatibility fallbacks above apply only inside central config resolution.
-- Broader precedence between CLI flags, VM-local config, profiles, and central config is defined separately by the runtime precedence contract.
+- Broader runtime precedence is now implemented and enforced in code for both `start` and `start --dry-run` paths.
 
 ## See also
 

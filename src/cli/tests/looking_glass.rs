@@ -21,9 +21,13 @@ fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
         host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
-    let launch = runtime::build_looking_glass_launch(&config, &central_config)
-        .unwrap()
-        .unwrap();
+    let launch = runtime::build_looking_glass_launch(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap()
+    .unwrap();
 
     assert_eq!(launch.program, "looking-glass-client");
     assert_eq!(
@@ -47,7 +51,12 @@ fn test_build_looking_glass_launch_returns_none_without_tool() {
     let config = base_config();
     let central_config = crate::config::CentralConfig::default();
 
-    let launch = runtime::build_looking_glass_launch(&config, &central_config).unwrap();
+    let launch = runtime::build_looking_glass_launch(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap();
     assert!(launch.is_none());
 }
 
@@ -87,28 +96,97 @@ system:
         host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
-    let launch = runtime::build_looking_glass_launch(&config, &central_config).unwrap();
+    let launch = runtime::build_looking_glass_launch(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap();
     assert!(launch.is_none());
 }
 
 #[test]
 fn test_build_looking_glass_launch_rejects_empty_tool_path() {
-    let config = base_config();
+    let mut config = base_config();
+    config.options.looking_glass = Some(crate::config::LookingGlassOptions {
+        program: Some("   ".to_string()),
+        full_screen: None,
+        size: None,
+        grab_keyboard: None,
+        escape_key: None,
+    });
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
             qemu: None,
             swtpm: None,
             remote_viewer: None,
-            looking_glass: Some("   ".to_string()),
+            looking_glass: None,
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions::default(),
         host_capabilities: crate::config::HostCapabilitiesConfig::default(),
     };
 
-    let err = runtime::build_looking_glass_launch(&config, &central_config).unwrap_err();
+    let err = runtime::build_looking_glass_launch(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap_err();
     assert!(
         err.to_string()
             .contains("Looking Glass client path is empty")
     );
+}
+
+#[test]
+fn test_looking_glass_cli_override_has_highest_precedence() {
+    let mut config = base_config();
+    config.options.looking_glass = Some(crate::config::LookingGlassOptions {
+        program: Some("vm-local-looking-glass".to_string()),
+        full_screen: None,
+        size: None,
+        grab_keyboard: None,
+        escape_key: None,
+    });
+
+    let central_config = crate::config::CentralConfig {
+        tools: crate::config::ToolsConfig {
+            qemu: None,
+            swtpm: None,
+            remote_viewer: None,
+            looking_glass: Some("legacy-looking-glass".to_string()),
+        },
+        locations: crate::config::LocationsConfig::default(),
+        looking_glass: crate::config::LookingGlassOptions {
+            program: Some("central-looking-glass".to_string()),
+            full_screen: None,
+            size: None,
+            grab_keyboard: None,
+            escape_key: None,
+        },
+        host_capabilities: crate::config::HostCapabilitiesConfig {
+            integrations: crate::config::IntegrationHostCapabilities {
+                remote_viewer: crate::config::ProgramCapability::default(),
+                looking_glass: crate::config::LookingGlassCapability {
+                    program: Some("hostcap-looking-glass".to_string()),
+                    shared_memory_device: None,
+                },
+            },
+            ..Default::default()
+        },
+    };
+
+    let launch = runtime::build_looking_glass_launch(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides {
+            looking_glass_program: Some("cli-looking-glass".to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(launch.program, "cli-looking-glass");
 }

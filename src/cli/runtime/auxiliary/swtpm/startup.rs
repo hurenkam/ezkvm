@@ -10,12 +10,13 @@ use super::helpers::{
 pub(crate) fn ensure_runtime_socket_dirs(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
     if let Some(tpm) = config.system_tpm()
         && tpm.backend == "emulator"
     {
         ensure_socket_parent_dir(
-            &resolve_tpm_socket_path(config, central_config),
+            &resolve_tpm_socket_path(config, central_config, runtime_overrides),
             "TPM socket",
         )?;
     }
@@ -41,13 +42,14 @@ pub(crate) fn ensure_runtime_socket_dirs(
 pub(crate) fn start_swtpm_if_configured(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
     let Some(tpm) = config.system_tpm().filter(|tpm| tpm.backend == "emulator") else {
         return Ok(());
     };
 
-    let swtpm_path = swtpm_path(central_config)?;
-    let startup = prepare_swtpm_startup(config, central_config, tpm)?;
+    let swtpm_path = swtpm_path(central_config, runtime_overrides)?;
+    let startup = prepare_swtpm_startup(config, central_config, runtime_overrides, tpm)?;
     let rendered_cmd = render_swtpm_command(&swtpm_path, &startup);
     println!("Launching swtpm: {}", rendered_cmd.join(" "));
 
@@ -65,13 +67,16 @@ struct SwtpmStartup {
     log_arg: String,
 }
 
-fn swtpm_path(central_config: &crate::config::CentralConfig) -> Result<String> {
+fn swtpm_path(
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<String> {
     central_config
-        .swtpm_program()
+        .swtpm_program_with_overrides(runtime_overrides)
         .map(str::to_owned)
         .ok_or_else(|| {
             anyhow!(
-                "TPM emulator backend requires host_capabilities.tpm.swtpm_binary or legacy tools.swtpm to be configured in the central config"
+                "TPM emulator backend requires --swtpm-binary, host_capabilities.tpm.swtpm_binary, or legacy tools.swtpm"
             )
         })
 }
@@ -79,10 +84,11 @@ fn swtpm_path(central_config: &crate::config::CentralConfig) -> Result<String> {
 fn prepare_swtpm_startup(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
     tpm: &crate::config::TpmConfig,
 ) -> Result<SwtpmStartup> {
-    let run_dir = ensure_run_dir(central_config)?;
-    let socket_path = resolve_tpm_socket_path(config, central_config);
+    let run_dir = ensure_run_dir(central_config, runtime_overrides)?;
+    let socket_path = resolve_tpm_socket_path(config, central_config, runtime_overrides);
     ensure_socket_parent_dir(&socket_path, "TPM socket")?;
 
     let pid_path = run_dir.join(format!("{}.swtpm.pid", config.name));

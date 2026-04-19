@@ -115,6 +115,7 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm start <config.yaml>` - Start a VM from configuration
 - `ezkvm start <config.yaml> --dry-run` - Show the QEMU command without executing
 - `ezkvm start <config.yaml> --daemon` - Start VM in background
+- `ezkvm start <config.yaml> --run-dir <path> --swtpm-binary <path> --tpm-socket-path <path> --remote-viewer-program <path> --looking-glass-program <path> --ovmf-dir <path>` - Override runtime host defaults from the CLI
 - `ezkvm stop <config.yaml>` - Stop a VM gracefully
 - `ezkvm stop <config.yaml> --force` - Force stop a VM
 - `ezkvm kill <config.yaml>` - Force kill a VM
