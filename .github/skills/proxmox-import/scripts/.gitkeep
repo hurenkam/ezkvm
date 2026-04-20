@@ -1,0 +1,3 @@
+#!/bin/bash
+# Make script executable
+# chmod +x compare-proxmox-qemu.sh

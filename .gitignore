@@ -1,5 +1,4 @@
 Cargo.lock
-.github/**
 .vscode/**
 bak/**
 diff/**
