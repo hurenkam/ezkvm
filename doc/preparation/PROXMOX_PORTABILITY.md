@@ -230,14 +230,15 @@ This is the strongest architectural foundation, but it should be introduced incr
 - Mapper normalization for portable target operational
 - All 282+ tests passing
 
-**Phase 2**: 🔄 IN PROGRESS
-- Mapper normalization complete
-- Central host config schema pending
-- Runtime capability resolution pending
+**Phase 2**: ✅ COMPLETE (2026-04-19)
+- Central host capability schema implemented (B-42)
+- Runtime capability providers implemented: directory, firmware, swtpm, network, Looking Glass (B-43–B-47)
+- Capability precedence contract and validation implemented (B-48)
+- Integration tests for host capability resolution added (B-49)
+- Operator documentation for portable mode added (B-50)
 
 **Phase 3**: ⏳ READY TO START
-- Host capability resolution layer design defined
-- Can proceed once Phase 2 central config schema is in place
+- Requires real-host distro validation matrix (Debian Trixie, Ubuntu 26.04, Arch Linux)
 
 **Phase 4**: ⏳ PLANNED
 - Distro-specific validation matrix for Debian Trixie, Ubuntu 26.04, Arch Linux
@@ -534,11 +535,9 @@ Portable mode should either:
 - capability-matrix runs with host-config permutations
 - operator-path validation for preflight and diagnostics UX
 
-### Phase 4: Follow-On Hardening
+### Phase 4: Deferred Enhancements
 
-- profile compaction ownership audit completion (B-30)
-- compaction policy and default-omission guardrails completion (B-31)
-- optional networking backend expansion (`passt`) as deferred enhancement
+- optional networking backend expansion (`passt`)
 
 Validation should check both:
 
@@ -636,9 +635,10 @@ This keeps the selected approach intact while making central host config a first
 - Integration tests and user/operator documentation were expanded for capability resolution behavior.
 
 **What remains after Phase 2:**
-1. Execute full real-host distro validation matrix (Debian, Ubuntu, Arch) and capture operator runbooks.
-2. Complete compaction hardening backlog items (B-30, B-31) that remain outside the B-42..B-50 portability chain.
-3. Evaluate deferred optional enhancements such as `passt` networking backend support.
+1. Execute full real-host distro validation matrix (Debian, Ubuntu, Arch) and capture operator runbooks (Phase 3).
+2. Evaluate deferred optional enhancements such as `passt` networking backend support.
+
+Note: B-30 (profile-first compaction audit) and B-31 (profile inference coverage expansion) are both Done.
 
 ## Non-Goals
 
