@@ -38,7 +38,7 @@ Source: doc/backlog/BACKLOG.md
 - A-03 Create convergence tracking board
 - B-01 Port Proxmox parser into dedicated module (start)
 
-## Ticket Registry (A-01 to E-03)
+## Ticket Registry
 
 | ID | Title | Epic | Milestone | Labels | Depends On | Assignee | Status |
 |---|---|---|---|---|---|---|---|
@@ -95,6 +95,11 @@ Source: doc/backlog/BACKLOG.md
 | B-48 | Implement capability precedence contract and validation | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-47 | unassigned | Done |
 | B-49 | Add integration tests for host capability resolution | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-48 | unassigned | Done |
 | B-50 | Document portable mode operator guidance | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-49 | unassigned | Done |
+| B-51 | Define Phase 3 distro validation matrix and success criteria | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening, ready | B-50 | unassigned | Todo |
+| B-52 | Build reusable Phase 3 validation harness | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-51 | unassigned | Todo |
+| B-53 | Execute Debian Trixie portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Todo |
+| B-54 | Execute Ubuntu 26.04 portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Todo |
+| B-55 | Execute Arch Linux portable-runtime validation matrix and publish runbooks | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-53, B-54 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -153,6 +158,10 @@ Source: doc/backlog/BACKLOG.md
 - B-39 -> B-40
 - (B-39 and B-40) -> B-41
 - B-41 -> B-42 -> B-43 -> B-44 -> B-45 -> B-46 -> B-47 -> B-48 -> B-49 -> B-50
+- B-50 -> B-51 -> B-52
+- B-52 -> B-53
+- B-52 -> B-54
+- (B-53 and B-54) -> B-55
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

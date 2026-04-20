@@ -529,11 +529,58 @@ Portable mode should either:
 
 ### Phase 3: Validate On Real Target Distros
 
-- Debian Trixie test matrix
-- Ubuntu 26.04 LTS test matrix
-- Arch Linux test matrix
-- capability-matrix runs with host-config permutations
-- operator-path validation for preflight and diagnostics UX
+- Goal: prove that `portable-linux` works on supported hosts without Proxmox filesystem conventions while preserving guest-visible semantics.
+
+#### Recommended test strategy
+
+1. Use a two-layer validation model:
+	- fast resolution checks for import, dry-run, preflight, and capability diagnostics
+	- slower end-to-end smoke boot checks on real distro hosts or nested-KVM VMs
+2. Keep the same representative fixture corpus across all distros:
+	- Linux headless/networked guest
+	- Windows UEFI + TPM guest
+	- one capability-heavy mixed-device fixture
+	- one parity-target dry-run sanity fixture to guard against portable-mode regressions leaking into parity mode
+3. Separate required-portable coverage from optional integrations:
+	- required for Phase 3 sign-off: runtime dir, firmware resolution, swtpm, bridge-helper or user-mode networking, preflight UX
+	- optional and non-gating: Looking Glass enablement, GPU passthrough, hardware-specific tuning
+4. Capture the same artifacts on every distro run:
+	- imported YAML output
+	- dry-run QEMU args
+	- resolved capability diagnostics
+	- preflight output
+	- discovered helper and firmware paths plus package versions
+5. Fail Phase 3 only on portability-contract regressions:
+	- guest-visible topology changes
+	- reintroduction of Proxmox-only runtime paths
+	- missing required portable capabilities without actionable diagnostics
+
+#### Distro-specific approach
+
+- Debian Trixie:
+  - treat as the reference portable host
+  - run the full required matrix first, including bridge-helper and swtpm flows
+- Ubuntu 26.04 LTS:
+  - run the same required matrix with emphasis on firmware-path and package-name differences versus Debian
+  - keep fixture expectations identical so regressions are comparable
+- Arch Linux:
+  - treat as the path-variability and operator-setup stress case
+  - prioritize capability discovery, preflight clarity, and user-mode fallback before bridge-helper sign-off
+
+#### Suggested execution order
+
+1. Define the matrix and success criteria once.
+2. Build one reusable validation harness for dry-run, preflight, and smoke-boot checks.
+3. Execute Debian first, then Ubuntu, then Arch.
+4. Capture operator runbooks and distro deltas only after the matrix is stable.
+5. Keep required portable validation release-gating; leave optional integrations as follow-on validation.
+
+#### Phase 3 success criteria
+
+- Representative portable imports start successfully on Debian Trixie, Ubuntu 26.04 LTS, and Arch Linux.
+- Required capabilities resolve without Proxmox-specific paths.
+- Dry-run diagnostics clearly show the winning capability source per distro.
+- Operator runbooks document package and setup differences plus expected preflight behavior.
 
 ### Phase 4: Deferred Enhancements
 

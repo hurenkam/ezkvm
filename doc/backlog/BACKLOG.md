@@ -727,6 +727,73 @@ Acceptance Criteria:
 - Migration guide helps users transition from parity-only workflows
 Estimate: 2 days
 
+## Phase 3: Real-Host Distro Validation
+
+### B-51 Define Phase 3 distro validation matrix and success criteria
+Scope:
+- Convert the portability Phase 3 plan into an executable matrix covering Debian Trixie, Ubuntu 26.04 LTS, and Arch Linux.
+- Define required versus optional scenarios, required artifacts, and pass/fail gates.
+- Lock the representative fixture set for portable validation: Linux headless/networked, Windows UEFI+TPM, and one capability-heavy mixed-device fixture.
+Dependencies: B-50
+Acceptance Criteria:
+- Matrix document defines distro rows, scenario columns, and required artifacts.
+- Success criteria explicitly distinguish portability-contract failures from optional integration gaps.
+- Required portable validation scope excludes hardware-bound non-gating features such as GPU passthrough.
+- Matrix is referenced from portability docs and test guidance.
+Estimate: 1 day
+
+### B-52 Build reusable Phase 3 validation harness
+Scope:
+- Add a reusable harness or scripted workflow for running import, dry-run, preflight, and smoke-boot checks across distro-specific environments.
+- Standardize artifact capture: imported YAML, dry-run args, capability diagnostics, preflight output, discovered helper/firmware paths, package versions.
+- Keep the harness portable between nested-KVM test VMs and real hosts.
+Dependencies: B-51
+Acceptance Criteria:
+- One command or documented workflow can execute the Phase 3 matrix on a prepared distro host.
+- Artifact capture is consistent across Debian, Ubuntu, and Arch runs.
+- Harness supports both required portable checks and optional integration toggles without changing core fixtures.
+- Test guidance documents host prerequisites for nested virtualization versus direct-host execution.
+Estimate: 2 days
+
+### B-53 Execute Debian Trixie portable-runtime validation matrix
+Scope:
+- Run the full required Phase 3 matrix on Debian Trixie as the reference portable host.
+- Validate bridge-helper, firmware discovery, swtpm, runtime directory resolution, portable preflight UX, and smoke boots for representative fixtures.
+- Record Debian-specific package/path assumptions and any operator setup steps.
+Dependencies: B-52
+Acceptance Criteria:
+- Debian Trixie results include complete captured artifacts for all required scenarios.
+- No required portable path depends on Proxmox filesystem conventions.
+- Any failures are categorized as code defect, packaging assumption, or operator-doc gap.
+- Debian-specific setup notes are captured for operator documentation updates.
+Estimate: 2 days
+
+### B-54 Execute Ubuntu 26.04 portable-runtime validation matrix
+Scope:
+- Run the same required Phase 3 matrix on Ubuntu 26.04 LTS.
+- Focus on firmware path and package differences versus Debian while preserving identical fixture expectations.
+- Record Ubuntu-specific package/path assumptions and operator setup deltas.
+Dependencies: B-52
+Acceptance Criteria:
+- Ubuntu 26.04 results include complete captured artifacts for all required scenarios.
+- Required capability resolution and smoke-boot behavior match Phase 3 acceptance gates.
+- Ubuntu-specific deltas versus Debian are documented without weakening the portability contract.
+- Any failures are categorized and linked to actionable follow-up work.
+Estimate: 2 days
+
+### B-55 Execute Arch Linux portable-runtime validation matrix and publish runbooks
+Scope:
+- Run the required Phase 3 matrix on Arch Linux as the path-variability stress case.
+- Prioritize capability discovery, preflight clarity, and user-mode networking fallback before bridge-helper sign-off.
+- Consolidate Debian, Ubuntu, and Arch results into operator runbooks and support guidance.
+Dependencies: B-53, B-54
+Acceptance Criteria:
+- Arch results include complete captured artifacts for all required scenarios.
+- Operator runbooks document distro-specific package/setup differences and expected diagnostics.
+- Phase 3 summary explicitly states which capabilities are required, optional, and non-gating.
+- Portable-mode support claim for Debian, Ubuntu, and Arch is backed by captured validation evidence.
+Estimate: 3 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
