@@ -93,6 +93,65 @@ For each distro run, capture and archive:
 
 See `doc/preparation/PROXMOX_PORTABILITY.md` Phase 3 section for sequencing and rollout guidance.
 
+## Reusable Phase 3 Harness (B-52)
+
+Use the harness script to run required Phase 3 checks with consistent artifact capture on a prepared distro host.
+
+Script:
+
+- `tests/scripts/phase3_distro_matrix.sh`
+
+### Host Prerequisites
+
+Direct-host mode (recommended for distro validation):
+
+- Host has KVM support and permissions for QEMU workflows
+- `ezkvm` binary is available (`./target/debug/ezkvm` or `--ezkvm-bin`)
+- Fixture files are present in this repository (`tests/fixtures/proxmox_import/*` and `input/felucia/108.conf` or `108.conf`)
+- Packages and helper paths needed for the selected scenarios are installed or intentionally absent for fallback testing
+
+Nested-KVM mode (CI/lab friendly):
+
+- Nested virtualization enabled on the outer host
+- Distro VM prepared with the same prerequisites as direct-host mode
+- Use `--smoke-boot` only when nested guest resources are sufficient; otherwise rely on required dry-run/preflight phases
+
+### One-command execution
+
+Run required checks:
+
+```bash
+tests/scripts/phase3_distro_matrix.sh
+```
+
+Run required checks plus optional integration probes:
+
+```bash
+tests/scripts/phase3_distro_matrix.sh --with-optional
+```
+
+Run with smoke-boot checks enabled:
+
+```bash
+tests/scripts/phase3_distro_matrix.sh --smoke-boot --smoke-timeout-sec 120
+```
+
+### Output artifacts
+
+Each run writes an artifact bundle under `artifacts/phase3/<timestamp>-<distro>/` containing:
+
+1. imported YAML outputs per scenario
+2. import dry-run outputs (portable and parity guard)
+3. `start --dry-run` outputs (preflight + capability diagnostics)
+4. optional smoke-boot logs when enabled
+5. host environment/tool discovery report (`environment.txt`)
+6. scenario-phase status ledger (`summary.txt`)
+
+### Fixture and toggle notes
+
+- Core required scenarios are fixed to the Phase 3 fixture set (Linux, Windows UEFI+TPM, mixed capability-heavy, parity dry-run guard).
+- Optional checks (`--with-optional`) do not fail the run and are recorded as `WARN` when host capabilities are missing.
+
 ### Emulated distro matrix
 
 For deterministic CI, capability layouts are validated with temporary central config files and synthetic binaries rather than depending on host packages.

@@ -571,7 +571,7 @@ Portable mode should either:
 #### Suggested execution order
 
 1. Define the matrix and success criteria once.
-2. Build one reusable validation harness for dry-run, preflight, and smoke-boot checks.
+2. Build one reusable validation harness for dry-run, preflight, and smoke-boot checks (`tests/scripts/phase3_distro_matrix.sh`).
 3. Execute Debian first, then Ubuntu, then Arch.
 4. Capture operator runbooks and distro deltas only after the matrix is stable.
 5. Keep required portable validation release-gating; leave optional integrations as follow-on validation.
