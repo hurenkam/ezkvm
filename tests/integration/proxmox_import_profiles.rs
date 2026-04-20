@@ -1,5 +1,5 @@
 use super::*;
-use ezkvm::import::proxmox::{ImportRunOptions, run_import_from_files};
+use ezkvm::import::proxmox::{ImportOutputMode, ImportRunOptions, run_import_from_files};
 use serde_yaml::Value;
 use std::path::Path;
 
@@ -27,6 +27,7 @@ fn imported_profiles(
     conf_path: &str,
     storage_path: Option<&str>,
     runtime_target: ezkvm::import::proxmox::RuntimeTarget,
+    output_mode: ImportOutputMode,
 ) -> Vec<String> {
     let result = with_repo_profiles(|| {
         run_import_from_files(
@@ -37,14 +38,20 @@ fn imported_profiles(
                 strict: false,
                 dry_run: true,
                 compact_lists: false,
-                output_mode: ezkvm::import::proxmox::ImportOutputMode::Compact,
+                output_mode,
                 runtime_target,
             },
         )
         .expect("import should succeed")
     });
 
-    let root: Value = serde_yaml::from_str(&result.yaml).expect("yaml should parse");
+    let yaml = if output_mode == ImportOutputMode::DebugCanonical {
+        strip_yaml_comments(&result.yaml)
+    } else {
+        result.yaml
+    };
+
+    let root: Value = serde_yaml::from_str(&yaml).expect("yaml should parse");
     let profiles = root
         .as_mapping()
         .and_then(|map| map.get(Value::String("profiles".to_string())))
@@ -57,6 +64,14 @@ fn imported_profiles(
         .collect()
 }
 
+fn strip_yaml_comments(input: &str) -> String {
+    input
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn wakiza_import_emits_expected_profile_stack() {
     let _guard = env_lock()
@@ -67,6 +82,7 @@ fn wakiza_import_emits_expected_profile_stack() {
         "input/felucia/108.conf",
         Some("input/felucia/storage.cfg"),
         ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
     );
 
     assert_eq!(
@@ -94,6 +110,7 @@ fn linux_desktop_import_emits_expected_profile_stack() {
         "input/zbp-server-mh2/301.conf",
         Some("input/zbp-server-mh2/storage.cfg"),
         ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
     );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
@@ -112,6 +129,7 @@ fn macos_import_emits_expected_profile_stack() {
         "input/coruscant/401.conf",
         Some("input/coruscant/storage.cfg"),
         ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
     );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
@@ -129,6 +147,7 @@ fn nested_vm_import_emits_viommu_and_hidden_hypervisor_profiles() {
         "input/coruscant/194.conf",
         Some("input/coruscant/storage.cfg"),
         ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
     );
 
     assert!(profiles.contains(&"proxmox-q35-uefi".to_string()));
@@ -147,6 +166,7 @@ fn headless_vnc_fixture_emits_headless_vnc_profile() {
         "tests/fixtures/proxmox_import/10-headless-vnc.conf",
         None,
         ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
     );
 
     assert!(profiles.contains(&"headless-vnc".to_string()));
@@ -163,7 +183,59 @@ fn parity_target_includes_proxmox_parity_runtime_profile() {
         "input/felucia/108.conf",
         Some("input/felucia/storage.cfg"),
         ezkvm::import::proxmox::RuntimeTarget::ProxmoxParity,
+        ImportOutputMode::Compact,
     );
 
     assert!(profiles.contains(&"proxmox-parity-runtime".to_string()));
+}
+
+#[test]
+fn mixed_storage_fixture_keeps_scsi_profile_inference() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let profiles = imported_profiles(
+        "tests/fixtures/proxmox_import/12-mixed-storage-buses.conf",
+        None,
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
+    );
+
+    assert!(
+        profiles.contains(&"storage-virtio-scsi-single".to_string()),
+        "expected virtio-scsi-single profile for mixed-bus fixture: {profiles:?}"
+    );
+}
+
+#[test]
+fn profile_inference_is_consistent_across_output_modes() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let canonical = imported_profiles(
+        "tests/fixtures/proxmox_import/11-nested-viommu-hidden.conf",
+        None,
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Canonical,
+    );
+    let compact = imported_profiles(
+        "tests/fixtures/proxmox_import/11-nested-viommu-hidden.conf",
+        None,
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::Compact,
+    );
+    let debug = imported_profiles(
+        "tests/fixtures/proxmox_import/11-nested-viommu-hidden.conf",
+        None,
+        ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        ImportOutputMode::DebugCanonical,
+    );
+
+    assert_eq!(canonical, compact);
+    assert_eq!(canonical, debug);
+    assert!(canonical.contains(&"linux-l26-common".to_string()));
+    assert!(canonical.contains(&"viommu".to_string()));
+    assert!(canonical.contains(&"hidden-hypervisor".to_string()));
 }

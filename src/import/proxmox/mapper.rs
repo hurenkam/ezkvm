@@ -1017,6 +1017,76 @@ mod tests {
     }
 
     #[test]
+    fn infers_macos_profile_only_when_smbios_type_2_is_present() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-macos-no-smbios2
+            ostype: other
+            bios: ovmf
+            machine: pc-q35-5.2
+            cpu: Penryn
+            vga: none
+            args: -device isa-applesmc,osk=dummy -smbios type=1
+            "#,
+        );
+
+        assert!(!cfg.profiles.contains(&"macos-kvm".to_string()));
+    }
+
+    #[test]
+    fn infers_windows_profiles_from_hyperv_variant_signals_without_windows_ostype() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-hyperv-variant
+            bios: ovmf
+            machine: pc-q35-8.1+pve0
+            cpu: host,+hyperv-vendor-id,+hyperv-enlightened-vmx,+hyperv-time,+hyperv-synic
+            efidisk0: /var/lib/vm/vars.fd,efitype=4m,ms-cert=2023,pre-enrolled-keys=1
+            tpmstate0: /var/lib/vm/tpmstate,size=4M,version=v2.0
+            "#,
+        );
+
+        assert!(cfg.profiles.contains(&"proxmox-windows".to_string()));
+        assert!(cfg.profiles.contains(&"windows-11".to_string()));
+    }
+
+    #[test]
+    fn infers_linux_l26_profile_for_nested_virtualization_without_guest_agent() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-l26-nested
+            ostype: l26
+            bios: ovmf
+            machine: q35
+            cpu: host,+svm
+            "#,
+        );
+
+        assert!(cfg.profiles.contains(&"linux-l26-common".to_string()));
+    }
+
+    #[test]
+    fn infers_scsi_storage_profile_with_mixed_storage_buses() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-mixed-storage
+            ostype: win11
+            bios: ovmf
+            machine: pc-q35-8.1+pve0
+            scsihw: virtio-scsi-pci
+            scsi0: local-lvm:vm-500-disk-0,size=64G
+            sata0: local-lvm:vm-500-disk-1,size=32G
+            ide2: none,media=cdrom
+            "#,
+        );
+
+        assert!(
+            cfg.profiles
+                .contains(&"storage-virtio-scsi-pci".to_string())
+        );
+    }
+
+    #[test]
     fn infers_hugepages_profile() {
         let (_, cfg) = map_and_validate(
             r#"

@@ -40,6 +40,20 @@ pub(super) fn infer_profile_names(
         }
     }
 
+    let has_mixed_storage_buses = proxmox
+        .disks
+        .iter()
+        .map(|disk| disk.bus.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len()
+        > 1;
+
+    if has_mixed_storage_buses {
+        infer_storage_profile_from_controller_type(config, &mut profiles);
+    }
+
+    let has_hyperv_variant = has_hyperv_variant_signals(proxmox, config);
+
     match ostype {
         Some("win11") => {
             // proxmox-windows provides the HV CPU flags Proxmox adds for Windows guests
@@ -64,7 +78,9 @@ pub(super) fn infer_profile_names(
             profiles.push("windows-10".to_string());
         }
         Some("l26") => {
-            if config.options.guest_agent.is_some() {
+            if config.options.guest_agent.is_some()
+                || has_nested_virtualization_signals(proxmox, config)
+            {
                 profiles.push("linux-l26-common".to_string());
             }
         }
@@ -72,6 +88,16 @@ pub(super) fn infer_profile_names(
             profiles.push("macos-kvm".to_string());
         }
         _ => {}
+    }
+
+    // Some Proxmox exports provide Hyper-V CPU variants without a strict win10/win11 ostype.
+    // Preserve these by applying Windows tuning profiles when guest signals are explicit.
+    if has_hyperv_variant {
+        profiles.push("proxmox-windows".to_string());
+
+        if config.system.boot.secure_boot && config.system.tpm.is_some() {
+            profiles.push("windows-11".to_string());
+        }
     }
 
     if config.system.memory.ivshmem.is_some() {
@@ -119,15 +145,63 @@ pub(super) fn infer_profile_names(
 }
 
 fn has_hidden_hypervisor_signals(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
-    config
-        .system
-        .cpu
-        .features
-        .iter()
-        .any(|feature| matches!(feature.as_str(), "kvm=off" | "-hypervisor" | "hidden=1"))
+    config.system.cpu.features.iter().any(|feature| {
+        matches!(
+            feature.as_str(),
+            "kvm=off" | "-hypervisor" | "hidden=1" | "vmport=off"
+        ) || feature.starts_with("hv_vendor_id=")
+    }) || proxmox.scalars.get("args").is_some_and(|args| {
+        args.contains("kvm=off")
+            || args.contains("-hypervisor")
+            || args.contains("hidden=1")
+            || args.contains("vmport=off")
+            || args.contains("hv_vendor_id=")
+    })
+}
+
+fn has_hyperv_variant_signals(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
+    let has_cpu_signals = config.system.cpu.features.iter().any(|feature| {
+        feature.starts_with("hv_")
+            || feature.starts_with("+hyperv-")
+            || feature.starts_with("hyperv-")
+            || feature.starts_with("hv-")
+    });
+
+    has_cpu_signals
         || proxmox.scalars.get("args").is_some_and(|args| {
-            args.contains("kvm=off") || args.contains("-hypervisor") || args.contains("hidden=1")
+            args.contains("hyperv-")
+                || args.contains("hv_relaxed")
+                || args.contains("hv_synic")
+                || args.contains("hv_time")
         })
+}
+
+fn has_nested_virtualization_signals(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
+    let has_cpu_nested_flags = config.system.cpu.features.iter().any(|feature| {
+        matches!(
+            feature.as_str(),
+            "+vmx" | "vmx=on" | "+svm" | "svm=on" | "+hyperv-enlightened-vmx"
+        )
+    });
+
+    has_cpu_nested_flags
+        || proxmox.scalars.get("args").is_some_and(|args| {
+            args.contains("+vmx")
+                || args.contains("vmx=on")
+                || args.contains("+svm")
+                || args.contains("svm=on")
+                || args.contains("hyperv-enlightened-vmx")
+        })
+}
+
+fn infer_storage_profile_from_controller_type(config: &VmConfig, profiles: &mut Vec<String>) {
+    if let Some(first_scsi) = config.controllers.scsi.first() {
+        match first_scsi.r#type.as_str() {
+            "virtio-scsi-single" => profiles.push("storage-virtio-scsi-single".to_string()),
+            "virtio-scsi-pci" => profiles.push("storage-virtio-scsi-pci".to_string()),
+            _ => {}
+        }
+    }
 }
 
 fn has_remote_viewer_input_devices(input_devices: &[InputDeviceConfig]) -> bool {
@@ -141,14 +215,24 @@ fn has_remote_viewer_input_devices(input_devices: &[InputDeviceConfig]) -> bool 
 }
 
 fn is_macos_guest(proxmox: &ProxmoxVmConfig, config: &VmConfig) -> bool {
-    let has_applesmc = proxmox
-        .scalars
-        .get("args")
-        .is_some_and(|args| args.contains("isa-applesmc"));
+    let has_applesmc = config.system.applesmc.is_some()
+        || proxmox
+            .scalars
+            .get("args")
+            .is_some_and(|args| args.contains("isa-applesmc"));
+    let has_smbios_type2 = config
+        .system
+        .smbios
+        .as_ref()
+        .is_some_and(|smbios| smbios.smbios_type == 2)
+        || proxmox
+            .scalars
+            .get("args")
+            .is_some_and(|args| args.contains("-smbios type=2"));
     let has_macos_display = config
         .devices
         .displays
         .iter()
         .any(|display| display.r#type == "none");
-    has_applesmc && has_macos_display && is_q35_machine(&config.system.machine)
+    has_applesmc && has_smbios_type2 && has_macos_display && is_q35_machine(&config.system.machine)
 }

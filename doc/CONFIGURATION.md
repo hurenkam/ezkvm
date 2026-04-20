@@ -297,7 +297,10 @@ Profile layering behavior:
 
 Current built-in layered profile names in this repo include:
 
+- `proxmox-base`
+- `proxmox-parity-runtime`
 - `proxmox-q35-uefi`
+- `proxmox-windows`
 - `storage-virtio-scsi-single`
 - `storage-virtio-scsi-pci`
 - `windows-common`
@@ -308,7 +311,37 @@ Current built-in layered profile names in this repo include:
 - `remote-viewer-spice`
 - `looking-glass`
 - `gpu-passthrough`
+- `hugepages`
+- `viommu`
+- `hidden-hypervisor`
+- `headless-vnc`
 - `headless-serial`
+
+### Import profile inference decision tree
+
+When running `import-proxmox`, profile inference follows this order:
+
+1. Baseline:
+  - always assign `proxmox-base`
+  - assign `proxmox-parity-runtime` only for `--runtime-target proxmox-parity`
+2. Machine/firmware:
+  - assign `proxmox-q35-uefi` for x86_64 + UEFI + q35
+3. Storage controller family:
+  - infer `storage-virtio-scsi-single` or `storage-virtio-scsi-pci` from `scsihw`
+  - preserve the same scsi-profile inference when mixed storage buses are present
+4. OS family and platform variants:
+  - Windows: `proxmox-windows`, `windows-common`, `windows-10`/`windows-11` as signals allow
+  - Hyper-V CPU variants can trigger Windows profile inference even when `ostype` is incomplete
+  - Linux (`l26`): infer `linux-l26-common` from guest-agent and nested-virtualization CPU signals
+  - macOS: infer `macos-kvm` when AppleSMC + SMBIOS type 2 + q35 + headless display signals are present
+5. Runtime integrations/tuning:
+  - `looking-glass` or `remote-viewer-spice` for display/input integration hints
+  - `gpu-passthrough`, `hugepages`, `viommu`, `hidden-hypervisor`, `headless-vnc`, `headless-serial` from mapped guest/runtime intent
+
+Export mode note:
+
+- Profile inference is identical for `--output-mode canonical`, `compact`, and `debug`.
+- Only YAML rendering/compaction differs by output mode.
 
 ## Chapter 2: general
 
