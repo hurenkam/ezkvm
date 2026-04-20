@@ -1,10 +1,34 @@
-use std::collections::BTreeMap;
-use std::path::Path;
-
 use super::{
     CapabilityPrecedenceResolver, CapabilitySource, CentralCapabilityPrecedenceResolver,
     StringCapabilityCandidate,
 };
+use std::collections::BTreeMap;
+
+trait BridgeHelperLookup {
+    fn find_in_path(&self, program: &str) -> Option<String>;
+    fn is_file(&self, path: &str) -> bool;
+}
+
+struct SystemBridgeHelperLookup;
+
+impl BridgeHelperLookup for SystemBridgeHelperLookup {
+    fn find_in_path(&self, program: &str) -> Option<String> {
+        let path = std::env::var_os("PATH")?;
+        for dir in std::env::split_paths(&path) {
+            let candidate = dir.join(program);
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().into_owned());
+            }
+        }
+        None
+    }
+
+    fn is_file(&self, path: &str) -> bool {
+        std::path::Path::new(path).is_file()
+    }
+}
+
+static SYSTEM_BRIDGE_HELPER_LOOKUP: SystemBridgeHelperLookup = SystemBridgeHelperLookup;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkResolutionMode {
@@ -31,26 +55,26 @@ pub trait NetworkCapabilityResolver {
 
 pub struct CentralNetworkCapabilityResolver<'a> {
     central_config: &'a crate::config::CentralConfig,
+    helper_lookup: &'a dyn BridgeHelperLookup,
 }
 
 impl<'a> CentralNetworkCapabilityResolver<'a> {
     pub fn new(central_config: &'a crate::config::CentralConfig) -> Self {
-        Self { central_config }
-    }
-
-    fn find_in_path(program: &str) -> Option<String> {
-        let path = std::env::var_os("PATH")?;
-        for dir in std::env::split_paths(&path) {
-            let candidate = dir.join(program);
-            if candidate.is_file() {
-                return Some(candidate.to_string_lossy().into_owned());
-            }
+        Self {
+            central_config,
+            helper_lookup: &SYSTEM_BRIDGE_HELPER_LOOKUP,
         }
-        None
     }
 
-    fn is_file(path: &str) -> bool {
-        Path::new(path).is_file()
+    #[cfg(test)]
+    fn with_lookup(
+        central_config: &'a crate::config::CentralConfig,
+        helper_lookup: &'a dyn BridgeHelperLookup,
+    ) -> Self {
+        Self {
+            central_config,
+            helper_lookup,
+        }
     }
 
     fn resolve_bridge_helper_with_source(
@@ -70,14 +94,14 @@ impl<'a> CentralNetworkCapabilityResolver<'a> {
         ]);
 
         if let Some(path) = resolution.value.as_deref() {
-            if Self::is_file(path) {
+            if self.helper_lookup.is_file(path) {
                 return (resolution.value, resolution.source);
             }
             resolution.value = None;
             resolution.source = None;
         }
 
-        if let Some(found) = Self::find_in_path("qemu-bridge-helper") {
+        if let Some(found) = self.helper_lookup.find_in_path("qemu-bridge-helper") {
             return (Some(found), Some(CapabilitySource::PathLookup));
         }
 
@@ -86,7 +110,7 @@ impl<'a> CentralNetworkCapabilityResolver<'a> {
             "/usr/libexec/qemu-bridge-helper",
             "/usr/lib64/qemu-bridge-helper",
         ] {
-            if Self::is_file(candidate) {
+            if self.helper_lookup.is_file(candidate) {
                 return (
                     Some(candidate.to_string()),
                     Some(CapabilitySource::PlatformDefault),
@@ -222,7 +246,31 @@ pub fn resolve_network_outcome(
 
 #[cfg(test)]
 mod tests {
-    use super::{NetworkResolutionMode, resolve_network_outcome};
+    use std::collections::BTreeSet;
+
+    use super::{
+        BridgeHelperLookup, CentralNetworkCapabilityResolver, NetworkCapabilityResolver,
+        NetworkResolutionMode, resolve_network_outcome,
+    };
+
+    #[derive(Default)]
+    struct MockBridgeHelperLookup {
+        path_helper: Option<String>,
+        existing_files: BTreeSet<String>,
+    }
+
+    impl BridgeHelperLookup for MockBridgeHelperLookup {
+        fn find_in_path(&self, program: &str) -> Option<String> {
+            if program == "qemu-bridge-helper" {
+                return self.path_helper.clone();
+            }
+            None
+        }
+
+        fn is_file(&self, path: &str) -> bool {
+            self.existing_files.contains(path)
+        }
+    }
 
     fn bridge_network(id: &str) -> crate::config::NetworkConfig {
         crate::config::NetworkConfig {
@@ -243,13 +291,46 @@ mod tests {
     }
 
     #[test]
-    fn falls_back_to_user_mode_when_helper_missing() {
+    fn uses_bridge_backend_when_helper_is_discoverable() {
+        let mock_lookup = MockBridgeHelperLookup {
+            path_helper: Some("/mock/bin/qemu-bridge-helper".to_string()),
+            ..Default::default()
+        };
+        let central = crate::config::CentralConfig::default();
+        let resolver = CentralNetworkCapabilityResolver::with_lookup(&central, &mock_lookup);
         let network = bridge_network("net0");
-        let outcome = resolve_network_outcome(
-            "vm-demo",
-            &network,
-            &crate::config::CentralConfig::default(),
+        let outcome = resolver.resolve_network("vm-demo", &network);
+
+        assert_eq!(outcome.mode, NetworkResolutionMode::BridgeHelper);
+        assert!(outcome.warning.is_none());
+        assert_eq!(
+            outcome
+                .network
+                .backend
+                .as_ref()
+                .expect("backend should exist")
+                .backend_type,
+            "bridge"
         );
+        assert_eq!(
+            outcome
+                .network
+                .backend
+                .as_ref()
+                .expect("backend should exist")
+                .helper
+                .as_deref(),
+            Some("/mock/bin/qemu-bridge-helper")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_user_mode_when_no_helper_is_discoverable() {
+        let mock_lookup = MockBridgeHelperLookup::default();
+        let central = crate::config::CentralConfig::default();
+        let resolver = CentralNetworkCapabilityResolver::with_lookup(&central, &mock_lookup);
+        let network = bridge_network("net0");
+        let outcome = resolver.resolve_network("vm-demo", &network);
 
         assert_eq!(outcome.mode, NetworkResolutionMode::UserFallback);
         assert!(outcome.warning.is_some());

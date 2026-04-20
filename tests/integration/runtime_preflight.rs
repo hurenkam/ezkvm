@@ -227,8 +227,24 @@ fn dry_run_network_bridge_falls_back_to_user_when_helper_missing() {
         stdout,
         stderr
     );
-    assert!(stdout.contains("network 'net0' downgraded to user-mode"));
-    assert!(stdout.contains("type=user,id=net0,hostname=preflight-network-fallback"));
+
+    let helper_available = std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path).any(|dir| dir.join("qemu-bridge-helper").is_file())
+    }) || [
+        "/usr/lib/qemu/qemu-bridge-helper",
+        "/usr/libexec/qemu-bridge-helper",
+        "/usr/lib64/qemu-bridge-helper",
+    ]
+    .iter()
+    .any(|candidate| Path::new(candidate).is_file());
+
+    if helper_available {
+        assert!(!stdout.contains("network 'net0' downgraded to user-mode"));
+        assert!(stdout.contains("type=bridge,id=net0,br=vmbr0"));
+    } else {
+        assert!(stdout.contains("network 'net0' downgraded to user-mode"));
+        assert!(stdout.contains("type=user,id=net0,hostname=preflight-network-fallback"));
+    }
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }

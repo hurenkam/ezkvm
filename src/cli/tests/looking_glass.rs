@@ -3,12 +3,17 @@ use super::{base_config, runtime};
 #[test]
 fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
     let config = base_config();
+    let temp_dir = std::env::temp_dir().join("ezkvm-lg-launch-test");
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let lg_binary = temp_dir.join("looking-glass-client");
+    std::fs::write(&lg_binary, b"#!/bin/sh\nexit 0\n").expect("create fake client");
+
     let central_config = crate::config::CentralConfig {
         tools: crate::config::ToolsConfig {
             qemu: None,
             swtpm: None,
             remote_viewer: None,
-            looking_glass: Some("looking-glass-client".to_string()),
+            looking_glass: Some(lg_binary.to_string_lossy().to_string()),
         },
         locations: crate::config::LocationsConfig::default(),
         looking_glass: crate::config::LookingGlassOptions {
@@ -30,7 +35,7 @@ fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
     .unwrap()
     .unwrap();
 
-    assert_eq!(launch.program, "looking-glass-client");
+    assert_eq!(launch.program, lg_binary.to_string_lossy().to_string());
     assert_eq!(
         launch.args,
         vec![
@@ -45,6 +50,9 @@ fn test_build_looking_glass_launch_uses_ivshmem_mem_path() {
     );
     assert!(launch.inherit_output);
     assert!(launch.verify_running);
+
+    let _ = std::fs::remove_file(&lg_binary);
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
