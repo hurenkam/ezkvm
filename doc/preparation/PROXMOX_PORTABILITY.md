@@ -530,6 +530,7 @@ Portable mode should either:
 ### Phase 3: Validate On Real Target Distros
 
 - Goal: prove that `portable-linux` works on supported hosts without Proxmox filesystem conventions while preserving guest-visible semantics.
+- Execution matrix and gates: `tests/IMPORT_TEST_GUIDE.md` section "Phase 3 Real-Host Distro Validation Matrix (B-51)".
 
 #### Recommended test strategy
 

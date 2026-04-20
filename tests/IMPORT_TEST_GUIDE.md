@@ -43,6 +43,56 @@ Primary integration files:
 - `tests/integration/runtime_preflight.rs`
 - `tests/integration/proxmox_import_profiles.rs`
 
+## Phase 3 Real-Host Distro Validation Matrix (B-51)
+
+This matrix defines required and optional real-host validation scenarios for portable runtime support.
+
+### Matrix Dimensions
+
+- Distro rows: Debian Trixie, Ubuntu 26.04 LTS, Arch Linux
+- Scenario columns: import and dry-run parity guard, capability resolution and preflight checks, portable smoke boot, optional integrations
+- Required artifacts: imported YAML, dry-run args, capability diagnostics, preflight output, helper and firmware discovery evidence
+
+### Required Versus Optional Gates
+
+- Required (release-gating for portable mode):
+   - import and dry-run succeed for the fixture set
+   - required capabilities resolve (runtime directory, firmware, swtpm, network backend)
+   - portable runs do not rely on Proxmox-only filesystem conventions
+   - smoke boot succeeds for representative Linux and Windows fixtures
+- Optional (non-gating in Phase 3):
+   - Looking Glass enablement
+   - GPU passthrough and hardware-bound tuning
+
+### Distro x Scenario Matrix
+
+| Distro | Import + Dry-Run (Required) | Capability + Preflight (Required) | Smoke Boot (Required) | Optional Integrations (Non-Gating) |
+|---|---|---|---|---|
+| Debian Trixie | Linux headless, Windows UEFI+TPM, mixed-device fixture, parity-target dry-run guard | Validate bridge-helper and user-mode fallback, runtime dir resolution, swtpm/firmware discovery, actionable preflight diagnostics | Boot Linux and Windows representative fixtures in portable target | Looking Glass auto/explicit behavior; GPU passthrough smoke where hardware exists |
+| Ubuntu 26.04 LTS | Same fixture set and assertions as Debian | Validate capability resolution with Ubuntu package/path differences, same precedence and diagnostics guarantees | Boot Linux and Windows representative fixtures in portable target | Same optional checks as Debian |
+| Arch Linux | Same fixture set and assertions as Debian | Prioritize discovery variability checks, preflight clarity, and user-mode networking fallback before bridge-helper sign-off | Boot Linux and Windows representative fixtures in portable target | Same optional checks as Debian |
+
+### Required Artifact Bundle Per Distro Run
+
+For each distro run, capture and archive:
+
+1. imported YAML outputs for the fixture set
+2. dry-run QEMU argument outputs
+3. capability diagnostics showing winning source by precedence
+4. preflight command output and exit status
+5. discovered helper and firmware paths plus package versions
+
+### Pass/Fail Classification
+
+- Portability-contract failure (blocks Phase 3):
+   - guest-visible topology drift versus fixture expectations
+   - Proxmox-only host literals reintroduced in portable flows
+   - required capability unresolved without actionable diagnostics
+- Optional integration gap (does not block Phase 3):
+   - Looking Glass/GPU passthrough setup issues isolated to optional paths
+
+See `doc/preparation/PROXMOX_PORTABILITY.md` Phase 3 section for sequencing and rollout guidance.
+
 ### Emulated distro matrix
 
 For deterministic CI, capability layouts are validated with temporary central config files and synthetic binaries rather than depending on host packages.

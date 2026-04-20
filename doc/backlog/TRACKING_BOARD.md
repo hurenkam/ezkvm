@@ -95,7 +95,7 @@ Source: doc/backlog/BACKLOG.md
 | B-48 | Implement capability precedence contract and validation | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-47 | unassigned | Done |
 | B-49 | Add integration tests for host capability resolution | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-48 | unassigned | Done |
 | B-50 | Document portable mode operator guidance | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-49 | unassigned | Done |
-| B-51 | Define Phase 3 distro validation matrix and success criteria | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening, ready | B-50 | unassigned | Todo |
+| B-51 | Define Phase 3 distro validation matrix and success criteria | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening, ready | B-50 | unassigned | Done |
 | B-52 | Build reusable Phase 3 validation harness | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-51 | unassigned | Todo |
 | B-53 | Execute Debian Trixie portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Todo |
 | B-54 | Execute Ubuntu 26.04 portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Todo |
