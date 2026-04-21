@@ -1,17 +1,25 @@
 ---
 name: debian-trixie
 description: 'Use when working on Debian Trixie packaging, architecture compatibility, Debian tooling, or distro-specific build and integration guidance.'
+argument-hint: 'What Debian Trixie packaging or integration task should this skill perform?'
 ---
 
 # debian-trixie
 
-**Scope**: Workspace skill for Debian Trixie packaging, architecture, and distro-specific workflow support.
+Scope: Workspace skill for Debian Trixie packaging, architecture, and distro-specific workflow support.
+
+## What This Skill Produces
+
+- Debian Trixie packaging guidance with architecture-aware decision support.
+- Packaging workflow and validation guidance for source and binary artifacts.
+- Runtime integration checks for QEMU/KVM-hosted ezkvm deployments.
+- Completion criteria for build, install, runtime verification, and documentation quality.
 
 ## Description
 
 This skill captures Debian Trixie expertise for package building, architecture compatibility, tooling, and distribution-specific design decisions. Use it when working on code changes, packaging guidance, or system integration that depends on Debian Trixie conventions.
 
-## Use when
+## Use When
 
 - designing or building Debian packages for Trixie
 - choosing Debian architecture support and ABI compatibility
@@ -50,7 +58,38 @@ This skill captures Debian Trixie expertise for package building, architecture c
    - Add examples for `debuild`, `dpkg-buildpackage`, or repo upload steps
    - Capture any distro-specific limitations or known issues
 
-## Decision points
+## QEMU/KVM Runtime Checks (Debian)
+
+- Validate KVM device and group access (`/dev/kvm`, host user/group model).
+- Confirm required binaries are installed and discoverable (`qemu-system-x86_64`, `qemu-img`).
+- Verify firmware paths used by local profiles (for example OVMF files under `/usr/share/OVMF/`).
+- Confirm bridge/tap requirements and helper policy when using bridged networking (`/etc/qemu/bridge.conf`).
+- Compare ezkvm dry-run arguments with effective runtime process args when diagnosing launch mismatches.
+
+## Package Install Verification
+
+1. Build using one of the standard commands
+   - `dpkg-buildpackage -us -uc -b`
+   - `debuild -us -uc -b`
+2. Validate artifacts and metadata
+   - `lintian ../*.changes`
+   - `dpkg-deb -c ../<package>_<version>_<arch>.deb`
+3. Install and resolve dependencies
+   - `sudo dpkg -i ../<package>_<version>_<arch>.deb`
+   - `sudo apt-get -f install` (only if dependency repair is required)
+4. Verify runtime readiness
+   - Confirm binaries, config files, and runtime directory creation behavior.
+   - Run ezkvm dry-run/start checks relevant to packaged defaults.
+
+## Runtime Directories And Defaults Checklist
+
+- Default config exists at `/etc/ezkvm/ezkvm.yaml`.
+- Default directories exist at `/etc/ezkvm/vms.d/` and `/etc/ezkvm/profiles.d/`.
+- Runtime dir policy is explicit and implemented (`/run/ezkvm` or `/var/run/ezkvm`).
+- Optional persistent state/log paths are created only when required (`/var/lib/ezkvm`, `/var/log/ezkvm`).
+- Upgrade behavior preserves admin-edited config files and expected ownership/mode semantics.
+
+## Decision Points
 
 - **Package type**: source-only vs binary package vs architecture-independent package
 - **Build environment**: native, containerized, or chroot-based build using Debian tools
@@ -58,7 +97,13 @@ This skill captures Debian Trixie expertise for package building, architecture c
 - **Policy compliance**: follow Debian policy for file placement, scripts, and versioning
 - **Repository format**: `deb`, `dsc`, and support for Debian archive layout
 
-## Quality criteria
+## Distro Delta Notes
+
+- Debian Trixie and Ubuntu 26.04 workflows are mostly aligned, but package naming and default integration paths can vary.
+- Keep distro-specific package names explicit in dependency guidance.
+- Validate runtime file locations and helper defaults rather than assuming parity across distributions.
+
+## Quality Criteria
 
 - package metadata is clean, explicit, and Trixie-compatible
 - build commands and scripts use Debian packaging best practices
@@ -67,14 +112,22 @@ This skill captures Debian Trixie expertise for package building, architecture c
 - documentation includes package build instructions and dependency notes
 - any distro-specific assumptions are stated clearly
 
-## Example prompts
+## Completion Gate
+
+- package builds in a clean environment
+- package lint/metadata checks pass
+- package installs with correct dependencies
+- ezkvm runtime launches with packaged defaults
+- docs/examples reflect current distro assumptions
+
+## Example Prompts
 
 - `Use the debian-trixie skill to add Debian packaging guidance for building this tool on Trixie.`
 - `Use the debian-trixie skill to document architecture restrictions and build directives for Debian packaging.`
 - `Use the debian-trixie skill to recommend Trixie-compatible packaging tools and validation steps.`
 - `Use the debian-trixie skill to create a packaging checklist for Debian Trixie builds.`
 
-## Next customization ideas
+## Follow-up Customizations To Consider
 
 - Add a workspace instruction for Debian packaging conventions and `debian/` layout
 - Create a prompt template for Debian package build requests (`debian-trixie-package.prompt.md`)

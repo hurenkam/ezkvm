@@ -36,3 +36,22 @@ For review-style requests, present:
 - Keep modules and functions small per thresholds in doc/dev/CODING_GUIDELINES.md.
 - Keep mod.rs files as module wiring only (no struct/fn/impl bodies).
 - For config serialization, follow compact-by-default output: omit fields at semantic defaults unless explicit values are needed for merge/override behavior.
+
+## Customization Registry
+
+### Agents
+
+- `Docs Sync`: use for final documentation synchronization pass on multi-file refactors and behavior changes.
+- `Backlog Sync`: use when backlog/tracking board status, dependencies, or registry metadata change.
+- `Cross-Distro Deb Reviewer`: use when reviewing packaging changes for one-package compatibility across Debian Trixie and Ubuntu 26.04.
+
+### Skills
+
+- `cross-distro-deb-packaging`: use when creating or updating ezkvm Debian packaging intended to run on both Debian Trixie and Ubuntu 26.04 from one binary package per architecture.
+- `debian-trixie`: use for Debian Trixie packaging and architecture-specific distribution guidance.
+- `ubuntu-resolute`: use for Ubuntu 26.04 host/runtime/path guidance and packaging validation.
+
+### Packaging Guard
+
+- For packaging-related edits, apply `.github/instructions/cross-distro-deb-package-guard.instructions.md`.
+- Treat dual-distro validation status (`pass`, `partial`, `not run`) as required final-response output for packaging changes.

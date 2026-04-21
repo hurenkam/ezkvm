@@ -1,12 +1,6 @@
 ---
 description: "Use when editing Proxmox VM import code, device topology, runtime paths, or QEMU args generation. Preserve Proxmox runtime parity; validate against captured QEMU commands. See /proxmox-import skill for full workflow."
-applyTo:
-  - "src/import/proxmox/**/*.rs"
-  - "src/qemu/args/**/*.rs"
-  - "src/qemu/command_builder/**/*.rs"
-  - "etc/profiles.d/proxmox-*.yaml"
-  - "tests/fixtures/proxmox_import/**"
-  - "tests/integration/proxmox_import.rs"
+applyTo: "src/import/proxmox/**/*.rs, src/qemu/args/**/*.rs, src/qemu/command_builder/**/*.rs, etc/profiles.d/proxmox-*.yaml, tests/fixtures/proxmox_import/**, tests/integration/proxmox_import.rs"
 ---
 
 # Proxmox Import Code Guidelines
