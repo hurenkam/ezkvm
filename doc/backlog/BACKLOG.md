@@ -995,6 +995,65 @@ Acceptance Criteria:
 - Error handling, module size limits, and testing style documented.
 Estimate: 2 days
 
+## Epic K: Cross-Distro Debian Packaging (Debian Trixie + Ubuntu Resolute)
+
+### K-01 Build packaging baseline inventory and contract
+Scope:
+- Inventory required versus optional runtime dependencies for packaged ezkvm.
+- Confirm filesystem/runtime path contract for packaged installs (`/usr/bin`, `/etc/ezkvm`, `/run/ezkvm`, optional `/var/lib/ezkvm`, `/var/log/ezkvm`).
+- Lock one-package-per-architecture policy for Debian Trixie and Ubuntu Resolute.
+Dependencies: B-54
+Acceptance Criteria:
+- Dependency inventory and path contract documented in preparation docs.
+- Required vs optional dependency split is explicit and reviewable.
+- One-package-per-architecture contract is recorded as packaging policy.
+Estimate: 1 day
+
+### K-02 Create Debian packaging skeleton for ezkvm
+Scope:
+- Add initial `debian/` metadata (`control`, `rules`, `changelog`, `install`, runtime directory policy) to build installable artifacts.
+- Ensure conffile-safe behavior for admin-edited files under `/etc/ezkvm`.
+Dependencies: K-01
+Acceptance Criteria:
+- `dpkg-buildpackage -us -uc -b` produces installable package artifacts.
+- Installed file layout matches packaging contract.
+- Config defaults are preserved across reinstall/upgrade scenarios.
+Estimate: 3 days
+
+### K-03 Harden dependency policy for cross-distro installability
+Scope:
+- Keep hard `Depends` on shared Debian/Ubuntu baseline only.
+- Move optional integrations to `Recommends` where practical.
+- Use alternative dependency expressions for naming differences between distros.
+Dependencies: K-02
+Acceptance Criteria:
+- Package dependencies resolve on Debian Trixie and Ubuntu Resolute without distro-specific package forks.
+- Any unavoidable deltas are documented with rationale.
+- Dependency policy is documented for maintainers.
+Estimate: 2 days
+
+### K-04 Execute dual-distro package validation matrix
+Scope:
+- Validate build, lint, install, dependency resolution, runtime readiness, and conffile preservation on Debian Trixie and Ubuntu Resolute.
+- Capture repeatable validation evidence and operator notes.
+Dependencies: K-03
+Acceptance Criteria:
+- Validation matrix completed for both distros with captured artifacts.
+- `lintian` and install/runtime checks pass for required scenarios.
+- Required runtime readiness checks pass with packaged defaults.
+Estimate: 2 days
+
+### K-05 Add packaging CI and release gate enforcement
+Scope:
+- Add CI checks for package build/lint and install smoke validation.
+- Add release gating requiring dual-distro packaging evidence before merge/release.
+Dependencies: K-04
+Acceptance Criteria:
+- CI enforces packaging checks on relevant changes.
+- Release checklist includes dual-distro packaging gate.
+- Packaging regressions are blocked before release.
+Estimate: 2 days
+
 ---
 
 # Suggested Sprint Sequence

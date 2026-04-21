@@ -1,6 +1,6 @@
 # Convergence Tracking Board
 
-Date: 2026-04-20  
+Date: 2026-04-21  
 Scope: Epics A-E (Phase 0 to Phase 2)  
 Source: doc/backlog/BACKLOG.md
 
@@ -18,6 +18,7 @@ Source: doc/backlog/BACKLOG.md
 - epic:hooks
 - epic:extensibility
 - epic:hardening
+- epic:packaging
 - phase:0-foundation
 - phase:1-features
 - phase:2-hardening
@@ -30,6 +31,7 @@ Source: doc/backlog/BACKLOG.md
 - Phase-0-Foundation
 - Phase-1-Features
 - Phase-2-Hardening
+- Phase-3-Packaging
 
 ## Sprint 1 Focus
 
@@ -112,6 +114,11 @@ Source: doc/backlog/BACKLOG.md
 | E-01 | Regression suite expansion | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | B-05, C-05, D-03 | unassigned | Todo |
 | E-02 | Performance and stability checks | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-01 | unassigned | Todo |
 | E-03 | Beta release gating | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-01, E-02 | unassigned | Todo |
+| K-01 | Build packaging baseline inventory and contract | K | Phase-3-Packaging | epic:packaging, phase:2-hardening, ready | B-54 | unassigned | Todo |
+| K-02 | Create Debian packaging skeleton for ezkvm | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-01 | unassigned | Todo |
+| K-03 | Harden dependency policy for cross-distro installability | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-02 | unassigned | Todo |
+| K-04 | Execute dual-distro package validation matrix | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
+| K-05 | Add packaging CI and release gate enforcement | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-04 | unassigned | Todo |
 
 ## Dependency Graph
 
@@ -167,6 +174,7 @@ Source: doc/backlog/BACKLOG.md
 - (C-02 and C-03) -> C-04 -> C-05
 - D-01 -> D-02 -> D-03 -> D-04
 - (B-05 and C-05 and D-03) -> E-01 -> E-02 -> E-03
+- B-54 -> K-01 -> K-02 -> K-03 -> K-04 -> K-05
 
 ## Usage Notes
 
