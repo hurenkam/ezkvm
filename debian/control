@@ -1,0 +1,32 @@
+Source: ezkvm
+Section: admin
+Priority: optional
+Maintainer: ezkvm maintainers <ezkvm@localhost>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-cargo (>= 25),
+ cargo,
+ rustc,
+ pkg-config,
+Rules-Requires-Root: no
+Standards-Version: 4.7.0
+Homepage: https://github.com/hurenkam/ezkvm
+
+Package: ezkvm
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ qemu-system-x86 | qemu-system-arm,
+ qemu-utils,
+Recommends:
+ ovmf,
+ swtpm,
+ swtpm-tools,
+ virt-viewer,
+Description: Easy KVM virtual machine manager
+ ezkvm is a lightweight KVM-based virtual machine manager that reads
+ declarative YAML configurations to launch and manage QEMU/KVM guests.
+ .
+ It supports profile-based configuration layering, Proxmox config import,
+ and portable runtime capability resolution across distributions.

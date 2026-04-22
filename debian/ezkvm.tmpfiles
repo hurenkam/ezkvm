@@ -1,0 +1,6 @@
+d /run/ezkvm         0755 root root -
+d /run/ezkvm/pids    0755 root root -
+d /run/ezkvm/sockets 0755 root root -
+d /run/ezkvm/tpm     0755 root root -
+d /var/log/ezkvm     0755 root root -
+d /var/lib/ezkvm/tpm 0755 root root -

@@ -114,9 +114,9 @@ Source: doc/backlog/BACKLOG.md
 | E-01 | Regression suite expansion | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | B-05, C-05, D-03 | unassigned | Todo |
 | E-02 | Performance and stability checks | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-01 | unassigned | Todo |
 | E-03 | Beta release gating | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-01, E-02 | unassigned | Todo |
-| K-01 | Build packaging baseline inventory and contract | K | Phase-3-Packaging | epic:packaging, phase:2-hardening, ready | B-54 | unassigned | Todo |
-| K-02 | Create Debian packaging skeleton for ezkvm | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-01 | unassigned | Todo |
-| K-03 | Harden dependency policy for cross-distro installability | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-02 | unassigned | Todo |
+| K-01 | Build packaging baseline inventory and contract | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | B-54 | unassigned | Done |
+| K-02 | Create Debian packaging skeleton for ezkvm | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-01 | unassigned | Done |
+| K-03 | Harden dependency policy for cross-distro installability | K | Phase-3-Packaging | epic:packaging, phase:2-hardening, ready | K-02 | unassigned | Todo |
 | K-04 | Execute dual-distro package validation matrix | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
 | K-05 | Add packaging CI and release gate enforcement | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-04 | unassigned | Todo |
 

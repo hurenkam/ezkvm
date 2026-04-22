@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=cargo
+
+# dh-cargo's system crate registry is not used here because transitive
+# dependencies are not yet packaged in Debian. cargo build --release --locked
+# is used directly until vendoring infrastructure is in place (K-02 follow-up).
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -Dm755 target/release/ezkvm debian/ezkvm/usr/bin/ezkvm
+
+override_dh_auto_test:
+	cargo test --locked

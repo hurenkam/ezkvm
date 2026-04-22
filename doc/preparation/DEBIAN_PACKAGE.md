@@ -47,6 +47,85 @@ Collect current runtime and packaging requirements before introducing `debian/` 
 - Mandatory runtime set agreed.
 - Optional feature set clearly separated.
 
+## Dependency Inventory
+
+Source of truth: `etc/ezkvm.yaml` and current profile corpus under `etc/profiles.d/`.
+
+### Architecture Targets
+
+| Architecture | Status |
+|---|---|
+| `amd64` | primary target |
+| `arm64` | secondary; include when CI hosts available |
+
+### Runtime: Required (Depends)
+
+These packages are needed for any useful ezkvm invocation.
+
+| Package | Provides | Rationale |
+|---|---|---|
+| `qemu-system-x86` | `/usr/bin/qemu-system-x86_64` | Core VM execution binary. All start operations require it. |
+| `qemu-utils` | `qemu-img` | Disk image management. Required for image creation and inspection. |
+
+Note: For arm64 targets, replace `qemu-system-x86` with `qemu-system-arm` as appropriate.
+
+### Runtime: Optional (Recommends)
+
+These packages enable specific features but are not needed for a minimal VM start.
+
+| Package | Provides | Needed For | Notes |
+|---|---|---|---|
+| `ovmf` | OVMF firmware files under `/usr/share/OVMF/` | UEFI VMs and secure-boot guests | Required by most non-legacy workloads; recommend rather than hard-depend since BIOS-only VMs do not need it |
+| `swtpm` | `/usr/bin/swtpm` | TPM-backed VMs (`tpmstate0` in Proxmox, `tpm` device in schema) | Optional; only needed when VM config includes a TPM device |
+| `swtpm-tools` | `swtpm_setup`, `swtpm_cert` | TPM state and certificate initialization | Optional companion to `swtpm` |
+| `virt-viewer` | `/usr/bin/remote-viewer` | SPICE/VNC display client (`remote_viewer` integration in `ezkvm.yaml`) | Client-side only; not required for VM runtime itself |
+| `looking-glass-client` | `/usr/bin/looking-glass-client` | Looking Glass low-latency display sharing | Requires `/dev/kvmfr0` shared memory device; highly optional |
+| `bridge-utils` | `brctl` | Bridged networking setup | Network bridge creation is admin responsibility, not ezkvm's |
+| `iproute2` | `ip` | TAP interface lifecycle for tap-based networking | Most systems already have this installed |
+
+### Alternative Dependency Expressions
+
+If package naming diverges between Debian Trixie and Ubuntu 26.04, use alternatives syntax in `debian/control`. Known current state:
+
+| Feature | Debian Trixie | Ubuntu 26.04 | Resolution |
+|---|---|---|---|
+| QEMU core | `qemu-system-x86` | `qemu-system-x86` | identical — no alternatives needed |
+| UEFI firmware | `ovmf` | `ovmf` | identical — no alternatives needed |
+| Software TPM | `swtpm` | `swtpm` | identical — no alternatives needed |
+
+No alternatives expressions required at this time. Revalidate at K-03.
+
+### Build Dependencies
+
+| Package | Rationale |
+|---|---|
+| `debhelper-compat (= 13)` | Packaging helper compatibility level |
+| `dh-cargo` | Rust/Cargo integration for `dh` |
+| `cargo` | Rust build tool |
+| `rustc` | Rust compiler |
+| `pkg-config` | Native library detection during build |
+
+## Path Contract Checklist
+
+Source of truth: `etc/ezkvm.yaml` (`host_capabilities` and `locations` sections).
+
+| Path | Type | Created By | Notes |
+|---|---|---|---|
+| `/usr/bin/ezkvm` | binary | package install | Main executable |
+| `/etc/ezkvm/ezkvm.yaml` | conffile | package install | Default global config; admin-editable; must survive upgrade |
+| `/etc/ezkvm/vms.d/` | directory | package install | VM definition files; admin-managed |
+| `/etc/ezkvm/profiles.d/` | directory | package install | Profile definition files; shipped defaults + admin-extendable |
+| `/run/ezkvm/` | runtime dir | `tmpfiles.d` or service | Root runtime directory; equivalent to `/var/run/ezkvm/` via symlink on systemd hosts |
+| `/run/ezkvm/pids/` | runtime dir | `tmpfiles.d` or service | PID files for running VMs |
+| `/run/ezkvm/sockets/` | runtime dir | `tmpfiles.d` or service | Unix domain sockets |
+| `/var/log/ezkvm/` | log dir | `tmpfiles.d` or service | Log output; optional if journald is used exclusively |
+| `/var/lib/ezkvm/tpm/` | state dir | `tmpfiles.d` or service | TPM state persistence; only required when TPM device is configured |
+| `/run/ezkvm/tpm/` | runtime dir | `tmpfiles.d` or service | TPM sockets; only required when TPM device is configured |
+
+**Conffile policy**: files under `/etc/ezkvm/` must be listed in `debian/conffiles` or managed by `dh_installdocs`/`dh_installconffiles` so admin edits are preserved across upgrades.
+
+**Runtime dir policy**: `/run/ezkvm/` and all subdirectories must be created via `debian/ezkvm.tmpfiles` at boot or by the service at start. They must NOT be present in the `.deb` as static directories.
+
 ## Phase 1: Debian Packaging Skeleton
 
 ## Objective

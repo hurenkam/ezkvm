@@ -1,0 +1,2 @@
+etc/ezkvm.yaml etc/ezkvm/
+etc/profiles.d/*.yaml etc/ezkvm/profiles.d/
