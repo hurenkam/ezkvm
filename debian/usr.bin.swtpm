@@ -1,0 +1,18 @@
+# ezkvm local AppArmor extension for swtpm
+#
+# This file is installed to /etc/apparmor.d/local/usr.bin.swtpm by the ezkvm
+# Debian package. It extends the distro swtpm profile to permit ezkvm runtime
+# sockets/pid files under /run|/var/run/ezkvm and log files under /var/log/ezkvm.
+
+/run/ezkvm/ rw,
+/run/ezkvm/*.socket rwk,
+/run/ezkvm/*.swtpm rwk,
+/run/ezkvm/*.pid rwk,
+
+/var/run/ezkvm/ rw,
+/var/run/ezkvm/*.socket rwk,
+/var/run/ezkvm/*.swtpm rwk,
+/var/run/ezkvm/*.pid rwk,
+
+/var/log/ezkvm/ rw,
+/var/log/ezkvm/*.log rwk,

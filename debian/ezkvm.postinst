@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+# Reload swtpm AppArmor profile to pick up /etc/apparmor.d/local/usr.bin.swtpm
+# when AppArmor is present on the host.
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
+    if command -v apparmor_parser >/dev/null 2>&1 && [ -f /etc/apparmor.d/usr.bin.swtpm ]; then
+        apparmor_parser ${DPKG_ROOT:+--root="$DPKG_ROOT"} -r /etc/apparmor.d/usr.bin.swtpm || true
+    fi
+fi
+
+#DEBHELPER#
