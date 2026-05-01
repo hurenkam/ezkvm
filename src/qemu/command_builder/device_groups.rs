@@ -70,10 +70,11 @@ impl QemuManager {
                 }
 
                 for audio_device in self.config.devices_audio() {
+                    let bus = self.normalize_legacy_root_bus(audio_device.bus.as_deref());
                     args.add_audio_device(
                         &audio_device.r#type,
                         &audio_device.id,
-                        audio_device.bus.as_deref(),
+                        bus.as_deref(),
                         audio_device.addr.as_deref(),
                         audio_device.cad,
                         audio_device.audiodev.as_deref(),

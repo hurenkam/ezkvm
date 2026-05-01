@@ -453,3 +453,56 @@ devices: {}
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn dry_run_q35_rewrites_legacy_audio_pci_bus_for_portable_runtime() {
+        let _guard = env_lock()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let temp_dir = unique_temp_dir("audio-bus-rewrite");
+        std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+
+        write_fake_qemu(&temp_dir);
+
+        let vm_path = temp_dir.join("vm.yaml");
+        write_file(
+                &vm_path,
+                r#"
+name: preflight-audio-bus-rewrite
+backend: qemu
+system:
+    architecture: x86_64
+    machine: q35
+    memory:
+        size: 1024
+    cpu:
+        model: host
+        vcpus: 2
+devices:
+    audio:
+        - type: ich9-intel-hda
+          id: audiodev0
+          bus: pci.2
+          addr: "0xc"
+spice:
+    enabled: true
+    audio: true
+"#,
+        );
+
+        let output = run_start_dry_run(&vm_path, &temp_dir);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(
+                output.status.success(),
+                "stdout:\n{}\n\nstderr:\n{}",
+                stdout,
+                stderr
+        );
+
+        assert!(stdout.contains("ich9-intel-hda,id=audiodev0,bus=pcie.0,addr=0xc"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+}

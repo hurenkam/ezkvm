@@ -16,3 +16,6 @@
 
 /var/log/ezkvm/ rw,
 /var/log/ezkvm/*.log rwk,
+
+/dev/vm1/vm-*-tpmstate rwk,
+/dev/dm-* rwk,

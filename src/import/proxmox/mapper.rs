@@ -157,7 +157,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         &mut warnings,
         runtime_target,
     );
-    let (audio, mut spice) = devices::map_audio_and_spice(&proxmox.scalars, &mut warnings);
+    let (audio, mut spice) =
+        devices::map_audio_and_spice(&proxmox.scalars, runtime_target, &mut warnings);
     let mut vnc = None;
     let mut input_devices = Vec::new();
     let mut ivshmem = None;
@@ -905,6 +906,7 @@ mod tests {
         assert_eq!(cfg.devices.audio.len(), 3);
         assert_eq!(cfg.devices.audio[0].r#type, "ich9-intel-hda");
         assert_eq!(cfg.devices.audio[0].id, "audiodev0");
+        assert_eq!(cfg.devices.audio[0].bus.as_deref(), Some("pcie.0"));
         assert_eq!(cfg.devices.audio[1].r#type, "hda-micro");
         assert_eq!(cfg.devices.audio[2].r#type, "hda-duplex");
 
@@ -913,6 +915,30 @@ mod tests {
         assert!(spice.audio);
         assert_eq!(spice.addr, "127.0.0.1");
         assert_eq!(spice.port, 5900);
+    }
+
+    #[test]
+    fn maps_audio0_controller_bus_by_runtime_target() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-audio-targets
+            vmid: 108
+            audio0: device=ich9-intel-hda,driver=spice
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let portable = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("portable mapping should succeed");
+        let portable_cfg: VmConfig =
+            serde_yaml::from_str(&portable.yaml).expect("yaml should deserialize");
+        assert_eq!(portable_cfg.devices.audio[0].bus.as_deref(), Some("pcie.0"));
+
+        let parity = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::ProxmoxParity)
+            .expect("parity mapping should succeed");
+        let parity_cfg: VmConfig =
+            serde_yaml::from_str(&parity.yaml).expect("yaml should deserialize");
+        assert_eq!(parity_cfg.devices.audio[0].bus.as_deref(), Some("pci.2"));
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use crate::config::{CentralConfig, VmConfig};
+use std::borrow::Cow;
 
 /// Main QEMU manager
 pub struct QemuManager {
@@ -97,5 +98,25 @@ impl QemuManager {
             &self.runtime_overrides,
         )
         .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", self.config.name))
+    }
+
+    pub(super) fn normalize_legacy_root_bus<'a>(&self, bus: Option<&'a str>) -> Option<Cow<'a, str>> {
+        let bus = bus?;
+        if !bus.starts_with("pci.") {
+            return Some(Cow::Borrowed(bus));
+        }
+
+        let mode = crate::state::detect_runtime_capability_mode(&self.config);
+        let machine_lower = self.config.system.machine.to_lowercase();
+        let is_q35_machine = machine_lower.contains("q35");
+        let is_proxmox_pve_machine = machine_lower.contains("+pve");
+        if mode == crate::state::RuntimeCapabilityMode::PortableLinux
+            && is_q35_machine
+            && !is_proxmox_pve_machine
+        {
+            return Some(Cow::Borrowed("pcie.0"));
+        }
+
+        Some(Cow::Borrowed(bus))
     }
 }

@@ -349,6 +349,7 @@ fn parse_socket_serial(
 
 pub(super) fn map_audio_and_spice(
     scalars: &BTreeMap<String, String>,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
     warnings: &mut Vec<MappingWarning>,
 ) -> (Vec<AudioDeviceConfig>, Option<SpiceConfig>) {
     let Some(raw) = scalars.get("audio0") else {
@@ -393,7 +394,13 @@ pub(super) fn map_audio_and_spice(
         AudioDeviceConfig {
             r#type: "ich9-intel-hda".to_string(),
             id: controller_id.clone(),
-            bus: Some("pci.2".to_string()),
+            bus: Some(
+                match runtime_target {
+                    crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
+                    crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.2",
+                }
+                .to_string(),
+            ),
             addr: Some("0xc".to_string()),
             cad: None,
             audiodev: None,

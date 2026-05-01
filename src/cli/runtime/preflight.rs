@@ -140,6 +140,7 @@ fn ensure_tpm_capabilities(
         ensure_swtpm_apparmor_socket_policy(&tpm_socket)?;
 
         ensure_tpm_backend_uri_local_path_exists(tpm)?;
+        ensure_tpm_backend_uri_apparmor_policy(tpm)?;
 
         if let Some(swtpm_log_path) = resolve_configured_swtpm_log_path(config, central_config) {
             ensure_parent_dir_is_writable_or_creatable(&swtpm_log_path, "swtpm log file")?;
@@ -176,6 +177,14 @@ fn ensure_tpm_backend_uri_local_path_exists(tpm: &crate::config::TpmConfig) -> R
     ))
 }
 
+fn ensure_tpm_backend_uri_apparmor_policy(tpm: &crate::config::TpmConfig) -> Result<()> {
+    let Some(path) = tpm_backend_uri_local_path(tpm.state_backend_uri.as_deref()) else {
+        return Ok(());
+    };
+
+    ensure_swtpm_apparmor_path_policy(&path, false, "TPM backend URI path")
+}
+
 fn ensure_swtpm_apparmor_socket_policy(socket_path: &str) -> Result<()> {
     ensure_swtpm_apparmor_path_policy(socket_path, true, "TPM socket")
 }
@@ -194,7 +203,11 @@ fn ensure_swtpm_apparmor_path_policy(
     allow_builtin_socket_patterns: bool,
     label: &str,
 ) -> Result<()> {
-    if !(path.starts_with("/run/") || path.starts_with("/var/run/") || path.starts_with("/var/log/")) {
+    if !(path.starts_with("/run/")
+        || path.starts_with("/var/run/")
+        || path.starts_with("/var/log/")
+        || path.starts_with("/dev/"))
+    {
         return Ok(());
     }
 
@@ -771,7 +784,7 @@ mod tests {
         ensure_bridge_helper_acl_allows_bridge, ensure_bridge_helper_acl_exists,
         ensure_bridge_helper_acl_requirements,
         apparmor_glob_matches, apparmor_rules_allow_path, run_runtime_preflight,
-        swtpm_apparmor_socket_path_is_allowed,
+        swtpm_apparmor_path_is_allowed, swtpm_apparmor_socket_path_is_allowed,
     };
     use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
     use std::path::Path;
@@ -1166,6 +1179,21 @@ devices:
         assert!(swtpm_apparmor_socket_path_is_allowed(
             "/var/run/ezkvm/tpmstate0-tpm.socket",
             Some(local),
+        ));
+    }
+
+    #[test]
+    fn swtpm_apparmor_path_accepts_local_override_for_tpm_backend_device() {
+        let local = "/dev/vm1/vm-*-tpmstate rwk,\n/dev/dm-* rwk,";
+        assert!(swtpm_apparmor_path_is_allowed(
+            "/dev/vm1/vm-108-tpmstate",
+            Some(local),
+            false,
+        ));
+        assert!(swtpm_apparmor_path_is_allowed(
+            "/dev/dm-28",
+            Some(local),
+            false,
         ));
     }
 
