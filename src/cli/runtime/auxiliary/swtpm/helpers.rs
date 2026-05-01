@@ -86,18 +86,47 @@ pub(super) fn resolve_tpm_socket_path(
     .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", config.name))
 }
 
+pub(super) fn resolve_swtpm_log_path(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    run_dir: &Path,
+) -> PathBuf {
+    let base_dir = config
+        .options
+        .log_dir
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            central_config
+                .host_capabilities
+                .runtime
+                .log_dir
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+                .map(PathBuf::from)
+        })
+        .or_else(|| {
+            central_config
+                .locations
+                .log_dir
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+                .map(PathBuf::from)
+        })
+        .unwrap_or_else(|| run_dir.to_path_buf());
+
+    base_dir.join(format!("{}-swtpm.log", config.name))
+}
+
 pub(super) fn build_tpmstate_arg(
     tpm: &crate::config::TpmConfig,
     run_dir: &Path,
     create_default_dir: bool,
 ) -> Result<String> {
     if let Some(uri) = tpm.state_backend_uri.as_deref() {
-        let trimmed = uri.trim();
-        let normalized = if let Some(stripped) = trimmed.strip_prefix("file://dev/") {
-            format!("file:///dev/{}", stripped)
-        } else {
-            trimmed.to_string()
-        };
+        let normalized = normalize_tpm_backend_uri(uri);
+
         let mut backend = if normalized.starts_with('/') {
             format!("backend-uri=file://{}", normalized)
         } else {
@@ -109,6 +138,14 @@ pub(super) fn build_tpmstate_arg(
         return Ok(backend);
     }
 
+    build_tpmstate_dir_arg(tpm, run_dir, create_default_dir)
+}
+
+fn build_tpmstate_dir_arg(
+    tpm: &crate::config::TpmConfig,
+    run_dir: &Path,
+    create_default_dir: bool,
+) -> Result<String> {
     let state_dir_path: PathBuf = if let Some(explicit) = tpm.state_dir.as_deref() {
         explicit.into()
     } else {
@@ -124,6 +161,16 @@ pub(super) fn build_tpmstate_arg(
     }
 
     Ok(format!("dir={}", state_dir_path.display()))
+}
+
+fn normalize_tpm_backend_uri(uri: &str) -> String {
+    let trimmed = uri.trim();
+    let without_prefix = trimmed.strip_prefix("backend-uri=").unwrap_or(trimmed);
+    let no_options = without_prefix.split(',').next().unwrap_or(without_prefix);
+    if let Some(stripped) = no_options.strip_prefix("file://dev/") {
+        return format!("file:///dev/{}", stripped);
+    }
+    no_options.to_string()
 }
 
 #[cfg(test)]
@@ -176,5 +223,53 @@ mod tests {
             .expect("building tpmstate arg should succeed");
         assert!(arg.starts_with("dir="));
         assert!(!explicit_dir.exists());
+    }
+
+    #[test]
+    fn keeps_backend_uri_when_local_path_exists() {
+        let tpm = TpmConfig {
+            version: "2.0".to_string(),
+            backend: "emulator".to_string(),
+            state_path: None,
+            state_dir: None,
+            state_backend_uri: Some("file:///etc/hosts".to_string()),
+            model: "tpm-tis".to_string(),
+        };
+
+        let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
+            .expect("building tpmstate arg should succeed");
+        assert_eq!(arg, "backend-uri=file:///etc/hosts,mode=0600");
+    }
+
+    #[test]
+    fn keeps_backend_uri_when_local_path_is_missing() {
+        let tpm = TpmConfig {
+            version: "2.0".to_string(),
+            backend: "emulator".to_string(),
+            state_path: None,
+            state_dir: None,
+            state_backend_uri: Some("file:///definitely/missing/tpmstate".to_string()),
+            model: "tpm-tis".to_string(),
+        };
+
+        let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
+            .expect("building tpmstate arg should succeed");
+        assert_eq!(arg, "backend-uri=file:///definitely/missing/tpmstate,mode=0600");
+    }
+
+    #[test]
+    fn strips_backend_uri_prefix_and_options() {
+        let tpm = TpmConfig {
+            version: "2.0".to_string(),
+            backend: "emulator".to_string(),
+            state_path: None,
+            state_dir: None,
+            state_backend_uri: Some("backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600".to_string()),
+            model: "tpm-tis".to_string(),
+        };
+
+        let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
+            .expect("building tpmstate arg should succeed");
+        assert_eq!(arg, "backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600");
     }
 }

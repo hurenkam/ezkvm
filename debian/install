@@ -1,2 +1,4 @@
 etc/ezkvm.yaml etc/ezkvm/
 etc/profiles.d/*.yaml etc/ezkvm/profiles.d/
+share/ezkvm-q35.cfg usr/share/ezkvm/
+debian/usr.bin.swtpm etc/apparmor.d/local/

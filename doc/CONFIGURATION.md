@@ -106,9 +106,10 @@ Network capability resolver behavior:
 - If a bridge backend cannot resolve a helper, ezkvm downgrades that NIC to user-mode (`-netdev user`) and emits a deterministic preflight warning.
 - `host_capabilities.network.preferred_backend: user` (or `user-mode`) forces bridge backends to downgrade to user-mode with warning.
 - When a bridge backend resolves successfully, ezkvm checks `/dev/net/tun` availability and write access during preflight and warns with remediation guidance if host permissions are insufficient.
+- When a bridge backend resolves to `qemu-bridge-helper`, ezkvm fails preflight if `/etc/qemu/bridge.conf` is missing, because QEMU bridge-helper ACL parsing requires that file.
 
 Bridge setup quick reference (portable mode):
-- Debian/Ubuntu: install `qemu-system-common` (or `qemu-system-x86`) and allow bridge helper in `/etc/qemu/bridge.conf` (for example: `allow br0`), then ensure `qemu-bridge-helper` is setuid if required by your distro policy.
+- Debian/Ubuntu: install `qemu-system-common` (or `qemu-system-x86`). For bridge networking via `qemu-bridge-helper`, `/etc/qemu/bridge.conf` is required by QEMU helper ACL parsing. Create it if missing and allow your bridge(s) (for example: `allow vmbr0`). Then ensure `qemu-bridge-helper` is setuid if required by your distro policy.
 - Arch Linux: install `qemu-base`, configure `/etc/qemu/bridge.conf`, and verify `/usr/lib/qemu/qemu-bridge-helper` exists.
 - For all distros: create/bring up your bridge (`ip link`, NetworkManager, or netctl/systemd-networkd) before `ezkvm start`.
 
@@ -128,7 +129,9 @@ Bridge setup quick reference (portable mode):
 TPM capability resolver behavior:
 - `swtpm_binary` resolution precedence (socket mode): CLI `--swtpm-binary` -> `host_capabilities.tpm.swtpm_binary` / legacy `tools.swtpm` -> `PATH` `swtpm` -> distro fallbacks (`/usr/bin/swtpm`, `/usr/sbin/swtpm`).
 - `placement_mode: socket` resolves socket path as CLI `--tpm-socket-path` -> VM `system.tpm.state_path` -> `host_capabilities.tpm.socket_dir/<vm>.swtpm` -> runtime root `<vm>.swtpm`.
-- In socket mode, swtpm binary availability is required unless the VM already provides an explicit `system.tpm.state_path` (parity/external-managed socket).
+- In portable socket mode, preflight always requires the resolved swtpm binary to exist.
+- In portable socket mode, if `system.tpm.state_backend_uri` resolves to a local file path (`/path`, `file:///path`, or `file://path`) that does not exist, preflight fails with an actionable error.
+- On AppArmor-enabled hosts with the distro `swtpm` profile (`/etc/apparmor.d/usr.bin.swtpm`), preflight also validates that the TPM socket path is allowed by policy. Common allowed paths are `/run/libvirt/qemu/swtpm/<name>.sock` and `/run/swtpm/sock`; paths such as `/var/run/ezkvm/*.socket` are typically denied unless a local AppArmor override is added. The Debian package ships `/etc/apparmor.d/local/usr.bin.swtpm` to allow ezkvm runtime sockets/pid files under `/run|/var/run/ezkvm` and logs under `/var/log/ezkvm`.
 - `placement_mode: state-file` skips socket launch and resolves state storage from `system.tpm.state_dir` -> `host_capabilities.tpm.state_dir` -> `XDG_STATE_HOME/ezkvm/tpm` -> `~/.local/state/ezkvm/tpm` -> `/tmp/ezkvm/tpm-state`.
 
 #### `host_capabilities.integrations`

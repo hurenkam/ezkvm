@@ -1,2 +1,3 @@
 etc/ezkvm/vms.d
 etc/ezkvm/profiles.d
+usr/share/ezkvm

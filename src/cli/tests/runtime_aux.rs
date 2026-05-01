@@ -88,6 +88,57 @@ system:
 }
 
 #[test]
+fn test_swtpm_preview_uses_configured_log_dir_for_logfile() {
+    let config = crate::config::VmConfig::from_str(
+        r#"
+name: "test-vm"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    memory:
+        size: 1024
+    cpu:
+        vcpus: 1
+        model: "host"
+    tpm:
+        version: "2.0"
+        backend: "emulator"
+        model: "tpm-tis"
+"#,
+    )
+    .unwrap();
+
+    let central_config = crate::config::CentralConfig {
+        tools: crate::config::ToolsConfig {
+            qemu: None,
+            swtpm: Some("/usr/bin/swtpm".to_string()),
+            remote_viewer: None,
+            looking_glass: None,
+        },
+        host_capabilities: crate::config::HostCapabilitiesConfig {
+            runtime: crate::config::RuntimeHostCapabilities {
+                log_dir: Some("/var/log/ezkvm".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let preview = runtime::build_swtpm_launch_preview(
+        &config,
+        &central_config,
+        &crate::config::RuntimeCliOverrides::default(),
+    )
+    .unwrap()
+    .expect("swtpm preview should be generated");
+
+    assert!(preview.contains("--log file=/var/log/ezkvm/test-vm-swtpm.log,level=1"));
+}
+
+#[test]
 fn test_swtpm_preview_skips_when_vm_uses_explicit_state_path() {
     let config = crate::config::VmConfig::from_str(
         r#"

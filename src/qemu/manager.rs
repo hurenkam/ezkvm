@@ -42,23 +42,35 @@ impl QemuManager {
     }
 
     pub(super) fn uses_external_swtpm(&self) -> bool {
-        let explicit_state_path = self
-            .config
-            .system_tpm()
-            .and_then(|tpm| tpm.state_path.as_deref())
-            .is_some();
+        let Some(tpm) = self.config.system_tpm() else {
+            return false;
+        };
 
-        self.config
-            .system_tpm()
-            .map(|tpm| tpm.backend == "emulator")
-            .unwrap_or(false)
-            && !explicit_state_path
-            && crate::state::resolve_tpm_placement_mode(
-                &self.central_config,
-                &self.runtime_overrides,
-            ) == crate::state::TpmPlacementMode::Socket
-            && crate::state::resolve_swtpm_binary(&self.central_config, &self.runtime_overrides)
-                .is_some()
+        if tpm.backend != "emulator" {
+            return false;
+        }
+
+        if crate::state::resolve_tpm_placement_mode(
+            &self.central_config,
+            &self.runtime_overrides,
+        ) != crate::state::TpmPlacementMode::Socket
+        {
+            return false;
+        }
+
+        // In ProxmoxParity mode with an explicit state_path, QEMU is the server
+        // and qemu-server starts swtpm as a client that connects to QEMU's socket.
+        // In PortableLinux mode, ezkvm starts swtpm as the server and QEMU connects.
+        let is_proxmox_parity =
+            crate::state::detect_runtime_capability_mode(&self.config)
+                == crate::state::RuntimeCapabilityMode::ProxmoxParity;
+
+        if is_proxmox_parity && tpm.state_path.is_some() {
+            return false;
+        }
+
+        crate::state::resolve_swtpm_binary(&self.central_config, &self.runtime_overrides)
+            .is_some()
     }
 
     pub(super) fn tpm_placement_mode(&self) -> crate::state::TpmPlacementMode {

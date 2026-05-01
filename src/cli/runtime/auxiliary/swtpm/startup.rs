@@ -3,8 +3,8 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use super::helpers::{
-    build_tpmstate_arg, ensure_run_dir, ensure_socket_parent_dir, resolve_tpm_socket_path,
-    wait_for_unix_socket,
+    build_tpmstate_arg, ensure_run_dir, ensure_socket_parent_dir, resolve_swtpm_log_path,
+    resolve_tpm_socket_path, wait_for_unix_socket,
 };
 
 pub(crate) fn ensure_runtime_socket_dirs(
@@ -48,8 +48,12 @@ pub(crate) fn start_swtpm_if_configured(
         return Ok(());
     };
 
-    // Parity mode: explicit TPM socket paths are assumed to be externally managed.
-    if tpm.state_path.is_some() {
+    // In ProxmoxParity mode, an explicit state_path means qemu-server manages swtpm externally.
+    // In PortableLinux mode, ezkvm must start swtpm regardless of whether state_path is set.
+    let runtime_mode = crate::state::detect_runtime_capability_mode(config);
+    if runtime_mode == crate::state::RuntimeCapabilityMode::ProxmoxParity
+        && tpm.state_path.is_some()
+    {
         return Ok(());
     }
 
@@ -100,7 +104,8 @@ fn prepare_swtpm_startup(
     ensure_socket_parent_dir(&socket_path, "TPM socket")?;
 
     let pid_path = run_dir.join(format!("{}.swtpm.pid", config.name));
-    let log_path = run_dir.join(format!("{}-swtpm.log", config.name));
+    let log_path = resolve_swtpm_log_path(config, central_config, &run_dir);
+    ensure_socket_parent_dir(&log_path.display().to_string(), "swtpm log file")?;
     let tpmstate_arg = build_tpmstate_arg(tpm, &run_dir, true)?;
 
     Ok(SwtpmStartup {

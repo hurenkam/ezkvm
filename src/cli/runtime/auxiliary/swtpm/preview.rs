@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
-use super::helpers::{build_tpmstate_arg, resolve_tpm_socket_path};
+use super::helpers::{build_tpmstate_arg, resolve_swtpm_log_path, resolve_tpm_socket_path};
 
 pub(crate) fn build_swtpm_launch_preview(
     config: &crate::config::VmConfig,
@@ -38,8 +38,7 @@ pub(crate) fn build_swtpm_launch_preview(
 
     let socket_path = resolve_tpm_socket_path(config, central_config, runtime_overrides);
     let pid_path = Path::new(&run_dir).join(format!("{}.swtpm.pid", config.name));
-    let log_path = Path::new(&run_dir).join(format!("{}-swtpm.log", config.name));
-
+    let log_path = resolve_swtpm_log_path(config, central_config, Path::new(&run_dir));
     let tpmstate_arg = build_tpmstate_arg(tpm, Path::new(&run_dir), false)?;
 
     let tpm_flag = if tpm.version == "2.0" {

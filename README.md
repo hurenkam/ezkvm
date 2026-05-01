@@ -11,6 +11,7 @@ A simple alternative to libvirt and virt-manager that uses YAML configuration fi
 - **KVM Optimized**: Built specifically for KVM with QEMU
 - **Environment Variable Substitution**: Support for `${VAR_NAME}` syntax in configs
 
+
 ## Installation
 
 ### Prerequisites
@@ -18,6 +19,7 @@ A simple alternative to libvirt and virt-manager that uses YAML configuration fi
 - Rust 1.70+ (2021 edition)
 - QEMU with KVM support
 - Linux kernel with KVM module
+- For portable q35 topology: `/usr/share/ezkvm/ezkvm-q35.cfg` (installed by default)
 
 ### Build from Source
 
@@ -119,6 +121,7 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm start ...` and `ezkvm start ... --dry-run` run the same deterministic preflight checks in the same order before execution/preview
 - `--dry-run` now prints a capability-resolution diagnostics section showing effective source/value pairs (for example runtime root, swtpm binary, OVMF code path, network backend mode, Looking Glass program)
 - Required preflight failures stop startup with actionable diagnostics (QEMU/swtpm binaries, OVMF availability for UEFI, bridge helper paths when configured, and runtime/socket directory access)
+- Debian packaging installs `/etc/apparmor.d/local/usr.bin.swtpm` so AppArmor-confined swtpm can create ezkvm runtime sockets/pid files under `/run|/var/run/ezkvm` and logs under `/var/log/ezkvm`
 - Bridge backends auto-downgrade to user-mode with deterministic warnings when bridge-helper resolution fails or host policy prefers user networking
 - TPM capability checks honor `host_capabilities.tpm.placement_mode`: `socket` mode validates swtpm binary discovery while `state-file` mode validates TPM state directory resolution
 - Looking Glass honors `options.looking_glass.mode`: `explicit` fails fast when the client is missing, `auto` degrades silently, and `disabled` suppresses launch

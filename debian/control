@@ -1,7 +1,7 @@
 Source: ezkvm
 Section: admin
 Priority: optional
-Maintainer: ezkvm maintainers <ezkvm@localhost>
+Maintainer: Mark Hurenkamp <mark.hurenkamp@xs4all.nl>
 Build-Depends:
  debhelper-compat (= 13),
  dh-cargo (>= 25),

@@ -37,12 +37,13 @@ pub(super) fn map_architecture(
 pub(super) fn apply_proxmox_q35_compat_if_needed(
     proxmox: &ProxmoxVmConfig,
     machine: &mut String,
-    readconfig: &mut Vec<String>,
-) {
-    const PVE_Q35_READCONFIG: &str = "/usr/share/qemu-server/pve-q35-4.0.cfg";
+    _readconfig: &mut Vec<String>,
+) -> bool {
+    // Returns true if q35 topology is detected; does not modify machine string here.
+    // The caller must handle machine rewriting based on runtime_target.
 
     if !super::helpers::is_q35_machine(machine) {
-        return;
+        return false;
     }
 
     let has_pve_machine_hint = proxmox
@@ -65,20 +66,10 @@ pub(super) fn apply_proxmox_q35_compat_if_needed(
         });
 
     if !has_pve_machine_hint && !has_topology_bus_hints {
-        return;
+        return false;
     }
 
-    if !machine.contains("+pve") {
-        if machine == "q35" {
-            *machine = "pc-q35-8.1+pve0".to_string();
-        } else {
-            *machine = format!("{}+pve0", machine);
-        }
-    }
-
-    if !readconfig.iter().any(|path| path == PVE_Q35_READCONFIG) {
-        readconfig.push(PVE_Q35_READCONFIG.to_string());
-    }
+    true
 }
 
 pub(super) fn map_vcpus(scalars: &BTreeMap<String, String>) -> u32 {

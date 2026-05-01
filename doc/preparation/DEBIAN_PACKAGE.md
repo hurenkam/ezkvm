@@ -22,10 +22,11 @@ This plan prioritizes a single shared package contract, explicit dependency poli
 3. Put optional integrations into `Recommends` whenever possible.
 4. Use alternative dependency expressions when package naming differs.
 5. Keep filesystem layout stable:
-   - `/usr/bin` for executables
-   - `/etc/ezkvm/` for config and defaults
-   - `/run/ezkvm` (or `/var/run/ezkvm`) for runtime sockets/state
-   - `/var/lib/ezkvm` and `/var/log/ezkvm` only when behavior requires them
+  - `/usr/bin` for executables
+  - `/etc/ezkvm/` for config and defaults
+  - `/run/ezkvm` (or `/var/run/ezkvm`) for runtime sockets/state
+  - `/var/lib/ezkvm` and `/var/log/ezkvm` only when behavior requires them
+  - `/usr/share/ezkvm/ezkvm-q35.cfg` for portable q35 PCIe topology definitions (required for portable mode)
 6. Preserve conffile-safe behavior for admin-edited config.
 
 ## Phase 0: Baseline Inventory
