@@ -1,6 +1,7 @@
 use crate::config::QmpSocketType;
 use crate::qemu::{QemuManager, types::QemuArgs};
 use anyhow::{Result, anyhow};
+use std::borrow::Cow;
 
 impl QemuManager {
     pub(super) fn add_base_args(&self, args: &mut QemuArgs) {
@@ -80,24 +81,41 @@ impl QemuManager {
         if let Some(guest_agent) = self.config.options_guest_agent()
             && guest_agent.enabled
         {
+            let bus = self.normalize_legacy_root_bus(guest_agent.bus.as_deref());
             args.add_guest_agent(
                 guest_agent.socket_path.as_deref(),
                 guest_agent.freeze_cpu,
-                guest_agent.bus.as_deref(),
+                bus.as_deref(),
                 guest_agent.addr.as_deref(),
             );
         }
+    }
+
+    fn normalize_legacy_root_bus<'a>(&self, bus: Option<&'a str>) -> Option<Cow<'a, str>> {
+        let bus = bus?;
+        if bus != "pci.0" {
+            return Some(Cow::Borrowed(bus));
+        }
+
+        let mode = crate::state::detect_runtime_capability_mode(&self.config);
+        let is_q35_machine = self.config.system.machine.to_lowercase().contains("q35");
+        if mode == crate::state::RuntimeCapabilityMode::PortableLinux && is_q35_machine {
+            return Some(Cow::Borrowed("pcie.0"));
+        }
+
+        Some(Cow::Borrowed(bus))
     }
 
     fn add_balloon_args(&self, args: &mut QemuArgs) {
         if let Some(ballooning) = self.config.system_memory_ballooning()
             && ballooning.enabled
         {
+            let bus = self.normalize_legacy_root_bus(ballooning.bus.as_deref());
             args.add_balloon(
                 &ballooning.model,
                 ballooning.free_page_reporting,
                 ballooning.id.as_deref(),
-                ballooning.bus.as_deref(),
+                bus.as_deref(),
                 ballooning.addr.as_deref(),
             );
         }

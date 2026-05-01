@@ -199,7 +199,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .map(|entry| devices::map_usb(entry, use_explicit_xhci))
         .collect::<Vec<_>>();
 
-    let ballooning = system::map_ballooning(is_windows);
+    let ballooning = system::map_ballooning(is_windows, runtime_target);
 
     let tpm = system::map_tpm(
         &proxmox.scalars,
@@ -956,8 +956,76 @@ mod tests {
             agent.socket_path.as_deref(),
             Some("/var/run/ezkvm/qga.sock")
         );
+        assert_eq!(agent.bus.as_deref(), Some("pcie.0"));
+        assert_eq!(agent.addr.as_deref(), Some("0x8"));
+    }
+
+    #[test]
+    fn maps_agent_enabled_into_guest_agent_config_for_proxmox_parity() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-agent-parity
+            vmid: 108
+            agent: 1
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::ProxmoxParity)
+            .expect("mapper should succeed");
+        let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        validation::validate_config(&cfg).expect("config should validate");
+
+        let agent = cfg
+            .options
+            .guest_agent
+            .as_ref()
+            .expect("guest agent should be configured");
+        assert_eq!(agent.socket_path.as_deref(), Some("/var/run/qemu-server/108.qga"));
         assert_eq!(agent.bus.as_deref(), Some("pci.0"));
         assert_eq!(agent.addr.as_deref(), Some("0x8"));
+    }
+
+    #[test]
+    fn maps_windows_balloon_bus_by_runtime_target() {
+        let portable = parse_proxmox_config(
+            r#"
+            name: vm-balloon-portable
+            ostype: win11
+            "#,
+        )
+        .expect("parser should succeed");
+        let portable_mapped = map_proxmox_to_canonical_yaml(&portable, RuntimeTarget::PortableLinux)
+            .expect("portable mapper should succeed");
+        let portable_cfg: VmConfig =
+            serde_yaml::from_str(&portable_mapped.yaml).expect("yaml should deserialize");
+        let portable_balloon = portable_cfg
+            .system
+            .memory
+            .ballooning
+            .as_ref()
+            .expect("ballooning should be configured");
+        assert_eq!(portable_balloon.bus.as_deref(), Some("pcie.0"));
+
+        let parity = parse_proxmox_config(
+            r#"
+            name: vm-balloon-parity
+            vmid: 108
+            ostype: win11
+            "#,
+        )
+        .expect("parser should succeed");
+        let parity_mapped = map_proxmox_to_canonical_yaml(&parity, RuntimeTarget::ProxmoxParity)
+            .expect("parity mapper should succeed");
+        let parity_cfg: VmConfig =
+            serde_yaml::from_str(&parity_mapped.yaml).expect("yaml should deserialize");
+        let parity_balloon = parity_cfg
+            .system
+            .memory
+            .ballooning
+            .as_ref()
+            .expect("ballooning should be configured");
+        assert_eq!(parity_balloon.bus.as_deref(), Some("pci.0"));
     }
 
     #[test]

@@ -4,6 +4,8 @@ This guide shows how to create a Linux bridge with Netplan on Ubuntu 26.04 and r
 
 Use this setup for local VMs/containers attached to an isolated bridge network.
 
+If you use ezkvm or raw QEMU with `qemu-bridge-helper`, you must also allow the bridge in `/etc/qemu/bridge.conf`. The helper error `access denied by acl file` means the bridge exists but is not whitelisted there.
+
 ## Goal
 
 - Create bridge `br0`
@@ -57,6 +59,34 @@ ip -br a show br0
 ```
 
 Expected: `br0` has `10.50.0.1/24`.
+
+## 2a) Allow the Bridge for qemu-bridge-helper
+
+If your VM networking uses `backend.type: bridge` with `qemu-bridge-helper`, add the bridge name to `/etc/qemu/bridge.conf`:
+
+```bash
+sudo install -d -m 0755 /etc/qemu
+sudo tee /etc/qemu/bridge.conf >/dev/null <<'CONF'
+allow br0
+CONF
+```
+
+For a Proxmox-style bridge name, use that name instead:
+
+```bash
+sudo tee /etc/qemu/bridge.conf >/dev/null <<'CONF'
+allow vmbr0
+CONF
+```
+
+Verify the ACL file:
+
+```bash
+sudo cat /etc/qemu/bridge.conf
+ls -l /usr/lib/qemu/qemu-bridge-helper
+```
+
+If your distro expects the helper to be setuid, verify that as well before starting the VM.
 
 ## 3) Run DHCP Server on the Bridge
 
@@ -153,6 +183,15 @@ sysctl net.ipv4.ip_forward
 ```
 
    - Confirm NAT rule uses the correct uplink interface.
+
+4. QEMU fails with `access denied by acl file`:
+  - Confirm the requested bridge name is listed in `/etc/qemu/bridge.conf`:
+
+```bash
+sudo cat /etc/qemu/bridge.conf
+```
+
+  - For ezkvm imports from Proxmox, the requested bridge is often `vmbr0`, so the ACL file must contain `allow vmbr0` unless you intentionally renamed the bridge in the VM config.
 
 ## Rollback
 

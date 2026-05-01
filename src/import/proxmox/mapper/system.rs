@@ -349,7 +349,11 @@ pub(super) fn map_guest_agent(
         enabled: true,
         socket_path,
         freeze_cpu: false,
-        bus: Some("pci.0".to_string()),
+        bus: Some(match runtime_target {
+            crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
+            crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.0",
+        }
+        .to_string()),
         addr: Some("0x8".to_string()),
     })
 }
@@ -380,7 +384,10 @@ pub(super) fn parse_smbios_uuid(scalars: &BTreeMap<String, String>) -> Option<St
     })
 }
 
-pub(super) fn map_ballooning(is_windows: bool) -> Option<BallooningConfig> {
+pub(super) fn map_ballooning(
+    is_windows: bool,
+    runtime_target: crate::import::proxmox::RuntimeTarget,
+) -> Option<BallooningConfig> {
     Some(BallooningConfig {
         enabled: true,
         free_page_reporting: is_windows,
@@ -391,7 +398,13 @@ pub(super) fn map_ballooning(is_windows: bool) -> Option<BallooningConfig> {
             None
         },
         bus: if is_windows {
-            Some("pci.0".to_string())
+            Some(
+                match runtime_target {
+                    crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
+                    crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.0",
+                }
+                .to_string(),
+            )
         } else {
             None
         },

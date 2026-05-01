@@ -106,7 +106,7 @@ Network capability resolver behavior:
 - If a bridge backend cannot resolve a helper, ezkvm downgrades that NIC to user-mode (`-netdev user`) and emits a deterministic preflight warning.
 - `host_capabilities.network.preferred_backend: user` (or `user-mode`) forces bridge backends to downgrade to user-mode with warning.
 - When a bridge backend resolves successfully, ezkvm checks `/dev/net/tun` availability and write access during preflight and warns with remediation guidance if host permissions are insufficient.
-- When a bridge backend resolves to `qemu-bridge-helper`, ezkvm fails preflight if `/etc/qemu/bridge.conf` is missing, because QEMU bridge-helper ACL parsing requires that file.
+- When a bridge backend resolves to `qemu-bridge-helper`, ezkvm fails preflight if `/etc/qemu/bridge.conf` is missing, or if the resolved bridge is not allowed there. Add `allow <bridge>` for every bridge ezkvm will request, or use `allow all` if that matches your host policy.
 
 Bridge setup quick reference (portable mode):
 - Debian/Ubuntu: install `qemu-system-common` (or `qemu-system-x86`). For bridge networking via `qemu-bridge-helper`, `/etc/qemu/bridge.conf` is required by QEMU helper ACL parsing. Create it if missing and allow your bridge(s) (for example: `allow vmbr0`). Then ensure `qemu-bridge-helper` is setuid if required by your distro policy.

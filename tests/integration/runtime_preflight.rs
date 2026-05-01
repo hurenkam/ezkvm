@@ -44,6 +44,34 @@ fn run_start_dry_run(config_path: &Path, bin_dir: &Path) -> std::process::Output
         .expect("command should run")
 }
 
+fn helper_available_on_host() -> bool {
+    std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path).any(|dir| dir.join("qemu-bridge-helper").is_file())
+    }) || [
+        "/usr/lib/qemu/qemu-bridge-helper",
+        "/usr/libexec/qemu-bridge-helper",
+        "/usr/lib64/qemu-bridge-helper",
+    ]
+    .iter()
+    .any(|candidate| Path::new(candidate).is_file())
+}
+
+fn bridge_acl_allows_vmbr0_on_host() -> std::io::Result<bool> {
+    let rules = std::fs::read_to_string("/etc/qemu/bridge.conf")?;
+
+    for raw_line in rules.lines() {
+        let line = raw_line.split('#').next().unwrap_or("").trim();
+        if line == "allow vmbr0" || line == "allow all" {
+            return Ok(true);
+        }
+        if line == "deny vmbr0" {
+            return Ok(false);
+        }
+    }
+
+    Ok(false)
+}
+
 #[test]
 fn dry_run_preflight_success_path() {
     let _guard = env_lock()
@@ -221,29 +249,52 @@ fn dry_run_network_bridge_falls_back_to_user_when_helper_missing() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
+    let helper_available = helper_available_on_host();
+    let bridge_acl_state = bridge_acl_allows_vmbr0_on_host();
+
+    if !helper_available {
+        assert!(
+            output.status.success(),
+            "stdout:\n{}\n\nstderr:\n{}",
+            stdout,
+            stderr
+        );
+        assert!(stdout.contains("network 'net0' downgraded to user-mode"));
+        assert!(stdout.contains("type=user,id=net0,hostname=preflight-network-fallback"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return;
+    }
+
+    if matches!(bridge_acl_state, Ok(true)) {
+        assert!(
+            output.status.success(),
+            "stdout:\n{}\n\nstderr:\n{}",
+            stdout,
+            stderr
+        );
+        assert!(!stdout.contains("network 'net0' downgraded to user-mode"));
+        assert!(stdout.contains("type=bridge,id=net0,br=vmbr0"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return;
+    }
+
     assert!(
-        output.status.success(),
+        !output.status.success(),
         "stdout:\n{}\n\nstderr:\n{}",
         stdout,
         stderr
     );
 
-    let helper_available = std::env::var_os("PATH").is_some_and(|path| {
-        std::env::split_paths(&path).any(|dir| dir.join("qemu-bridge-helper").is_file())
-    }) || [
-        "/usr/lib/qemu/qemu-bridge-helper",
-        "/usr/libexec/qemu-bridge-helper",
-        "/usr/lib64/qemu-bridge-helper",
-    ]
-    .iter()
-    .any(|candidate| Path::new(candidate).is_file());
-
-    if helper_available {
-        assert!(!stdout.contains("network 'net0' downgraded to user-mode"));
-        assert!(stdout.contains("type=bridge,id=net0,br=vmbr0"));
-    } else {
-        assert!(stdout.contains("network 'net0' downgraded to user-mode"));
-        assert!(stdout.contains("type=user,id=net0,hostname=preflight-network-fallback"));
+    match bridge_acl_state {
+        Ok(true) => unreachable!("Ok(true) returns earlier"),
+        Ok(false) => {
+            assert!(stderr.contains("does not allow it") || stderr.contains("does not exist"));
+        }
+        Err(_) => {
+            assert!(stderr.contains("bridge-helper ACL file '/etc/qemu/bridge.conf' could not be read"));
+        }
     }
 
     let _ = std::fs::remove_dir_all(&temp_dir);
@@ -296,6 +347,109 @@ devices: {}
     );
     assert!(stdout.contains("Capability resolution diagnostics:"));
     assert!(stdout.contains("runtime capabilities: source=parity-bypass"));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn dry_run_q35_rewrites_legacy_guest_agent_pci_bus_for_portable_runtime() {
+        let _guard = env_lock()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let temp_dir = unique_temp_dir("guest-agent-bus-rewrite");
+        std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+
+        write_fake_qemu(&temp_dir);
+
+        let vm_path = temp_dir.join("vm.yaml");
+        write_file(
+                &vm_path,
+                r#"
+name: preflight-guest-agent-bus-rewrite
+backend: qemu
+system:
+    architecture: x86_64
+    machine: q35
+    memory:
+        size: 1024
+    cpu:
+        model: host
+        vcpus: 2
+devices: {}
+options:
+    guest_agent:
+        enabled: true
+        socket_path: /var/run/ezkvm/qga.sock
+        bus: pci.0
+        addr: "0x8"
+"#,
+        );
+
+        let output = run_start_dry_run(&vm_path, &temp_dir);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(
+                output.status.success(),
+                "stdout:\n{}\n\nstderr:\n{}",
+                stdout,
+                stderr
+        );
+
+        assert!(stdout.contains("virtio-serial,id=qga0,bus=pcie.0,addr=0x8"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn dry_run_q35_rewrites_legacy_balloon_pci_bus_for_portable_runtime() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let temp_dir = unique_temp_dir("balloon-bus-rewrite");
+    std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+
+    write_fake_qemu(&temp_dir);
+
+    let vm_path = temp_dir.join("vm.yaml");
+    write_file(
+        &vm_path,
+        r#"
+name: preflight-balloon-bus-rewrite
+backend: qemu
+system:
+    architecture: x86_64
+    machine: q35
+    memory:
+        size: 1024
+        ballooning:
+            enabled: true
+            model: virtio-balloon-pci
+            id: balloon0
+            bus: pci.0
+            addr: "0x3"
+            free_page_reporting: true
+    cpu:
+        model: host
+        vcpus: 2
+devices: {}
+"#,
+    );
+
+    let output = run_start_dry_run(&vm_path, &temp_dir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        stdout,
+        stderr
+    );
+
+    assert!(stdout.contains("virtio-balloon-pci,id=balloon0,bus=pcie.0,addr=0x3,free-page-reporting=on"));
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
