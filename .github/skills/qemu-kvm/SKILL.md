@@ -53,6 +53,30 @@ This skill captures the recurring `ezkvm` development workflow for QEMU/KVM inte
    - keep `ProjectPlan.md` aligned with current phase and implementation status
    - capture feature coverage and test results in the README or progress notes
 
+## Field Debug Playbook (Portable Linux)
+
+Use this quick sequence before changing code when imported VMs behave unexpectedly:
+
+1. **Bridge path verification first**
+   - Confirm bridge exists and is up (`ip -br link show br0`)
+   - Confirm bridge-helper ACL (`/etc/qemu/bridge.conf`) includes requested bridge
+   - Confirm QEMU actually emitted bridge backend args (`-netdev ... br=<bridge> ...`)
+
+2. **If guest gets DHCP but no internet**
+   - Treat as host routing/NAT issue, not guest NIC mapping issue
+   - Check `sysctl -n net.ipv4.ip_forward` (must be `1`)
+   - Add/verify NAT + FORWARD policy from bridge subnet to uplink
+
+3. **Display isolation strategy for black-screen boots**
+   - Isolate with `vnc` + `devices.displays: [{type: vga}]`
+   - Remove SPICE/QXL variables while keeping storage/controller baseline fixed
+   - Test one variable at a time; avoid changing storage + display simultaneously
+
+4. **Shutdown analysis before force-stop**
+   - If VM appears hung with high vCPU usage, check process args for `-no-shutdown`
+   - Verify with `ezkvm status` over time before concluding process leak
+   - Prefer evidence gathering first, force-stop only when user requests
+
 ## Decision points
 
 - **Backend support**: `ezkvm` currently targets QEMU only; do not introduce alternative backends without explicit plan updates

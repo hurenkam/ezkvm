@@ -8,7 +8,7 @@ use crate::config::{
 };
 
 pub(crate) fn validate_input_devices(input_devices: &[InputDeviceConfig]) -> Result<()> {
-    let valid_types = ["virtio-mouse", "virtio-keyboard"];
+    let valid_types = ["virtio-mouse", "virtio-keyboard", "usb-tablet"];
     let mut seen_types = HashSet::new();
 
     for input_device in input_devices {

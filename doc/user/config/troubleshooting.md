@@ -96,6 +96,85 @@ Common issues and quick checks for VM configuration and startup.
    - Preferred key: `host_capabilities.integrations.remote_viewer.program`
    - Compatibility key: `tools.remote_viewer`
 
+### Display isolation strategy (black screen after early boot)
+
+When display handoff is ambiguous, isolate display variables before changing storage or CPU topology:
+
+1. Switch to VNC + VGA (`vnc.enabled: true`, `devices.displays: [{type: vga}]`)
+2. Temporarily remove SPICE/QXL-related profile layers
+3. Keep storage/controller baseline fixed while testing display
+4. Reintroduce SPICE/QXL only after baseline VGA boot is stable
+
+## Guest gets DHCP lease but has no internet
+
+### Symptoms
+
+- Guest receives an IP on bridge subnet (for example via `dnsmasq.leases`)
+- Guest can ping bridge gateway (host `br0` address)
+- Guest cannot reach public IPs or DNS names
+
+### Likely Causes
+
+- Host IPv4 forwarding is disabled (`net.ipv4.ip_forward = 0`)
+- NAT/forwarding policy is missing between bridge subnet and uplink interface
+
+### Checks
+
+1. Verify host forwarding state:
+   ```bash
+   sysctl -n net.ipv4.ip_forward
+   ```
+
+2. Confirm guest lease exists:
+   ```bash
+   sudo tail -n 20 /var/lib/misc/dnsmasq.leases
+   ```
+
+3. Confirm host default route uplink:
+   ```bash
+   ip route | awk '/default/ {print $5; exit}'
+   ```
+
+### Fix
+
+1. Enable forwarding persistently:
+   ```bash
+   echo 'net.ipv4.ip_forward = 1' | sudo tee /etc/sysctl.d/99-ezkvm-forwarding.conf
+   sudo sysctl --system
+   ```
+
+2. Add NAT and FORWARD rules for bridge subnet to uplink (replace uplink as needed):
+   ```bash
+   sudo iptables -t nat -A POSTROUTING -s 192.168.191.0/24 -o wlp5s0 -j MASQUERADE
+   sudo iptables -A FORWARD -i br0 -o wlp5s0 -j ACCEPT
+   sudo iptables -A FORWARD -i wlp5s0 -o br0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+   ```
+
+   Use one firewall backend consistently (`nftables` or `iptables`) on the host.
+
+## VM appears hung on shutdown with high CPU, then eventually exits
+
+### Symptoms
+
+- Display path goes black (VNC/SPICE)
+- RDP/ICMP to guest stops responding
+- QEMU process remains running and vCPU threads can be near 100% each
+- After several minutes, process exits cleanly and `ezkvm status` reports `Not running`
+
+### Notes
+
+- This pattern can still be a delayed guest shutdown path (service/update/finalization), not an ezkvm host-runtime leak.
+- Verify whether QEMU was started without `-no-shutdown` before assuming host-side process handling fault.
+- Confirm final state using `ezkvm status`; if it transitions to `Not running`, shutdown completed.
+
+### Checks
+
+```bash
+sudo ./target/debug/ezkvm status <vm-config.yaml>
+ps -p <qemu-pid> -o pid,stat,etime,%cpu,cmd --no-headers
+top -b -H -n 1 -p <qemu-pid> | sed -n '1,40p'
+```
+
 ## Imported Proxmox VM boots from wrong disk
 
 ### Symptoms

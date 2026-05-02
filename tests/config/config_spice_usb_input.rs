@@ -111,6 +111,31 @@ devices:
 }
 
 #[test]
+fn test_config_with_usb_tablet_input_device() {
+    let yaml = r#"
+name: "input-vm"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 2048
+  cpu:
+    vcpus: 2
+    model: "host"
+
+devices:
+  input:
+    - type: "usb-tablet"
+"#;
+
+    let config = VmConfig::from_str(yaml).unwrap();
+    assert_eq!(config.devices.input.len(), 1);
+    assert_eq!(config.devices.input[0].r#type, "usb-tablet");
+}
+
+#[test]
 fn test_duplicate_input_devices_are_rejected() {
     let yaml = r#"
 name: "input-vm"

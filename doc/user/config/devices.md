@@ -83,6 +83,8 @@ Common fields:
 ### devices.input (canonical)
 
 - list of input devices (`type`)
+- supported values: `virtio-mouse`, `virtio-keyboard`, `usb-tablet`
+- `usb-tablet` is recommended for VNC/SPICE sessions when pointer alignment drifts
 
 ### devices.audio (canonical)
 

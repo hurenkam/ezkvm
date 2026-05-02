@@ -16,12 +16,14 @@ When invoked:
 - runtime behavior/defaults/precedence
 - CLI commands or flags
 - examples and troubleshooting guidance
+ - repeated field-debug outcomes worth codifying in troubleshooting docs
 3. Map impacted code paths to documentation targets:
 - `doc/user/config/*.md`
 - `doc/CONFIGURATION.md`
 - `README.md`
 - other docs explicitly referenced by the changed behavior
 4. Apply minimal documentation edits to reflect the current behavior.
+4a. If the task established a verified troubleshooting pattern, record it in the most specific troubleshooting document instead of leaving it only in chat history.
 5. Validate markdown diagnostics for edited docs.
 6. Return a doc delta summary:
 - files updated

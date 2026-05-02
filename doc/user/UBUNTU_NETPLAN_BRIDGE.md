@@ -183,8 +183,25 @@ sysctl net.ipv4.ip_forward
 ```
 
    - Confirm NAT rule uses the correct uplink interface.
+  - If clients can ping the bridge gateway but not public IPs, forwarding/NAT on the host is the failure point.
 
-4. QEMU fails with `access denied by acl file`:
+4. Make forwarding persistent across reboot:
+
+```bash
+echo 'net.ipv4.ip_forward = 1' | sudo tee /etc/sysctl.d/99-ezkvm-forwarding.conf
+sudo sysctl --system
+```
+
+5. Persist iptables NAT/FORWARD rules (if using iptables backend):
+
+```bash
+sudo apt-get install -y iptables-persistent
+sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
+sudo systemctl enable netfilter-persistent
+sudo systemctl restart netfilter-persistent
+```
+
+6. QEMU fails with `access denied by acl file`:
   - Confirm the requested bridge name is listed in `/etc/qemu/bridge.conf`:
 
 ```bash
