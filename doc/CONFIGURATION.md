@@ -894,8 +894,10 @@ Likely causes:
 Checks:
 
 - For SPICE flow, use `display.type: remote-viewer` and a valid `spice` section.
+- For VNC flow, enable `vnc.enabled: true` with a TCP display endpoint (for example `127.0.0.1:0`).
 - For headless operation, use `display.type: no_display` and connect via serial/VNC intentionally.
 - If using VNC TCP mode, verify expected display/port mapping.
+- When launching `remote-viewer` from a VNC endpoint, ezkvm translates `vnc.display` display indexes to TCP ports (`127.0.0.1:0` -> `vnc://127.0.0.1:5900`).
 
 ### Imported Proxmox VM boots from wrong disk
 
@@ -970,7 +972,7 @@ This section summarizes how Proxmox VM config fields map into ezkvm YAML during 
 | `serial0: socket` | `system.serial` | Path inferred from vmid or VM name. |
 | `numa` + `hugepages` | `system.numa_nodes` | Nodes derived from sockets/cores/memory. |
 | `vmgenid` | `system.vmgenid` | Passed through directly. |
-| `vga` and passthrough grouping | `gpu`, `display`, `spice`, `vnc` | Display path inferred; remote-viewer path defaults to SPICE. |
+| `vga` and passthrough grouping | `gpu`, `display`, `spice`, `vnc` | Display path inferred; remote-viewer uses SPICE when enabled, otherwise it uses VNC when enabled. |
 | `boot: order=...` | `storage[].drives[].boot_index` | Converted to 1-based order position. |
 | `scsihw: virtio-scsi-single` | storage controller type | SCSI bus maps to `virtio-scsi-single` instead of `pvscsi`. |
 | `netN` with `bridge` | `network[]` | Uses `proxmox_tap` when vmid is known, else `bridge`. |

@@ -639,6 +639,7 @@ fn should_launch_remote_viewer(config: &crate::config::VmConfig) -> bool {
     }
 
     matches!(&config.spice, Some(spice) if spice.enabled)
+        || matches!(&config.vnc, Some(vnc) if vnc.enabled)
 }
 
 fn should_launch_looking_glass(config: &crate::config::VmConfig) -> bool {

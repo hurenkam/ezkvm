@@ -69,6 +69,60 @@ fn has_primary_passthrough_gpu(config: &crate::config::VmConfig) -> bool {
         .any(|device| device.x_vga || device.id.starts_with("hostpci0"))
 }
 
+fn vnc_display_to_tcp_port(display_or_port: u16) -> u16 {
+    if display_or_port < 100 {
+        5900 + display_or_port
+    } else {
+        display_or_port
+    }
+}
+
+fn parse_vnc_host_and_display(endpoint: &str) -> Option<(String, u16)> {
+    let endpoint = endpoint.trim();
+    if endpoint.is_empty() || endpoint.starts_with("unix:") {
+        return None;
+    }
+
+    if let Some(display) = endpoint.strip_prefix(':') {
+        let display = display.parse::<u16>().ok()?;
+        return Some(("127.0.0.1".to_string(), display));
+    }
+
+    let (host, display) = if endpoint.starts_with('[') {
+        let bracket_end = endpoint.find(']')?;
+        let host = &endpoint[..=bracket_end];
+        let remainder = endpoint.get(bracket_end + 1..)?;
+        let display = remainder.strip_prefix(':')?;
+        (host, display)
+    } else {
+        endpoint.rsplit_once(':')?
+    };
+
+    let host = if host.trim().is_empty() {
+        "127.0.0.1"
+    } else {
+        host.trim()
+    };
+
+    let display = display.parse::<u16>().ok()?;
+    Some((resolve_client_host(host), display))
+}
+
+fn format_uri_host(host: &str) -> String {
+    if host.contains(':') && !host.starts_with('[') && !host.ends_with(']') {
+        format!("[{}]", host)
+    } else {
+        host.to_string()
+    }
+}
+
+fn vnc_uri_from_display(endpoint: &str) -> Option<String> {
+    let (host, display) = parse_vnc_host_and_display(endpoint)?;
+    let host = format_uri_host(&host);
+    let port = vnc_display_to_tcp_port(display);
+    Some(format!("vnc://{}:{}", host, port))
+}
+
 pub(crate) fn build_remote_viewer_launch(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
@@ -78,21 +132,27 @@ pub(crate) fn build_remote_viewer_launch(
         return None;
     }
 
-    let spice = match &config.spice {
-        Some(spice) if spice.enabled => spice,
-        _ => return None,
-    };
-
     let remote_viewer_path =
         central_config.remote_viewer_program_with_overrides(runtime_overrides)?;
-    let uri = format!(
-        "spice://{}:{}",
-        resolve_client_host(&spice.addr),
-        spice.port
-    );
+
+    let uri = if let Some(spice) = &config.spice
+        && spice.enabled
+    {
+        format!(
+            "spice://{}:{}",
+            resolve_client_host(&spice.addr),
+            spice.port
+        )
+    } else if let Some(vnc) = &config.vnc
+        && vnc.enabled
+    {
+        vnc_uri_from_display(&vnc.display)?
+    } else {
+        return None;
+    };
 
     Some(AuxiliaryLaunch {
-        label: "remote-viewer for SPICE session",
+        label: "remote-viewer session",
         program: remote_viewer_path.to_string(),
         args: vec![uri],
         inherit_output: false,

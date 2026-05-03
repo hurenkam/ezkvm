@@ -86,13 +86,16 @@ Common issues and quick checks for VM configuration and startup.
 
 1. For SPICE flow, use `display.type: remote-viewer` and a valid `spice` section
 
-2. For headless operation, use `display.type: no_display` and connect via serial/VNC intentionally
+2. For VNC flow, enable `vnc.enabled: true` with a TCP display endpoint (for example `127.0.0.1:0`)
 
-3. If using VNC TCP mode, verify expected display/port mapping:
+3. For headless operation, use `display.type: no_display` and connect via serial/VNC intentionally
+
+4. If using VNC TCP mode, verify expected display/port mapping:
    - TCP `port: 5900` maps to VNC display `:0`
    - TCP `port: 5901` maps to VNC display `:1`, etc.
+   - When launching `remote-viewer` from a VNC endpoint, ezkvm translates `vnc.display` display indexes to TCP ports (`127.0.0.1:0` -> `vnc://127.0.0.1:5900`)
 
-4. Verify the configured viewer path in central config:
+5. Verify the configured viewer path in central config:
    - Preferred key: `host_capabilities.integrations.remote_viewer.program`
    - Compatibility key: `tools.remote_viewer`
 

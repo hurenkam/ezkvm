@@ -156,7 +156,7 @@ fn print_dry_run(
         build_remote_viewer_launch(manager.config(), central_config, runtime_overrides)
     {
         println!(
-            "Auxiliary launch (SPICE): {}",
+            "Auxiliary launch (remote-viewer): {}",
             format_auxiliary_launch(&launch)
         );
     }
