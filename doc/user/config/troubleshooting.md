@@ -43,6 +43,7 @@ Common issues and quick checks for VM configuration and startup.
 
 - Preflight checks run in deterministic order in both `start` and `start --dry-run`.
 - Optional integrations (remote-viewer, Looking Glass) emit warnings and degrade gracefully instead of failing startup.
+- `ezkvm status <vm.yaml>` now includes a guest-agent section when QEMU guest agent is reachable, including interface/IP information from `guest-network-get-interfaces`.
 
 ## VM fails with memory backend or hugepages errors
 

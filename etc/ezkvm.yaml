@@ -16,11 +16,14 @@ host_capabilities:
     socket_dir: "/var/run/ezkvm/sockets"
     log_dir: "/var/log/ezkvm"
   firmware:
-    ovmf_dir: "/usr/share/pve-edk2-firmware"
+    #ovmf_dir: "/usr/share/pve-edk2-firmware"
+    ovmf_dir: "/mnt/trixie/usr/share/pve-edk2-firmware"
     search_paths:
-      - "/usr/share/ovmf"
-      - "/usr/share/OVMF"
-      - "/usr/share/edk2/ovmf"
+      - "/mnt/trixie/usr/share/pve-edk2-firmware"
+    #  - "/usr/share/ovmf"
+    #  - "/usr/share/ovmf"
+    #  - "/usr/share/OVMF"
+    #  - "/usr/share/edk2/ovmf"
     secure_boot_code_files:
       - "OVMF_CODE_4M.secboot.fd"
       - "OVMF_CODE.secboot.fd"
