@@ -39,6 +39,9 @@ policies:
     - match:
         backend_type: tap
       defaults:
+        # bus: pci.0 is correct for Proxmox-parity mode.
+        # For portable-linux Q35 imports the command builder normalizes
+        # pci.N bus references to pcie.0 at emit time via normalize_legacy_root_bus.
         bus: pci.0
         rx_queue_size: 1024
         tx_queue_size: 256

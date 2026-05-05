@@ -111,6 +111,25 @@ For `q35` machine types, treat topology as a compatibility contract rather than 
 - Keep topology flat by default: prefer root-port fanout to deep switch trees unless bus-count constraints require switches.
 - Preserve imported guest-visible slot identity for sensitive devices (network, GPU, guest-agent paths) unless migration notes explicitly approve change.
 
+#### Q35TopologyPlanner (import path)
+
+All bus-policy decisions for a single Proxmox import pass are centralized in `Q35TopologyPlanner` (`src/import/proxmox/mapper/topology.rs`). This struct is instantiated once per import and is the **single source of truth** for bus names during mapping. No mapper helper may derive bus names independently from `RuntimeTarget`.
+
+Planner contract:
+
+| Decision | PortableLinux | ProxmoxParity |
+|---|---|---|
+| `readconfig` injected | `/usr/share/ezkvm/ezkvm-q35.cfg` | `/usr/share/qemu-server/pve-q35-4.0.cfg` |
+| Machine string rewritten | No (kept as-is) | Yes (`+pve0` appended) |
+| `legacy_root_bus()` | `pcie.0` | `pci.0` |
+| `audio_controller_bus()` | `pcie.0` | `pci.2` |
+| hostpci without explicit bus | Auto-allocates `ich9-pcie-port-1..4` | Falls back to `pcie.0` |
+| Root-port budget | 4 (`MAX_PORTABLE_ROOT_PORTS`) | N/A |
+
+The 4-port budget matches the port definitions in `share/ezkvm-q35.cfg`. Changing either requires updating both.
+
+**Safety fallback**: `normalize_legacy_root_bus` in `src/qemu/manager.rs` rewrites any surviving `pci.N` bus references to `pcie.0` at command-emit time for portable-linux + Q35 + non-pve machines. This is a last-resort normalization, not a replacement for correct planner output.
+
 Q35 device placement policy:
 
 | Device Class | Default Bus Type | Bridge Chain | Hotplug Model | Slot Stability Requirement |
@@ -124,6 +143,7 @@ Avoid these anti-patterns:
 - Placing large numbers of legacy PCI devices directly on `pcie.0`.
 - Using deep PCIe switch hierarchies without bus budget justification.
 - Re-slotting imported devices without explicit migration guidance.
+- Bypassing `Q35TopologyPlanner` to derive bus names from `RuntimeTarget` in mapper helpers.
 
 Topology validation checklist for Q35 changes:
 
@@ -132,6 +152,7 @@ Topology validation checklist for Q35 changes:
 - Hotplug behavior reviewed (native PCIe vs bridge-based semantics).
 - Dry-run parity checked against captured Proxmox command lines.
 - Imported guest-visible slot identities preserved or migration-noted.
+- `MAX_PORTABLE_ROOT_PORTS` and `share/ezkvm-q35.cfg` port count kept in sync.
 
 ## 3. Layering / Packaging
 

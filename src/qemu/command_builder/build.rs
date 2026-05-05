@@ -4,6 +4,10 @@ use anyhow::Result;
 impl QemuManager {
     /// Generate the complete QEMU command line.
     pub fn build_command(&self) -> Result<QemuArgs> {
+        for warning in crate::qemu::preflight::check_hostpci_bus_references(&self.config) {
+            eprintln!("Warning: {warning}");
+        }
+
         let mut args = QemuArgs::new();
 
         self.add_base_args(&mut args);

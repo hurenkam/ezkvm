@@ -1,0 +1,198 @@
+use crate::config::VmConfig;
+use std::collections::HashSet;
+
+/// Parse a QEMU `-readconfig` INI file and return the names of all
+/// `[device "name"]` sections defined in it.
+///
+/// Returns `None` if the file cannot be read (e.g. not present on this host).
+fn device_names_from_readconfig(path: &str) -> Option<HashSet<String>> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let names = content
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.starts_with("[device \"") && line.ends_with("\"]") {
+                Some(line[9..line.len() - 2].to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+    Some(names)
+}
+
+/// Collect every `ich9-pcie-port-*` bus name referenced by hostpci entries in
+/// the given config.
+fn referenced_root_port_buses(config: &VmConfig) -> HashSet<String> {
+    config
+        .host_pci()
+        .iter()
+        .filter_map(|h| h.bus.as_deref())
+        .filter(|bus| bus.starts_with("ich9-pcie-port"))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Check that every `ich9-pcie-port-*` bus name referenced by hostpci entries
+/// is actually defined in one of the loaded readconfig files.
+///
+/// This catches mismatches between the planner's root-port allocation and the
+/// readconfig template on disk — for example if the template defines 4 ports but
+/// a config was somehow created with a reference to port-5.
+///
+/// Returns a sorted list of human-readable warning strings. An empty vec means
+/// all references are satisfied (or no check was possible).
+pub(super) fn check_hostpci_bus_references(config: &VmConfig) -> Vec<String> {
+    let referenced = referenced_root_port_buses(config);
+    if referenced.is_empty() {
+        return vec![];
+    }
+
+    // Build the set of device names defined across all readable readconfig files.
+    let mut defined: HashSet<String> = HashSet::new();
+    let mut any_read = false;
+    for path in &config.system.readconfig {
+        if let Some(names) = device_names_from_readconfig(path) {
+            defined.extend(names);
+            any_read = true;
+        }
+    }
+
+    if !any_read {
+        // No readconfig file could be read on this host; skip the check rather
+        // than emit false positives.
+        return vec![];
+    }
+
+    let mut missing: Vec<&str> = referenced
+        .iter()
+        .filter(|bus| !defined.contains(*bus))
+        .map(String::as_str)
+        .collect();
+    missing.sort_unstable();
+
+    missing
+        .into_iter()
+        .map(|bus| {
+            format!(
+                "hostpci device references bus '{}' which is not defined in any loaded \
+                 readconfig file; QEMU may fail to start",
+                bus
+            )
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn write_readconfig(content: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "ezkvm-preflight-test-{}.cfg",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut f = std::fs::File::create(&path).expect("create tempfile");
+        write!(f, "{}", content).expect("write tempfile");
+        path
+    }
+
+    fn config_with_hostpci_bus(bus: &str, readconfig_path: &str) -> VmConfig {
+        let yaml = format!(
+            r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+  readconfig:
+    - "{readconfig_path}"
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      pcie: true
+      bus: "{bus}"
+"#
+        );
+        VmConfig::from_str(&yaml).expect("parse config")
+    }
+
+    #[test]
+    fn no_warnings_when_bus_is_defined_in_readconfig() {
+        let path = write_readconfig(
+            r#"
+[device "ich9-pcie-port-1"]
+driver = "pcie-root-port"
+bus = "pcie.0"
+"#,
+        );
+        let config = config_with_hostpci_bus("ich9-pcie-port-1", &path.to_string_lossy());
+        assert!(check_hostpci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn warning_when_bus_is_not_in_readconfig() {
+        let path = write_readconfig(
+            r#"
+[device "ich9-pcie-port-1"]
+driver = "pcie-root-port"
+bus = "pcie.0"
+"#,
+        );
+        let config = config_with_hostpci_bus("ich9-pcie-port-5", &path.to_string_lossy());
+        let warnings = check_hostpci_bus_references(&config);
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("ich9-pcie-port-5"),
+            "warning should name the missing bus: {:?}",
+            warnings
+        );
+    }
+
+    #[test]
+    fn no_warnings_when_bus_is_not_an_ich9_port() {
+        let path = write_readconfig("[device \"some-device\"]\n");
+        let config = config_with_hostpci_bus("pcie.0", &path.to_string_lossy());
+        assert!(check_hostpci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn no_warnings_when_readconfig_file_is_missing() {
+        let config = config_with_hostpci_bus("ich9-pcie-port-5", "/nonexistent/path.cfg");
+        // File cannot be read → check is skipped, no false positive.
+        assert!(check_hostpci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn no_warnings_when_no_hostpci_bus_is_set() {
+        let yaml = r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      pcie: true
+"#;
+        let config = VmConfig::from_str(yaml).expect("parse config");
+        assert!(check_hostpci_bus_references(&config).is_empty());
+    }
+}

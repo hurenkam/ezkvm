@@ -25,6 +25,13 @@ pub(super) fn infer_profile_names(
     // For portable-linux target, parity-runtime is omitted; host-specific paths
     // will be resolved at runtime via B-41 capability resolution.
 
+    // For portable Q35 imports, override the network bus placement from pci.0 to
+    // pcie.0. This makes the bus assignment explicit in emitted YAMLs and removes
+    // the need for silent runtime normalization.
+    if runtime_target == RuntimeTarget::PortableLinux && is_q35_machine(&config.system.machine) {
+        profiles.push("proxmox-portable-q35".to_string());
+    }
+
     if config.system.architecture == "x86_64"
         && config.system.boot.firmware.as_deref() == Some("uefi")
         && is_q35_machine(&config.system.machine)

@@ -22,6 +22,8 @@ mod profile_compat;
 mod proxmox_import;
 #[path = "integration/proxmox_import_output_modes.rs"]
 mod proxmox_import_output_modes;
+#[path = "integration/proxmox_import_portable_q35.rs"]
+mod proxmox_import_portable_q35;
 #[path = "integration/proxmox_import_profiles.rs"]
 mod proxmox_import_profiles;
 #[path = "integration/proxmox_import_wakiza.rs"]

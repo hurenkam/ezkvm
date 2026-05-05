@@ -1,0 +1,25 @@
+# Profile: proxmox-portable-q35
+#
+# Overrides the network device bus placement from pci.0 (Proxmox default in
+# proxmox-base) to pcie.0, which is the correct PCIe root complex bus name for
+# portable Q35 machines that do not load the Proxmox pve-q35 readconfig.
+#
+# Applied after proxmox-base for all portable-linux Q35 imports so that network
+# devices are placed on pcie.0 directly rather than relying on silent runtime
+# normalization in normalize_legacy_root_bus.
+#
+# Do NOT assign to parity-mode imports; those use pci.0 via the Proxmox bridge
+# topology defined in pve-q35-4.0.cfg.
+
+policies:
+  networks:
+    - match:
+        backend_type: tap
+      defaults:
+        bus: pcie.0
+      placement:
+        addr:
+          scope: bus
+          bus: pcie.0
+          start: "0x12"
+          step: 1

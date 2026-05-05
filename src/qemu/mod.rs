@@ -9,6 +9,7 @@ mod command_builder;
 pub mod executor;
 pub mod firmware_locator;
 mod manager;
+mod preflight;
 pub mod process;
 pub mod types;
 

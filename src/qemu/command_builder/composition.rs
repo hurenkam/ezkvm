@@ -119,12 +119,13 @@ impl QemuManager {
 
     fn add_hostpci_args(&self, args: &mut QemuArgs) {
         for hostpci in self.config.host_pci() {
+            let bus = self.normalize_legacy_root_bus(hostpci.bus.as_deref());
             args.add_vfio_pci(
                 &hostpci.device,
                 &hostpci.id,
                 hostpci.pcie,
                 hostpci.x_vga,
-                hostpci.bus.as_deref(),
+                bus.as_deref(),
                 hostpci.addr.as_deref(),
                 hostpci.multifunction,
                 hostpci.romfile.as_deref(),

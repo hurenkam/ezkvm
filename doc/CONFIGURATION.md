@@ -990,6 +990,9 @@ This section summarizes how Proxmox VM config fields map into ezkvm YAML during 
 - Some Proxmox CPU options are not represented in typed schema and may need manual `extras` entries.
 - VGA models without direct typed mapping can be preserved as raw `extras`.
 - After import, validate: boot order, display path, passthrough device identity, and network backend type.
+- Q35 host PCI passthrough without explicit `bus` now uses runtime-target-aware placement during import: portable-linux auto-allocates `ich9-pcie-port-N` slots from `/usr/share/ezkvm/ezkvm-q35.cfg` and falls back to `pcie.0` with a warning when the template root-port budget is exhausted.
+- Imported host PCI bus names respect runtime target semantics: portable-linux normalizes legacy `pci.N` root-bus names to `pcie.0` during QEMU command emission, while proxmox-parity preserves `pci.N` naming to match Proxmox readconfig topology.
+- Audio controller, guest-agent, and balloon default bus placement also follows runtime-target policy when no explicit bus is configured.
 
 ## Chapter 15: Code-Backed Shape Examples
 

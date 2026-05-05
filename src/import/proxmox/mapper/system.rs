@@ -1,7 +1,7 @@
 // Temporary over-size rationale (B-29): system-path mapping still combines several
 // ownership areas (cpu/memory/boot/firmware). Closure target is <=250 lines by
 // splitting memory and boot helpers while keeping behavior stable.
-use super::super::model::{ProxmoxStorageConfig, ProxmoxVmConfig};
+use super::super::model::ProxmoxStorageConfig;
 use super::helpers::{
     is_enabled, parse_human_size_to_bytes, parse_options, parse_source_and_options,
 };
@@ -32,44 +32,6 @@ pub(super) fn map_architecture(
             "x86_64".to_string()
         }
     }
-}
-
-pub(super) fn apply_proxmox_q35_compat_if_needed(
-    proxmox: &ProxmoxVmConfig,
-    machine: &str,
-    _readconfig: &mut Vec<String>,
-) -> bool {
-    // Returns true if q35 topology is detected; does not modify machine string here.
-    // The caller must handle machine rewriting based on runtime_target.
-
-    if !super::helpers::is_q35_machine(machine) {
-        return false;
-    }
-
-    let has_pve_machine_hint = proxmox
-        .scalars
-        .get("machine")
-        .is_some_and(|value| value.contains("+pve"));
-
-    let has_topology_bus_hints = !proxmox.host_pci.is_empty()
-        || proxmox.host_pci.iter().any(|entry| {
-            entry.options.get("bus").is_some_and(|bus| {
-                bus.starts_with("pci.")
-                    || bus.starts_with("pcie.")
-                    || bus.starts_with("ich9-pcie-port")
-            })
-        })
-        || proxmox.scalars.get("args").is_some_and(|args| {
-            args.contains("bus=pci.")
-                || args.contains("bus=pcie.")
-                || args.contains("ich9-pcie-port")
-        });
-
-    if !has_pve_machine_hint && !has_topology_bus_hints {
-        return false;
-    }
-
-    true
 }
 
 pub(super) fn map_vcpus(scalars: &BTreeMap<String, String>) -> u32 {
@@ -312,6 +274,7 @@ pub(super) fn map_guest_agent(
     scalars: &BTreeMap<String, String>,
     vmid: Option<u32>,
     runtime_target: crate::import::proxmox::RuntimeTarget,
+    legacy_root_bus: &str,
 ) -> Option<GuestAgentConfig> {
     let raw = scalars.get("agent")?.trim();
     if raw.is_empty() {
@@ -349,13 +312,7 @@ pub(super) fn map_guest_agent(
         enabled: true,
         socket_path,
         freeze_cpu: false,
-        bus: Some(
-            match runtime_target {
-                crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
-                crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.0",
-            }
-            .to_string(),
-        ),
+        bus: Some(legacy_root_bus.to_string()),
         addr: Some("0x8".to_string()),
     })
 }
@@ -386,10 +343,7 @@ pub(super) fn parse_smbios_uuid(scalars: &BTreeMap<String, String>) -> Option<St
     })
 }
 
-pub(super) fn map_ballooning(
-    is_windows: bool,
-    runtime_target: crate::import::proxmox::RuntimeTarget,
-) -> Option<BallooningConfig> {
+pub(super) fn map_ballooning(is_windows: bool, legacy_root_bus: &str) -> Option<BallooningConfig> {
     Some(BallooningConfig {
         enabled: true,
         free_page_reporting: is_windows,
@@ -400,13 +354,7 @@ pub(super) fn map_ballooning(
             None
         },
         bus: if is_windows {
-            Some(
-                match runtime_target {
-                    crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
-                    crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.0",
-                }
-                .to_string(),
-            )
+            Some(legacy_root_bus.to_string())
         } else {
             None
         },

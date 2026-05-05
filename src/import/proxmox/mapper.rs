@@ -20,6 +20,7 @@ mod network;
 mod profiles;
 mod storage;
 mod system;
+mod topology;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MappingWarning {
@@ -56,41 +57,11 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let (mut machine, machine_options) =
         helpers::parse_machine_and_options(proxmox.scalars.get("machine"));
     let mut readconfig = Vec::new();
-    let mut dummy_readconfig = Vec::new();
-    // Check if q35 topology is detected
-    let needs_q35_config = system::apply_proxmox_q35_compat_if_needed(
-        proxmox,
-        machine.as_str(),
-        &mut dummy_readconfig,
-    );
-    if needs_q35_config {
-        if runtime_target == crate::import::proxmox::RuntimeTarget::ProxmoxParity {
-            // Proxmox parity: use Proxmox config and rewrite machine string
-            if !readconfig
-                .iter()
-                .any(|path| path == "/usr/share/qemu-server/pve-q35-4.0.cfg")
-            {
-                readconfig.push("/usr/share/qemu-server/pve-q35-4.0.cfg".to_string());
-            }
-            // Rewrite machine string for ProxmoxParity only
-            if !machine.contains("+pve") {
-                if machine == "q35" {
-                    machine = "pc-q35-8.1+pve0".to_string();
-                } else {
-                    machine = format!("{}+pve0", machine);
-                }
-            }
-        } else {
-            // Portable: use ezkvm config, do NOT rewrite machine string
-            if !readconfig
-                .iter()
-                .any(|path| path == "/usr/share/ezkvm/ezkvm-q35.cfg")
-            {
-                readconfig.push("/usr/share/ezkvm/ezkvm-q35.cfg".to_string());
-            }
-            // Do not rewrite machine string in portable mode
-        }
-    }
+    let mut topology_planner =
+        topology::Q35TopologyPlanner::new(proxmox, machine.as_str(), runtime_target);
+    machine = topology_planner.apply_machine_and_readconfig(&machine, &mut readconfig);
+    let legacy_root_bus = topology_planner.legacy_root_bus();
+    let audio_bus = topology_planner.audio_controller_bus();
     let iommu = system::map_iommu(&machine_options, proxmox.scalars.get("args"));
 
     let memory = proxmox
@@ -168,7 +139,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         runtime_target,
     );
     let (audio, mut spice) =
-        devices::map_audio_and_spice(&proxmox.scalars, runtime_target, &mut warnings);
+        devices::map_audio_and_spice(&proxmox.scalars, audio_bus, &mut warnings);
     let mut vnc = None;
     let mut input_devices = Vec::new();
     let mut ivshmem = None;
@@ -198,11 +169,15 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .map(|entry| devices::normalize_host_pci_device(&entry.host))
         .collect::<BTreeSet<_>>();
 
-    let host_pci = proxmox
-        .host_pci
-        .iter()
-        .flat_map(|entry| devices::map_host_pci_entries(entry, &explicit_host_functions))
-        .collect::<Vec<_>>();
+    let mut host_pci = Vec::new();
+    for entry in &proxmox.host_pci {
+        let default_bus = topology_planner.allocate_hostpci_default_bus(entry, &mut warnings);
+        host_pci.extend(devices::map_host_pci_entries(
+            entry,
+            &explicit_host_functions,
+            default_bus,
+        ));
+    }
     let use_explicit_xhci = !proxmox.usb.is_empty();
     let host_usb = proxmox
         .usb
@@ -210,7 +185,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         .map(|entry| devices::map_usb(entry, use_explicit_xhci))
         .collect::<Vec<_>>();
 
-    let ballooning = system::map_ballooning(is_windows, runtime_target);
+    let ballooning = system::map_ballooning(is_windows, legacy_root_bus);
 
     let tpm = system::map_tpm(
         &proxmox.scalars,
@@ -218,7 +193,12 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         inferred_vmid,
         runtime_target,
     );
-    let guest_agent = system::map_guest_agent(&proxmox.scalars, inferred_vmid, runtime_target);
+    let guest_agent = system::map_guest_agent(
+        &proxmox.scalars,
+        inferred_vmid,
+        runtime_target,
+        legacy_root_bus,
+    );
 
     let vm_generation_id = proxmox.scalars.get("vmgenid").cloned();
     let smbios = if smbios_uuid.is_some() || vm_generation_id.is_some() || smbios_type != 1 {
@@ -1156,6 +1136,7 @@ mod tests {
             cfg.profiles,
             vec![
                 "proxmox-base".to_string(),
+                "proxmox-portable-q35".to_string(),
                 "proxmox-q35-uefi".to_string(),
                 "storage-virtio-scsi-pci".to_string(),
                 "proxmox-windows".to_string(),
@@ -1692,6 +1673,56 @@ mod tests {
         );
 
         assert_eq!(cfg.host.pci.len(), 3);
+    }
+
+    #[test]
+    fn portable_q35_auto_assigns_root_ports_for_pcie_hostpci_without_bus() {
+        let (_, cfg) = map_and_validate(
+            r#"
+            name: vm-auto-hostpci-bus
+            machine: q35
+            hostpci0: 0000:03:00.0,pcie=1
+            hostpci1: 0000:04:00.0,pcie=1
+            "#,
+        );
+
+        assert_eq!(cfg.host.pci.len(), 2);
+        assert_eq!(cfg.host.pci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(cfg.host.pci[1].bus.as_deref(), Some("ich9-pcie-port-2"));
+    }
+
+    #[test]
+    fn portable_q35_warns_and_falls_back_when_root_ports_are_exhausted() {
+        let parsed = parse_proxmox_config(
+            r#"
+            name: vm-hostpci-root-port-budget
+            machine: q35
+            hostpci0: 0000:03:00.0,pcie=1
+            hostpci1: 0000:04:00.0,pcie=1
+            hostpci2: 0000:05:00.0,pcie=1
+            hostpci3: 0000:06:00.0,pcie=1
+            hostpci4: 0000:07:00.0,pcie=1
+            "#,
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapper should succeed");
+
+        let mut cfg: VmConfig =
+            serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+        cfg.assign_default_device_ids();
+
+        assert_eq!(cfg.host.pci.len(), 5);
+        assert_eq!(cfg.host.pci[3].bus.as_deref(), Some("ich9-pcie-port-4"));
+        assert_eq!(cfg.host.pci[4].bus.as_deref(), Some("pcie.0"));
+        assert!(
+            mapped
+                .warnings
+                .iter()
+                .any(|warning| warning.source_field == "hostpci4"
+                    && warning.message.contains("falling back to bus=pcie.0"))
+        );
     }
 
     #[test]

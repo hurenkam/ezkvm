@@ -14,6 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(super) fn map_host_pci_entries(
     entry: &ProxmoxHostPciEntry,
     explicit_host_functions: &BTreeSet<String>,
+    default_bus: Option<String>,
 ) -> Vec<super::HostPciConfig> {
     let has_explicit_function = entry
         .host
@@ -27,12 +28,17 @@ pub(super) fn map_host_pci_entries(
     let wants_multifunction = super::helpers::is_enabled(entry.options.get("multifunction"));
     let should_expand_pair = !has_explicit_function && (requested_x_vga || wants_multifunction);
 
-    let default_bus = if should_expand_pair {
+    let pair_fallback_bus = if should_expand_pair {
         Some("ich9-pcie-port-1".to_string())
     } else {
         None
     };
-    let base_bus = entry.options.get("bus").cloned().or(default_bus);
+    let base_bus = entry
+        .options
+        .get("bus")
+        .cloned()
+        .or(default_bus)
+        .or(pair_fallback_bus);
     let base_addr = entry.options.get("addr").cloned().or_else(|| {
         if should_expand_pair {
             Some("0x0.0".to_string())
@@ -349,7 +355,7 @@ fn parse_socket_serial(
 
 pub(super) fn map_audio_and_spice(
     scalars: &BTreeMap<String, String>,
-    runtime_target: crate::import::proxmox::RuntimeTarget,
+    legacy_root_bus: &str,
     warnings: &mut Vec<MappingWarning>,
 ) -> (Vec<AudioDeviceConfig>, Option<SpiceConfig>) {
     let Some(raw) = scalars.get("audio0") else {
@@ -394,13 +400,7 @@ pub(super) fn map_audio_and_spice(
         AudioDeviceConfig {
             r#type: "ich9-intel-hda".to_string(),
             id: controller_id.clone(),
-            bus: Some(
-                match runtime_target {
-                    crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
-                    crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.2",
-                }
-                .to_string(),
-            ),
+            bus: Some(legacy_root_bus.to_string()),
             addr: Some("0xc".to_string()),
             cad: None,
             audiodev: None,
