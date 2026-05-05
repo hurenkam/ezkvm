@@ -262,6 +262,30 @@ ezkvm import-proxmox ... --runtime-target proxmox-parity --dry-run
 4. Keep parity mode only for workloads that still require strict Proxmox path/script behavior.
 5. Once validated, standardize operations on portable imports.
 
+## Portable Q35 Topology Defaults
+
+When importing Q35 VMs with `portable-linux`, ezkvm loads
+`/usr/share/ezkvm/ezkvm-q35.cfg` and exposes both PCIe and legacy placement
+buses so imported layouts can stay closer to Proxmox semantics.
+
+Portable Q35 bus layout used by import defaults:
+
+- `pcie.0`: PCIe root complex
+- `ich9-pcie-port-1..8`: dedicated PCIe root ports at `0x1c.0`–`0x1c.7`,
+  auto-assigned for PCIe passthrough devices when no explicit hostpci bus is set
+- `ehci.0`: USB 2.0 high-speed bus (ICH9 EHCI at `0x1d.7` + UHCI companions
+  at `0x1d.0`–`0x1d.2`); `usb-tablet` input devices are placed here automatically
+- `pci.0`..`pci.3`: four legacy PCI buses backed by `i82801b11-bridge` (ICH9
+  DMI-to-PCI at `0x1e`) feeding four `pci-bridge` subordinates, matching the
+  `pve-q35-4.0.cfg` layout
+
+Current portable Q35 placement defaults for imported Proxmox VMs:
+
+- Audio controller (`ich9-intel-hda`): `bus: pci.2`, `addr: 0xc`
+- XHCI controller (when USB passthrough exists): `bus: pci.1`, `addr: 0x1b`
+- `usb-tablet` input device: placed on `ehci.0,port=1` when a Q35 readconfig is loaded
+- Guest-agent and balloon defaults remain on `pcie.0` unless explicitly overridden
+
 ## Import Mapping Reference
 
 For field-level mapping reference:
@@ -274,7 +298,7 @@ For field-level mapping reference:
 | `bios` / `efidisk0` | `system.boot.*` | `efidisk0` implies UEFI when BIOS is absent. |
 | `tpmstate0` | `system.tpm` | Requires resolvable absolute source path. |
 | `netN` with `bridge` | `devices.networks[]` | Uses canonical network backend mapping. |
-| `hostpciN` | `host.pci[]` | Preserves passthrough placement and multifunction grouping. `x-vga` is not a reliable runtime parity indicator for imports that use shorthand hostpci entries (for example `0000:03:00` without explicit `.0`). |
+| `hostpciN` | `host.pci[]` | Preserves passthrough placement and multifunction grouping. On portable Q35, missing hostpci bus values auto-allocate across `ich9-pcie-port-1..8` from `ezkvm-q35.cfg`, then fall back to `pcie.0` with a warning. `x-vga` is not a reliable runtime parity indicator for imports that use shorthand hostpci entries (for example `0000:03:00` without explicit `.0`). |
 | `usbN` | `host.usb[]` | Supports `<bus>-<port>` and `<vendor>:<product>` selectors. |
 
 ## See Also

@@ -103,6 +103,14 @@ impl QemuArgs {
         self.push_str("-device");
         self.push(device_type.to_string());
     }
+
+    /// Add a USB tablet device on the given USB bus at the given port.
+    /// Use this when an ICH9/EHCI USB controller is present (e.g. via ezkvm-q35.cfg
+    /// or pve-q35-4.0.cfg), so the tablet is placed on `ehci.0` as Proxmox does.
+    pub fn add_usb_tablet(&mut self, bus: &str, port: u8) {
+        self.push_str("-device");
+        self.push(format!("usb-tablet,id=tablet,bus={},port={}", bus, port));
+    }
 }
 
 fn build_spice_server_spec(port: u16, addr: &str, disable_ticketing: bool) -> String {

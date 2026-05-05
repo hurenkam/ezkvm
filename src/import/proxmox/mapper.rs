@@ -62,6 +62,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     machine = topology_planner.apply_machine_and_readconfig(&machine, &mut readconfig);
     let legacy_root_bus = topology_planner.legacy_root_bus();
     let audio_bus = topology_planner.audio_controller_bus();
+    let xhci_bus = topology_planner.xhci_controller_bus();
+    let xhci_addr = topology_planner.xhci_controller_addr();
     let iommu = system::map_iommu(&machine_options, proxmox.scalars.get("args"));
 
     let memory = proxmox
@@ -264,8 +266,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
                     p2: None,
                     p3: None,
                     usb: Vec::new(),
-                    bus: None,
-                    addr: None,
+                    bus: xhci_bus.map(str::to_string),
+                    addr: xhci_addr.map(str::to_string),
                 }]
             } else {
                 Vec::new()
@@ -911,7 +913,7 @@ mod tests {
         assert_eq!(cfg.devices.audio.len(), 3);
         assert_eq!(cfg.devices.audio[0].r#type, "ich9-intel-hda");
         assert_eq!(cfg.devices.audio[0].id, "audiodev0");
-        assert_eq!(cfg.devices.audio[0].bus.as_deref(), Some("pcie.0"));
+        assert_eq!(cfg.devices.audio[0].bus.as_deref(), Some("pci.2"));
         assert_eq!(cfg.devices.audio[1].r#type, "hda-micro");
         assert_eq!(cfg.devices.audio[2].r#type, "hda-duplex");
 
@@ -937,7 +939,7 @@ mod tests {
             .expect("portable mapping should succeed");
         let portable_cfg: VmConfig =
             serde_yaml::from_str(&portable.yaml).expect("yaml should deserialize");
-        assert_eq!(portable_cfg.devices.audio[0].bus.as_deref(), Some("pcie.0"));
+        assert_eq!(portable_cfg.devices.audio[0].bus.as_deref(), Some("pci.2"));
 
         let parity = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::ProxmoxParity)
             .expect("parity mapping should succeed");
@@ -1702,6 +1704,10 @@ mod tests {
             hostpci2: 0000:05:00.0,pcie=1
             hostpci3: 0000:06:00.0,pcie=1
             hostpci4: 0000:07:00.0,pcie=1
+            hostpci5: 0000:08:00.0,pcie=1
+            hostpci6: 0000:09:00.0,pcie=1
+            hostpci7: 0000:0a:00.0,pcie=1
+            hostpci8: 0000:0b:00.0,pcie=1
             "#,
         )
         .expect("parser should succeed");
@@ -1713,14 +1719,14 @@ mod tests {
             serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
         cfg.assign_default_device_ids();
 
-        assert_eq!(cfg.host.pci.len(), 5);
-        assert_eq!(cfg.host.pci[3].bus.as_deref(), Some("ich9-pcie-port-4"));
-        assert_eq!(cfg.host.pci[4].bus.as_deref(), Some("pcie.0"));
+        assert_eq!(cfg.host.pci.len(), 9);
+        assert_eq!(cfg.host.pci[7].bus.as_deref(), Some("ich9-pcie-port-8"));
+        assert_eq!(cfg.host.pci[8].bus.as_deref(), Some("pcie.0"));
         assert!(
             mapped
                 .warnings
                 .iter()
-                .any(|warning| warning.source_field == "hostpci4"
+                .any(|warning| warning.source_field == "hostpci8"
                     && warning.message.contains("falling back to bus=pcie.0"))
         );
     }
@@ -1741,8 +1747,9 @@ mod tests {
         assert_eq!(cfg.controllers.xhci.len(), 1);
         assert_eq!(cfg.controllers.xhci[0].p2, None);
         assert_eq!(cfg.controllers.xhci[0].p3, None);
-        assert_eq!(cfg.controllers.xhci[0].bus, None);
-        assert_eq!(cfg.controllers.xhci[0].addr, None);
+        // No topology hints → ezkvm-q35.cfg not loaded → pci.1 not available; bus left unset
+        assert_eq!(cfg.controllers.xhci[0].bus.as_deref(), None);
+        assert_eq!(cfg.controllers.xhci[0].addr.as_deref(), None);
     }
 
     #[test]

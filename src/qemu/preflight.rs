@@ -84,11 +84,10 @@ pub(super) fn check_hostpci_bus_references(config: &VmConfig) -> Vec<String> {
 }
 
 /// Check that no hostpci entry references a legacy `pci.N` bus name on a portable
-/// Q35 machine (i.e. a Q35 machine without a Proxmox pve-q35 readconfig).
+/// Q35 machine when no loaded readconfig defines legacy PCI bridge buses.
 ///
-/// `pci.N` buses are only valid when the Proxmox bridge topology is loaded via
-/// `pve-q35-4.0.cfg`. On portable machines those bridges do not exist and QEMU
-/// will fail to start.
+/// `pci.N` buses are valid when a Q35 topology template defines those bridge names
+/// (for example Proxmox `pve-q35-4.0.cfg` or ezkvm `ezkvm-q35.cfg`).
 ///
 /// Returns a sorted list of human-readable warning strings. An empty vec means
 /// all references are valid (or the check is not applicable).
@@ -98,13 +97,13 @@ pub(super) fn check_legacy_pci_bus_references(config: &VmConfig) -> Vec<String> 
         return vec![];
     }
 
-    // Only applies when the Proxmox pve-q35 bridges are NOT loaded.
-    let has_proxmox_readconfig = config
+    // Only applies when no known Q35 bridge template is loaded.
+    let has_legacy_pci_bridge_readconfig = config
         .system
         .readconfig
         .iter()
-        .any(|p| p.contains("pve-q35"));
-    if has_proxmox_readconfig {
+        .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+    if has_legacy_pci_bridge_readconfig {
         return vec![];
     }
 
@@ -116,7 +115,8 @@ pub(super) fn check_legacy_pci_bus_references(config: &VmConfig) -> Vec<String> 
         .map(|bus| {
             format!(
                 "hostpci device references legacy PCI bus '{}' on a portable Q35 machine; \
-                 this bus is only defined when the Proxmox pve-q35 readconfig is loaded and \
+                 this bus is only defined when a Q35 bridge readconfig is loaded \
+                 (for example pve-q35-4.0.cfg or ezkvm-q35.cfg) and \
                  QEMU may fail to start",
                 bus
             )
@@ -299,6 +299,33 @@ host:
 "#;
         let config = VmConfig::from_str(yaml).expect("parse config");
         // pci.0 is valid when Proxmox bridges are loaded
+        assert!(check_legacy_pci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn legacy_pci_bus_no_warning_when_ezkvm_readconfig_loaded() {
+        let yaml = r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+  readconfig:
+    - /usr/share/ezkvm/ezkvm-q35.cfg
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      pcie: true
+      bus: pci.1
+"#;
+        let config = VmConfig::from_str(yaml).expect("parse config");
+        // pci.1 is valid when ezkvm q35 legacy bridges are loaded
         assert!(check_legacy_pci_bus_references(&config).is_empty());
     }
 

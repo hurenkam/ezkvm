@@ -72,6 +72,19 @@ fn test_input_devices() {
 }
 
 #[test]
+fn test_usb_tablet_on_ehci_bus() {
+    let mut args = QemuArgs::new();
+    args.add_usb_tablet("ehci.0", 1);
+
+    let built = args.build();
+    assert!(
+        built
+            .iter()
+            .any(|arg| arg == "usb-tablet,id=tablet,bus=ehci.0,port=1")
+    );
+}
+
+#[test]
 fn test_spice_vdagent_reuses_existing_serial_controller() {
     let mut args = QemuArgs::new();
     args.add_guest_agent(

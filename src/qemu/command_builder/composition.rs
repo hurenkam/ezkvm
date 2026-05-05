@@ -143,8 +143,18 @@ impl QemuManager {
     }
 
     fn add_input_device_args(&self, args: &mut QemuArgs) {
+        let has_q35_usb = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
         for input_device in self.config.devices_input() {
-            args.add_input_device(&input_device.r#type);
+            if input_device.r#type == "usb-tablet" && has_q35_usb {
+                args.add_usb_tablet("ehci.0", 1);
+            } else {
+                args.add_input_device(&input_device.r#type);
+            }
         }
     }
 

@@ -105,15 +105,15 @@ impl QemuManager {
             return Some(Cow::Borrowed(bus));
         }
 
-        // If a Proxmox readconfig is present it defines pci.0/pci.1/etc. bridges,
-        // so the bus name is correct as-is and must not be rewritten.
-        let has_proxmox_readconfig = self
+        // If a Q35 topology readconfig is present that defines legacy pci.N bridges,
+        // the bus name is correct as-is and must not be rewritten.
+        let has_legacy_pci_bridge_readconfig = self
             .config
             .system
             .readconfig
             .iter()
-            .any(|p| p.contains("pve-q35"));
-        if has_proxmox_readconfig {
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+        if has_legacy_pci_bridge_readconfig {
             return Some(Cow::Borrowed(bus));
         }
 

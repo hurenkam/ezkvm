@@ -5,7 +5,7 @@ use super::{MappingWarning, helpers};
 const PROXMOX_Q35_CFG: &str = "/usr/share/qemu-server/pve-q35-4.0.cfg";
 const EZKVM_Q35_CFG: &str = "/usr/share/ezkvm/ezkvm-q35.cfg";
 // Must match the number of [device "ich9-pcie-port-*"] entries in share/ezkvm-q35.cfg.
-const MAX_PORTABLE_ROOT_PORTS: u8 = 4;
+const MAX_PORTABLE_ROOT_PORTS: u8 = 8;
 
 pub(super) struct Q35TopologyPlanner {
     runtime_target: RuntimeTarget,
@@ -64,13 +64,27 @@ impl Q35TopologyPlanner {
     }
 
     pub(super) fn audio_controller_bus(&self) -> &'static str {
-        if self.runtime_target == RuntimeTarget::PortableLinux {
-            "pcie.0"
-        } else if self.runtime_target == RuntimeTarget::ProxmoxParity {
+        if self.runtime_target == RuntimeTarget::PortableLinux
+            || self.runtime_target == RuntimeTarget::ProxmoxParity
+        {
             "pci.2"
         } else {
             "pci.0"
         }
+    }
+
+    pub(super) fn xhci_controller_bus(&self) -> Option<&'static str> {
+        if !self.needs_q35_compat {
+            return None;
+        }
+        Some("pci.1")
+    }
+
+    pub(super) fn xhci_controller_addr(&self) -> Option<&'static str> {
+        if !self.needs_q35_compat {
+            return None;
+        }
+        Some("0x1b")
     }
 
     pub(super) fn allocate_hostpci_default_bus(
