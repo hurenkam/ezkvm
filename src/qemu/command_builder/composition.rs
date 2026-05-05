@@ -42,6 +42,15 @@ impl QemuManager {
             println!("Warning: {}", warning);
         }
 
+        // Normalize any pci.N bus references on network devices so that portable Q35
+        // configs that somehow carry pci.0 (e.g. hand-edited YAMLs) are corrected at
+        // emit time, consistent with the normalization applied to guest-agent/balloon.
+        for network in &mut devices.networks {
+            if let Some(normalized) = self.normalize_legacy_root_bus(network.bus.as_deref()) {
+                network.bus = Some(normalized.into_owned());
+            }
+        }
+
         args.extend(QemuArgs::from(devices));
         args.extend(self.build_boot_args());
         self.add_tpm_args(args)?;
@@ -143,11 +152,12 @@ impl QemuManager {
         if let Some(ivshmem) = self.config.system_memory_ivshmem()
             && ivshmem.enabled
         {
+            let bus = self.normalize_legacy_root_bus(ivshmem.bus.as_deref());
             args.add_ivshmem(
                 ivshmem.size,
                 ivshmem.vectors,
                 &ivshmem.id,
-                ivshmem.bus.as_deref(),
+                bus.as_deref(),
                 &ivshmem.mem_path,
             );
         }

@@ -83,6 +83,49 @@ pub(super) fn check_hostpci_bus_references(config: &VmConfig) -> Vec<String> {
         .collect()
 }
 
+/// Check that no hostpci entry references a legacy `pci.N` bus name on a portable
+/// Q35 machine (i.e. a Q35 machine without a Proxmox pve-q35 readconfig).
+///
+/// `pci.N` buses are only valid when the Proxmox bridge topology is loaded via
+/// `pve-q35-4.0.cfg`. On portable machines those bridges do not exist and QEMU
+/// will fail to start.
+///
+/// Returns a sorted list of human-readable warning strings. An empty vec means
+/// all references are valid (or the check is not applicable).
+pub(super) fn check_legacy_pci_bus_references(config: &VmConfig) -> Vec<String> {
+    let machine_lower = config.system.machine.to_lowercase();
+    if !machine_lower.contains("q35") {
+        return vec![];
+    }
+
+    // Only applies when the Proxmox pve-q35 bridges are NOT loaded.
+    let has_proxmox_readconfig = config
+        .system
+        .readconfig
+        .iter()
+        .any(|p| p.contains("pve-q35"));
+    if has_proxmox_readconfig {
+        return vec![];
+    }
+
+    let mut warnings: Vec<String> = config
+        .host_pci()
+        .iter()
+        .filter_map(|h| h.bus.as_deref())
+        .filter(|bus| bus.starts_with("pci."))
+        .map(|bus| {
+            format!(
+                "hostpci device references legacy PCI bus '{}' on a portable Q35 machine; \
+                 this bus is only defined when the Proxmox pve-q35 readconfig is loaded and \
+                 QEMU may fail to start",
+                bus
+            )
+        })
+        .collect();
+    warnings.sort_unstable();
+    warnings
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,5 +237,104 @@ host:
 "#;
         let config = VmConfig::from_str(yaml).expect("parse config");
         assert!(check_hostpci_bus_references(&config).is_empty());
+    }
+
+    fn portable_q35_config_with_hostpci_bus(bus: &str) -> VmConfig {
+        let yaml = format!(
+            r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      pcie: true
+      bus: "{bus}"
+"#
+        );
+        VmConfig::from_str(&yaml).expect("parse config")
+    }
+
+    #[test]
+    fn legacy_pci_bus_warns_on_portable_q35() {
+        let config = portable_q35_config_with_hostpci_bus("pci.0");
+        let warnings = check_legacy_pci_bus_references(&config);
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("pci.0"),
+            "warning should name the legacy bus: {:?}",
+            warnings
+        );
+    }
+
+    #[test]
+    fn legacy_pci_bus_no_warning_when_proxmox_readconfig_loaded() {
+        let yaml = r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+  readconfig:
+    - /usr/share/qemu-server/pve-q35-4.0.cfg
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      pcie: true
+      bus: pci.0
+"#;
+        let config = VmConfig::from_str(yaml).expect("parse config");
+        // pci.0 is valid when Proxmox bridges are loaded
+        assert!(check_legacy_pci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn legacy_pci_bus_no_warning_for_pcie_bus() {
+        let config = portable_q35_config_with_hostpci_bus("pcie.0");
+        assert!(check_legacy_pci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn legacy_pci_bus_no_warning_for_ich9_port() {
+        let config = portable_q35_config_with_hostpci_bus("ich9-pcie-port-1");
+        assert!(check_legacy_pci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn legacy_pci_bus_no_warning_for_non_q35_machine() {
+        let yaml = r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: pc
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      bus: pci.0
+"#;
+        let config = VmConfig::from_str(yaml).expect("parse config");
+        // pci.0 is the correct bus for non-Q35 machines
+        assert!(check_legacy_pci_bus_references(&config).is_empty());
     }
 }

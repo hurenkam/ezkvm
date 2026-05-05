@@ -7,6 +7,9 @@ impl QemuManager {
         for warning in crate::qemu::preflight::check_hostpci_bus_references(&self.config) {
             eprintln!("Warning: {warning}");
         }
+        for warning in crate::qemu::preflight::check_legacy_pci_bus_references(&self.config) {
+            eprintln!("Warning: {warning}");
+        }
 
         let mut args = QemuArgs::new();
 

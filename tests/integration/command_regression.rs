@@ -168,7 +168,7 @@ controllers:
     assert!(args.iter().any(|arg| {
         arg.contains("virtio-net-pci,netdev=net0")
             && arg.contains("mac=52:54:00:12:34:56")
-            && arg.contains("bus=pci.0")
+            && arg.contains("bus=pcie.0")
             && arg.contains("addr=0x12")
             && arg.contains("rx_queue_size=1024")
             && arg.contains("tx_queue_size=256")
