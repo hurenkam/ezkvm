@@ -34,4 +34,8 @@ none
 -nographic
 -global
 kvm-pit.lost_tick_policy=discard
+-global
+ICH9-LPC.disable_s3=1
+-global
+ICH9-LPC.disable_s4=1
 -enable-kvm

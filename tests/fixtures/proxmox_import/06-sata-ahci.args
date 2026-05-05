@@ -35,4 +35,8 @@ unix:<RUNTIME_DIR>/ezkvm/e2e-sata-ahci.qmp,server=on,wait=off
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard
+-global
+ICH9-LPC.disable_s3=1
+-global
+ICH9-LPC.disable_s4=1
 -enable-kvm
