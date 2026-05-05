@@ -34,6 +34,8 @@ virtserialport,chardev=qga0,name=org.qemu.guest_agent.0
 virtio-balloon-pci
 -device
 intel-iommu,id=iommu0,intremap=on
+-qmp
+unix:<RUNTIME_DIR>/ezkvm/fixture-nested.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/fixture-nested.pid
 -nodefaults

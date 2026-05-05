@@ -38,6 +38,8 @@ virtserialport,chardev=qga0,name=org.qemu.guest_agent.0
 virtio-balloon-pci
 -vnc
 unix:/var/run/qemu-server/405.vnc,password=on
+-qmp
+unix:<RUNTIME_DIR>/ezkvm/fixture-headless-vnc.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/fixture-headless-vnc.pid
 -nodefaults

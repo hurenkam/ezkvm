@@ -14,7 +14,8 @@ pub(crate) async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
         println!("✓ VM '{}' force stopped", config.name);
     } else {
         println!("Gracefully stopping...");
-        crate::qemu::process::stop_vm(&config.name)?;
+        let qmp_socket = resolve_qmp_socket_path(&config);
+        crate::qemu::process::stop_vm(&config.name, qmp_socket.as_deref())?;
         println!("✓ VM '{}' stopped", config.name);
     }
 
@@ -59,4 +60,27 @@ pub(crate) async fn handle_list() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_qmp_socket_path(config: &crate::config::VmConfig) -> Option<String> {
+    if let Some(qmp) = config.options_qmp()
+        && qmp.enabled
+    {
+        return match qmp.socket_type {
+            crate::config::QmpSocketType::Unix => Some(
+                qmp.socket_path
+                    .clone()
+                    .unwrap_or_else(|| "/var/run/qemu-monitor.sock".to_string()),
+            ),
+            crate::config::QmpSocketType::Tcp => None,
+        };
+    }
+
+    let central = crate::config::CentralConfig::load().unwrap_or_default();
+    let overrides = crate::config::RuntimeCliOverrides::default();
+    let runtime_root = crate::state::resolve_runtime_root_with_source(None, &central, &overrides)
+        .value
+        .unwrap_or_else(|| "/tmp/ezkvm".to_string());
+
+    Some(format!("{}/{}.qmp", runtime_root, config.name))
 }

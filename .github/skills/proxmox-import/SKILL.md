@@ -26,6 +26,26 @@ argument-hint: "Describe the import task: topology alignment, fixture update, ru
 
 4. **Dry-run validation is essential**: Always compare generated QEMU arguments against a captured Proxmox reference to detect regressions before testing in VMs.
 
+5. **Q35 hierarchy is policy, not preference**: Keep PCIe devices in PCIe paths and legacy PCI devices in bridge-backed legacy PCI paths unless an explicit exception is documented.
+
+## Q35 Topology Decision Tree
+
+Use this decision flow before changing bus placement:
+
+1. Is the target device PCIe-capable and expected to use PCIe features?
+   - Yes: place behind `pcie-root-port` (or a downstream PCIe switch port if already required).
+   - No: continue to step 2.
+2. Is the target device legacy PCI only?
+   - Yes: place behind `pcie-pci-bridge` and optionally `pci-bridge` when scaling device count.
+   - No: continue to step 3.
+3. Is hotplug required?
+   - PCIe hotplug: use dedicated root ports/downstream ports and keep ports available.
+   - Legacy PCI hotplug: ensure bridge path supports ACPI/SHPC behavior.
+4. Is imported guest identity stability required?
+   - Yes: preserve existing `bus/addr` mapping unless migration guidance explicitly allows change.
+5. Are IO and bus-number budgets still safe?
+   - If unclear, stop and evaluate budget impact before merging topology changes.
+
 ## Workflow
 
 ### Phase 1: Environment Setup
@@ -107,6 +127,11 @@ See [runtime-parity-checklist.md](./references/runtime-parity-checklist.md) for 
    - Re-generate ezkvm dry-run output with updated code
    - Use [compare-proxmox-qemu.sh](./scripts/compare-proxmox-qemu.sh) script
    - Expected output: minimal diffs, no topology regressions
+
+4. **Run topology parity checks**
+   - Confirm PCIe/legacy PCI separation is still respected.
+   - Confirm bridge count and bus-number growth are intentional and justified.
+   - Confirm imported sensitive devices keep stable guest-visible slot identity.
 
 ### Phase 5: Guest Functionality Testing
 

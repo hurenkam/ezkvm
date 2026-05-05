@@ -18,6 +18,8 @@ qemu-xhci,id=xhci
 usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1
 -device
 usb-host,host=0451:16a0,id=usb1,bus=xhci.0,port=2
+-qmp
+unix:<RUNTIME_DIR>/ezkvm/e2e-usb.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-usb.pid
 -nodefaults

@@ -254,7 +254,10 @@ mod tests {
 
         let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
             .expect("building tpmstate arg should succeed");
-        assert_eq!(arg, "backend-uri=file:///definitely/missing/tpmstate,mode=0600");
+        assert_eq!(
+            arg,
+            "backend-uri=file:///definitely/missing/tpmstate,mode=0600"
+        );
     }
 
     #[test]
@@ -264,7 +267,9 @@ mod tests {
             backend: "emulator".to_string(),
             state_path: None,
             state_dir: None,
-            state_backend_uri: Some("backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600".to_string()),
+            state_backend_uri: Some(
+                "backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600".to_string(),
+            ),
             model: "tpm-tis".to_string(),
         };
 

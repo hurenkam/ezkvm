@@ -50,6 +50,7 @@ For review-style requests, present:
 - `cross-distro-deb-packaging`: use when creating or updating ezkvm Debian packaging intended to run on both Debian Trixie and Ubuntu 26.04 from one binary package per architecture.
 - `debian-trixie`: use for Debian Trixie packaging and architecture-specific distribution guidance.
 - `ubuntu-resolute`: use for Ubuntu 26.04 host/runtime/path guidance and packaging validation.
+- `q35-topology-review`: use when reviewing or planning Q35 PCIe and legacy PCI hierarchy, bridge topology, hotplug paths, or imported slot stability.
 
 ### Packaging Guard
 

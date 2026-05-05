@@ -293,7 +293,9 @@ fn dry_run_network_bridge_falls_back_to_user_when_helper_missing() {
             assert!(stderr.contains("does not allow it") || stderr.contains("does not exist"));
         }
         Err(_) => {
-            assert!(stderr.contains("bridge-helper ACL file '/etc/qemu/bridge.conf' could not be read"));
+            assert!(
+                stderr.contains("bridge-helper ACL file '/etc/qemu/bridge.conf' could not be read")
+            );
         }
     }
 
@@ -353,19 +355,19 @@ devices: {}
 
 #[test]
 fn dry_run_q35_rewrites_legacy_guest_agent_pci_bus_for_portable_runtime() {
-        let _guard = env_lock()
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        let temp_dir = unique_temp_dir("guest-agent-bus-rewrite");
-        std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+    let temp_dir = unique_temp_dir("guest-agent-bus-rewrite");
+    std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
 
-        write_fake_qemu(&temp_dir);
+    write_fake_qemu(&temp_dir);
 
-        let vm_path = temp_dir.join("vm.yaml");
-        write_file(
-                &vm_path,
-                r#"
+    let vm_path = temp_dir.join("vm.yaml");
+    write_file(
+        &vm_path,
+        r#"
 name: preflight-guest-agent-bus-rewrite
 backend: qemu
 system:
@@ -384,22 +386,22 @@ options:
         bus: pci.0
         addr: "0x8"
 "#,
-        );
+    );
 
-        let output = run_start_dry_run(&vm_path, &temp_dir);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+    let output = run_start_dry_run(&vm_path, &temp_dir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
-        assert!(
-                output.status.success(),
-                "stdout:\n{}\n\nstderr:\n{}",
-                stdout,
-                stderr
-        );
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        stdout,
+        stderr
+    );
 
-        assert!(stdout.contains("virtio-serial,id=qga0,bus=pcie.0,addr=0x8"));
+    assert!(stdout.contains("virtio-serial,id=qga0,bus=pcie.0,addr=0x8"));
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
@@ -449,26 +451,29 @@ devices: {}
         stderr
     );
 
-    assert!(stdout.contains("virtio-balloon-pci,id=balloon0,bus=pcie.0,addr=0x3,free-page-reporting=on"));
+    assert!(
+        stdout
+            .contains("virtio-balloon-pci,id=balloon0,bus=pcie.0,addr=0x3,free-page-reporting=on")
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
 fn dry_run_q35_rewrites_legacy_audio_pci_bus_for_portable_runtime() {
-        let _guard = env_lock()
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        let temp_dir = unique_temp_dir("audio-bus-rewrite");
-        std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+    let temp_dir = unique_temp_dir("audio-bus-rewrite");
+    std::fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
 
-        write_fake_qemu(&temp_dir);
+    write_fake_qemu(&temp_dir);
 
-        let vm_path = temp_dir.join("vm.yaml");
-        write_file(
-                &vm_path,
-                r#"
+    let vm_path = temp_dir.join("vm.yaml");
+    write_file(
+        &vm_path,
+        r#"
 name: preflight-audio-bus-rewrite
 backend: qemu
 system:
@@ -489,20 +494,20 @@ spice:
     enabled: true
     audio: true
 "#,
-        );
+    );
 
-        let output = run_start_dry_run(&vm_path, &temp_dir);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+    let output = run_start_dry_run(&vm_path, &temp_dir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
-        assert!(
-                output.status.success(),
-                "stdout:\n{}\n\nstderr:\n{}",
-                stdout,
-                stderr
-        );
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        stdout,
+        stderr
+    );
 
-        assert!(stdout.contains("ich9-intel-hda,id=audiodev0,bus=pcie.0,addr=0xc"));
+    assert!(stdout.contains("ich9-intel-hda,id=audiodev0,bus=pcie.0,addr=0xc"));
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }

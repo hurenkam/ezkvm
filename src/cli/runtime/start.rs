@@ -367,6 +367,11 @@ fn run_interactive_start(
         eprintln!("Warning: {}", err);
     }
 
+    // Spawn QMP shutdown monitor: detects guest-initiated power-off and sends
+    // `quit` to QEMU so the process exits instead of spinning indefinitely.
+    let qmp_socket = manager.auto_qmp_socket_path();
+    let _monitor = crate::qemu::process::spawn_shutdown_monitor(qmp_socket);
+
     let status = if let Some(log_file) = log_file {
         println!("Logging QEMU output to {}", log_file.display());
         executor.execute_sync_logged(log_file, Stdio::inherit())?

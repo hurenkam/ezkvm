@@ -20,6 +20,8 @@ menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.j
 virtio-balloon-pci
 -device
 intel-iommu,id=iommu0,intremap=on
+-qmp
+unix:<RUNTIME_DIR>/ezkvm/e2e-iommu-intel.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-iommu-intel.pid
 -nodefaults

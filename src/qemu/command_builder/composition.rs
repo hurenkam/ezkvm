@@ -223,6 +223,11 @@ impl QemuManager {
                 QmpSocketType::Unix => "unix",
             };
             args.add_qmp(qmp.socket_path.as_deref(), socket_type);
+        } else {
+            // Auto-add a QMP unix socket so the shutdown monitor can detect
+            // guest-initiated power-off and send `quit` to QEMU.
+            let socket_path = self.auto_qmp_socket_path();
+            args.add_qmp(Some(&socket_path), "unix");
         }
 
         if let Some(smbios) = self.config.system_smbios() {

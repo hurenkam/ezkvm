@@ -51,10 +51,8 @@ impl QemuManager {
             return false;
         }
 
-        if crate::state::resolve_tpm_placement_mode(
-            &self.central_config,
-            &self.runtime_overrides,
-        ) != crate::state::TpmPlacementMode::Socket
+        if crate::state::resolve_tpm_placement_mode(&self.central_config, &self.runtime_overrides)
+            != crate::state::TpmPlacementMode::Socket
         {
             return false;
         }
@@ -62,16 +60,14 @@ impl QemuManager {
         // In ProxmoxParity mode with an explicit state_path, QEMU is the server
         // and qemu-server starts swtpm as a client that connects to QEMU's socket.
         // In PortableLinux mode, ezkvm starts swtpm as the server and QEMU connects.
-        let is_proxmox_parity =
-            crate::state::detect_runtime_capability_mode(&self.config)
-                == crate::state::RuntimeCapabilityMode::ProxmoxParity;
+        let is_proxmox_parity = crate::state::detect_runtime_capability_mode(&self.config)
+            == crate::state::RuntimeCapabilityMode::ProxmoxParity;
 
         if is_proxmox_parity && tpm.state_path.is_some() {
             return false;
         }
 
-        crate::state::resolve_swtpm_binary(&self.central_config, &self.runtime_overrides)
-            .is_some()
+        crate::state::resolve_swtpm_binary(&self.central_config, &self.runtime_overrides).is_some()
     }
 
     pub(super) fn tpm_placement_mode(&self) -> crate::state::TpmPlacementMode {
@@ -100,9 +96,24 @@ impl QemuManager {
         .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", self.config.name))
     }
 
-    pub(super) fn normalize_legacy_root_bus<'a>(&self, bus: Option<&'a str>) -> Option<Cow<'a, str>> {
+    pub(super) fn normalize_legacy_root_bus<'a>(
+        &self,
+        bus: Option<&'a str>,
+    ) -> Option<Cow<'a, str>> {
         let bus = bus?;
         if !bus.starts_with("pci.") {
+            return Some(Cow::Borrowed(bus));
+        }
+
+        // If a Proxmox readconfig is present it defines pci.0/pci.1/etc. bridges,
+        // so the bus name is correct as-is and must not be rewritten.
+        let has_proxmox_readconfig = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35"));
+        if has_proxmox_readconfig {
             return Some(Cow::Borrowed(bus));
         }
 
@@ -118,5 +129,18 @@ impl QemuManager {
         }
 
         Some(Cow::Borrowed(bus))
+    }
+
+    /// Returns the auto-generated QMP socket path for this VM.
+    /// Used when no explicit QMP socket is configured.
+    pub fn auto_qmp_socket_path(&self) -> String {
+        let runtime_root = crate::state::resolve_runtime_root_with_source(
+            None,
+            &self.central_config,
+            &self.runtime_overrides,
+        )
+        .value
+        .unwrap_or_else(|| "/tmp/ezkvm".to_string());
+        format!("{}/{}.qmp", runtime_root, self.config.name)
     }
 }

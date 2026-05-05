@@ -167,8 +167,14 @@ When display handoff is ambiguous, isolate display variables before changing sto
 
 ### Notes
 
-- This pattern can still be a delayed guest shutdown path (service/update/finalization), not an ezkvm host-runtime leak.
-- Verify whether QEMU was started without `-no-shutdown` before assuming host-side process handling fault.
+- ezkvm automatically monitors QMP `SHUTDOWN` events and sends `quit` to QEMU when the
+  guest initiates power-off. This prevents the indefinite spin that happens when GPU
+  passthrough teardown hangs (common with AMD RDNA2/3 on Windows).
+- If the VM is still alive after the screen goes dark, the auto-quit should fire within
+  a few seconds. If it does not, the QMP socket may not have been created (check `ezkvm
+  status` output and `/var/run/ezkvm/` for `<name>.qmp`).
+- This pattern can also be a delayed guest shutdown path (service/update/finalization),
+  not an ezkvm host-runtime leak.
 - Confirm final state using `ezkvm status`; if it transitions to `Not running`, shutdown completed.
 
 ### Checks
@@ -178,6 +184,53 @@ sudo ./target/debug/ezkvm status <vm-config.yaml>
 ps -p <qemu-pid> -o pid,stat,etime,%cpu,cmd --no-headers
 top -b -H -n 1 -p <qemu-pid> | sed -n '1,40p'
 ```
+
+### Manual stop behavior
+
+- `ezkvm stop` now attempts an orderly shutdown via QMP first: it sends
+   `system_powerdown`, then `quit` if the VM process stays alive.
+- `SIGTERM` is now only used as a fallback when QMP is unavailable or the
+   VM does not exit after QMP requests.
+
+## GPU passthrough: VM works once but hangs on passthrough after stop/kill
+
+### Symptoms
+
+- First boot after host reboot works correctly with GPU passthrough
+- After using `ezkvm stop` or `ezkvm kill` (or a forced termination), subsequent
+  passthrough attempts produce a spinner hang or black screen
+- `dmesg | grep -Ei 'vfio|reset'` shows clean reset entries with no errors
+
+### Cause
+
+AMD RDNA2/3 GPUs (and other AMD discrete GPUs in hybrid laptop configurations) can get
+stuck in a bad register state after an unclean QEMU exit, even when the VFIO reset
+sequence completes without kernel errors. The GPU driver inside the guest may have left
+the device in a partially initialized state that the host VFIO reset does not fully
+clear.
+
+### Fix
+
+Reboot the Ubuntu host before retrying GPU passthrough after any forced stop/kill:
+
+```bash
+sudo reboot
+```
+
+A host reboot performs a hardware-level GPU reset (power cycle via firmware) that fully
+clears the bad state. The `vendor-reset` kernel module (`sudo modprobe vendor-reset`)
+can sometimes clear it without a reboot for RDNA1 but has limited support for RDNA3.
+
+### Prevention
+
+- Use `ezkvm stop` rather than `ezkvm kill` when possible; the QMP auto-quit (above)
+  now handles clean guest-initiated shutdown automatically.
+- Never force-kill QEMU while the guest is mid-boot or mid-shutdown; wait for the
+  screen to go dark before stopping.
+- Disable Windows **Fast Startup** in the guest (Control Panel → Power Options →
+  Choose what the power buttons do → Turn on fast startup: OFF). Fast Startup uses
+  hybrid sleep (S4) instead of full shutdown (S5), which leaves the GPU in a dirty
+  state and also prevents Windows from applying driver updates on boot.
 
 ## Imported Proxmox VM boots from wrong disk
 

@@ -10,6 +10,9 @@ applyTo: "src/import/proxmox/**/*.rs, src/qemu/args/**/*.rs, src/qemu/command_bu
 - [ ] **Runtime paths preserved**: PID files at `/var/run/qemu-server/<vmid>.pid`, sockets at `/var/run/qemu-server/<vmid>.qga`
 - [ ] **TAP naming**: Uses `tap<vmid>i<index>` pattern, not generic names
 - [ ] **PCI placement**: NIC at `bus=pci.0,addr=0x12`, guest-agent at `bus=pci.0,addr=0x8`
+- [ ] **Q35 hierarchy policy**: PCIe devices on PCIe ports; legacy PCI devices behind `pcie-pci-bridge`/`pci-bridge`
+- [ ] **Bridge budget reviewed**: IO and bus-number impact justified when adding bridges/switch depth
+- [ ] **Slot identity stability**: imported sensitive devices keep guest-visible `bus/addr` unless migration note exists
 - [ ] **Serial topology**: Separate `virtio-serial-pci` for vdagent when guest-agent is pinned
 - [ ] **Test fixtures updated**: `tests/fixtures/proxmox_import/*.args` reflect new device topology
 - [ ] **Dry-run parity validated**: No regression diffs vs captured Proxmox reference
@@ -41,8 +44,18 @@ if let Some(vmid) = inferred_vmid {
 
 - **NIC placement** (profile policy): `bus: pci.0`, addr: `0x12` for net0, `0x13` for net1, etc.
 - **Guest-agent placement** (mapper): `bus: pci.0`, addr: `0x8`
+- **Q35 separation**: keep PCIe devices in PCIe hierarchy; keep legacy PCI devices in legacy PCI islands
+- **Flat-by-default**: avoid adding PCIe switch depth unless bus-count constraints require it
 - **Serial controller model**: Use `virtio-serial` (not `-pci`) when explicit bus/addr set
 - **SPICE vdagent**: Separate controller `virtio-serial-pci` when guest-agent is pinned
+
+## Topology Change Fail Conditions
+
+Treat these as blockers unless explicitly approved in the change notes:
+
+- Imported NIC/GPU/guest-agent-related devices move to different guest-visible slots without migration rationale.
+- PCIe and legacy PCI hierarchies are mixed in a way that breaks the Q35 placement policy.
+- Bridge/switch additions are made without IO and bus-number budget review.
 
 ## Device Topology Code Pattern
 

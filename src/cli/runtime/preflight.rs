@@ -222,14 +222,17 @@ fn ensure_swtpm_apparmor_path_policy(
     };
     let local_override = std::fs::read_to_string("/etc/apparmor.d/local/usr.bin.swtpm").ok();
 
-    let has_restrictive_rules = profile.contains("/run/libvirt/qemu/swtpm/*.sock")
-        || profile.contains("/run/swtpm/sock");
+    let has_restrictive_rules =
+        profile.contains("/run/libvirt/qemu/swtpm/*.sock") || profile.contains("/run/swtpm/sock");
     if !has_restrictive_rules {
         return Ok(());
     }
 
-    if swtpm_apparmor_path_is_allowed(path, local_override.as_deref(), allow_builtin_socket_patterns)
-    {
+    if swtpm_apparmor_path_is_allowed(
+        path,
+        local_override.as_deref(),
+        allow_builtin_socket_patterns,
+    ) {
         return Ok(());
     }
 
@@ -257,7 +260,9 @@ fn swtpm_apparmor_path_is_allowed(
 
     let is_libvirt_pattern = allow_builtin_socket_patterns
         && matches!(parent, Some(p) if p == Path::new("/run/libvirt/qemu/swtpm") || p == Path::new("/var/run/libvirt/qemu/swtpm"))
-        && file_name.map(|name| name.ends_with(".sock")).unwrap_or(false);
+        && file_name
+            .map(|name| name.ends_with(".sock"))
+            .unwrap_or(false);
 
     let is_single_socket_pattern = allow_builtin_socket_patterns
         && matches!(parent, Some(p) if p == Path::new("/run/swtpm") || p == Path::new("/var/run/swtpm"))
@@ -296,8 +301,7 @@ fn resolve_configured_swtpm_log_path(
                 .as_deref()
                 .filter(|value| !value.trim().is_empty())
                 .map(PathBuf::from)
-        })
-        ?;
+        })?;
 
     Some(
         base_dir
@@ -781,10 +785,9 @@ fn program_available(program: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        bridge_acl_allows_bridge,
+        apparmor_glob_matches, apparmor_rules_allow_path, bridge_acl_allows_bridge,
         ensure_bridge_helper_acl_allows_bridge, ensure_bridge_helper_acl_exists,
-        ensure_bridge_helper_acl_requirements,
-        apparmor_glob_matches, apparmor_rules_allow_path, run_runtime_preflight,
+        ensure_bridge_helper_acl_requirements, run_runtime_preflight,
         swtpm_apparmor_path_is_allowed, swtpm_apparmor_socket_path_is_allowed,
     };
     use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
@@ -868,10 +871,10 @@ devices: {}
         );
     }
 
-        #[test]
-        fn preflight_fails_when_tpm_backend_uri_local_path_missing() {
-                let config = VmConfig::from_str(
-                        r#"
+    #[test]
+    fn preflight_fails_when_tpm_backend_uri_local_path_missing() {
+        let config = VmConfig::from_str(
+            r#"
 name: preflight-tpm-uri-missing
 backend: qemu
 system:
@@ -888,31 +891,30 @@ system:
         state_backend_uri: file:///definitely/missing/vm-tpm-state
 devices: {}
 "#,
-                )
-                .expect("vm config should parse");
+        )
+        .expect("vm config should parse");
 
-                let err = run_runtime_preflight(
-                        &config,
-                        &CentralConfig::default(),
-                        &RuntimeCliOverrides {
-                                swtpm_binary: Some("/bin/sh".to_string()),
-                        tpm_socket_path: Some("/run/libvirt/qemu/swtpm/preflight.sock".to_string()),
-                                ..Default::default()
-                        },
-                        "/bin/sh",
-                )
-                .expect_err("preflight should fail");
+        let err = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides {
+                swtpm_binary: Some("/bin/sh".to_string()),
+                tpm_socket_path: Some("/run/libvirt/qemu/swtpm/preflight.sock".to_string()),
+                ..Default::default()
+            },
+            "/bin/sh",
+        )
+        .expect_err("preflight should fail");
 
-                assert!(
-                        err.to_string()
-                                .contains("system.tpm.state_backend_uri resolves to local path '/definitely/missing/vm-tpm-state'")
-                );
-        }
+        assert!(err.to_string().contains(
+            "system.tpm.state_backend_uri resolves to local path '/definitely/missing/vm-tpm-state'"
+        ));
+    }
 
-        #[test]
-        fn preflight_accepts_existing_tpm_backend_uri_local_path() {
-                let config = VmConfig::from_str(
-                        r#"
+    #[test]
+    fn preflight_accepts_existing_tpm_backend_uri_local_path() {
+        let config = VmConfig::from_str(
+            r#"
 name: preflight-tpm-uri-existing
 backend: qemu
 system:
@@ -929,22 +931,22 @@ system:
         state_backend_uri: file:///etc/hosts
 devices: {}
 "#,
-                )
-                .expect("vm config should parse");
+        )
+        .expect("vm config should parse");
 
-                let result = run_runtime_preflight(
-                        &config,
-                        &CentralConfig::default(),
-                        &RuntimeCliOverrides {
-                                swtpm_binary: Some("/bin/sh".to_string()),
-                        tpm_socket_path: Some("/run/libvirt/qemu/swtpm/preflight.sock".to_string()),
-                                ..Default::default()
-                        },
-                        "/bin/sh",
-                );
+        let result = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides {
+                swtpm_binary: Some("/bin/sh".to_string()),
+                tpm_socket_path: Some("/run/libvirt/qemu/swtpm/preflight.sock".to_string()),
+                ..Default::default()
+            },
+            "/bin/sh",
+        );
 
-                assert!(result.is_ok());
-        }
+        assert!(result.is_ok());
+    }
 
     #[test]
     fn preflight_keeps_shared_memory_warning_when_looking_glass_auto_mode_skips_client() {
@@ -1084,34 +1086,40 @@ host_capabilities:
         let missing = Path::new("/definitely/missing/bridge.conf");
         let err = ensure_bridge_helper_acl_exists(missing).expect_err("missing ACL should fail");
         assert!(err.to_string().contains("/definitely/missing/bridge.conf"));
-        assert!(err.to_string().contains("qemu-bridge-helper requires this ACL file"));
+        assert!(
+            err.to_string()
+                .contains("qemu-bridge-helper requires this ACL file")
+        );
     }
 
-        #[test]
-        fn bridge_acl_parser_accepts_allow_rule_for_bridge() {
-                assert!(bridge_acl_allows_bridge("allow vmbr0\n", "vmbr0"));
-                assert!(bridge_acl_allows_bridge("allow all\n", "vmbr0"));
-        }
+    #[test]
+    fn bridge_acl_parser_accepts_allow_rule_for_bridge() {
+        assert!(bridge_acl_allows_bridge("allow vmbr0\n", "vmbr0"));
+        assert!(bridge_acl_allows_bridge("allow all\n", "vmbr0"));
+    }
 
-        #[test]
-        fn bridge_acl_parser_rejects_missing_or_denied_bridge() {
-                assert!(!bridge_acl_allows_bridge("allow br0\n", "vmbr0"));
-                assert!(!bridge_acl_allows_bridge("deny vmbr0\nallow vmbr0\n", "vmbr0"));
-        }
+    #[test]
+    fn bridge_acl_parser_rejects_missing_or_denied_bridge() {
+        assert!(!bridge_acl_allows_bridge("allow br0\n", "vmbr0"));
+        assert!(!bridge_acl_allows_bridge(
+            "deny vmbr0\nallow vmbr0\n",
+            "vmbr0"
+        ));
+    }
 
-        #[test]
-        fn bridge_acl_requirement_rejects_unlisted_bridge_helper_bridge() {
-                let acl_path = unique_temp_path("bridge-acl");
-                std::fs::write(&acl_path, "allow br0\n").expect("acl file should be created");
+    #[test]
+    fn bridge_acl_requirement_rejects_unlisted_bridge_helper_bridge() {
+        let acl_path = unique_temp_path("bridge-acl");
+        std::fs::write(&acl_path, "allow br0\n").expect("acl file should be created");
 
-                let err = ensure_bridge_helper_acl_allows_bridge(&acl_path, "vmbr0", "net0")
-                        .expect_err("unlisted bridge should fail");
+        let err = ensure_bridge_helper_acl_allows_bridge(&acl_path, "vmbr0", "net0")
+            .expect_err("unlisted bridge should fail");
 
-                assert!(err.to_string().contains("network 'net0'"));
-                assert!(err.to_string().contains("allow vmbr0"));
+        assert!(err.to_string().contains("network 'net0'"));
+        assert!(err.to_string().contains("allow vmbr0"));
 
-                let _ = std::fs::remove_file(acl_path);
-        }
+        let _ = std::fs::remove_file(acl_path);
+    }
 
     #[test]
     fn bridge_acl_requirement_skips_non_bridge_helper_networks() {
@@ -1155,7 +1163,10 @@ devices:
 
     #[test]
     fn swtpm_apparmor_path_allows_single_run_socket() {
-        assert!(swtpm_apparmor_socket_path_is_allowed("/run/swtpm/sock", None));
+        assert!(swtpm_apparmor_socket_path_is_allowed(
+            "/run/swtpm/sock",
+            None
+        ));
         assert!(swtpm_apparmor_socket_path_is_allowed(
             "/var/run/swtpm/sock",
             None,

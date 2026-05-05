@@ -2,6 +2,10 @@ use super::find_qemu_processes;
 use anyhow::{Result, anyhow};
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
+use serde_json::{Value, json};
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
+use std::time::{Duration, Instant};
 
 /// Send signal to a process
 pub(super) fn signal_process(pid: i32, signal: Signal) -> Result<()> {
@@ -15,8 +19,13 @@ pub(super) fn signal_process(pid: i32, signal: Signal) -> Result<()> {
     })
 }
 
-/// Gracefully stop a VM by sending SIGTERM
-pub fn stop_vm(vm_name: &str) -> Result<()> {
+/// Gracefully stop a VM.
+///
+/// Preferred order:
+/// 1) QMP `system_powerdown`
+/// 2) QMP `quit`
+/// 3) SIGTERM fallback
+pub fn stop_vm(vm_name: &str, qmp_socket_path: Option<&str>) -> Result<()> {
     let pids = find_qemu_processes(vm_name)?;
 
     if pids.is_empty() {
@@ -29,6 +38,27 @@ pub fn stop_vm(vm_name: &str) -> Result<()> {
             pids.len(),
             vm_name
         );
+    }
+
+    if let Some(socket_path) = qmp_socket_path {
+        println!(
+            "Requesting guest shutdown via QMP system_powerdown ({})",
+            socket_path
+        );
+        if qmp_execute(socket_path, "system_powerdown").is_ok() {
+            if wait_for_vm_exit(vm_name, Duration::from_secs(10))? {
+                return Ok(());
+            }
+
+            println!("VM still running, requesting QMP quit");
+            if qmp_execute(socket_path, "quit").is_ok()
+                && wait_for_vm_exit(vm_name, Duration::from_secs(5))?
+            {
+                return Ok(());
+            }
+        } else {
+            eprintln!("Warning: QMP powerdown request failed, falling back to SIGTERM");
+        }
     }
 
     for pid in pids {
@@ -67,4 +97,80 @@ pub fn kill_vm(vm_name: &str) -> Result<()> {
 pub fn is_vm_running(vm_name: &str) -> Result<bool> {
     let pids = find_qemu_processes(vm_name)?;
     Ok(!pids.is_empty())
+}
+
+fn wait_for_vm_exit(vm_name: &str, timeout: Duration) -> Result<bool> {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if find_qemu_processes(vm_name)?.is_empty() {
+            return Ok(true);
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    Ok(find_qemu_processes(vm_name)?.is_empty())
+}
+
+fn qmp_execute(socket_path: &str, command: &str) -> Result<()> {
+    let stream = UnixStream::connect(socket_path)
+        .map_err(|e| anyhow!("Failed to connect to QMP socket {}: {}", socket_path, e))?;
+    let reader_stream = stream
+        .try_clone()
+        .map_err(|e| anyhow!("Failed to clone QMP socket stream: {}", e))?;
+
+    let mut reader = BufReader::new(reader_stream);
+    let mut writer = stream;
+
+    let greeting = read_qmp_message(&mut reader)?;
+    if greeting.get("QMP").is_none() {
+        return Err(anyhow!("Invalid QMP greeting: {}", greeting));
+    }
+
+    write_qmp_message(&mut writer, json!({ "execute": "qmp_capabilities" }))?;
+    read_qmp_response(&mut reader)?;
+
+    write_qmp_message(&mut writer, json!({ "execute": command }))?;
+    read_qmp_response(&mut reader)?;
+
+    Ok(())
+}
+
+fn write_qmp_message(writer: &mut UnixStream, msg: Value) -> Result<()> {
+    writer
+        .write_all(format!("{}\n", msg).as_bytes())
+        .map_err(|e| anyhow!("Failed to write QMP command: {}", e))?;
+    writer
+        .flush()
+        .map_err(|e| anyhow!("Failed to flush QMP command: {}", e))
+}
+
+fn read_qmp_message(reader: &mut BufReader<UnixStream>) -> Result<Value> {
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let bytes = reader
+            .read_line(&mut line)
+            .map_err(|e| anyhow!("Failed to read QMP message: {}", e))?;
+        if bytes == 0 {
+            return Err(anyhow!("QMP socket closed unexpectedly"));
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        return serde_json::from_str(trimmed)
+            .map_err(|e| anyhow!("Invalid QMP JSON '{}': {}", trimmed, e));
+    }
+}
+
+fn read_qmp_response(reader: &mut BufReader<UnixStream>) -> Result<()> {
+    loop {
+        let msg = read_qmp_message(reader)?;
+        if msg.get("return").is_some() {
+            return Ok(());
+        }
+        if let Some(err) = msg.get("error") {
+            return Err(anyhow!("QMP command failed: {}", err));
+        }
+        // Ignore asynchronous events while waiting for the command response.
+    }
 }

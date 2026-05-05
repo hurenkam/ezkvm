@@ -102,6 +102,37 @@ Use a layered modular monolith pattern with ports-and-adapters influence:
 - Keep guest-agent and SPICE/vdagent serial topology compatible with Proxmox to avoid input-channel regressions in Looking Glass workflows.
 - Treat dry-run parity against captured Proxmox command lines as a required architecture-level regression check for import changes.
 
+### Q35 PCIe and Legacy PCI Topology Contract
+
+For `q35` machine types, treat topology as a compatibility contract rather than only a generated command detail.
+
+- Default to a PCIe-first layout: place PCIe-capable devices behind `pcie-root-port` or PCIe downstream ports.
+- Keep PCIe and legacy PCI hierarchies separated: use `pcie-pci-bridge` plus `pci-bridge` for legacy PCI device islands.
+- Keep topology flat by default: prefer root-port fanout to deep switch trees unless bus-count constraints require switches.
+- Preserve imported guest-visible slot identity for sensitive devices (network, GPU, guest-agent paths) unless migration notes explicitly approve change.
+
+Q35 device placement policy:
+
+| Device Class | Default Bus Type | Bridge Chain | Hotplug Model | Slot Stability Requirement |
+| --- | --- | --- | --- | --- |
+| PCIe NIC / GPU / NVMe / passthrough devices | PCIe | `pcie-root-port` -> endpoint | PCIe native hotplug | Required for imported VMs |
+| Legacy PCI network/storage/audio cards | Legacy PCI | `pcie-pci-bridge` -> `pci-bridge` -> endpoint | ACPI/SHPC bridge hotplug | Required for imported VMs |
+| Guest agent and related serial controllers | Legacy PCI unless explicit PCIe policy is required | Profile-defined, but consistent across imports | Depends on controller choice | Required for imported VMs |
+
+Avoid these anti-patterns:
+
+- Placing large numbers of legacy PCI devices directly on `pcie.0`.
+- Using deep PCIe switch hierarchies without bus budget justification.
+- Re-slotting imported devices without explicit migration guidance.
+
+Topology validation checklist for Q35 changes:
+
+- IO window budget reviewed (bridge/port IO pressure considered).
+- Bus number budget reviewed (0..255 domain usage planned).
+- Hotplug behavior reviewed (native PCIe vs bridge-based semantics).
+- Dry-run parity checked against captured Proxmox command lines.
+- Imported guest-visible slot identities preserved or migration-noted.
+
 ## 3. Layering / Packaging
 
 ### Goal
@@ -154,6 +185,7 @@ Major architecture decisions are recorded in `doc/dev/adr/` for visibility and f
 - [ADR-0002: Import Normalization Contract](adr/ADR-0002-import-normalization-contract.md) - How external configs (Proxmox) normalize to canonical schema
 - [ADR-0003: Hooks Policy](adr/ADR-0003-hooks-policy.md) - VM lifecycle hooks design (pre/post start/stop)
 - [ADR-0004: Trait Seam Policy](adr/ADR-0004-trait-seam-policy.md) - Where and how trait-based extensibility is allowed
+- [ADR-0005: Q35 Topology Contract](adr/ADR-0005-q35-topology-contract.md) - Why ezkvm preserves Proxmox-aligned Q35 PCIe/PCI topology and slot stability for imports
 
 Concrete seam definitions and examples live in `doc/dev/EXTENSIBILITY_SEAMS.md`.
 

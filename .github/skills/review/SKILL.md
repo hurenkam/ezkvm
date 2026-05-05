@@ -84,6 +84,12 @@ This skill captures a systematic review methodology for comparing Proxmox-genera
 - **Display**: -vga, -device virtio-gpu
 - **Other**: -boot, -serial, -monitor, -qmp
 
+### Topology Review Checklist (Q35)
+- **PCIe/PCI hierarchy correctness**: PCIe devices in PCIe hierarchies, legacy PCI devices behind legacy bridges
+- **IO and bus budget risk**: bridge/switch additions justified against IO-space and bus-number limits
+- **Hotplug model correctness**: native PCIe hotplug paths are used for PCIe devices; bridge-based paths used for legacy PCI devices
+- **Guest identity stability**: imported sensitive devices preserve guest-visible `bus/addr` identity unless migration notes explicitly allow change
+
 ### ezkvm Mapping Considerations
 - YAML structure should remain human-readable
 - Support Proxmox naming conventions where possible

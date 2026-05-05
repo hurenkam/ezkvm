@@ -72,8 +72,13 @@ fn parse_guest_network_interfaces(response: &Value) -> Vec<GuestNetworkInterface
 }
 
 fn guest_network_interfaces_from_socket(socket_path: &str) -> Result<Vec<GuestNetworkInterface>> {
-    let mut stream = UnixStream::connect(socket_path)
-        .map_err(|e| anyhow!("failed to connect to guest agent socket '{}': {}", socket_path, e))?;
+    let mut stream = UnixStream::connect(socket_path).map_err(|e| {
+        anyhow!(
+            "failed to connect to guest agent socket '{}': {}",
+            socket_path,
+            e
+        )
+    })?;
     stream
         .set_read_timeout(Some(Duration::from_millis(1200)))
         .map_err(|e| anyhow!("failed to configure guest agent read timeout: {}", e))?;
@@ -199,6 +204,66 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) async fn handle_console(config_path: &str) -> Result<()> {
+    println!("Loading configuration from: {}", config_path);
+
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration loaded");
+
+    println!("Attaching to console of VM: {}", config.name);
+
+    match crate::qemu::process::is_vm_running(&config.name) {
+        Ok(is_running) if is_running => {
+            println!("\nVM is running. Attempting VNC connection...");
+            println!("VNC Server: localhost:5900");
+            println!("\nYou can connect using:");
+            println!("  vncviewer localhost:5900");
+            println!("  or any other VNC client\n");
+
+            if std::process::Command::new("which")
+                .arg("vncviewer")
+                .output()
+                .is_ok()
+            {
+                println!("Attempting to launch vncviewer...");
+                let _ = std::process::Command::new("vncviewer")
+                    .arg("localhost:5900")
+                    .spawn();
+            }
+        }
+        Ok(_) => {
+            println!("\nError: VM '{}' is not running", config.name);
+            println!("Start the VM first with: ezkvm start {}", config_path);
+            return Err(anyhow!("VM is not running"));
+        }
+        Err(e) => {
+            eprintln!("Error checking VM status: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) async fn handle_validate(config_path: &str, show_resolved_config: bool) -> Result<()> {
+    println!("Validating configuration: {}", config_path);
+
+    let config = crate::config::VmConfig::from_file(config_path)?;
+    println!("✓ Configuration is valid");
+    println!("VM Name: {}", config.name);
+    println!("Architecture: {}", config.system.architecture);
+    println!("Memory: {} MiB", config.system.memory.size);
+    println!("vCPUs: {}", config.system.cpu.vcpus);
+
+    if show_resolved_config {
+        println!("\nResolved configuration:");
+        let resolved_yaml = serde_yaml::to_string(&config)?;
+        print!("{}", resolved_yaml);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{guest_agent_socket_path, parse_guest_network_interfaces};
@@ -272,64 +337,4 @@ mod tests {
             Some("/var/run/qemu-server/qga.sock")
         );
     }
-}
-
-pub(crate) async fn handle_console(config_path: &str) -> Result<()> {
-    println!("Loading configuration from: {}", config_path);
-
-    let config = crate::config::VmConfig::from_file(config_path)?;
-    println!("✓ Configuration loaded");
-
-    println!("Attaching to console of VM: {}", config.name);
-
-    match crate::qemu::process::is_vm_running(&config.name) {
-        Ok(is_running) if is_running => {
-            println!("\nVM is running. Attempting VNC connection...");
-            println!("VNC Server: localhost:5900");
-            println!("\nYou can connect using:");
-            println!("  vncviewer localhost:5900");
-            println!("  or any other VNC client\n");
-
-            if std::process::Command::new("which")
-                .arg("vncviewer")
-                .output()
-                .is_ok()
-            {
-                println!("Attempting to launch vncviewer...");
-                let _ = std::process::Command::new("vncviewer")
-                    .arg("localhost:5900")
-                    .spawn();
-            }
-        }
-        Ok(_) => {
-            println!("\nError: VM '{}' is not running", config.name);
-            println!("Start the VM first with: ezkvm start {}", config_path);
-            return Err(anyhow!("VM is not running"));
-        }
-        Err(e) => {
-            eprintln!("Error checking VM status: {}", e);
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-
-pub(crate) async fn handle_validate(config_path: &str, show_resolved_config: bool) -> Result<()> {
-    println!("Validating configuration: {}", config_path);
-
-    let config = crate::config::VmConfig::from_file(config_path)?;
-    println!("✓ Configuration is valid");
-    println!("VM Name: {}", config.name);
-    println!("Architecture: {}", config.system.architecture);
-    println!("Memory: {} MiB", config.system.memory.size);
-    println!("vCPUs: {}", config.system.cpu.vcpus);
-
-    if show_resolved_config {
-        println!("\nResolved configuration:");
-        let resolved_yaml = serde_yaml::to_string(&config)?;
-        print!("{}", resolved_yaml);
-    }
-
-    Ok(())
 }

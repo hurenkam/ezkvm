@@ -58,11 +58,18 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let mut readconfig = Vec::new();
     let mut dummy_readconfig = Vec::new();
     // Check if q35 topology is detected
-    let needs_q35_config = system::apply_proxmox_q35_compat_if_needed(proxmox, &mut machine.clone(), &mut dummy_readconfig);
+    let needs_q35_config = system::apply_proxmox_q35_compat_if_needed(
+        proxmox,
+        machine.as_str(),
+        &mut dummy_readconfig,
+    );
     if needs_q35_config {
         if runtime_target == crate::import::proxmox::RuntimeTarget::ProxmoxParity {
             // Proxmox parity: use Proxmox config and rewrite machine string
-            if !readconfig.iter().any(|path| path == "/usr/share/qemu-server/pve-q35-4.0.cfg") {
+            if !readconfig
+                .iter()
+                .any(|path| path == "/usr/share/qemu-server/pve-q35-4.0.cfg")
+            {
                 readconfig.push("/usr/share/qemu-server/pve-q35-4.0.cfg".to_string());
             }
             // Rewrite machine string for ProxmoxParity only
@@ -75,7 +82,10 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             }
         } else {
             // Portable: use ezkvm config, do NOT rewrite machine string
-            if !readconfig.iter().any(|path| path == "/usr/share/ezkvm/ezkvm-q35.cfg") {
+            if !readconfig
+                .iter()
+                .any(|path| path == "/usr/share/ezkvm/ezkvm-q35.cfg")
+            {
                 readconfig.push("/usr/share/ezkvm/ezkvm-q35.cfg".to_string());
             }
             // Do not rewrite machine string in portable mode
@@ -748,14 +758,20 @@ mod tests {
         assert!(cfg_parity.host.pci[0].pcie);
         assert!(!cfg_parity.host.pci[0].x_vga);
         assert!(cfg_parity.host.pci[0].multifunction);
-        assert_eq!(cfg_parity.host.pci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(
+            cfg_parity.host.pci[0].bus.as_deref(),
+            Some("ich9-pcie-port-1")
+        );
         assert_eq!(cfg_parity.host.pci[0].addr.as_deref(), Some("0x0.0"));
         assert_eq!(cfg_parity.host.pci[1].device, "0000:03:00.1");
         assert_eq!(cfg_parity.host.pci[1].id, "hostpci1");
         assert!(!cfg_parity.host.pci[1].pcie);
         assert!(!cfg_parity.host.pci[1].x_vga);
         assert!(!cfg_parity.host.pci[1].multifunction);
-        assert_eq!(cfg_parity.host.pci[1].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(
+            cfg_parity.host.pci[1].bus.as_deref(),
+            Some("ich9-pcie-port-1")
+        );
         assert_eq!(cfg_parity.host.pci[1].addr.as_deref(), Some("0x0.1"));
         assert_eq!(cfg_parity.host.usb.len(), 2);
         assert_eq!(cfg_parity.host.usb[0].hostbus.as_deref(), Some("1"));
@@ -772,21 +788,30 @@ mod tests {
             "#,
         );
         assert_eq!(cfg_portable.system.machine, "q35");
-        assert_eq!(cfg_portable.system.readconfig, vec!["/usr/share/ezkvm/ezkvm-q35.cfg"]);
+        assert_eq!(
+            cfg_portable.system.readconfig,
+            vec!["/usr/share/ezkvm/ezkvm-q35.cfg"]
+        );
         assert_eq!(cfg_portable.host.pci.len(), 2);
         assert_eq!(cfg_portable.host.pci[0].device, "0000:03:00.0");
         assert_eq!(cfg_portable.host.pci[0].id, "hostpci0");
         assert!(cfg_portable.host.pci[0].pcie);
         assert!(!cfg_portable.host.pci[0].x_vga);
         assert!(cfg_portable.host.pci[0].multifunction);
-        assert_eq!(cfg_portable.host.pci[0].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(
+            cfg_portable.host.pci[0].bus.as_deref(),
+            Some("ich9-pcie-port-1")
+        );
         assert_eq!(cfg_portable.host.pci[0].addr.as_deref(), Some("0x0.0"));
         assert_eq!(cfg_portable.host.pci[1].device, "0000:03:00.1");
         assert_eq!(cfg_portable.host.pci[1].id, "hostpci1");
         assert!(!cfg_portable.host.pci[1].pcie);
         assert!(!cfg_portable.host.pci[1].x_vga);
         assert!(!cfg_portable.host.pci[1].multifunction);
-        assert_eq!(cfg_portable.host.pci[1].bus.as_deref(), Some("ich9-pcie-port-1"));
+        assert_eq!(
+            cfg_portable.host.pci[1].bus.as_deref(),
+            Some("ich9-pcie-port-1")
+        );
         assert_eq!(cfg_portable.host.pci[1].addr.as_deref(), Some("0x0.1"));
         assert_eq!(cfg_portable.host.usb.len(), 2);
         assert_eq!(cfg_portable.host.usb[0].hostbus.as_deref(), Some("1"));
@@ -1007,7 +1032,10 @@ mod tests {
             .guest_agent
             .as_ref()
             .expect("guest agent should be configured");
-        assert_eq!(agent.socket_path.as_deref(), Some("/var/run/qemu-server/108.qga"));
+        assert_eq!(
+            agent.socket_path.as_deref(),
+            Some("/var/run/qemu-server/108.qga")
+        );
         assert_eq!(agent.bus.as_deref(), Some("pci.0"));
         assert_eq!(agent.addr.as_deref(), Some("0x8"));
     }
@@ -1021,8 +1049,9 @@ mod tests {
             "#,
         )
         .expect("parser should succeed");
-        let portable_mapped = map_proxmox_to_canonical_yaml(&portable, RuntimeTarget::PortableLinux)
-            .expect("portable mapper should succeed");
+        let portable_mapped =
+            map_proxmox_to_canonical_yaml(&portable, RuntimeTarget::PortableLinux)
+                .expect("portable mapper should succeed");
         let portable_cfg: VmConfig =
             serde_yaml::from_str(&portable_mapped.yaml).expect("yaml should deserialize");
         let portable_balloon = portable_cfg

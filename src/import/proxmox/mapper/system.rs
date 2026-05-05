@@ -36,7 +36,7 @@ pub(super) fn map_architecture(
 
 pub(super) fn apply_proxmox_q35_compat_if_needed(
     proxmox: &ProxmoxVmConfig,
-    machine: &mut String,
+    machine: &str,
     _readconfig: &mut Vec<String>,
 ) -> bool {
     // Returns true if q35 topology is detected; does not modify machine string here.
@@ -349,11 +349,13 @@ pub(super) fn map_guest_agent(
         enabled: true,
         socket_path,
         freeze_cpu: false,
-        bus: Some(match runtime_target {
-            crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
-            crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.0",
-        }
-        .to_string()),
+        bus: Some(
+            match runtime_target {
+                crate::import::proxmox::RuntimeTarget::PortableLinux => "pcie.0",
+                crate::import::proxmox::RuntimeTarget::ProxmoxParity => "pci.0",
+            }
+            .to_string(),
+        ),
         addr: Some("0x8".to_string()),
     })
 }

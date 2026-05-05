@@ -80,6 +80,9 @@ Use this quick sequence before changing code when imported VMs behave unexpected
 ## Decision points
 
 - **Backend support**: `ezkvm` currently targets QEMU only; do not introduce alternative backends without explicit plan updates
+- **Machine type policy**: choose machine type intentionally (`q35` for PCIe-first topologies and passthrough-heavy modern guests; `i440fx` for legacy compatibility cases)
+- **Q35 topology policy**: keep PCIe devices on PCIe root/downstream ports and place legacy PCI devices behind `pcie-pci-bridge`/`pci-bridge`
+- **Topology complexity**: keep PCIe hierarchy flat unless bus budgeting requires switch depth
 - **Config validation**: reject unsupported architectures or invalid resource values early
 - **Command behavior**: separate interactive vs daemon execution clearly
 - **Storage/network subcommands**: implement minimal helper functionality first, then expand with real QEMU integration

@@ -28,6 +28,8 @@ virtio-balloon-pci
 qemu-xhci,id=xhci
 -device
 usb-host,hostbus=3,hostport=1.4,id=usb0,bus=xhci.0,port=1
+-qmp
+unix:<RUNTIME_DIR>/ezkvm/e2e-warning.qmp,server=on,wait=off
 -pidfile
 /var/run/qemu-server/500.pid
 -nodefaults

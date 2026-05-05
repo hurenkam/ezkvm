@@ -59,5 +59,4 @@ mod tests {
         let args = QemuArgs::from(display).into_inner();
         assert_eq!(args, vec!["-device".to_string(), "VGA".to_string()]);
     }
-
 }

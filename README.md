@@ -129,9 +129,9 @@ See the `examples/` directory for complete configuration examples:
 - Runtime mode gates are target-aware: portable mode enforces capability resolution, while imported parity configs (`proxmox-parity-runtime`) bypass portable capability gates and keep parity defaults
 - `ezkvm start <config.yaml> --daemon` - Start VM in background
 - `ezkvm start <config.yaml> --run-dir <path> --swtpm-binary <path> --tpm-socket-path <path> --remote-viewer-program <path> --looking-glass-program <path> --ovmf-dir <path>` - Override runtime host defaults used by preflight capability checks and runtime resolution
-- `ezkvm stop <config.yaml>` - Stop a VM gracefully
-- `ezkvm stop <config.yaml> --force` - Force stop a VM
-- `ezkvm kill <config.yaml>` - Force kill a VM
+- `ezkvm stop <config.yaml>` - Stop a VM gracefully (QMP `system_powerdown` -> QMP `quit` -> SIGTERM fallback)
+- `ezkvm stop <config.yaml> --force` - Force stop a VM immediately with SIGKILL
+- `ezkvm kill <config.yaml>` - Force kill a VM immediately with SIGKILL
 - `ezkvm list` - List running VMs
 - `ezkvm status <config.yaml>` - Show VM status
 - `ezkvm console <config.yaml>` - Attach to VM console
