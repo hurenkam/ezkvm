@@ -232,6 +232,26 @@ can sometimes clear it without a reboot for RDNA1 but has limited support for RD
   hybrid sleep (S4) instead of full shutdown (S5), which leaves the GPU in a dirty
   state and also prevents Windows from applying driver updates on boot.
 
+## Imported VM108 (portable mode): spinner disappears and boot appears stuck
+
+### Important non-fix
+
+- Do not treat `x-vga` as a default remediation for this specific case.
+- The captured Proxmox runtime command for VM108 does not include `x-vga=on`, so
+  adding it is not required for parity with the known-good Proxmox runtime.
+- Some host/QEMU combinations reject `x-vga` for `vfio-pci`; when that happens,
+  forcing `x-vga` adds noise to diagnosis instead of narrowing root cause.
+
+### What to check instead
+
+1. Compare generated ezkvm dry-run args against the captured Proxmox command,
+   prioritizing PCI bus/addr placement, USB controller placement, storage
+   controller path, and guest-agent/serial topology.
+2. Confirm no recent forced-stop path left the GPU in a stale state (host reboot
+   remains the safest reset for this class of issue).
+3. Validate portable-mode capability resolution and runtime assets with
+   diagnostics before changing guest-visible passthrough flags.
+
 ## Imported Proxmox VM boots from wrong disk
 
 ### Symptoms

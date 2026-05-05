@@ -274,7 +274,7 @@ For field-level mapping reference:
 | `bios` / `efidisk0` | `system.boot.*` | `efidisk0` implies UEFI when BIOS is absent. |
 | `tpmstate0` | `system.tpm` | Requires resolvable absolute source path. |
 | `netN` with `bridge` | `devices.networks[]` | Uses canonical network backend mapping. |
-| `hostpciN` | `host.pci[]` | `x-vga` devices preserved in passthrough settings. |
+| `hostpciN` | `host.pci[]` | Preserves passthrough placement and multifunction grouping. `x-vga` is not a reliable runtime parity indicator for imports that use shorthand hostpci entries (for example `0000:03:00` without explicit `.0`). |
 | `usbN` | `host.usb[]` | Supports `<bus>-<port>` and `<vendor>:<product>` selectors. |
 
 ## See Also
