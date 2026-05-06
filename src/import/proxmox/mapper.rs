@@ -99,8 +99,18 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let boot_indices = system::parse_boot_order(&proxmox.scalars);
     let smbios_uuid = system::parse_smbios_uuid(&proxmox.scalars);
 
-    let scsi_controllers =
+    let mut scsi_controllers =
         storage::map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
+    let scsi_controller_bus = topology_planner.scsi_controller_bus();
+    let scsi_controller_addr = topology_planner.scsi_controller_addr();
+    if let Some(controller) = scsi_controllers.first_mut() {
+        if controller.bus.is_none() {
+            controller.bus = scsi_controller_bus.map(str::to_string);
+        }
+        if controller.addr.is_none() {
+            controller.addr = scsi_controller_addr.map(str::to_string);
+        }
+    }
     let sata_controllers = storage::map_sata_controllers(&proxmox.disks);
     let inferred_vmid = helpers::infer_proxmox_vmid(proxmox);
     let mut drives = proxmox

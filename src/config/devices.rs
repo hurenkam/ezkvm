@@ -245,6 +245,8 @@ mod tests {
         let display = DisplayConfig {
             r#type: "qxl".to_string(),
             vram: Some(256),
+            bus: None,
+            addr: None,
         };
 
         let args = QemuArgs::from(display).into_inner();
@@ -336,6 +338,8 @@ mod tests {
             displays: vec![DisplayConfig {
                 r#type: "qxl".to_string(),
                 vram: Some(64),
+                bus: None,
+                addr: None,
             }],
             serials: vec![SerialConfig {
                 r#type: "pty".to_string(),

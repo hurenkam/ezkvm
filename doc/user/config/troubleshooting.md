@@ -14,6 +14,9 @@ Common issues and quick checks for VM configuration and startup.
 - Required binary is missing (`qemu-system-*`, `swtpm`, or configured bridge helper path).
 - UEFI/OVMF firmware is requested but no compatible firmware file is available.
 - Runtime/socket parent directory is not writable by the current user.
+- A configured `system.readconfig` file is missing on this host (for example
+   `/usr/share/ezkvm/ezkvm-q35.cfg`), which can lead to startup errors like
+   `Bus 'pci.1' not found` when Q35 bridge buses are expected.
 
 ### Checks
 
@@ -37,6 +40,12 @@ Common issues and quick checks for VM configuration and startup.
 4. Use runtime overrides to point at host-specific paths:
    ```bash
    ezkvm start vm.yaml --run-dir /tmp/ezkvm --swtpm-binary /usr/bin/swtpm --ovmf-dir /usr/share/OVMF
+   ```
+
+5. Verify every configured readconfig path exists:
+   ```bash
+   yq '.system.readconfig[]' vm.yaml
+   ls -la /usr/share/ezkvm/ezkvm-q35.cfg
    ```
 
 ### Notes

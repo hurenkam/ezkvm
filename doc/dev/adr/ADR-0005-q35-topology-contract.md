@@ -18,6 +18,21 @@ ezkvm adopts a Q35 topology contract:
 - Treat imported guest-visible slot identity as a compatibility requirement for sensitive devices (for example NIC/GPU/guest-agent-related placement).
 - Require dry-run parity checks against captured Proxmox command lines for import topology-affecting changes.
 
+ezkvm shall follow proxmox policies with respect to bus assignments for the following devices, and only deviate from this if explicitly instructed to do so by the config file:
+
+- virtio-vga-gl -> preferred bus: pcie.0, preferred address: 0x01+
+- ivshmem-plain -> preferred bus: pcie.0, preferred address: 0x08+
+- virtio-balloon-pci -> preferred bus: pci.0, preferred address: 0x03
+- pvscsi -> preferred bus: pci.0, preferred address: 0x05+
+- virtio-serial -> preferred bus: pci.0, preferred address: 0x08+
+- virtio-net-pci -> preferred bus: pci.0, preferred address: 0x12+
+- qemu-xhci -> preferred bus: pci.1, preferred address: 0x1b+
+- ich9-intel-hda -> preferred bus: pci.2, preferred address: 0x0c+
+- virtio-scsi-pci -> preferred bus: pci.3, preferred address: 0x01+
+- vfio-pci -> preferred bus: ich9-pcie-port-1..8, preferred address: 0x0.0+
+
+other policies (not proxmox specific)
+
 ## Rationale
 
 - Q35 in QEMU is PCIe-centric and has practical IO/bus-number constraints that become significant when bridge depth grows.

@@ -64,8 +64,13 @@ Feature flags for Windows optimization:
 - `size` MiB (default 32)
 - `vectors` (default 1)
 - `id` (default ivshmem0)
-- optional `bus`
+- optional `bus`, `addr`
 - `mem_path` (default /dev/kvmfr0)
+
+When Q35 bridge readconfig is loaded (`pve-q35-*` or `ezkvm-q35.cfg`), omitted
+`bus`/`addr` default to `pcie.0` and `0x8` for `ivshmem-plain` emission.
+For virtio-gpu placement defaults, see `devices.displays` in
+[Devices, controllers, and host passthrough](devices.md).
 
 ## system.cpu.numa (canonical)
 

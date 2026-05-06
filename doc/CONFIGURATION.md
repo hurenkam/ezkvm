@@ -422,12 +422,8 @@ NUMA backend behavior:
 | Field | Type | Default | Valid values | Example |
 | --- | --- | --- | --- | --- |
 | `model` | string | `qemu64` | QEMU CPU model | `model: host` |
-| `sockets` | integer | `1` | positive integer | `sockets: 1` |
-| `dies` | integer | unset | positive integer | `dies: 2` |
-| `clusters` | integer | unset | positive integer | `clusters: 2` |
-| `cores` | integer | `4` | positive integer | `cores: 8` |
-| `threads` | integer | `1` | positive integer | `threads: 2` |
-| `flags` | string | `+aes,+pni,+popcnt,+sse4.1,+sse4.2,+ssse3,enforce` | CPU flag list | `flags: "+aes,enforce"` |
+| `vcpus` | integer | `1` | positive integer | `vcpus: 8` |
+| `features` | sequence of strings | empty | CPU feature list | `features: ["+aes", "+sse4.1"]` |
 
 ### system.tpm
 
@@ -708,7 +704,7 @@ system:
     type: ovmf
     file: /dev/vm1/ubuntu-desktop-efi
     uuid: c0e240a5-859a-4378-a2d9-95088f531142
-  cpu: { model: host, sockets: 1, cores: 8, threads: 1 }
+  cpu: { model: host, vcpus: 8 }
   memory: { max: 16384, balloon: true }
   tpm: { type: swtpm, disk: /dev/vm1/ubuntu-desktop-tpmstate, socket: /var/ezkvm/ubuntu-desktop-tpm.socket }
 
@@ -749,7 +745,7 @@ general:
 system:
   chipset: { type: q35, xhci_enabled: false }
   bios: { type: seabios, uuid: e7f0f0f1-0000-4e4a-a999-111111111111 }
-  cpu: { model: qemu64, sockets: 1, cores: 4, threads: 1 }
+  cpu: { model: qemu64, vcpus: 4 }
   memory: { max: 8192, hugepages: false }
   serial: { type: socket, path: /var/run/qemu-server/301.serial0 }
 
@@ -784,7 +780,7 @@ system:
   bios:
     type: ovmf
     file: /dev/vm3/windows-gaming-efi
-  cpu: { model: host, sockets: 1, cores: 12, threads: 2 }
+  cpu: { model: host, vcpus: 24 }
   memory: { max: 32768 }
   vmgenid: b42d5b83-fee2-47dc-98a8-7856b18542ec
 
@@ -820,7 +816,7 @@ general:
 system:
   chipset: { type: q35 }
   bios: { type: ovmf, file: /dev/vm4/numa-efi }
-  cpu: { model: host, sockets: 2, dies: 1, clusters: 1, cores: 12, threads: 1 }
+  cpu: { model: host, vcpus: 24 }
   memory:
     max: 65536
     hugepages: true

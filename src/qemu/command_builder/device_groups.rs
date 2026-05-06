@@ -13,7 +13,25 @@ impl QemuManager {
                 );
             }
         } else if !self.config.host_usb().is_empty() {
-            args.add_xhci_controller("xhci", None, None, None, None);
+            // When auto-synthesizing an XHCI controller, keep ADR-0005 preferred
+            // placement for Q35-compatible topologies.
+            let has_q35_usb_topology = self
+                .config
+                .system
+                .readconfig
+                .iter()
+                .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+            let bus = if has_q35_usb_topology {
+                Some("pci.1")
+            } else {
+                None
+            };
+            let addr = if has_q35_usb_topology {
+                Some("0x1b")
+            } else {
+                None
+            };
+            args.add_xhci_controller("xhci", None, None, bus, addr);
         }
 
         for usb_device in self.config.host_usb() {

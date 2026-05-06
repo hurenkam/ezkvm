@@ -7,7 +7,7 @@ host
 -m
 2048M
 -smp
-cpus=2
+2,sockets=1,cores=2,maxcpus=2
 -boot
 menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
@@ -25,8 +25,4 @@ unix:<RUNTIME_DIR>/ezkvm/e2e-usb.qmp,server=on,wait=off
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard
--global
-ICH9-LPC.disable_s3=1
--global
-ICH9-LPC.disable_s4=1
 -enable-kvm

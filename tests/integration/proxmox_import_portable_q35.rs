@@ -135,8 +135,8 @@ fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
         "hostpci1 must be placed on ich9-pcie-port-2; got: {hostpci1_arg}"
     );
 
-    // No raw pci.N bus references should survive to the final args (all must be
-    // normalized to pcie.0 by the portable-linux bus normalization pass).
+    // Legacy pci.N bus references are expected when portable Q35 readconfig
+    // defines bridge-backed pci.0..pci.3 buses.
     let raw_pci_bus_args: Vec<&str> = args
         .iter()
         .filter(|a| {
@@ -147,8 +147,8 @@ fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
         .map(|a| a.as_str())
         .collect();
     assert!(
-        raw_pci_bus_args.is_empty(),
-        "no raw pci.N bus references expected in portable Q35 args; found: {raw_pci_bus_args:?}\nfull args:\n{}",
+        !raw_pci_bus_args.is_empty(),
+        "expected portable Q35 args to include legacy pci.N bus references when ezkvm-q35.cfg is loaded; full args:\n{}",
         args.join("\n")
     );
 

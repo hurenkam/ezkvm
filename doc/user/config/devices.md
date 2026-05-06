@@ -73,6 +73,11 @@ Common fields:
 
 - `type`
 - optional `vram`
+- optional placement: `bus`, `addr`
+- with Q35 bridge readconfig (`pve-q35-*` or `ezkvm-q35.cfg`), `type: virtio-gpu`
+  defaults to `bus=pcie.0,addr=0x1` when `bus`/`addr` are omitted
+- for ivshmem placement defaults, see `system.memory.ivshmem` in
+  [Platform features and options](platform-features.md)
 
 ### devices.serials
 
@@ -105,6 +110,9 @@ Common fields:
 ### controllers.xhci
 
 - entries match XHCI schema: `id`, optional `p2`, `p3`, `bus`, `addr`
+- when `host.usb` is present and no explicit `controllers.xhci` entry exists,
+  ezkvm auto-creates an `xhci` controller; with a loaded Q35 readconfig
+  (`pve-q35-*` or `ezkvm-q35.cfg`) the fallback is placed at `bus=pci.1,addr=0x1b`
 
 ## host (canonical)
 

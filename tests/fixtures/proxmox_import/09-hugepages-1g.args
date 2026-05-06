@@ -7,7 +7,7 @@ host
 -m
 8192M
 -smp
-cpus=4
+4,sockets=1,cores=4,maxcpus=4
 -device
 virtio-scsi-pci,id=scsihw0
 -drive
@@ -43,8 +43,4 @@ unix:<RUNTIME_DIR>/ezkvm/e2e-hugepages-1g.qmp,server=on,wait=off
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard
--global
-ICH9-LPC.disable_s3=1
--global
-ICH9-LPC.disable_s4=1
 -enable-kvm

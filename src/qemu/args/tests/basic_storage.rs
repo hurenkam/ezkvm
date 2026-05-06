@@ -7,7 +7,10 @@ fn test_basic_args() {
     args.add_smp(2);
 
     let built = args.build();
-    assert_eq!(built, vec!["-m", "1024M", "-smp", "cpus=2"]);
+    assert_eq!(
+        built,
+        vec!["-m", "1024M", "-smp", "2,sockets=1,cores=2,maxcpus=2"]
+    );
 }
 
 #[test]

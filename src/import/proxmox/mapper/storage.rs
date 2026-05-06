@@ -126,10 +126,18 @@ pub(super) fn map_drive(
         rotation_rate,
         bus: if disk.bus == "sata" {
             Some(format!("sata0.{}", disk.index))
+        } else if disk.bus == "ide" {
+            Some(format!("ide.{}", disk.index / 2))
         } else {
             None
         },
-        unit: if disk.bus == "sata" { Some(0) } else { None },
+        unit: if disk.bus == "sata" {
+            Some(0)
+        } else if disk.bus == "ide" {
+            Some((disk.index % 2) as u32)
+        } else {
+            None
+        },
     }
 }
 

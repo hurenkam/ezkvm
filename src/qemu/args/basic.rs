@@ -42,7 +42,10 @@ impl QemuArgs {
     /// Add SMP argument
     pub fn add_smp(&mut self, cpus: u32) {
         self.push_str("-smp");
-        self.push(format!("cpus={}", cpus));
+        self.push(format!(
+            "{},sockets=1,cores={},maxcpus={}",
+            cpus, cpus, cpus
+        ));
     }
 
     /// Add boot order argument

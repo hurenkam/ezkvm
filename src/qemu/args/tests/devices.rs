@@ -25,7 +25,7 @@ fn test_vfio_pci_with_guest_placement_and_multifunction() {
 #[test]
 fn test_ivshmem_bus_and_mem_path() {
     let mut args = QemuArgs::new();
-    args.add_ivshmem(128, 1, "ivshmem0", Some("pcie.0"), "/dev/kvmfr0");
+    args.add_ivshmem(128, 1, "ivshmem0", Some("pcie.0"), None, "/dev/kvmfr0");
 
     let built = args.build();
     assert!(
@@ -36,6 +36,26 @@ fn test_ivshmem_bus_and_mem_path() {
     assert!(built.iter().any(
         |arg| arg == "memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M"
     ));
+}
+
+#[test]
+fn test_ivshmem_bus_addr_and_mem_path() {
+    let mut args = QemuArgs::new();
+    args.add_ivshmem(
+        128,
+        1,
+        "ivshmem0",
+        Some("pcie.0"),
+        Some("0x8"),
+        "/dev/kvmfr0",
+    );
+
+    let built = args.build();
+    assert!(
+        built
+            .iter()
+            .any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0,addr=0x8")
+    );
 }
 
 #[test]

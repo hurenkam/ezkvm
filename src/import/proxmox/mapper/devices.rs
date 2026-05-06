@@ -189,7 +189,12 @@ pub(super) fn map_displays(
         }
     }
 
-    vec![DisplayConfig { r#type, vram }]
+    vec![DisplayConfig {
+        r#type,
+        vram,
+        bus: None,
+        addr: None,
+    }]
 }
 
 pub(super) fn map_serials(
@@ -459,6 +464,7 @@ pub(super) fn apply_args_passthrough_subset(
 
     let mut ivshmem_memdev: Option<String> = None;
     let mut ivshmem_bus: Option<String> = None;
+    let mut ivshmem_addr: Option<String> = None;
     let mut ivshmem_id: Option<String> = None;
     let mut ivshmem_mem_path: Option<String> = None;
     let mut ivshmem_size: Option<u32> = None;
@@ -525,6 +531,7 @@ pub(super) fn apply_args_passthrough_subset(
                         "ivshmem-plain" => {
                             ivshmem_memdev = options.get("memdev").cloned();
                             ivshmem_bus = options.get("bus").cloned();
+                            ivshmem_addr = options.get("addr").cloned();
                         }
                         "isa-applesmc" => {
                             let osk = options.get("osk").cloned().unwrap_or_default();
@@ -609,6 +616,7 @@ pub(super) fn apply_args_passthrough_subset(
                 vectors: 1,
                 id: ivshmem_id.unwrap_or_else(|| "ivshmem0".to_string()),
                 bus: ivshmem_bus,
+                addr: ivshmem_addr,
                 mem_path: ivshmem_mem_path.unwrap_or_else(|| "/dev/kvmfr0".to_string()),
             });
         } else {

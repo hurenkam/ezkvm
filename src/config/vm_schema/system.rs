@@ -117,7 +117,10 @@ impl From<SystemConfig> for QemuArgs {
 
         // SMP (symmetric multiprocessing)
         args.push_str("-smp");
-        args.push(format!("cpus={}", config.cpu.vcpus));
+        args.push(format!(
+            "{},sockets=1,cores={},maxcpus={}",
+            config.cpu.vcpus, config.cpu.vcpus, config.cpu.vcpus
+        ));
 
         args
     }

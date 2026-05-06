@@ -18,8 +18,11 @@ system:
 options:
   global_options:
     - kvm-pit.lost_tick_policy=discard
-    - ICH9-LPC.disable_s3=1
-    - ICH9-LPC.disable_s4=1
+    # Keep these disabled by default for VM108 parity: its captured Proxmox
+    # launch command does not include them. Uncomment if a specific guest needs
+    # explicit S3/S4 disable behavior on non-Proxmox hosts.
+    # - ICH9-LPC.disable_s3=1
+    # - ICH9-LPC.disable_s4=1
 
 policies:
   drives:

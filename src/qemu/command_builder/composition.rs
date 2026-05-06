@@ -51,6 +51,25 @@ impl QemuManager {
             }
         }
 
+        let has_q35_bridge_readconfig = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+        if has_q35_bridge_readconfig {
+            for display in &mut devices.displays {
+                if display.r#type == "virtio-gpu" {
+                    if display.bus.is_none() {
+                        display.bus = Some("pcie.0".to_string());
+                    }
+                    if display.addr.is_none() {
+                        display.addr = Some("0x1".to_string());
+                    }
+                }
+            }
+        }
+
         args.extend(QemuArgs::from(devices));
         args.extend(self.build_boot_args());
         self.add_tpm_args(args)?;
@@ -162,12 +181,32 @@ impl QemuManager {
         if let Some(ivshmem) = self.config.system_memory_ivshmem()
             && ivshmem.enabled
         {
-            let bus = self.normalize_legacy_root_bus(ivshmem.bus.as_deref());
+            let has_q35_bridge_readconfig = self
+                .config
+                .system
+                .readconfig
+                .iter()
+                .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+            let bus = if ivshmem.bus.is_some() {
+                self.normalize_legacy_root_bus(ivshmem.bus.as_deref())
+            } else if has_q35_bridge_readconfig {
+                Some(std::borrow::Cow::Borrowed("pcie.0"))
+            } else {
+                None
+            };
+            let addr = if ivshmem.addr.is_some() {
+                ivshmem.addr.as_deref()
+            } else if has_q35_bridge_readconfig {
+                Some("0x8")
+            } else {
+                None
+            };
             args.add_ivshmem(
                 ivshmem.size,
                 ivshmem.vectors,
                 &ivshmem.id,
                 bus.as_deref(),
+                addr,
                 &ivshmem.mem_path,
             );
         }
@@ -273,5 +312,117 @@ impl QemuManager {
         {
             args.add_isa_applesmc(&applesmc.osk);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
+    use crate::qemu::QemuManager;
+
+    #[test]
+    fn defaults_virtio_gpu_and_ivshmem_placement_with_q35_readconfig() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-display-ivshmem-defaults"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    readconfig:
+        - "/usr/share/ezkvm/ezkvm-q35.cfg"
+    memory:
+        size: 4096
+        ivshmem:
+            enabled: true
+            size: 128
+            vectors: 1
+            id: "ivshmem0"
+            mem_path: "/dev/kvmfr0"
+    cpu:
+        vcpus: 4
+        model: "host"
+
+devices:
+    displays:
+        - type: "virtio-gpu"
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+        let args = manager
+            .build_command()
+            .expect("qemu command should build")
+            .build();
+
+        assert!(
+            args.iter()
+                .any(|arg| arg == "virtio-gpu,bus=pcie.0,addr=0x1")
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0,addr=0x8")
+        );
+    }
+
+    #[test]
+    fn keeps_explicit_virtio_gpu_and_ivshmem_placement() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-display-ivshmem-explicit"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    readconfig:
+        - "/usr/share/ezkvm/ezkvm-q35.cfg"
+    memory:
+        size: 4096
+        ivshmem:
+            enabled: true
+            size: 128
+            vectors: 1
+            id: "ivshmem0"
+            bus: "pcie.0"
+            addr: "0x9"
+            mem_path: "/dev/kvmfr0"
+    cpu:
+        vcpus: 4
+        model: "host"
+
+devices:
+    displays:
+        - type: "virtio-gpu"
+          bus: "pcie.0"
+          addr: "0x2"
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+        let args = manager
+            .build_command()
+            .expect("qemu command should build")
+            .build();
+
+        assert!(
+            args.iter()
+                .any(|arg| arg == "virtio-gpu,bus=pcie.0,addr=0x2")
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0,addr=0x9")
+        );
     }
 }

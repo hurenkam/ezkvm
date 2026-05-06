@@ -7,7 +7,7 @@ host
 -m
 1024M
 -smp
-cpus=1
+1,sockets=1,cores=1,maxcpus=1
 -netdev
 type=user,id=net0
 -device
@@ -27,8 +27,4 @@ unix:<RUNTIME_DIR>/ezkvm/e2e-iommu-intel.qmp,server=on,wait=off
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard
--global
-ICH9-LPC.disable_s3=1
--global
-ICH9-LPC.disable_s4=1
 -enable-kvm

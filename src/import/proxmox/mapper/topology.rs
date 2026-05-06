@@ -57,10 +57,28 @@ impl Q35TopologyPlanner {
 
     pub(super) fn legacy_root_bus(&self) -> &'static str {
         if self.runtime_target == RuntimeTarget::PortableLinux {
-            "pcie.0"
+            if self.needs_q35_compat {
+                "pci.0"
+            } else {
+                "pcie.0"
+            }
         } else {
             "pci.0"
         }
+    }
+
+    pub(super) fn scsi_controller_bus(&self) -> Option<&'static str> {
+        if !self.needs_q35_compat {
+            return None;
+        }
+        Some("pci.0")
+    }
+
+    pub(super) fn scsi_controller_addr(&self) -> Option<&'static str> {
+        if !self.needs_q35_compat {
+            return None;
+        }
+        Some("0x5")
     }
 
     pub(super) fn audio_controller_bus(&self) -> &'static str {

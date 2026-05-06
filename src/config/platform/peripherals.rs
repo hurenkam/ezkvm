@@ -124,6 +124,10 @@ pub struct IvshmemConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bus: Option<String>,
 
+    /// Address on the selected bus
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub addr: Option<String>,
+
     /// Shared memory file path
     #[serde(default = "default_ivshmem_mem_path")]
     pub mem_path: String,

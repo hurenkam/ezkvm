@@ -17,6 +17,14 @@ pub struct DisplayConfig {
     /// Video RAM in MiB
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vram: Option<u32>,
+
+    /// Optional bus placement for the display device
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bus: Option<String>,
+
+    /// Optional address on the selected bus
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub addr: Option<String>,
 }
 
 impl From<DisplayConfig> for QemuArgs {
@@ -39,6 +47,14 @@ impl From<DisplayConfig> for QemuArgs {
             }
         }
 
+        if let Some(bus) = display.bus {
+            device_spec.push_str(&format!(",bus={}", bus));
+        }
+
+        if let Some(addr) = display.addr {
+            device_spec.push_str(&format!(",addr={}", addr));
+        }
+
         args.push(device_spec);
         args
     }
@@ -54,6 +70,8 @@ mod tests {
         let display = DisplayConfig {
             r#type: "vga".to_string(),
             vram: None,
+            bus: None,
+            addr: None,
         };
 
         let args = QemuArgs::from(display).into_inner();

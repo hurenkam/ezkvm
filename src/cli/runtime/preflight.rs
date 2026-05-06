@@ -26,6 +26,7 @@ pub(crate) fn run_runtime_preflight(
 ) -> Result<RuntimePreflightReport> {
     crate::qemu::executor::check_qemu_available(qemu_binary)
         .map_err(|err| anyhow!("preflight failed: {}", err))?;
+    ensure_readconfig_files_present(config)?;
     let mode = crate::state::detect_runtime_capability_mode(config);
 
     if mode == crate::state::RuntimeCapabilityMode::PortableLinux {
@@ -42,6 +43,21 @@ pub(crate) fn run_runtime_preflight(
     let mut report = RuntimePreflightReport::default();
     collect_optional_warnings(config, central_config, runtime_overrides, mode, &mut report);
     Ok(report)
+}
+
+fn ensure_readconfig_files_present(config: &crate::config::VmConfig) -> Result<()> {
+    for path in &config.system.readconfig {
+        if Path::new(path).exists() {
+            continue;
+        }
+
+        return Err(anyhow!(
+            "preflight failed: system.readconfig path '{}' does not exist on this host",
+            path
+        ));
+    }
+
+    Ok(())
 }
 
 fn ensure_program_available(label: &str, program: &str) -> Result<()> {
@@ -829,6 +845,71 @@ devices: {}
         .expect("preflight should pass");
 
         assert!(result.optional_warnings().is_empty());
+    }
+
+    #[test]
+    fn preflight_fails_when_readconfig_path_is_missing() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-missing-readconfig
+backend: qemu
+system:
+    architecture: x86_64
+    machine: q35
+    readconfig:
+        - /definitely/missing/ezkvm-q35.cfg
+    memory:
+        size: 1024
+    cpu:
+        model: host
+        vcpus: 2
+devices: {}
+"#,
+        )
+        .expect("vm config should parse");
+
+        let err = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        )
+        .expect_err("preflight should fail");
+
+        assert!(err.to_string().contains(
+            "system.readconfig path '/definitely/missing/ezkvm-q35.cfg' does not exist on this host"
+        ));
+    }
+
+    #[test]
+    fn preflight_accepts_existing_readconfig_path() {
+        let config = VmConfig::from_str(
+            r#"
+name: preflight-existing-readconfig
+backend: qemu
+system:
+    architecture: x86_64
+    machine: q35
+    readconfig:
+        - /etc/hosts
+    memory:
+        size: 1024
+    cpu:
+        model: host
+        vcpus: 2
+devices: {}
+"#,
+        )
+        .expect("vm config should parse");
+
+        let result = run_runtime_preflight(
+            &config,
+            &CentralConfig::default(),
+            &RuntimeCliOverrides::default(),
+            "/bin/sh",
+        );
+
+        assert!(result.is_ok());
     }
 
     #[test]

@@ -121,15 +121,14 @@ Planner contract:
 |---|---|---|
 | `readconfig` injected | `/usr/share/ezkvm/ezkvm-q35.cfg` | `/usr/share/qemu-server/pve-q35-4.0.cfg` |
 | Machine string rewritten | No (kept as-is) | Yes (`+pve0` appended) |
-| `legacy_root_bus()` | `pcie.0` | `pci.0` |
+| `legacy_root_bus()` | `pci.0` | `pci.0` |
 | `audio_controller_bus()` | `pci.2` | `pci.2` |
 | `xhci_controller` default placement | `bus: pci.1, addr: 0x1b` | `bus: pci.1, addr: 0x1b` |
-| hostpci without explicit bus | Auto-allocates `ich9-pcie-port-1..8` | Falls back to `pcie.0` |
-| Root-port budget | 8 (`MAX_PORTABLE_ROOT_PORTS`) | N/A |
+| hostpci without explicit bus | Auto-allocates `ich9-pcie-port-1..8` | Auto-allocates `ich9-pcie-port-1..4` |
+| Root-port budget | 8 (`MAX_PORTABLE_ROOT_PORTS`) | 4 |
 
-The 8-port budget matches the port definitions in `share/ezkvm-q35.cfg`. Changing either requires updating both.
-
-**Safety fallback**: `normalize_legacy_root_bus` in `src/qemu/manager.rs` rewrites any surviving `pci.N` bus references to `pcie.0` at command-emit time for portable-linux + Q35 + non-pve machines. This is a last-resort normalization, not a replacement for correct planner output.
+The PortableLinux 8-port budget matches the port definitions in `share/ezkvm-q35.cfg`. Changing either requires updating both.
+The ProxmoxParity 4-port budget matches the port definitions in `/usr/share/qemu-server/pve-q35-4.0.cfg`. Changing either requires updating both.
 
 Q35 device placement policy:
 

@@ -273,18 +273,25 @@ Portable Q35 bus layout used by import defaults:
 - `pcie.0`: PCIe root complex
 - `ich9-pcie-port-1..8`: dedicated PCIe root ports at `0x1c.0`–`0x1c.7`,
   auto-assigned for PCIe passthrough devices when no explicit hostpci bus is set
-- `ehci.0`: USB 2.0 high-speed bus (ICH9 EHCI at `0x1d.7` + UHCI companions
-  at `0x1d.0`–`0x1d.2`); `usb-tablet` input devices are placed here automatically
+- `ehci.0`: USB 2.0 high-speed bus from ICH9 USB complex #1 (EHCI at `0x1d.7`
+  + UHCI companions at `0x1d.0`–`0x1d.2`); `usb-tablet` input devices are placed here automatically
+- `ehci-2.0`: USB 2.0 high-speed bus from ICH9 USB complex #2 (EHCI at `0x1a.7`
+  + UHCI companions at `0x1a.0`–`0x1a.2`) for closer parity with `pve-q35-4.0.cfg`
 - `pci.0`..`pci.3`: four legacy PCI buses backed by `i82801b11-bridge` (ICH9
   DMI-to-PCI at `0x1e`) feeding four `pci-bridge` subordinates, matching the
   `pve-q35-4.0.cfg` layout
+- `audio0` stub: `ich9-intel-hda` at `pcie.0,addr=1b.0`, retained for Proxmox
+  compatibility parity with `pve-q35-4.0.cfg`
 
 Current portable Q35 placement defaults for imported Proxmox VMs:
 
 - Audio controller (`ich9-intel-hda`): `bus: pci.2`, `addr: 0xc`
 - XHCI controller (when USB passthrough exists): `bus: pci.1`, `addr: 0x1b`
+- Display (`virtio-gpu`): `bus: pcie.0`, `addr: 0x1` when placement is omitted
+- ivshmem (`ivshmem-plain`): `bus: pcie.0`, `addr: 0x8` when placement is omitted
 - `usb-tablet` input device: placed on `ehci.0,port=1` when a Q35 readconfig is loaded
-- Guest-agent and balloon defaults remain on `pcie.0` unless explicitly overridden
+- Guest-agent and Windows balloon defaults use `bus: pci.0` (Proxmox-compatible
+  legacy root bus when portable Q35 bridge template is loaded)
 
 ## Import Mapping Reference
 

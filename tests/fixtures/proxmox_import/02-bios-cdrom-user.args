@@ -7,11 +7,11 @@ host
 -m
 2048M
 -smp
-cpus=2
+2,sockets=1,cores=2,maxcpus=2
 -drive
 if=none,id=drive-ide2,media=cdrom,readonly=on
 -device
-ide-cd,drive=drive-ide2,id=ide2,bootindex=101
+ide-cd,drive=drive-ide2,id=ide2,bus=ide.1,unit=0,bootindex=101
 -netdev
 type=user,id=net0
 -device
@@ -29,8 +29,4 @@ unix:<RUNTIME_DIR>/ezkvm/e2e-bios-cdrom.qmp,server=on,wait=off
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard
--global
-ICH9-LPC.disable_s3=1
--global
-ICH9-LPC.disable_s4=1
 -enable-kvm

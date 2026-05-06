@@ -7,7 +7,7 @@ host
 -m
 8192M
 -smp
-cpus=8
+8,sockets=1,cores=8,maxcpus=8
 -readconfig
 /usr/share/qemu-server/pve-q35-4.0.cfg
 -netdev
@@ -34,8 +34,4 @@ none
 -nographic
 -global
 kvm-pit.lost_tick_policy=discard
--global
-ICH9-LPC.disable_s3=1
--global
-ICH9-LPC.disable_s4=1
 -enable-kvm

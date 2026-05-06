@@ -67,12 +67,16 @@ impl QemuArgs {
         _vectors: u32,
         id: &str,
         bus: Option<&str>,
+        addr: Option<&str>,
         mem_path: &str,
     ) {
         self.push_str("-device");
         let mut device_spec = format!("ivshmem-plain,memdev={}", id);
         if let Some(bus) = bus {
             device_spec.push_str(&format!(",bus={}", bus));
+        }
+        if let Some(addr) = addr {
+            device_spec.push_str(&format!(",addr={}", addr));
         }
         self.push(device_spec);
 
