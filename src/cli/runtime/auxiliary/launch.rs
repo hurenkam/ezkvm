@@ -29,6 +29,14 @@ pub(crate) fn format_auxiliary_launch(launch: &AuxiliaryLaunch) -> String {
 }
 
 fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
+    tracing::debug!(
+        target: "ezkvm::runtime::auxiliary",
+        label = launch.label,
+        program = %launch.program,
+        args = ?launch.args,
+        "spawning auxiliary process"
+    );
+
     let mut cmd = Command::new(&launch.program);
     cmd.args(&launch.args).stdin(Stdio::null());
 
@@ -39,6 +47,13 @@ fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
     }
 
     let mut child = cmd.spawn().map_err(|err| {
+        tracing::warn!(
+            target: "ezkvm::runtime::auxiliary",
+            label = launch.label,
+            program = %launch.program,
+            error = %err,
+            "failed to spawn auxiliary process"
+        );
         anyhow!(
             "failed to start {} at '{}': {}",
             launch.label,
@@ -50,6 +65,12 @@ fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
     if launch.verify_running {
         std::thread::sleep(Duration::from_millis(250));
         if let Some(status) = child.try_wait()? {
+            tracing::warn!(
+                target: "ezkvm::runtime::auxiliary",
+                label = launch.label,
+                status = %status,
+                "auxiliary process exited immediately"
+            );
             return Err(anyhow!(
                 "{} exited immediately with status {}",
                 launch.label,
@@ -58,6 +79,12 @@ fn run_auxiliary_launch(launch: &AuxiliaryLaunch) -> Result<()> {
         }
     }
 
+    tracing::info!(
+        target: "ezkvm::runtime::auxiliary",
+        label = launch.label,
+        program = %launch.program,
+        "auxiliary process started"
+    );
     println!("✓ Started {}", launch.label);
     Ok(())
 }

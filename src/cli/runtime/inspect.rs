@@ -182,10 +182,15 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
     let vm_name = &config.name;
     println!("Status of VM: {}", vm_name);
 
+    let mut lifecycle_state = crate::state::VmState::Stopped;
+
     if let Ok(Some(pid)) = crate::state::read_pid_at(vm_name, config.options.pid_file.as_deref()) {
         match crate::qemu::process::find_qemu_processes(vm_name) {
             Ok(pids) if pids.contains(&pid) => {
-                println!("Status: Running (PID: {})", pid);
+                lifecycle_state = lifecycle_state
+                    .transition(crate::state::VmStateEvent::StartCommandIssued)?
+                    .transition(crate::state::VmStateEvent::ProcessObserved { pid: Some(pid) })?;
+                println!("Status: {} (PID: {})", lifecycle_state.status_label(), pid);
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
                 print_guest_agent_network_details(&config, &central_config);
@@ -200,12 +205,15 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
     match crate::qemu::process::is_vm_running(vm_name) {
         Ok(is_running) => {
             if is_running {
-                println!("Status: Running");
+                lifecycle_state = lifecycle_state
+                    .transition(crate::state::VmStateEvent::StartCommandIssued)?
+                    .transition(crate::state::VmStateEvent::ProcessObserved { pid: None })?;
+                println!("Status: {}", lifecycle_state.status_label());
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
                 print_guest_agent_network_details(&config, &central_config);
             } else {
-                println!("Status: Not running");
+                println!("Status: {}", lifecycle_state.status_label());
             }
         }
         Err(e) => {

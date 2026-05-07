@@ -23,7 +23,7 @@ pub fn spawn_shutdown_monitor(socket_path: String) -> std::thread::JoinHandle<()
         if let Err(e) = run_monitor(&socket_path) {
             // Only log unexpected errors, not normal socket-closed cases.
             if !is_connection_closed(&e) {
-                eprintln!("[shutdown-monitor] error: {}", e);
+                tracing::error!(target: "ezkvm::shutdown_monitor", error = %e, "shutdown monitor error");
             }
         }
     })

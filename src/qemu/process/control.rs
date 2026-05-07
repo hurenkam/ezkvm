@@ -33,36 +33,34 @@ pub fn stop_vm(vm_name: &str, qmp_socket_path: Option<&str>) -> Result<()> {
     }
 
     if pids.len() > 1 {
-        eprintln!(
-            "Warning: Found {} processes for VM '{}', stopping all",
-            pids.len(),
-            vm_name
+        tracing::warn!(
+            target: "ezkvm::process",
+            vm = %vm_name,
+            count = pids.len(),
+            "multiple processes found for VM; stopping all"
         );
     }
 
     if let Some(socket_path) = qmp_socket_path {
-        println!(
-            "Requesting guest shutdown via QMP system_powerdown ({})",
-            socket_path
-        );
+        tracing::info!(target: "ezkvm::process", vm = %vm_name, socket = %socket_path, "requesting guest shutdown via QMP system_powerdown");
         if qmp_execute(socket_path, "system_powerdown").is_ok() {
             if wait_for_vm_exit(vm_name, Duration::from_secs(10))? {
                 return Ok(());
             }
 
-            println!("VM still running, requesting QMP quit");
+            tracing::info!(target: "ezkvm::process", vm = %vm_name, "VM still running after system_powerdown; requesting QMP quit");
             if qmp_execute(socket_path, "quit").is_ok()
                 && wait_for_vm_exit(vm_name, Duration::from_secs(5))?
             {
                 return Ok(());
             }
         } else {
-            eprintln!("Warning: QMP powerdown request failed, falling back to SIGTERM");
+            tracing::warn!(target: "ezkvm::process", vm = %vm_name, "QMP powerdown failed; falling back to SIGTERM");
         }
     }
 
     for pid in pids {
-        println!("Sending SIGTERM to process {}", pid);
+        tracing::info!(target: "ezkvm::process", vm = %vm_name, pid, "sending SIGTERM to process");
         signal_process(pid, Signal::SIGTERM)?;
     }
 
@@ -78,15 +76,16 @@ pub fn kill_vm(vm_name: &str) -> Result<()> {
     }
 
     if pids.len() > 1 {
-        eprintln!(
-            "Warning: Found {} processes for VM '{}', killing all",
-            pids.len(),
-            vm_name
+        tracing::warn!(
+            target: "ezkvm::process",
+            vm = %vm_name,
+            count = pids.len(),
+            "multiple processes found for VM; killing all"
         );
     }
 
     for pid in pids {
-        println!("Sending SIGKILL to process {}", pid);
+        tracing::info!(target: "ezkvm::process", vm = %vm_name, pid, "sending SIGKILL to process");
         signal_process(pid, Signal::SIGKILL)?;
     }
 

@@ -1,7 +1,24 @@
-//! Configuration module for ezkvm
+//! Configuration module - parsing, validation, and merging of VM specs.
 //!
-//! This module handles parsing and validation of YAML configuration files
-//! that define virtual machine specifications.
+//! Handles complete lifecycle of VM configurations:
+//! - YAML parsing with serde and schema validation
+//! - Profile-aware merging with precedence policies
+//! - Device ID assignment and normalization
+//! - Proxmox VM import mapping
+//! - Central tool configuration and override threading
+//!
+//! # Architecture
+//! - `vm_schema/`: Core VmConfig type hierarchy (system, devices, controllers, host)
+//! - `platform/`: Platform-specific config types (TPM, guest-agent, SPICE, etc.)
+//! - `loader/`: Profile loading, merge policies, and YAML composition
+//! - `validation/`: Multi-stage config validation with domain checks
+//! - `central.rs`: Central tool configuration and CLI override struct
+//!
+//! # Design
+//! - Compact output: omits fields at semantic defaults via skip_serializing_if
+//! - Backward compatible: deserializer handles missing optional fields gracefully
+//! - Fail-fast: validates after parsing, rejects invalid configs early
+//! - Profile-aware: supports layered configurations with merge policies
 
 mod central;
 pub mod devices;

@@ -14,6 +14,9 @@ pub(crate) async fn handle_start(
     dry_run: bool,
     runtime_overrides: crate::config::RuntimeCliOverrides,
 ) -> Result<()> {
+    let mut lifecycle_state = crate::state::VmState::Stopped
+        .transition(crate::state::VmStateEvent::StartCommandIssued)?;
+
     println!("Loading configuration from: {}", config_path);
 
     let (mut config, central_config) = load_start_configs(config_path)?;
@@ -24,6 +27,7 @@ pub(crate) async fn handle_start(
         run_runtime_preflight(&config, &central_config, &runtime_overrides, &qemu_binary)?;
     println!("✓ Runtime preflight checks passed");
     for warning in preflight.optional_warnings() {
+        tracing::warn!(target: "ezkvm::preflight", warning = %warning, "optional preflight warning");
         println!("Preflight warning: {}", warning);
     }
 
@@ -75,6 +79,10 @@ pub(crate) async fn handle_start(
             &runtime_overrides,
         )?;
     }
+
+    lifecycle_state =
+        lifecycle_state.transition(crate::state::VmStateEvent::ProcessObserved { pid: None })?;
+    tracing::debug!(target: "ezkvm::lifecycle", state = ?lifecycle_state, "vm start path completed");
 
     Ok(())
 }
@@ -387,10 +395,10 @@ fn run_daemon_start(
     }
 
     if let Err(err) = spawn_remote_viewer(manager.config(), central_config, runtime_overrides) {
-        eprintln!("Warning: {}", err);
+        report_auxiliary_warning("remote-viewer", &err);
     }
     if let Err(err) = spawn_looking_glass(manager.config(), central_config, runtime_overrides) {
-        eprintln!("Warning: {}", err);
+        report_auxiliary_warning("looking-glass", &err);
     }
 
     Ok(())
@@ -406,10 +414,10 @@ fn run_interactive_start(
     println!("Starting interactively...");
 
     if let Err(err) = spawn_remote_viewer(manager.config(), central_config, runtime_overrides) {
-        eprintln!("Warning: {}", err);
+        report_auxiliary_warning("remote-viewer", &err);
     }
     if let Err(err) = spawn_looking_glass(manager.config(), central_config, runtime_overrides) {
-        eprintln!("Warning: {}", err);
+        report_auxiliary_warning("looking-glass", &err);
     }
 
     // Spawn QMP shutdown monitor: detects guest-initiated power-off and sends
@@ -434,6 +442,16 @@ fn run_interactive_start(
     );
 
     Ok(())
+}
+
+fn report_auxiliary_warning(component: &str, err: &dyn std::fmt::Display) {
+    tracing::warn!(
+        target: "ezkvm::runtime::auxiliary",
+        component,
+        error = %err,
+        "auxiliary launch failed"
+    );
+    eprintln!("Warning: {}", err);
 }
 
 #[cfg(test)]

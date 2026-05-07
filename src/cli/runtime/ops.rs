@@ -8,16 +8,25 @@ pub(crate) async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
 
     println!("Stopping VM: {}", config.name);
 
+    let mut lifecycle_state = crate::state::VmState::Running { pid: None };
+
     if force {
+        lifecycle_state =
+            lifecycle_state.transition(crate::state::VmStateEvent::ForceKillIssued)?;
         println!("Force stopping...");
         crate::qemu::process::kill_vm(&config.name)?;
         println!("✓ VM '{}' force stopped", config.name);
     } else {
+        lifecycle_state =
+            lifecycle_state.transition(crate::state::VmStateEvent::StopCommandIssued)?;
         println!("Gracefully stopping...");
         let qmp_socket = resolve_qmp_socket_path(&config);
         crate::qemu::process::stop_vm(&config.name, qmp_socket.as_deref())?;
         println!("✓ VM '{}' stopped", config.name);
     }
+
+    lifecycle_state = lifecycle_state.transition(crate::state::VmStateEvent::ProcessExited)?;
+    tracing::debug!(target: "ezkvm::lifecycle", vm = %config.name, state = ?lifecycle_state, "vm stop path completed");
 
     let _ = crate::state::delete_pid_at(&config.name, config.options.pid_file.as_deref());
 
@@ -32,8 +41,14 @@ pub(crate) async fn handle_kill(config_path: &str) -> Result<()> {
 
     println!("Killing VM: {}", config.name);
 
+    let mut lifecycle_state = crate::state::VmState::Running { pid: None };
+    lifecycle_state = lifecycle_state.transition(crate::state::VmStateEvent::ForceKillIssued)?;
+
     crate::qemu::process::kill_vm(&config.name)?;
     println!("✓ VM '{}' killed", config.name);
+
+    lifecycle_state = lifecycle_state.transition(crate::state::VmStateEvent::ProcessExited)?;
+    tracing::debug!(target: "ezkvm::lifecycle", vm = %config.name, state = ?lifecycle_state, "vm kill path completed");
 
     let _ = crate::state::delete_pid_at(&config.name, config.options.pid_file.as_deref());
 

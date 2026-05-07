@@ -1,6 +1,14 @@
-//! Configuration validation module
+//! Configuration validation module with multi-stage checks.
 //!
-//! Validates VM configurations for correctness and compatibility.
+//! Performs comprehensive validation of parsed VM configurations following
+//! the fail-fast principle: catches errors early with actionable messages.
+//! Validation stages: schema > business logic > cross-device constraints.
+//!
+//! # Design
+//! - Validates after deserialization to catch YAML/type issues
+//! - Provides descriptive errors using anyhow context
+//! - Modular validators per subsystem (system, boot, devices, platform)
+//! - Can be extended for custom validation rules in future phases
 
 mod boot;
 mod devices;
@@ -26,6 +34,29 @@ use system::validate_system_config;
 use vm_options::validate_vm_options;
 
 /// Validate a complete VM configuration
+/// Validate a complete VM configuration.
+///
+/// Performs multi-stage validation:
+/// 1. Backend support check (currently qemu only)
+/// 2. Core sections (system, boot, devices)
+/// 3. Optional platform sections (TPM, guest-agent, SPICE, VNC, etc.)
+/// 4. Device collections (hostpci, USB, XHCI, audio, input)
+/// 5. VM options (RTC, guest-agent, balloon)
+///
+/// # Arguments
+/// * `config` - The VmConfig to validate
+///
+/// # Returns
+/// Ok if config passes all checks, Err with actionable message otherwise
+///
+/// # Examples
+/// ```ignore
+/// use ezkvm::config::validation::validate_config;
+/// match validate_config(&config) {
+///     Ok(()) => println!("Configuration valid"),
+///     Err(e) => eprintln!("Validation error: {}", e),
+/// }
+/// ```
 pub fn validate_config(config: &VmConfig) -> Result<()> {
     validate_backend(config)?;
     validate_core_sections(config)?;

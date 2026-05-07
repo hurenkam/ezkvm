@@ -66,6 +66,17 @@ pub(crate) fn start_swtpm_if_configured(
     let swtpm_path = swtpm_path(central_config, runtime_overrides)?;
     let startup = prepare_swtpm_startup(config, central_config, runtime_overrides, tpm)?;
     let rendered_cmd = render_swtpm_command(&swtpm_path, &startup);
+    tracing::info!(
+        target: "ezkvm::runtime::swtpm",
+        vm = %config.name,
+        socket = %startup.socket_path,
+        "launching swtpm emulator"
+    );
+    tracing::debug!(
+        target: "ezkvm::runtime::swtpm",
+        command = %rendered_cmd.join(" "),
+        "resolved swtpm command"
+    );
     println!("Launching swtpm: {}", rendered_cmd.join(" "));
 
     spawn_swtpm(&swtpm_path, &startup)?;
@@ -167,6 +178,11 @@ fn spawn_swtpm(swtpm_path: &str, startup: &SwtpmStartup) -> Result<()> {
     }
 
     wait_for_unix_socket(&startup.socket_path, Duration::from_secs(3), "swtpm socket")?;
+    tracing::info!(
+        target: "ezkvm::runtime::swtpm",
+        socket = %startup.socket_path,
+        "swtpm emulator started"
+    );
     println!(
         "✓ Started swtpm emulator using socket {}",
         startup.socket_path

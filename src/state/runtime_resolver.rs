@@ -107,7 +107,18 @@ pub fn resolve_runtime_root_with_source(
     resolution
 }
 
-/// Convenience helper for resolving runtime root paths with central defaults.
+/// Resolve the runtime directory root following the standard precedence contract.
+///
+/// Returns absolute path to runtime directory where sockets, PIDs, and state files are stored.
+/// Uses precedence order: CLI override > central config > XDG_RUNTIME_DIR > HOME/.local/run > /tmp/ezkvm
+///
+/// # Arguments
+/// * `explicit` - Explicit path (usually from VM config)
+/// * `central_config` - Central tool configuration
+/// * `runtime_overrides` - CLI-provided overrides
+///
+/// # Returns
+/// Result containing the resolved PathBuf, or error if resolution fails
 pub fn resolve_runtime_root(
     explicit: Option<&str>,
     central_config: &crate::config::CentralConfig,
@@ -119,25 +130,70 @@ pub fn resolve_runtime_root(
     Ok(PathBuf::from(resolved))
 }
 
-/// Resolve default TPM socket path under runtime root.
+/// Resolve the default TPM socket path for a VM.
+///
+/// TPM socket is placed under runtime root with naming convention: `<vm-name>.swtpm`
+/// This ensures sockets are cleaned up with system restart and follows ezkvm's
+/// runtime-root precedence contract rather than using Proxmox hardcoded paths.
+///
+/// # Arguments
+/// * `vm_name` - Virtual machine name used to generate deterministic socket filename
+/// * `central_config` - Central tool configuration with runtime directory policy
+/// * `runtime_overrides` - CLI-provided path overrides
+///
+/// # Returns
+/// Result containing absolute path to TPM socket (e.g., `/run/ezkvm/vm-name.swtpm`)
+///
+/// # Errors
+/// Returns error if VM name is empty or runtime root resolution fails.
 pub fn resolve_runtime_tpm_socket(
     vm_name: &str,
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<String> {
-    let root = resolve_runtime_root(None, central_config, runtime_overrides)?;
-    let vm = vm_name.trim();
-    if vm.is_empty() {
-        return Err(anyhow!(
-            "VM name must not be empty when resolving TPM socket path"
-        ));
-    }
-    Ok(root.join(format!("{}.swtpm", vm)).display().to_string())
+    resolve_runtime_named_path(
+        vm_name,
+        "swtpm",
+        "TPM socket",
+        central_config,
+        runtime_overrides,
+    )
 }
 
-/// Resolve default guest-agent socket path under runtime root.
+/// Resolve the default guest-agent socket path for a VM.
+///
+/// QGA socket is placed under runtime root with naming convention: `<vm-name>.qga`
+/// Follows same runtime-root precedence as TPM sockets for consistency.
+/// Defaults to `<runtime-root>/<vm-name>.qga` when no explicit socket path is configured.
+///
+/// # Arguments
+/// * `vm_name` - Virtual machine name used to generate deterministic socket filename
+/// * `central_config` - Central tool configuration with runtime directory policy  
+/// * `runtime_overrides` - CLI-provided path overrides
+///
+/// # Returns
+/// Result containing absolute path to guest-agent socket (e.g., `/run/ezkvm/vm-name.qga`)
+///
+/// # Errors
+/// Returns error if VM name is empty or runtime root resolution fails.
 pub fn resolve_runtime_guest_agent_socket(
     vm_name: &str,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<String> {
+    resolve_runtime_named_path(
+        vm_name,
+        "qga",
+        "guest agent socket",
+        central_config,
+        runtime_overrides,
+    )
+}
+
+fn resolve_runtime_named_path(
+    vm_name: &str,
+    suffix: &str,
+    label: &str,
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
 ) -> Result<String> {
@@ -145,10 +201,14 @@ pub fn resolve_runtime_guest_agent_socket(
     let vm = vm_name.trim();
     if vm.is_empty() {
         return Err(anyhow!(
-            "VM name must not be empty when resolving guest agent socket path"
+            "VM name must not be empty when resolving {} path",
+            label
         ));
     }
-    Ok(root.join(format!("{}.qga", vm)).display().to_string())
+    Ok(root
+        .join(format!("{}.{}", vm, suffix))
+        .display()
+        .to_string())
 }
 
 #[cfg(test)]

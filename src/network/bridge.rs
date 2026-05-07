@@ -26,6 +26,7 @@ pub fn create_bridge(name: &str) -> Result<()> {
         .args(["link", "set", name, "up"])
         .output()?;
 
+    tracing::info!(target: "ezkvm::network::bridge", bridge = %name, "created bridge");
     println!("✓ Created bridge: {}", name);
     Ok(())
 }
@@ -42,6 +43,7 @@ pub fn delete_bridge(name: &str) -> Result<()> {
         return Err(anyhow!("Failed to delete bridge: {}", err));
     }
 
+    tracing::info!(target: "ezkvm::network::bridge", bridge = %name, "deleted bridge");
     println!("✓ Deleted bridge: {}", name);
     Ok(())
 }
@@ -82,6 +84,7 @@ pub fn add_to_bridge(bridge: &str, device: &str) -> Result<()> {
         return Err(anyhow!("Failed to add device to bridge: {}", err));
     }
 
+    tracing::info!(target: "ezkvm::network::bridge", bridge = %bridge, device = %device, "added device to bridge");
     println!("✓ Added {} to bridge {}", device, bridge);
     Ok(())
 }

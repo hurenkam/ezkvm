@@ -1,6 +1,21 @@
-//! VM state management
+//! VM state management, runtime path resolution, and capability detection.
 //!
-//! Handles PID files, configuration caching, and VM state persistence.
+//! This module manages VM lifecycle tracking and resolves runtime paths following
+//! the portable-runtime precedence contract. It handles:
+//! - PID files and process lifecycle
+//! - Configuration caching for status/inspection commands
+//! - Socket path resolution with precedence (TPM, guest-agent, QMP)
+//! - Runtime capability detection (Proxmox parity vs portable Linux)
+//! - Network capability negotiation and resolution
+//! - Looking Glass program resolution with fallback chains
+//!
+//! # Precedence Model
+//! All path resolution follows: CLI > central config > platform defaults > fallback
+//!
+//! # Design Patterns
+//! - Trait-based capability resolvers for extension boundaries
+//! - No global singletons; all resolution is explicit and dependency-injected
+//! - Centralized error context with anyhow for actionable error messages
 
 mod cache;
 mod capability_precedence;
@@ -11,6 +26,7 @@ mod paths;
 mod pid;
 mod runtime_resolver;
 mod tpm_resolver;
+mod vm_state;
 
 #[allow(unused_imports)]
 pub use cache::{cache_config, delete_cached_config, load_cached_config};
@@ -52,6 +68,8 @@ pub use tpm_resolver::{
     resolve_swtpm_binary_with_source, resolve_tpm_placement_mode, resolve_tpm_socket_path,
     resolve_tpm_state_dir,
 };
+#[allow(unused_imports)]
+pub use vm_state::{VmState, VmStateEvent};
 
 #[cfg(test)]
 mod tests {

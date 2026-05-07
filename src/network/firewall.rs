@@ -35,6 +35,15 @@ pub fn add_port_forward(rule: &PortForwardRule, external_ip: &str) -> Result<()>
         return Err(anyhow!("Failed to setup port forward: {}", err));
     }
 
+    tracing::info!(
+        target: "ezkvm::network::firewall",
+        external_ip = %external_ip,
+        host_port,
+        guest_ip = %guest_ip,
+        guest_port,
+        protocol = %protocol,
+        "added port forward rule"
+    );
     println!(
         "✓ Added port forward: {}:{} -> {}:{}",
         external_ip, host_port, guest_ip, guest_port
@@ -74,6 +83,15 @@ pub fn remove_port_forward(rule: &PortForwardRule, external_ip: &str) -> Result<
         return Err(anyhow!("Failed to remove port forward: {}", err));
     }
 
+    tracing::info!(
+        target: "ezkvm::network::firewall",
+        external_ip = %external_ip,
+        host_port,
+        guest_ip = %guest_ip,
+        guest_port,
+        protocol = %protocol,
+        "removed port forward rule"
+    );
     println!("✓ Removed port forward rule");
     Ok(())
 }
@@ -113,6 +131,7 @@ pub fn setup_network_isolation(vm_name: &str, vlan_id: u16) -> Result<()> {
         }
 
         // If it's just "already exists", log and continue
+        tracing::info!(target: "ezkvm::network::firewall", vlan = %vlan_name, "VLAN interface already exists; continuing setup");
         eprintln!(
             "ℹ VLAN interface '{}' already exists, proceeding with setup",
             vlan_name
@@ -134,6 +153,7 @@ pub fn setup_network_isolation(vm_name: &str, vlan_id: u16) -> Result<()> {
         ));
     }
 
+    tracing::info!(target: "ezkvm::network::firewall", vm = %vm_name, vlan_id, "configured network isolation VLAN");
     println!(
         "✓ Setup network isolation for VM '{}' on VLAN {}",
         vm_name, vlan_id

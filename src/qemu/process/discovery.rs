@@ -16,6 +16,7 @@ pub fn find_qemu_processes(vm_name: &str) -> Result<Vec<i32>> {
         && is_process_alive(pid)?
         && is_qemu_process(pid, Some(vm_name))?
     {
+        tracing::debug!(target: "ezkvm::process::discovery", vm = %vm_name, pid, "resolved qemu process from pid file");
         return Ok(vec![pid]);
     }
     // PID file exists but process is not running or is not the right one
@@ -23,6 +24,7 @@ pub fn find_qemu_processes(vm_name: &str) -> Result<Vec<i32>> {
 
     // Strategy 2: Fall back to exact command-line matching
     // Find all qemu-system processes and check for exact -name match
+    tracing::debug!(target: "ezkvm::process::discovery", vm = %vm_name, "falling back to exact command-line process lookup");
     find_qemu_processes_by_exact_name(vm_name)
 }
 
@@ -92,6 +94,7 @@ fn find_qemu_processes_by_exact_name(vm_name: &str) -> Result<Vec<i32>> {
         }
     }
 
+    tracing::debug!(target: "ezkvm::process::discovery", vm = %vm_name, matches = pids.len(), "completed exact command-line process lookup");
     Ok(pids)
 }
 
@@ -166,6 +169,7 @@ pub fn list_running_vms() -> Result<Vec<(String, i32)>> {
         }
     }
 
+    tracing::debug!(target: "ezkvm::process::discovery", count = vms.len(), "listed running VMs");
     Ok(vms)
 }
 

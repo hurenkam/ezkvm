@@ -7,6 +7,7 @@ mod cli;
 mod config;
 mod device;
 mod import;
+mod logging;
 mod network;
 mod qemu;
 mod state;
@@ -20,6 +21,7 @@ use clap::Parser;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    logging::init();
     let cli = cli::Cli::parse();
 
     cli::execute(cli).await
