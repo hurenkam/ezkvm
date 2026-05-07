@@ -1,0 +1,45 @@
+name: wakiza
+backend: qemu
+profiles:
+  - proxmox-base
+  - proxmox-portable-q35
+  - proxmox-q35-uefi
+  - proxmox-windows
+  - windows-common
+  - windows-11
+  - looking-glass
+  - gpu-passthrough
+
+system:
+  memory: { size: 16384 }
+  cpu:    { model: host, vcpus: 8 }
+  boot:   { uefi_vars: /dev/vm1/vm-108-efidisk }
+  tpm:    { state_backend_uri: /dev/vm1/vm-108-tpmstate }
+  smbios:
+    uuid: 04d064c3-66a1-4aa7-9589-f8b3ecf91cd7
+    vm_generation_id: c13b46f3-9743-49f0-92e8-297b9feac497
+
+options: { guest_agent: {} }
+spice:   { port: 5903, disable_ticketing: true }
+
+host:
+  pci:
+    - { device: 0000:03:00.0, multifunction: true }
+    - { device: 0000:03:00.1 }
+  usb:
+    - { host: '', hostbus: '1', hostport: '2.2', bus: xhci.0, port: '1' }
+
+devices:
+  displays:
+    - { type: none }
+  networks:
+    - { id: net0, model: virtio-net-pci, backend: {type: bridge, bridge: br0}, mac: BC:24:11:3A:21:B7, boot_index: 102 }
+  controllers:
+    scsi:
+      - type: pvscsi
+        drives:
+          - { id: scsi0, path: /dev/vm1/vm-108-boot, boot_index: 100, type: disk, format: raw, discard: true, ssd: true, rotation_rate: 1 }
+          - { id: scsi1, path: /dev/vm1/vm-108-tmp, rotation_rate: 1, type: disk, format: raw, discard: true, ssd: true }
+    ide:
+      - drives:
+          - { id: ide2, boot_index: 101, type: cdrom, format: raw }

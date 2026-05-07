@@ -11,5 +11,7 @@ mod system;
 mod tpm;
 mod usb;
 
+pub(crate) use display::SpiceVdagentConfig;
+
 #[cfg(test)]
 mod tests;

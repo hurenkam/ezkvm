@@ -9,6 +9,8 @@ pub struct RuntimeCliOverrides {
     pub remote_viewer_program: Option<String>,
     pub looking_glass_program: Option<String>,
     pub ovmf_dir: Option<String>,
+    /// When true, missing resource paths are downgraded from preflight errors to warnings.
+    pub dry_run: bool,
 }
 
 /// Central tool configuration structure

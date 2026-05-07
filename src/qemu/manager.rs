@@ -96,6 +96,15 @@ impl QemuManager {
         .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.swtpm", self.config.name))
     }
 
+    pub(super) fn resolve_guest_agent_socket_path(&self) -> String {
+        crate::state::resolve_runtime_guest_agent_socket(
+            &self.config.name,
+            &self.central_config,
+            &self.runtime_overrides,
+        )
+        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.qga", self.config.name))
+    }
+
     pub(super) fn normalize_legacy_root_bus<'a>(
         &self,
         bus: Option<&'a str>,

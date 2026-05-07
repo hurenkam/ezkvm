@@ -42,8 +42,9 @@ pub use paths::{
 pub use pid::{delete_pid, delete_pid_at, read_pid, read_pid_at, save_pid, save_pid_at};
 #[allow(unused_imports)]
 pub use runtime_resolver::{
-    CentralRuntimeCapabilityResolver, RuntimeCapabilityResolver, resolve_runtime_root,
-    resolve_runtime_root_with_source, resolve_runtime_tpm_socket,
+    CentralRuntimeCapabilityResolver, RuntimeCapabilityResolver,
+    resolve_runtime_guest_agent_socket, resolve_runtime_root, resolve_runtime_root_with_source,
+    resolve_runtime_tpm_socket,
 };
 #[allow(unused_imports)]
 pub use tpm_resolver::{

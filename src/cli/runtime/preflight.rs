@@ -155,7 +155,9 @@ fn ensure_tpm_capabilities(
         ensure_parent_dir_is_writable_or_creatable(&tpm_socket, "TPM socket")?;
         ensure_swtpm_apparmor_socket_policy(&tpm_socket)?;
 
-        ensure_tpm_backend_uri_local_path_exists(tpm)?;
+        if !runtime_overrides.dry_run {
+            ensure_tpm_backend_uri_local_path_exists(tpm)?;
+        }
         ensure_tpm_backend_uri_apparmor_policy(tpm)?;
 
         if let Some(swtpm_log_path) = resolve_configured_swtpm_log_path(config, central_config) {
@@ -404,6 +406,9 @@ fn ensure_firmware_capabilities(
         if Path::new(explicit_code).exists() {
             return Ok(());
         }
+        if runtime_overrides.dry_run {
+            return Ok(());
+        }
         return Err(anyhow!(
             "preflight failed: UEFI firmware code '{}' does not exist",
             explicit_code
@@ -415,6 +420,10 @@ fn ensure_firmware_capabilities(
         crate::qemu::CentralFirmwareCapabilityResolver::new(central_config, runtime_overrides);
 
     if resolver.resolve_ovmf_code(secure_boot).is_some() {
+        return Ok(());
+    }
+
+    if runtime_overrides.dry_run {
         return Ok(());
     }
 
@@ -440,6 +449,10 @@ fn collect_optional_warnings(
 ) {
     if mode == crate::state::RuntimeCapabilityMode::PortableLinux {
         collect_network_capability_warnings(config, central_config, report);
+        if runtime_overrides.dry_run {
+            collect_tpm_backend_uri_warnings(config, central_config, runtime_overrides, report);
+            collect_firmware_warnings(config, central_config, runtime_overrides, report);
+        }
     }
 
     if should_launch_remote_viewer(config)
@@ -514,6 +527,74 @@ fn ensure_looking_glass_capabilities(
     ) {
         Ok(_) => Ok(()),
         Err(err) => Err(anyhow!("preflight failed: {}", err)),
+    }
+}
+
+fn collect_tpm_backend_uri_warnings(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+    report: &mut RuntimePreflightReport,
+) {
+    let Some(tpm) = config.system_tpm().filter(|t| t.backend == "emulator") else {
+        return;
+    };
+    let placement_mode =
+        crate::state::resolve_tpm_placement_mode(central_config, runtime_overrides);
+    if placement_mode != crate::state::TpmPlacementMode::Socket {
+        return;
+    }
+    let Some(path) = tpm_backend_uri_local_path(tpm.state_backend_uri.as_deref()) else {
+        return;
+    };
+    if !Path::new(&path).exists() {
+        report.push_warning(format!(
+            "system.tpm.state_backend_uri resolves to local path '{}' but it does not exist on this host",
+            path
+        ));
+    }
+}
+
+fn collect_firmware_warnings(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+    report: &mut RuntimePreflightReport,
+) {
+    let firmware = config
+        .system_boot()
+        .firmware
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("");
+    if firmware != "uefi" && firmware != "ovmf" {
+        return;
+    }
+
+    if let Some(explicit_code) = config.system_boot().uefi_code.as_deref() {
+        if !Path::new(explicit_code).exists() {
+            report.push_warning(format!(
+                "UEFI firmware code '{}' does not exist",
+                explicit_code
+            ));
+        }
+        return;
+    }
+
+    let secure_boot = config.system_boot().secure_boot;
+    let resolver =
+        crate::qemu::CentralFirmwareCapabilityResolver::new(central_config, runtime_overrides);
+    if resolver.resolve_ovmf_code(secure_boot).is_none() {
+        let search_dirs = central_config.ovmf_search_dirs_with_overrides(runtime_overrides);
+        let searched = if search_dirs.is_empty() {
+            "/usr/share/ovmf, /usr/share/OVMF".to_string()
+        } else {
+            search_dirs.join(", ")
+        };
+        report.push_warning(format!(
+            "UEFI firmware requested but no OVMF file found in: {}",
+            searched
+        ));
     }
 }
 

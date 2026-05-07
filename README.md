@@ -38,6 +38,11 @@ cargo build --release
 ezkvm validate examples/basic-vm.yaml
 ```
 
+To inspect the generated machine topology as a tree (similar to `lspci -t`):
+```bash
+ezkvm validate examples/basic-vm.yaml --show-machine-layout
+```
+
 3. Start the VM:
 ```bash
 ezkvm start examples/basic-vm.yaml
@@ -136,6 +141,7 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm status <config.yaml>` - Show VM status
 - `ezkvm console <config.yaml>` - Attach to VM console
 - `ezkvm validate <config.yaml>` - Validate configuration file
+- `ezkvm validate <config.yaml> --show-machine-layout` - Print machine/device layout tree derived from generated QEMU args and loaded `-readconfig` templates
 
 ### Storage Management
 - `ezkvm storage create <name> --size <GB>` - Create a QCOW2 disk image

@@ -34,6 +34,7 @@ pub async fn execute(cli: Cli) -> Result<()> {
                 remote_viewer_program,
                 looking_glass_program,
                 ovmf_dir,
+                dry_run,
             };
             handle_start(&config, daemon, dry_run, runtime_overrides).await
         }
@@ -45,7 +46,8 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Commands::Validate {
             config,
             show_resolved_config,
-        } => handle_validate(&config, show_resolved_config).await,
+            show_machine_layout,
+        } => handle_validate(&config, show_resolved_config, show_machine_layout).await,
         Commands::ImportProxmox {
             input,
             proxmox_storage,

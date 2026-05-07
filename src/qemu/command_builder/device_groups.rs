@@ -56,23 +56,46 @@ impl QemuManager {
         if let Some(spice) = &self.config.spice
             && spice.enabled
         {
+            let has_q35_bridge_readconfig = self
+                .config
+                .system
+                .readconfig
+                .iter()
+                .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
             let has_serial_controller = self
                 .config
                 .options_guest_agent()
                 .map(|guest_agent| {
                     // Proxmox-style pinned guest-agent controllers should not be reused
                     // for SPICE vdagent. Keep a dedicated vdagent serial controller.
-                    guest_agent.enabled && guest_agent.bus.is_none() && guest_agent.addr.is_none()
+                    guest_agent.enabled
+                        && guest_agent.bus.is_none()
+                        && guest_agent.addr.is_none()
+                        && !has_q35_bridge_readconfig
                 })
                 .unwrap_or(false);
             let attach_display_device = !self.has_primary_passthrough_gpu();
+            let vdagent_serial_bus = if has_q35_bridge_readconfig && !has_serial_controller {
+                Some("pci.0")
+            } else {
+                None
+            };
+            let vdagent_serial_addr = if has_q35_bridge_readconfig && !has_serial_controller {
+                Some("0x9")
+            } else {
+                None
+            };
             args.add_spice(
                 spice.port,
                 &spice.addr,
                 spice.disable_ticketing,
-                spice.vdagent,
-                has_serial_controller,
                 attach_display_device,
+                crate::qemu::args::SpiceVdagentConfig {
+                    enabled: spice.vdagent,
+                    has_serial_controller,
+                    serial_bus: vdagent_serial_bus,
+                    serial_addr: vdagent_serial_addr,
+                },
             );
 
             if spice.audio {

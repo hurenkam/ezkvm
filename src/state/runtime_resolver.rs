@@ -135,9 +135,27 @@ pub fn resolve_runtime_tpm_socket(
     Ok(root.join(format!("{}.swtpm", vm)).display().to_string())
 }
 
+/// Resolve default guest-agent socket path under runtime root.
+pub fn resolve_runtime_guest_agent_socket(
+    vm_name: &str,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Result<String> {
+    let root = resolve_runtime_root(None, central_config, runtime_overrides)?;
+    let vm = vm_name.trim();
+    if vm.is_empty() {
+        return Err(anyhow!(
+            "VM name must not be empty when resolving guest agent socket path"
+        ));
+    }
+    Ok(root.join(format!("{}.qga", vm)).display().to_string())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{resolve_runtime_root, resolve_runtime_tpm_socket};
+    use super::{
+        resolve_runtime_guest_agent_socket, resolve_runtime_root, resolve_runtime_tpm_socket,
+    };
     use crate::config::{CentralConfig, RuntimeCliOverrides};
 
     #[test]
@@ -200,5 +218,18 @@ mod tests {
         let socket = resolve_runtime_tpm_socket("vm-a", &central, &overrides)
             .expect("socket path should resolve");
         assert_eq!(socket, "/run/ezkvm/vm-a.swtpm");
+    }
+
+    #[test]
+    fn runtime_guest_agent_socket_uses_runtime_root_and_vm_name() {
+        let central = CentralConfig::default();
+        let overrides = RuntimeCliOverrides {
+            run_dir: Some("/run/ezkvm".to_string()),
+            ..Default::default()
+        };
+
+        let socket = resolve_runtime_guest_agent_socket("vm-a", &central, &overrides)
+            .expect("socket path should resolve");
+        assert_eq!(socket, "/run/ezkvm/vm-a.qga");
     }
 }

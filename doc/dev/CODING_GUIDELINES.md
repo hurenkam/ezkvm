@@ -91,7 +91,7 @@ Import output compactness rule:
 - Preserve Proxmox runtime integration paths and identifiers when VMID is known:
   - tap interface names: `tap<vmid>i<index>`
   - pid file path: `/var/run/qemu-server/<vmid>.pid`
-  - guest agent socket path: `/var/run/qemu-server/<vmid>.qga`
+  - guest agent socket path (import/parity): `/var/run/qemu-server/<vmid>.qga`
 - Preserve Proxmox-compatible PCI topology for imported devices when defaults are expected by guest OS behavior (for example NIC `bus/addr` placement and guest-agent controller placement).
 - Preserve Proxmox-compatible serial topology for guest agent and SPICE/vdagent channels to avoid Looking Glass keyboard/input regressions.
 - For Proxmox import changes that affect runtime arguments, update fixture snapshots and verify dry-run parity against captured Proxmox command lines.

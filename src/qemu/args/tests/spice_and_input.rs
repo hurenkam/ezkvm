@@ -1,9 +1,21 @@
 use super::QemuArgs;
+use crate::qemu::args::SpiceVdagentConfig;
 
 #[test]
 fn test_spice_audio_devices() {
     let mut args = QemuArgs::new();
-    args.add_spice(5903, "0.0.0.0", true, true, false, true);
+    args.add_spice(
+        5903,
+        "0.0.0.0",
+        true,
+        true,
+        SpiceVdagentConfig {
+            enabled: true,
+            has_serial_controller: false,
+            serial_bus: None,
+            serial_addr: None,
+        },
+    );
     args.add_spice_audiodev("spice-backend0");
     args.add_audio_device(
         "ich9-intel-hda",
@@ -49,13 +61,30 @@ fn test_spice_audio_devices() {
 #[test]
 fn test_input_devices() {
     let mut args = QemuArgs::new();
-    args.add_spice(5903, "0.0.0.0", true, true, false, true);
-    args.add_input_device("virtio-mouse");
-    args.add_input_device("virtio-keyboard");
+    args.add_spice(
+        5903,
+        "0.0.0.0",
+        true,
+        true,
+        SpiceVdagentConfig {
+            enabled: true,
+            has_serial_controller: false,
+            serial_bus: None,
+            serial_addr: None,
+        },
+    );
+    args.add_input_device_with_bus("virtio-mouse", Some("pci.0"));
+    args.add_input_device_with_bus("virtio-keyboard", Some("pci.0"));
 
     let built = args.build();
-    let mouse_count = built.iter().filter(|arg| *arg == "virtio-mouse").count();
-    let keyboard_count = built.iter().filter(|arg| *arg == "virtio-keyboard").count();
+    let mouse_count = built
+        .iter()
+        .filter(|arg| *arg == "virtio-mouse,bus=pci.0")
+        .count();
+    let keyboard_count = built
+        .iter()
+        .filter(|arg| *arg == "virtio-keyboard,bus=pci.0")
+        .count();
 
     assert_eq!(mouse_count, 1);
     assert_eq!(keyboard_count, 1);
@@ -65,9 +94,8 @@ fn test_input_devices() {
             .any(|arg| arg == "virtio-serial-pci,id=virtio-serial0")
     );
     assert!(
-        built
-            .iter()
-            .any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0")
+        built.iter().any(|arg| arg
+            == "virtserialport,chardev=vdagent,name=com.redhat.spice.0,bus=virtio-serial0.0")
     );
 }
 
@@ -93,7 +121,18 @@ fn test_spice_vdagent_reuses_existing_serial_controller() {
         Some("pci.0"),
         Some("0x8"),
     );
-    args.add_spice(5903, "0.0.0.0", true, true, true, true);
+    args.add_spice(
+        5903,
+        "0.0.0.0",
+        true,
+        true,
+        SpiceVdagentConfig {
+            enabled: true,
+            has_serial_controller: true,
+            serial_bus: None,
+            serial_addr: None,
+        },
+    );
 
     let built = args.build();
     let serial_controller_count = built
@@ -103,21 +142,31 @@ fn test_spice_vdagent_reuses_existing_serial_controller() {
 
     assert_eq!(serial_controller_count, 1);
     assert!(
-        built
-            .iter()
-            .any(|arg| arg == "virtserialport,chardev=vdagent,name=com.redhat.spice.0")
+        built.iter().any(|arg| arg
+            == "virtserialport,chardev=vdagent,name=com.redhat.spice.0,bus=virtio-serial0.0")
     );
     assert!(
         built
             .iter()
-            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0")
+            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0")
     );
 }
 
 #[test]
 fn test_spice_without_display_device_for_passthrough_vm() {
     let mut args = QemuArgs::new();
-    args.add_spice(5903, "0.0.0.0", true, true, false, false);
+    args.add_spice(
+        5903,
+        "0.0.0.0",
+        true,
+        false,
+        SpiceVdagentConfig {
+            enabled: true,
+            has_serial_controller: false,
+            serial_bus: None,
+            serial_addr: None,
+        },
+    );
 
     let built = args.build();
     assert!(

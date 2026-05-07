@@ -54,6 +54,7 @@ system:
 
 options:
   guest_agent:
+    # Explicit Proxmox-style override; if omitted, default is <runtime_root>/<vm-name>.qga
     socket_path: "/var/run/qemu-server/108.qga"
   qmp:
     enabled: true

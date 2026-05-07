@@ -11,6 +11,7 @@ pub mod firmware_locator;
 mod manager;
 mod preflight;
 pub mod process;
+pub mod topology;
 pub mod types;
 
 #[allow(unused_imports)]

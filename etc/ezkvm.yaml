@@ -1,8 +1,5 @@
 tools:
   qemu: "/usr/bin/qemu-system-x86_64"
-  # Legacy compatibility keys remain supported for now.
-  swtpm: "/usr/bin/swtpm"
-  remote_viewer: "/usr/bin/remote-viewer"
 
 locations:
   vm_dir: "/etc/ezkvm/vms.d"
@@ -12,14 +9,11 @@ host_capabilities:
   runtime:
     # `root_directory` is the preferred key; `run_dir` is kept for compatibility.
     root_directory: "/var/run/ezkvm"
-    pid_dir: "/var/run/ezkvm/pids"
-    socket_dir: "/var/run/ezkvm/sockets"
     log_dir: "/var/log/ezkvm"
   firmware:
-    #ovmf_dir: "/usr/share/pve-edk2-firmware"
-    ovmf_dir: "/mnt/trixie/usr/share/pve-edk2-firmware"
+    ovmf_dir: "/usr/share/pve-edk2-firmware"
     search_paths:
-      - "/mnt/trixie/usr/share/pve-edk2-firmware"
+      - "/usr/share/pve-edk2-firmware"
     #  - "/usr/share/ovmf"
     #  - "/usr/share/ovmf"
     #  - "/usr/share/OVMF"
@@ -39,8 +33,6 @@ host_capabilities:
   tpm:
     swtpm_binary: "/usr/bin/swtpm"
     placement_mode: "socket"
-    state_dir: "/var/lib/ezkvm/tpm"
-    socket_dir: "/var/run/ezkvm/tpm"
   integrations:
     remote_viewer:
       program: "/usr/bin/remote-viewer"

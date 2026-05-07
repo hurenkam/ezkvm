@@ -10,22 +10,39 @@ impl QemuArgs {
         addr: Option<&str>,
     ) {
         let chardev_id = "qga0";
+        let controller_id = guest_agent_controller_id(bus, addr);
         self.push_str("-device");
-        self.push(build_guest_agent_serial_spec(bus, addr));
+        self.push(build_guest_agent_serial_spec(controller_id, bus, addr));
         self.push_str("-chardev");
         self.push(build_guest_agent_chardev_spec(socket_path, chardev_id));
         self.push_str("-device");
-        self.push(build_guest_agent_channel_spec(chardev_id, freeze_cpu));
+        self.push(build_guest_agent_channel_spec(
+            chardev_id,
+            controller_id,
+            freeze_cpu,
+        ));
     }
 }
 
-fn build_guest_agent_serial_spec(bus: Option<&str>, addr: Option<&str>) -> String {
+fn guest_agent_controller_id(bus: Option<&str>, addr: Option<&str>) -> &'static str {
+    if bus.is_some() || addr.is_some() {
+        "qga0"
+    } else {
+        "virtio-serial0"
+    }
+}
+
+fn build_guest_agent_serial_spec(
+    controller_id: &str,
+    bus: Option<&str>,
+    addr: Option<&str>,
+) -> String {
     // When placement is explicit, use the Proxmox-style legacy controller form.
     // This keeps device topology aligned with imported Proxmox VMs.
-    let mut serial_spec = if bus.is_some() || addr.is_some() {
-        "virtio-serial,id=qga0".to_string()
+    let mut serial_spec = if controller_id == "qga0" {
+        format!("virtio-serial,id={}", controller_id)
     } else {
-        "virtio-serial-pci,id=virtio-serial0".to_string()
+        format!("virtio-serial-pci,id={}", controller_id)
     };
     if let Some(bus) = bus {
         serial_spec.push_str(&format!(",bus={}", bus));
@@ -44,10 +61,14 @@ fn build_guest_agent_chardev_spec(socket_path: Option<&str>, chardev_id: &str) -
     )
 }
 
-fn build_guest_agent_channel_spec(chardev_id: &str, freeze_cpu: bool) -> String {
+fn build_guest_agent_channel_spec(
+    chardev_id: &str,
+    controller_id: &str,
+    freeze_cpu: bool,
+) -> String {
     let mut channel_spec = format!(
-        "virtserialport,chardev={},name=org.qemu.guest_agent.0",
-        chardev_id
+        "virtserialport,chardev={},name=org.qemu.guest_agent.0,bus={}.0",
+        chardev_id, controller_id
     );
     if freeze_cpu {
         channel_spec.push_str(",freeze=on");

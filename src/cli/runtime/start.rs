@@ -134,12 +134,8 @@ fn print_dry_run(
 ) {
     println!("Dry run mode - would execute:");
     println!(
-        "{} {}",
-        manager.binary_name(),
-        args.iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join(" ")
+        "{}",
+        format_wrapped_qemu_command(&manager.binary_name(), args)
     );
     println!("PID file: {}", pid_file.display());
     if let Some(log_file) = log_file {
@@ -177,6 +173,55 @@ fn print_dry_run(
     }
 
     print_capability_diagnostics(manager, central_config, runtime_overrides);
+}
+
+fn format_wrapped_qemu_command(binary: &str, args: &[String]) -> String {
+    if args.is_empty() {
+        return binary.to_string();
+    }
+
+    let grouped = group_qemu_args(args);
+    let mut lines = Vec::with_capacity(grouped.len() + 1);
+    lines.push(binary.to_string());
+    lines.extend(grouped.into_iter().map(|arg| format!("  {}", arg)));
+
+    let last = lines.len().saturating_sub(1);
+    lines
+        .into_iter()
+        .enumerate()
+        .map(|(index, line)| {
+            if index < last {
+                format!("{} \\", line)
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn group_qemu_args(args: &[String]) -> Vec<String> {
+    let mut groups: Vec<String> = Vec::new();
+    let mut current: Vec<&str> = Vec::new();
+
+    for token in args {
+        if token.starts_with('-') {
+            if !current.is_empty() {
+                groups.push(current.join(" "));
+                current.clear();
+            }
+            current.push(token.as_str());
+            continue;
+        }
+
+        current.push(token.as_str());
+    }
+
+    if !current.is_empty() {
+        groups.push(current.join(" "));
+    }
+
+    groups
 }
 
 fn print_capability_diagnostics(
@@ -389,4 +434,40 @@ fn run_interactive_start(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_wrapped_qemu_command;
+
+    #[test]
+    fn wrapped_command_prints_each_flag_group_on_new_line() {
+        let args = vec![
+            "-id".to_string(),
+            "108".to_string(),
+            "-name".to_string(),
+            "vm-a,debug-threads=on".to_string(),
+            "-daemonize".to_string(),
+            "-cpu".to_string(),
+            "host,+kvm_pv_eoi".to_string(),
+        ];
+
+        let rendered = format_wrapped_qemu_command("/usr/bin/kvm", &args);
+        let expected = [
+            "/usr/bin/kvm \\",
+            "  -id 108 \\",
+            "  -name vm-a,debug-threads=on \\",
+            "  -daemonize \\",
+            "  -cpu host,+kvm_pv_eoi",
+        ]
+        .join("\n");
+
+        assert_eq!(rendered, expected);
+    }
+
+    #[test]
+    fn wrapped_command_without_args_returns_binary_only() {
+        let rendered = format_wrapped_qemu_command("/usr/bin/kvm", &[]);
+        assert_eq!(rendered, "/usr/bin/kvm");
+    }
 }

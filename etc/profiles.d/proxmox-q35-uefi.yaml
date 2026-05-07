@@ -4,3 +4,6 @@ system:
     - "hpet=off"
   boot:
     firmware: "uefi"
+    uefi_vars_size: 540672
+    uefi_ms_cert: '2023'
+    uefi_pre_enrolled_keys: '1'

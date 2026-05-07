@@ -115,6 +115,10 @@ pub enum Commands {
         /// Print the resolved config after profile merging
         #[arg(long)]
         show_resolved_config: bool,
+
+        /// Print machine/device layout in tree form from the generated QEMU command
+        #[arg(long)]
+        show_machine_layout: bool,
     },
 
     /// Import a Proxmox VM config into canonical ezkvm YAML

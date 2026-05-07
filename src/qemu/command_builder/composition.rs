@@ -1,11 +1,26 @@
 use crate::config::QmpSocketType;
 use crate::qemu::{QemuManager, types::QemuArgs};
 use anyhow::{Result, anyhow};
+use std::collections::HashMap;
+
+const MAX_Q35_HOSTPCI_ROOT_PORTS: usize = 8;
+
+struct HostPciSlotPlacement {
+    bus: Option<String>,
+    assign_function_addrs: bool,
+}
 
 impl QemuManager {
     pub(super) fn add_base_args(&self, args: &mut QemuArgs) {
         args.add_name(&self.config.name);
         args.extend(QemuArgs::from(self.config.system.clone()));
+
+        let has_q35_bridge_readconfig = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
 
         for path in &self.config.system.readconfig {
             args.push_str("-readconfig");
@@ -13,13 +28,27 @@ impl QemuManager {
         }
 
         for scsi_controller in self.config.controllers_scsi() {
+            let bus = scsi_controller.bus.as_deref().or_else(|| {
+                if has_q35_bridge_readconfig && scsi_controller.r#type == "pvscsi" {
+                    Some("pci.0")
+                } else {
+                    None
+                }
+            });
+            let addr = scsi_controller.addr.as_deref().or_else(|| {
+                if has_q35_bridge_readconfig && scsi_controller.r#type == "pvscsi" {
+                    Some("0x5")
+                } else {
+                    None
+                }
+            });
             args.add_scsi_controller(
                 &scsi_controller.id,
                 &scsi_controller.r#type,
                 scsi_controller.iothread.as_deref(),
                 scsi_controller.max_targets,
-                scsi_controller.bus.as_deref(),
-                scsi_controller.addr.as_deref(),
+                bus,
+                addr,
             );
         }
 
@@ -68,6 +97,12 @@ impl QemuManager {
                     }
                 }
             }
+
+            for drive in &mut devices.drives {
+                if drive.interface == "ide" && drive.bus.is_none() {
+                    drive.bus = Some("ide.1".to_string());
+                }
+            }
         }
 
         args.extend(QemuArgs::from(devices));
@@ -108,12 +143,36 @@ impl QemuManager {
         if let Some(guest_agent) = self.config.options_guest_agent()
             && guest_agent.enabled
         {
-            let bus = self.normalize_legacy_root_bus(guest_agent.bus.as_deref());
+            let socket_path = guest_agent
+                .socket_path
+                .clone()
+                .unwrap_or_else(|| self.resolve_guest_agent_socket_path());
+            let has_q35_bridge_readconfig = self
+                .config
+                .system
+                .readconfig
+                .iter()
+                .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+            let fallback_bus = if has_q35_bridge_readconfig {
+                Some("pci.0")
+            } else {
+                None
+            };
+            let bus = self
+                .normalize_legacy_root_bus(guest_agent.bus.as_deref())
+                .or_else(|| fallback_bus.map(std::borrow::Cow::Borrowed));
+            let addr = if guest_agent.addr.is_some() {
+                guest_agent.addr.as_deref()
+            } else if has_q35_bridge_readconfig {
+                Some("0x8")
+            } else {
+                None
+            };
             args.add_guest_agent(
-                guest_agent.socket_path.as_deref(),
+                Some(&socket_path),
                 guest_agent.freeze_cpu,
                 bus.as_deref(),
-                guest_agent.addr.as_deref(),
+                addr,
             );
         }
     }
@@ -146,15 +205,43 @@ impl QemuManager {
     }
 
     fn add_hostpci_args(&self, args: &mut QemuArgs) {
+        let has_q35_bridge_readconfig = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+        let slot_placements = if has_q35_bridge_readconfig {
+            plan_q35_hostpci_slot_placement(self.config.host_pci())
+        } else {
+            HashMap::new()
+        };
+
         for hostpci in self.config.host_pci() {
-            let bus = self.normalize_legacy_root_bus(hostpci.bus.as_deref());
+            let slot_placement =
+                hostpci_slot_key(&hostpci.device).and_then(|slot| slot_placements.get(slot));
+            let bus = self
+                .normalize_legacy_root_bus(hostpci.bus.as_deref())
+                .or_else(|| {
+                    slot_placement.and_then(|placement| {
+                        self.normalize_legacy_root_bus(placement.bus.as_deref())
+                    })
+                });
+            let default_addr = slot_placement.and_then(|placement| {
+                if placement.assign_function_addrs && placement.bus.is_some() {
+                    default_q35_hostpci_function_addr(hostpci)
+                } else {
+                    None
+                }
+            });
+            let addr = hostpci.addr.as_deref().or(default_addr.as_deref());
             args.add_vfio_pci(
                 &hostpci.device,
                 &hostpci.id,
                 hostpci.pcie,
                 hostpci.x_vga,
                 bus.as_deref(),
-                hostpci.addr.as_deref(),
+                addr,
                 hostpci.multifunction,
                 hostpci.romfile.as_deref(),
             );
@@ -172,7 +259,15 @@ impl QemuManager {
             if input_device.r#type == "usb-tablet" && has_q35_usb {
                 args.add_usb_tablet("ehci.0", 1);
             } else {
-                args.add_input_device(&input_device.r#type);
+                let legacy_q35_input_bus = if has_q35_usb
+                    && (input_device.r#type == "virtio-mouse"
+                        || input_device.r#type == "virtio-keyboard")
+                {
+                    Some("pci.0")
+                } else {
+                    None
+                };
+                args.add_input_device_with_bus(&input_device.r#type, legacy_q35_input_bus);
             }
         }
     }
@@ -315,6 +410,106 @@ impl QemuManager {
     }
 }
 
+fn plan_q35_hostpci_slot_placement(
+    hostpci_devices: &[crate::config::HostPciConfig],
+) -> HashMap<String, HostPciSlotPlacement> {
+    #[derive(Clone)]
+    struct SlotState {
+        first_seen: usize,
+        min_hostpci_index: usize,
+        explicit_bus: Option<String>,
+        device_count: usize,
+        should_assign_root_port: bool,
+        has_multifunction_hint: bool,
+    }
+
+    let mut states = HashMap::<String, SlotState>::new();
+
+    for (index, device) in hostpci_devices.iter().enumerate() {
+        let Some(slot) = hostpci_slot_key(&device.device) else {
+            continue;
+        };
+
+        let state = states.entry(slot.to_string()).or_insert_with(|| SlotState {
+            first_seen: index,
+            min_hostpci_index: hostpci_id_index(&device.id).unwrap_or(index),
+            explicit_bus: None,
+            device_count: 0,
+            should_assign_root_port: false,
+            has_multifunction_hint: false,
+        });
+
+        state.min_hostpci_index = state
+            .min_hostpci_index
+            .min(hostpci_id_index(&device.id).unwrap_or(index));
+        state.device_count += 1;
+        if state.explicit_bus.is_none() {
+            state.explicit_bus = device.bus.clone();
+        }
+        state.should_assign_root_port |= device.pcie || device.multifunction || device.x_vga;
+        state.has_multifunction_hint |= device.multifunction || device.x_vga;
+    }
+
+    let mut ordered_slots = states
+        .iter()
+        .filter_map(|(slot, state)| {
+            if state.explicit_bus.is_none() && state.should_assign_root_port {
+                Some((state.min_hostpci_index, state.first_seen, slot.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    ordered_slots.sort();
+
+    let default_buses = ordered_slots
+        .into_iter()
+        .enumerate()
+        .map(|(position, (_, _, slot))| {
+            let bus = if position < MAX_Q35_HOSTPCI_ROOT_PORTS {
+                format!("ich9-pcie-port-{}", position + 1)
+            } else {
+                "pcie.0".to_string()
+            };
+            (slot, bus)
+        })
+        .collect::<HashMap<_, _>>();
+
+    states
+        .into_iter()
+        .map(|(slot, state)| {
+            let bus = state
+                .explicit_bus
+                .or_else(|| default_buses.get(&slot).cloned());
+            (
+                slot,
+                HostPciSlotPlacement {
+                    bus,
+                    assign_function_addrs: state.has_multifunction_hint || state.device_count > 1,
+                },
+            )
+        })
+        .collect()
+}
+
+fn default_q35_hostpci_function_addr(hostpci: &crate::config::HostPciConfig) -> Option<String> {
+    Some(format!("0x0.{}", hostpci_function(&hostpci.device)?))
+}
+
+fn hostpci_id_index(id: &str) -> Option<usize> {
+    id.strip_prefix("hostpci")?.split('.').next()?.parse().ok()
+}
+
+fn hostpci_slot_key(device: &str) -> Option<&str> {
+    device.rsplit_once('.').map(|(slot, _)| slot)
+}
+
+fn hostpci_function(device: &str) -> Option<u8> {
+    let (_, slot_function) = device.rsplit_once(':')?;
+    let (_, function) = slot_function.split_once('.')?;
+    function.parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::config::{CentralConfig, RuntimeCliOverrides, VmConfig};
@@ -354,7 +549,10 @@ devices:
         let manager = QemuManager::new_with_overrides(
             vm,
             CentralConfig::default(),
-            RuntimeCliOverrides::default(),
+            RuntimeCliOverrides {
+                run_dir: Some("/tmp/ezkvm-test".to_string()),
+                ..Default::default()
+            },
         );
         let args = manager
             .build_command()
@@ -409,7 +607,10 @@ devices:
         let manager = QemuManager::new_with_overrides(
             vm,
             CentralConfig::default(),
-            RuntimeCliOverrides::default(),
+            RuntimeCliOverrides {
+                run_dir: Some("/tmp/ezkvm-test".to_string()),
+                ..Default::default()
+            },
         );
         let args = manager
             .build_command()
@@ -423,6 +624,234 @@ devices:
         assert!(
             args.iter()
                 .any(|arg| arg == "ivshmem-plain,memdev=ivshmem0,bus=pcie.0,addr=0x9")
+        );
+    }
+
+    #[test]
+    fn defaults_guest_agent_and_virtio_input_to_legacy_q35_bus() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-q35-legacy-defaults"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    readconfig:
+        - "/usr/share/ezkvm/ezkvm-q35.cfg"
+    memory:
+        size: 4096
+    cpu:
+        vcpus: 4
+        model: "host"
+
+spice:
+    enabled: true
+    vdagent: true
+    port: 5903
+    addr: "127.0.0.1"
+
+options:
+    guest_agent:
+        enabled: true
+
+devices:
+    input:
+        - type: "virtio-mouse"
+        - type: "virtio-keyboard"
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+        let args = manager
+            .build_command()
+            .expect("qemu command should build")
+            .build();
+
+        assert!(
+            args.iter()
+                .any(|arg| arg == "virtio-serial,id=qga0,bus=pci.0,addr=0x8")
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg
+                    == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0")
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg == "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x9")
+        );
+        assert!(args.iter().any(|arg| arg
+            == "virtserialport,chardev=vdagent,name=com.redhat.spice.0,bus=virtio-serial0.0"));
+        assert!(args.iter().any(|arg| arg == "virtio-mouse,bus=pci.0"));
+        assert!(args.iter().any(|arg| arg == "virtio-keyboard,bus=pci.0"));
+        assert!(args.iter().any(|arg| {
+            arg.starts_with("socket,path=")
+                && arg.contains("vm-q35-legacy-defaults.qga")
+                && arg.ends_with(",server=on,wait=off,id=qga0")
+        }));
+    }
+
+    #[test]
+    fn defaults_pvscsi_and_ide_drive_bus_on_q35_bridge_template() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-q35-storage-defaults"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    readconfig:
+        - "/usr/share/ezkvm/ezkvm-q35.cfg"
+    memory:
+        size: 4096
+    cpu:
+        vcpus: 2
+        model: "host"
+
+devices:
+    drives:
+        - id: "ide2"
+          interface: "ide"
+          type: "cdrom"
+          format: "raw"
+
+controllers:
+    scsi:
+      - id: "scsihw0"
+        type: "pvscsi"
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+        let args = manager
+            .build_command()
+            .expect("qemu command should build")
+            .build();
+
+        assert!(
+            args.iter()
+                .any(|arg| arg == "pvscsi,id=scsihw0,bus=pci.0,addr=0x5")
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg == "ide-cd,drive=drive-ide2,id=ide2,bus=ide.1")
+        );
+    }
+
+    #[test]
+    fn defaults_primary_gpu_pair_to_first_root_port_on_q35_bridge_template() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-q35-hostpci-defaults"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    readconfig:
+        - "/usr/share/ezkvm/ezkvm-q35.cfg"
+    memory:
+        size: 4096
+    cpu:
+        vcpus: 2
+        model: "host"
+
+host:
+    pci:
+      - device: "0000:03:00.0"
+        multifunction: true
+      - device: "0000:03:00.1"
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+        let args = manager
+            .build_command()
+            .expect("qemu command should build")
+            .build();
+
+        assert!(args.iter().any(|arg| {
+            arg == "vfio-pci,host=0000:03:00.0,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on"
+        }));
+        assert!(args.iter().any(|arg| {
+            arg == "vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1"
+        }));
+    }
+
+    #[test]
+    fn defaults_additional_pcie_hostpci_groups_to_sequential_root_ports() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-q35-hostpci-sequential-defaults"
+backend: "qemu"
+
+system:
+    architecture: "x86_64"
+    machine: "q35"
+    readconfig:
+        - "/usr/share/ezkvm/ezkvm-q35.cfg"
+    memory:
+        size: 4096
+    cpu:
+        vcpus: 2
+        model: "host"
+
+host:
+    pci:
+      - device: "0000:07:00.0"
+        pcie: true
+      - device: "0000:41:00.0"
+        pcie: true
+        multifunction: true
+      - device: "0000:41:00.1"
+      - device: "0000:0e:10.4"
+        pcie: true
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+        let args = manager
+            .build_command()
+            .expect("qemu command should build")
+            .build();
+
+        assert!(
+            args.iter().any(|arg| {
+                arg == "vfio-pci,host=0000:07:00.0,id=hostpci0,bus=ich9-pcie-port-1"
+            })
+        );
+        assert!(args.iter().any(|arg| {
+            arg == "vfio-pci,host=0000:41:00.0,id=hostpci1,bus=ich9-pcie-port-2,addr=0x0.0,multifunction=on"
+        }));
+        assert!(args.iter().any(|arg| {
+            arg == "vfio-pci,host=0000:41:00.1,id=hostpci2,bus=ich9-pcie-port-2,addr=0x0.1"
+        }));
+        assert!(
+            args.iter().any(|arg| {
+                arg == "vfio-pci,host=0000:0e:10.4,id=hostpci3,bus=ich9-pcie-port-3"
+            })
         );
     }
 }

@@ -120,6 +120,11 @@ fn test_guest_agent_with_bus_and_addr() {
             .iter()
             .any(|arg| arg == "virtio-serial,id=qga0,bus=pci.0,addr=0x8")
     );
+    assert!(
+        built
+            .iter()
+            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0")
+    );
 }
 
 #[test]

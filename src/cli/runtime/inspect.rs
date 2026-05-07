@@ -10,17 +10,26 @@ struct GuestNetworkInterface {
     addresses: Vec<String>,
 }
 
-fn guest_agent_socket_path(config: &crate::config::VmConfig) -> Option<String> {
+fn guest_agent_socket_path(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+) -> Option<String> {
     let guest_agent = config.options_guest_agent()?;
     if !guest_agent.enabled {
         return None;
     }
 
+    if let Some(socket_path) = guest_agent.socket_path.clone() {
+        return Some(socket_path);
+    }
+
     Some(
-        guest_agent
-            .socket_path
-            .clone()
-            .unwrap_or_else(|| "/var/run/qemu-server/qga.sock".to_string()),
+        crate::state::resolve_runtime_guest_agent_socket(
+            &config.name,
+            central_config,
+            &crate::config::RuntimeCliOverrides::default(),
+        )
+        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.qga", config.name)),
     )
 }
 
@@ -135,8 +144,11 @@ fn guest_network_interfaces_from_socket(socket_path: &str) -> Result<Vec<GuestNe
     }
 }
 
-fn print_guest_agent_network_details(config: &crate::config::VmConfig) {
-    let Some(socket_path) = guest_agent_socket_path(config) else {
+fn print_guest_agent_network_details(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+) {
+    let Some(socket_path) = guest_agent_socket_path(config, central_config) else {
         return;
     };
 
@@ -164,6 +176,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
     println!("Loading configuration from: {}", config_path);
 
     let config = crate::config::VmConfig::from_file(config_path)?;
+    let central_config = crate::config::CentralConfig::load().unwrap_or_default();
     println!("✓ Configuration loaded");
 
     let vm_name = &config.name;
@@ -175,7 +188,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
                 println!("Status: Running (PID: {})", pid);
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
-                print_guest_agent_network_details(&config);
+                print_guest_agent_network_details(&config, &central_config);
                 return Ok(());
             }
             _ => {
@@ -190,7 +203,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
                 println!("Status: Running");
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
-                print_guest_agent_network_details(&config);
+                print_guest_agent_network_details(&config, &central_config);
             } else {
                 println!("Status: Not running");
             }
@@ -245,7 +258,11 @@ pub(crate) async fn handle_console(config_path: &str) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn handle_validate(config_path: &str, show_resolved_config: bool) -> Result<()> {
+pub(crate) async fn handle_validate(
+    config_path: &str,
+    show_resolved_config: bool,
+    show_machine_layout: bool,
+) -> Result<()> {
     println!("Validating configuration: {}", config_path);
 
     let config = crate::config::VmConfig::from_file(config_path)?;
@@ -254,6 +271,23 @@ pub(crate) async fn handle_validate(config_path: &str, show_resolved_config: boo
     println!("Architecture: {}", config.system.architecture);
     println!("Memory: {} MiB", config.system.memory.size);
     println!("vCPUs: {}", config.system.cpu.vcpus);
+
+    if show_machine_layout {
+        let central_config = crate::config::CentralConfig::load()?;
+        let manager = crate::qemu::QemuManager::new_with_overrides(
+            config.clone(),
+            central_config,
+            crate::config::RuntimeCliOverrides::default(),
+        );
+        let args = manager.build_command()?;
+        let layout = crate::qemu::topology::render_machine_layout(
+            &config.system.machine,
+            &args,
+            &config.system.readconfig,
+        );
+        println!("\nMachine layout:");
+        println!("{}", layout);
+    }
 
     if show_resolved_config {
         println!("\nResolved configuration:");
@@ -332,9 +366,17 @@ mod tests {
         )
         .unwrap();
 
+        let central_config = crate::config::CentralConfig {
+            locations: crate::config::LocationsConfig {
+                run_dir: Some("/run/ezkvm".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
         assert_eq!(
-            guest_agent_socket_path(&config).as_deref(),
-            Some("/var/run/qemu-server/qga.sock")
+            guest_agent_socket_path(&config, &central_config).as_deref(),
+            Some("/run/ezkvm/test-vm.qga")
         );
     }
 }

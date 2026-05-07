@@ -27,6 +27,7 @@ Other fields:
 
 - `enabled` (default true)
 - `socket_path` (optional)
+- when `socket_path` is omitted, default is `<runtime_root>/<vm-name>.qga`
 - `freeze_cpu` (default false)
 - optional placement: `bus`, `addr`
 
