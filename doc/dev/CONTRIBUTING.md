@@ -37,6 +37,48 @@ Use this checklist in PR review for architecture-affecting changes.
 9. Anti-patterns avoided: cross-layer callbacks, mutable singletons, hidden side effects.
 10. At least one integration or regression test covers the changed layer path.
 
+## Building Packages
+
+### Debian Package (Debian Trixie / Ubuntu 26.04 Resolute)
+
+The `debian/` directory uses `dh-cargo` and produces a cross-distro `.deb`.
+
+1. Install build prerequisites:
+   ```bash
+   sudo apt install build-essential cargo rustc debhelper dh-cargo devscripts fakeroot lintian
+   ```
+2. Build from the repository root:
+   ```bash
+   dpkg-buildpackage -us -uc -b
+   ```
+3. The `.deb` is placed one directory above the repo root. Install with:
+   ```bash
+   sudo dpkg -i ../ezkvm_*.deb
+   ```
+
+The package is validated against both Debian Trixie and Ubuntu 26.04.
+See `debian/control` for the runtime dependency policy and `doc/backlog/implemented_features/DEBIAN_PACKAGE.md` for the full packaging contract.
+
+### Arch Linux Package
+
+The `pkg/arch/` directory contains a `PKGBUILD` and a helper script.
+
+1. Install build prerequisites:
+   ```bash
+   sudo pacman -S --needed rust cargo base-devel
+   ```
+2. Build using the helper:
+   ```bash
+   cd pkg/arch
+   ./build.sh
+   ```
+3. Install the resulting package:
+   ```bash
+   sudo pacman -U ezkvm-*.pkg.tar.zst
+   ```
+
+See `pkg/arch/PKGBUILD` for the full package definition.
+
 ## Documentation Expectations
 
 1. Link new architecture decisions in `doc/dev/adr/`.

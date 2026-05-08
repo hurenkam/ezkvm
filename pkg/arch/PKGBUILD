@@ -1,0 +1,45 @@
+# Maintainer: Mark Hurenkamp <mark.hurenkamp@xs4all.nl>
+pkgname=ezkvm
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Easy KVM virtual machine manager'
+arch=('x86_64' 'aarch64')
+url='https://github.com/hurenkam/ezkvm'
+license=('custom')
+depends=('qemu-full')
+optdepends=(
+    'swtpm: TPM emulation for guests'
+    'virt-viewer: SPICE/VNC remote display'
+)
+makedepends=('rust' 'cargo')
+backup=('etc/ezkvm/ezkvm.yaml')
+install=ezkvm.install
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    export RUSTFLAGS="-C link-arg=-Wl,-z,relro,-z,now"
+    cargo build --release --frozen
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    cargo test --frozen
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+
+    install -Dm755 target/release/ezkvm             "$pkgdir/usr/bin/ezkvm"
+    install -Dm644 etc/ezkvm.yaml                   "$pkgdir/etc/ezkvm/ezkvm.yaml"
+    install -Dm644 etc/profiles.d/*.yaml          -t "$pkgdir/etc/ezkvm/profiles.d/"
+    install -Dm644 share/ezkvm-q35.cfg              "$pkgdir/usr/share/ezkvm/ezkvm-q35.cfg"
+    install -Dm644 debian/ezkvm.tmpfiles            "$pkgdir/usr/lib/tmpfiles.d/ezkvm.conf"
+    install -dm755                                  "$pkgdir/etc/ezkvm/vms.d"
+}

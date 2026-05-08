@@ -29,6 +29,53 @@ cd ezkvm
 cargo build --release
 ```
 
+### Install from a Debian Package (Debian Trixie / Ubuntu 26.04 Resolute)
+
+The `debian/` directory contains a standard `dh-cargo`-based packaging skeleton that produces a single `.deb` installable on both Debian Trixie and Ubuntu 26.04.
+
+**Prerequisites** (install once):
+```bash
+sudo apt install build-essential cargo rustc debhelper dh-cargo devscripts fakeroot lintian
+```
+
+**Build and install**:
+```bash
+git clone <repository-url>
+cd ezkvm
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../ezkvm_*.deb
+```
+
+The package installs:
+- `/usr/bin/ezkvm`
+- `/etc/ezkvm/ezkvm.yaml` (preserved on upgrades)
+- `/etc/ezkvm/profiles.d/` with bundled profiles
+- `/usr/share/ezkvm/ezkvm-q35.cfg`
+- `/usr/lib/tmpfiles.d/ezkvm.conf` (runtime directories via systemd)
+- `/etc/apparmor.d/local/usr.bin.swtpm` (AppArmor swtpm extension)
+
+### Install from an Arch Linux Package
+
+The `pkg/arch/` directory contains a `PKGBUILD` and a `build.sh` helper that produce a `.pkg.tar.zst` installable with `pacman`.
+
+**Prerequisites** (install once):
+```bash
+sudo pacman -S --needed rust cargo base-devel
+```
+
+**Build and install**:
+```bash
+git clone <repository-url>
+cd ezkvm/pkg/arch
+./build.sh
+sudo pacman -U ezkvm-*.pkg.tar.zst
+```
+
+The package installs the same layout as the Debian package, with the following Arch-specific notes:
+- `qemu-full` is the single QEMU dependency (includes OVMF and `qemu-img`).
+- `swtpm` and `virt-viewer` are optional dependencies; install them from AUR if needed.
+- Runtime directories are created via `systemd-tmpfiles` on first install.
+
 ## Quick Start
 
 1. Create a VM configuration file (see `examples/basic-vm.yaml`)
