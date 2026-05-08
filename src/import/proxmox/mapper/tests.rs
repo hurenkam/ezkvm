@@ -516,7 +516,26 @@ fn maps_tpm_when_tpmstate_present() {
     assert_eq!(tpm.version, "2.0");
     assert_eq!(tpm.backend, "emulator");
     assert_eq!(tpm.model, "tpm-tis");
+    assert_eq!(tpm.state_path, None);
     assert_eq!(tpm.state_backend_uri, None);
+}
+
+#[test]
+fn maps_tpm_state_path_for_proxmox_parity_target() {
+    let (_, cfg) = map_and_validate_parity(
+        r#"
+            name: vm-tpm-parity
+            vmid: 108
+            bios: ovmf
+            tpmstate0: local-lvm:vm-108-tpmstate,size=4M,version=v2.0
+            "#,
+    );
+
+    let tpm = cfg.system.tpm.as_ref().expect("tpm should be mapped");
+    assert_eq!(
+        tpm.state_path.as_deref(),
+        Some("/var/run/qemu-server/108.swtpm")
+    );
 }
 
 #[test]
@@ -669,12 +688,9 @@ fn maps_agent_enabled_into_guest_agent_config() {
         .as_ref()
         .expect("guest agent should be configured");
     assert!(agent.enabled);
-    assert_eq!(
-        agent.socket_path.as_deref(),
-        Some("/var/run/ezkvm/qga.sock")
-    );
-    assert_eq!(agent.bus.as_deref(), Some("pcie.0"));
-    assert_eq!(agent.addr.as_deref(), Some("0x8"));
+    assert_eq!(agent.socket_path, None);
+    assert_eq!(agent.bus, None);
+    assert_eq!(agent.addr, None);
 }
 
 #[test]
@@ -712,6 +728,7 @@ fn maps_windows_balloon_bus_by_runtime_target() {
         r#"
             name: vm-balloon-portable
             ostype: win11
+            balloon: 0
             "#,
     )
     .expect("parser should succeed");
@@ -732,6 +749,7 @@ fn maps_windows_balloon_bus_by_runtime_target() {
             name: vm-balloon-parity
             vmid: 108
             ostype: win11
+            balloon: 0
             "#,
     )
     .expect("parser should succeed");
@@ -1422,12 +1440,11 @@ fn maps_multiple_usb_devices() {
     );
 
     assert_eq!(cfg.host.usb.len(), 4);
-    assert_eq!(cfg.controllers.xhci.len(), 1);
-    assert_eq!(cfg.controllers.xhci[0].p2, None);
-    assert_eq!(cfg.controllers.xhci[0].p3, None);
-    // No topology hints → ezkvm-q35.cfg not loaded → pci.1 not available; bus left unset
-    assert_eq!(cfg.controllers.xhci[0].bus.as_deref(), None);
-    assert_eq!(cfg.controllers.xhci[0].addr.as_deref(), None);
+    // USB devices are defined but xhci controller is not synthesized by mapper;
+    // let profiles or runtime provide it
+    assert_eq!(cfg.controllers.xhci.len(), 0);
+    // USB devices implicit bus is xhci.0
+    assert_eq!(cfg.host.usb[0].bus.as_deref(), Some("xhci.0"));
 }
 
 #[test]
@@ -1604,4 +1621,53 @@ fn warnings_accumulate_from_multiple_sources() {
         .expect("mapper should succeed");
 
     assert!(!mapped.warnings.is_empty());
+}
+
+#[test]
+fn omits_ballooning_when_not_defined_in_source() {
+    let parsed = parse_proxmox_config(
+        r#"
+            name: vm-no-balloon
+            machine: pc-q35
+            memory: 2048
+            cores: 2
+            "#,
+    )
+    .expect("parser should succeed");
+
+    let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+        .expect("mapper should succeed");
+    let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+
+    assert!(
+        cfg.system.memory.ballooning.is_none(),
+        "ballooning should be omitted when not in Proxmox source"
+    );
+}
+
+#[test]
+fn includes_ballooning_when_defined_in_source() {
+    let parsed = parse_proxmox_config(
+        r#"
+            name: vm-with-balloon
+            machine: pc-q35
+            memory: 2048
+            cores: 2
+            balloon: 1024
+            "#,
+    )
+    .expect("parser should succeed");
+
+    let mapped = map_proxmox_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+        .expect("mapper should succeed");
+    let cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
+
+    let ballooning = cfg
+        .system
+        .memory
+        .ballooning
+        .as_ref()
+        .expect("ballooning should be present when in Proxmox source");
+    assert!(ballooning.enabled);
+    assert_eq!(ballooning.model, "virtio-balloon-pci");
 }

@@ -23,8 +23,6 @@ virtio-gpu,vram=33554432
 -boot
 menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
 -device
-virtio-balloon-pci
--device
 qemu-xhci,id=xhci
 -device
 usb-host,hostbus=3,hostport=1.4,id=usb0,bus=xhci.0,port=1

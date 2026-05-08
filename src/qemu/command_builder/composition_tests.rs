@@ -91,6 +91,42 @@ controllers:
     );
     assert!(
         args.iter()
-            .any(|arg| arg == "ide-cd,drive=drive-ide2,id=ide2,bus=ide.1")
+            .any(|arg| arg == "ide-cd,drive=drive-ide2,id=ide2,bus=ide.1,unit=0")
+    );
+}
+
+#[test]
+fn defaults_explicit_xhci_bus_and_addr_on_q35_bridge_template() {
+    let args = built_qemu_args_from_yaml(
+        r#"
+name: "vm-q35-xhci-defaults"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  readconfig:
+    - "/usr/share/ezkvm/ezkvm-q35.cfg"
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: "host"
+
+controllers:
+  xhci:
+    - id: "xhci0"
+
+host:
+  usb:
+    - id: "usb0"
+      hostbus: "1"
+      hostport: "2.2"
+"#,
+    );
+
+    assert!(
+        args.iter()
+            .any(|arg| arg == "qemu-xhci,id=xhci0,bus=pci.1,addr=0x1b")
     );
 }

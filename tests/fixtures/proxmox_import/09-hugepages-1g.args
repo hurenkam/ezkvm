@@ -22,8 +22,6 @@ e1000,netdev=net0,mac=52:54:00:aa:bb:ee
 cirrus
 -boot
 menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
--device
-virtio-balloon-pci
 -object
 memory-backend-file,id=ram-node0,size=8192M,mem-path=/run/hugepages/kvm/1048576kB,share=on,prealloc=yes
 -numa

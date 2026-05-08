@@ -293,6 +293,16 @@ Current portable Q35 placement defaults for imported Proxmox VMs:
 - Guest-agent and Windows balloon defaults use `bus: pci.0` (Proxmox-compatible
   legacy root bus when portable Q35 bridge template is loaded)
 
+In compact import output, these defaults may be omitted from YAML when runtime
+already reconstructs them. For example, portable imports can omit guest-agent
+socket and bus/addr placement, pvscsi bus/addr, and xhci bus/addr while keeping
+the same emitted QEMU placement under a loaded Q35 readconfig. Compact output
+may also omit hostpci `bus` and `addr` when portable Q35 runtime deterministically
+reconstructs the same values; non-default hostpci placement values are kept.
+When SPICE is enabled, compact output omits `spice.addr` if it is the ezkvm
+default (`127.0.0.1`), and keeps explicit non-default values (for example
+`0.0.0.0`).
+
 ## Import Mapping Reference
 
 For field-level mapping reference:

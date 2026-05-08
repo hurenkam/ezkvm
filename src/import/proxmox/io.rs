@@ -157,13 +157,280 @@ fn render_export_yaml(
     canonical_yaml: &str,
     options: &ImportRunOptions,
 ) -> Result<String, ImportError> {
-    let rendered = match options.output_mode {
+    let mut rendered = match options.output_mode {
         ImportOutputMode::Canonical => canonical_yaml.to_string(),
         ImportOutputMode::Compact => compact_profile_owned_fields(canonical_yaml)?,
         ImportOutputMode::DebugCanonical => render_debug_canonical_yaml(parsed, canonical_yaml)?,
     };
 
+    if options.output_mode == ImportOutputMode::Compact {
+        rendered = omit_reconstructable_hostpci_bus_addr(&rendered, options.runtime_target)?;
+        rendered = omit_default_spice_addr(&rendered)?;
+    }
+
     Ok(rendered)
+}
+
+fn omit_default_spice_addr(input_yaml: &str) -> Result<String, ImportError> {
+    use serde_yaml::Value;
+
+    let mut root: Value = serde_yaml::from_str(input_yaml).map_err(|e| {
+        ImportError::ParseError(format!(
+            "failed to parse compact YAML for spice default omission: {e}"
+        ))
+    })?;
+
+    let Value::Mapping(root_map) = &mut root else {
+        return Ok(input_yaml.to_string());
+    };
+
+    let Some(spice_value) = root_map.get_mut(Value::String("spice".to_string())) else {
+        return Ok(input_yaml.to_string());
+    };
+    let Some(spice_map) = spice_value.as_mapping_mut() else {
+        return Ok(input_yaml.to_string());
+    };
+
+    let addr_key = Value::String("addr".to_string());
+    let keep_default_addr = spice_map
+        .get(&addr_key)
+        .and_then(Value::as_str)
+        .is_some_and(|addr| addr == "127.0.0.1");
+    if keep_default_addr {
+        spice_map.remove(&addr_key);
+    }
+
+    serde_yaml::to_string(&root).map_err(|e| {
+        ImportError::ParseError(format!(
+            "failed to serialize compact YAML after spice default omission: {e}"
+        ))
+    })
+}
+
+fn omit_reconstructable_hostpci_bus_addr(
+    input_yaml: &str,
+    runtime_target: RuntimeTarget,
+) -> Result<String, ImportError> {
+    use serde_yaml::{Mapping, Value};
+    use std::collections::HashMap;
+
+    const MAX_Q35_HOSTPCI_ROOT_PORTS: usize = 8;
+
+    #[derive(Clone)]
+    struct HostPciView {
+        device: String,
+        id: String,
+        pcie: bool,
+        x_vga: bool,
+        multifunction: bool,
+    }
+
+    #[derive(Clone)]
+    struct SlotState {
+        first_seen: usize,
+        min_hostpci_index: usize,
+        device_count: usize,
+        should_assign_root_port: bool,
+        has_multifunction_hint: bool,
+    }
+
+    #[derive(Clone)]
+    struct SlotPlacement {
+        bus: Option<String>,
+        assign_function_addrs: bool,
+    }
+
+    fn hostpci_slot_key(device: &str) -> Option<&str> {
+        device.rsplit_once('.').map(|(slot, _)| slot)
+    }
+
+    fn hostpci_function(device: &str) -> Option<u8> {
+        let (_, slot_function) = device.rsplit_once(':')?;
+        let (_, function) = slot_function.split_once('.')?;
+        function.parse().ok()
+    }
+
+    fn hostpci_id_index(id: &str) -> Option<usize> {
+        id.strip_prefix("hostpci")?.split('.').next()?.parse().ok()
+    }
+
+    fn map_bool(map: &Mapping, key: &str) -> bool {
+        map.get(Value::String(key.to_string()))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+
+    fn map_string(map: &Mapping, key: &str) -> Option<String> {
+        map.get(Value::String(key.to_string()))
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+    }
+
+    if runtime_target != RuntimeTarget::PortableLinux {
+        return Ok(input_yaml.to_string());
+    }
+
+    let mut root: Value = serde_yaml::from_str(input_yaml).map_err(|e| {
+        ImportError::ParseError(format!(
+            "failed to parse compact YAML for hostpci omission: {e}"
+        ))
+    })?;
+
+    let Value::Mapping(root_map) = &mut root else {
+        return Ok(input_yaml.to_string());
+    };
+
+    let readconfig_has_q35 = VmConfig::from_str(input_yaml).ok().is_some_and(|config| {
+        config
+            .system
+            .readconfig
+            .iter()
+            .any(|path| path.contains("pve-q35") || path.contains("ezkvm-q35"))
+    }) || root_map
+        .get(Value::String("system".to_string()))
+        .and_then(Value::as_mapping)
+        .and_then(|system| system.get(Value::String("readconfig".to_string())))
+        .and_then(Value::as_sequence)
+        .is_some_and(|readconfig| {
+            readconfig
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|path| path.contains("pve-q35") || path.contains("ezkvm-q35"))
+        });
+
+    if !readconfig_has_q35 {
+        return Ok(input_yaml.to_string());
+    }
+
+    let Some(host_value) = root_map.get_mut(Value::String("host".to_string())) else {
+        return Ok(input_yaml.to_string());
+    };
+    let Some(host) = host_value.as_mapping_mut() else {
+        return Ok(input_yaml.to_string());
+    };
+
+    let Some(host_pci_value) = host.get_mut(Value::String("pci".to_string())) else {
+        return Ok(input_yaml.to_string());
+    };
+    let Some(host_pci_seq) = host_pci_value.as_sequence_mut() else {
+        return Ok(input_yaml.to_string());
+    };
+
+    let views = host_pci_seq
+        .iter()
+        .map(|item| {
+            let map = item.as_mapping()?;
+            Some(HostPciView {
+                device: map_string(map, "device")?,
+                id: map_string(map, "id").unwrap_or_default(),
+                pcie: map_bool(map, "pcie"),
+                x_vga: map_bool(map, "x_vga"),
+                multifunction: map_bool(map, "multifunction"),
+            })
+        })
+        .collect::<Option<Vec<_>>>();
+
+    let Some(views) = views else {
+        return Ok(input_yaml.to_string());
+    };
+
+    let mut states = HashMap::<String, SlotState>::new();
+    for (index, device) in views.iter().enumerate() {
+        let Some(slot) = hostpci_slot_key(&device.device) else {
+            continue;
+        };
+
+        let state = states.entry(slot.to_string()).or_insert_with(|| SlotState {
+            first_seen: index,
+            min_hostpci_index: hostpci_id_index(&device.id).unwrap_or(index),
+            device_count: 0,
+            should_assign_root_port: false,
+            has_multifunction_hint: false,
+        });
+
+        state.min_hostpci_index = state
+            .min_hostpci_index
+            .min(hostpci_id_index(&device.id).unwrap_or(index));
+        state.device_count += 1;
+        state.should_assign_root_port |= device.pcie || device.multifunction || device.x_vga;
+        state.has_multifunction_hint |= device.multifunction || device.x_vga;
+    }
+
+    let mut ordered_slots = states
+        .iter()
+        .filter_map(|(slot, state)| {
+            if state.should_assign_root_port {
+                Some((state.min_hostpci_index, state.first_seen, slot.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    ordered_slots.sort();
+
+    let default_buses = ordered_slots
+        .into_iter()
+        .enumerate()
+        .map(|(position, (_, _, slot))| {
+            let bus = if position < MAX_Q35_HOSTPCI_ROOT_PORTS {
+                format!("ich9-pcie-port-{}", position + 1)
+            } else {
+                "pcie.0".to_string()
+            };
+            (slot, bus)
+        })
+        .collect::<HashMap<_, _>>();
+
+    let placements = states
+        .into_iter()
+        .map(|(slot, state)| {
+            (
+                slot.clone(),
+                SlotPlacement {
+                    bus: default_buses.get(&slot).cloned(),
+                    assign_function_addrs: state.has_multifunction_hint || state.device_count > 1,
+                },
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
+    for (idx, value) in host_pci_seq.iter_mut().enumerate() {
+        let Some(map) = value.as_mapping_mut() else {
+            continue;
+        };
+
+        let Some(slot) = hostpci_slot_key(&views[idx].device) else {
+            continue;
+        };
+        let Some(placement) = placements.get(slot) else {
+            continue;
+        };
+
+        let bus_key = Value::String("bus".to_string());
+        let addr_key = Value::String("addr".to_string());
+
+        let inferred_bus = placement.bus.as_deref();
+        let current_bus = map.get(&bus_key).and_then(Value::as_str);
+        if current_bus == inferred_bus {
+            map.remove(&bus_key);
+        }
+
+        let inferred_addr = if placement.assign_function_addrs && inferred_bus.is_some() {
+            hostpci_function(&views[idx].device).map(|function| format!("0x0.{function}"))
+        } else {
+            None
+        };
+        let current_addr = map.get(&addr_key).and_then(Value::as_str);
+        if current_addr == inferred_addr.as_deref() {
+            map.remove(&addr_key);
+        }
+    }
+
+    serde_yaml::to_string(&root).map_err(|e| {
+        ImportError::ParseError(format!(
+            "failed to serialize compact YAML after hostpci omission: {e}"
+        ))
+    })
 }
 
 fn render_debug_canonical_yaml(
@@ -291,6 +558,8 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
     // devices.controllers.ide so they appear alongside scsi/sata controllers.
     let ide_key = Value::String("ide".to_string());
     let interface_key = Value::String("interface".to_string());
+    let bus_key = Value::String("bus".to_string());
+    let unit_key = Value::String("unit".to_string());
     let mut ide_drives = Vec::new();
     let mut other_leftovers = Vec::new();
     for drive in leftovers {
@@ -302,6 +571,8 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
         if is_ide {
             if let Value::Mapping(mut map) = drive {
                 map.remove(interface_key.clone());
+                map.remove(bus_key.clone());
+                map.remove(unit_key.clone());
                 ide_drives.push(Value::Mapping(map));
             }
         } else {
@@ -515,7 +786,10 @@ fn build_debug_source_comments(parsed: &ProxmoxVmConfig, warnings: &[MappingWarn
 
 #[cfg(test)]
 mod tests {
-    use super::{ImportRunOptions, RuntimeTarget, run_import_from_files};
+    use super::{
+        ImportRunOptions, RuntimeTarget, omit_reconstructable_hostpci_bus_addr,
+        run_import_from_files,
+    };
     use crate::test_support::env_lock;
     use serde_yaml::Value;
     use std::path::PathBuf;
@@ -886,6 +1160,8 @@ mod tests {
             let drives_key = Value::String("drives".to_string());
             let path_key = Value::String("path".to_string());
             let interface_key = Value::String("interface".to_string());
+            let bus_key = Value::String("bus".to_string());
+            let unit_key = Value::String("unit".to_string());
             let devices = root
                 .as_mapping()
                 .and_then(|map| map.get(devices_key))
@@ -917,6 +1193,14 @@ mod tests {
             assert!(
                 !first_drive.contains_key(interface_key),
                 "ide nested drive should omit interface because container implies it"
+            );
+            assert!(
+                !first_drive.contains_key(bus_key),
+                "ide nested drive should omit bus because container implies it"
+            );
+            assert!(
+                !first_drive.contains_key(unit_key),
+                "ide nested drive should omit unit because container implies it"
             );
 
             let devices_drives = devices.get(drives_key).and_then(Value::as_sequence);
@@ -967,8 +1251,182 @@ mod tests {
             .expect("debug import");
 
             assert!(debug.yaml.contains("# from Proxmox ostype: win11"));
-            assert!(debug.yaml.contains("id: xhci"));
-            assert!(!canonical.yaml.contains("id: xhci"));
+            // USB device is present in both modes and references xhci.0
+            assert!(debug.yaml.contains("bus: xhci.0"));
+            assert!(canonical.yaml.contains("bus: xhci.0"));
+            // XHCI controller is not synthesized by mapper; comes from profiles/runtime
+            assert!(!debug.yaml.contains("xhci:"));
+            assert!(!canonical.yaml.contains("xhci:"));
+        });
+    }
+
+    #[test]
+    fn compact_mode_omits_reconstructable_hostpci_bus_and_addr() {
+        with_repo_profiles(|| {
+            let compact = run_import_from_files(
+                "input/felucia/108.conf",
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: Some("input/felucia/storage.cfg".to_string()),
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
+                },
+            )
+            .expect("compact import should succeed");
+
+            let root: serde_yaml::Value =
+                serde_yaml::from_str(&compact.yaml).expect("yaml should parse");
+            let host_pci = root
+                .as_mapping()
+                .and_then(|root| root.get(serde_yaml::Value::String("host".to_string())))
+                .and_then(serde_yaml::Value::as_mapping)
+                .and_then(|host| host.get(serde_yaml::Value::String("pci".to_string())))
+                .and_then(serde_yaml::Value::as_sequence)
+                .expect("host.pci should exist");
+
+            let first = host_pci
+                .first()
+                .and_then(serde_yaml::Value::as_mapping)
+                .expect("first hostpci should be mapping");
+            let second = host_pci
+                .get(1)
+                .and_then(serde_yaml::Value::as_mapping)
+                .expect("second hostpci should be mapping");
+            assert!(!first.contains_key(serde_yaml::Value::String("bus".to_string())));
+            assert!(!first.contains_key(serde_yaml::Value::String("addr".to_string())));
+            assert!(!second.contains_key(serde_yaml::Value::String("bus".to_string())));
+            assert!(!second.contains_key(serde_yaml::Value::String("addr".to_string())));
+        });
+    }
+
+    #[test]
+    fn compact_mode_keeps_nondefault_hostpci_bus_and_addr() {
+        let input = r#"
+name: vm
+backend: qemu
+system:
+  machine: q35
+  readconfig:
+    - /usr/share/ezkvm/ezkvm-q35.cfg
+host:
+  pci:
+    - id: hostpci0
+      device: 0000:03:00.0
+      pcie: true
+      bus: ich9-pcie-port-3
+      addr: 0x2.0
+"#;
+
+        let compacted = omit_reconstructable_hostpci_bus_addr(input, RuntimeTarget::PortableLinux)
+            .expect("compact omission should succeed");
+        let root: serde_yaml::Value = serde_yaml::from_str(&compacted).expect("yaml should parse");
+        let first = root
+            .as_mapping()
+            .and_then(|root| root.get(serde_yaml::Value::String("host".to_string())))
+            .and_then(serde_yaml::Value::as_mapping)
+            .and_then(|host| host.get(serde_yaml::Value::String("pci".to_string())))
+            .and_then(serde_yaml::Value::as_sequence)
+            .and_then(|seq| seq.first())
+            .and_then(serde_yaml::Value::as_mapping)
+            .expect("first hostpci should exist");
+
+        assert_eq!(
+            first
+                .get(serde_yaml::Value::String("bus".to_string()))
+                .and_then(serde_yaml::Value::as_str),
+            Some("ich9-pcie-port-3")
+        );
+        assert_eq!(
+            first
+                .get(serde_yaml::Value::String("addr".to_string()))
+                .and_then(serde_yaml::Value::as_str),
+            Some("0x2.0")
+        );
+    }
+
+    #[test]
+    fn compact_mode_omits_default_spice_addr() {
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-spice-default-addr");
+            let input_path = dir.join("705.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-spice-default\nmemory: 2048\ncores: 2\naudio0: device=ich9-intel-hda,driver=spice\n",
+            )
+            .expect("write input");
+
+            let compact = run_import_from_files(
+                &input_path.to_string_lossy(),
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: None,
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
+                },
+            )
+            .expect("compact import should succeed");
+
+            let root: serde_yaml::Value =
+                serde_yaml::from_str(&compact.yaml).expect("yaml should parse");
+            let spice = root
+                .as_mapping()
+                .and_then(|map| map.get(serde_yaml::Value::String("spice".to_string())))
+                .and_then(serde_yaml::Value::as_mapping)
+                .expect("spice mapping should exist");
+
+            assert!(
+                !spice.contains_key(serde_yaml::Value::String("addr".to_string())),
+                "compact YAML should omit default spice.addr"
+            );
+        });
+    }
+
+    #[test]
+    fn compact_mode_keeps_nondefault_spice_addr() {
+        with_repo_profiles(|| {
+            let dir = create_temp_test_dir("import-spice-nondefault-addr");
+            let input_path = dir.join("706.conf");
+            std::fs::write(
+                &input_path,
+                "name: vm-spice-nondefault\nmemory: 2048\ncores: 2\nargs: -spice port=5903,addr=0.0.0.0,disable-ticketing=on\n",
+            )
+            .expect("write input");
+
+            let compact = run_import_from_files(
+                &input_path.to_string_lossy(),
+                &ImportRunOptions {
+                    output_path: None,
+                    storage_path: None,
+                    strict: false,
+                    dry_run: true,
+                    compact_lists: false,
+                    output_mode: super::ImportOutputMode::Compact,
+                    runtime_target: RuntimeTarget::PortableLinux,
+                },
+            )
+            .expect("compact import should succeed");
+
+            let root: serde_yaml::Value =
+                serde_yaml::from_str(&compact.yaml).expect("yaml should parse");
+            let spice = root
+                .as_mapping()
+                .and_then(|map| map.get(serde_yaml::Value::String("spice".to_string())))
+                .and_then(serde_yaml::Value::as_mapping)
+                .expect("spice mapping should exist");
+
+            assert_eq!(
+                spice
+                    .get(serde_yaml::Value::String("addr".to_string()))
+                    .and_then(serde_yaml::Value::as_str),
+                Some("0.0.0.0"),
+                "compact YAML should keep non-default spice.addr"
+            );
         });
     }
 }

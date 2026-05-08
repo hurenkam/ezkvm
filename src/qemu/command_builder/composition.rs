@@ -88,11 +88,30 @@ impl QemuManager {
                     }
                 }
             }
+        }
 
-            for drive in &mut devices.drives {
-                if drive.interface == "ide" && drive.bus.is_none() {
-                    drive.bus = Some("ide.1".to_string());
+        for drive in &mut devices.drives {
+            if drive.interface != "ide" {
+                continue;
+            }
+
+            if let Some((fallback_bus, fallback_unit)) =
+                infer_ide_attachment_from_drive_id(&drive.id)
+            {
+                if drive.bus.is_none() {
+                    drive.bus = Some(fallback_bus);
                 }
+                if drive.unit.is_none() {
+                    drive.unit = Some(fallback_unit);
+                }
+                continue;
+            }
+
+            if has_q35_bridge_readconfig && drive.bus.is_none() {
+                drive.bus = Some("ide.1".to_string());
+            }
+            if drive.unit.is_none() {
+                drive.unit = Some(0);
             }
         }
 
@@ -280,4 +299,11 @@ impl QemuManager {
     pub(crate) fn add_monitoring_and_identity_args(&self, args: &mut QemuArgs) {
         super::composition_platform::add_monitoring_and_identity_args(self, args);
     }
+}
+
+fn infer_ide_attachment_from_drive_id(id: &str) -> Option<(String, u32)> {
+    let slot = id.strip_prefix("ide")?.parse::<u32>().ok()?;
+    let controller = slot / 2;
+    let unit = slot % 2;
+    Some((format!("ide.{controller}"), unit))
 }

@@ -149,6 +149,41 @@ options:
     }
 
     #[test]
+    fn keeps_empty_guest_agent_mapping_when_not_owned_by_profile() {
+        with_test_profiles(|profile_dir| {
+            std::fs::write(
+                profile_dir.join("base.yaml"),
+                "system:\n  machine_options:\n    - hpet=off\n",
+            )
+            .expect("write profile");
+
+            let input = r#"
+name: vm
+backend: qemu
+profiles:
+  - base
+options:
+  guest_agent: {}
+"#;
+
+            let compacted = compact_profile_owned_fields(input).expect("compact");
+            let value: Value = serde_yaml::from_str(&compacted).expect("parse compacted");
+
+            let guest_agent = value
+                .as_mapping()
+                .and_then(|m| m.get(Value::String("options".to_string())))
+                .and_then(Value::as_mapping)
+                .and_then(|m| m.get(Value::String("guest_agent".to_string())))
+                .and_then(Value::as_mapping);
+
+            assert!(
+                guest_agent.is_some(),
+                "guest_agent mapping should remain present"
+            );
+        });
+    }
+
+    #[test]
     fn compacts_id_merge_lists_by_keeping_only_item_differences() {
         with_test_profiles(|profile_dir| {
             std::fs::write(

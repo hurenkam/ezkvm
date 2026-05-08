@@ -130,10 +130,10 @@ pub(super) fn map_tpm(
     vmid: Option<u32>,
     runtime_target: crate::import::proxmox::RuntimeTarget,
 ) -> Option<TpmConfig> {
-    let (key, raw) = scalars
+    let raw = scalars
         .iter()
         .find(|(k, _)| k.starts_with("tpmstate"))
-        .map(|(k, v)| (k.as_str(), v.as_str()))?;
+        .map(|(_, v)| v.as_str())?;
 
     let (source, _) = parse_source_and_options(raw);
     let mut version = "2.0".to_string();
@@ -161,12 +161,12 @@ pub(super) fn map_tpm(
     Some(TpmConfig {
         version,
         backend: "emulator".to_string(),
-        state_path: Some(match (runtime_target, vmid) {
+        state_path: match (runtime_target, vmid) {
             (crate::import::proxmox::RuntimeTarget::ProxmoxParity, Some(id)) => {
-                format!("/var/run/qemu-server/{}.swtpm", id)
+                Some(format!("/var/run/qemu-server/{}.swtpm", id))
             }
-            _ => format!("/var/run/ezkvm/{}-tpm.socket", key),
-        }),
+            _ => None,
+        },
         state_dir: None,
         state_backend_uri,
         model,
@@ -303,17 +303,22 @@ pub(super) fn map_guest_agent(
                 Some(id) => format!("/var/run/qemu-server/{}.qga", id),
                 None => "/var/run/qemu-server/qga.sock".to_string(),
             }),
-            crate::import::proxmox::RuntimeTarget::PortableLinux => {
-                Some("/var/run/ezkvm/qga.sock".to_string())
-            }
+            crate::import::proxmox::RuntimeTarget::PortableLinux => None,
         });
+
+    let (bus, addr) = match runtime_target {
+        crate::import::proxmox::RuntimeTarget::ProxmoxParity => {
+            (Some(legacy_root_bus.to_string()), Some("0x8".to_string()))
+        }
+        crate::import::proxmox::RuntimeTarget::PortableLinux => (None, None),
+    };
 
     Some(GuestAgentConfig {
         enabled: true,
         socket_path,
         freeze_cpu: false,
-        bus: Some(legacy_root_bus.to_string()),
-        addr: Some("0x8".to_string()),
+        bus,
+        addr,
     })
 }
 

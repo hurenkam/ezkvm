@@ -31,8 +31,6 @@ socket,path=/var/run/qemu-server/qga.sock,server=on,wait=off,id=qga0
 -device
 virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0
 -device
-virtio-balloon-pci
--device
 intel-iommu,id=iommu0,intremap=on
 -qmp
 unix:<RUNTIME_DIR>/ezkvm/fixture-nested.qmp,server=on,wait=off

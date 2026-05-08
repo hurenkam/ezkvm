@@ -28,3 +28,7 @@ pub(super) fn is_append_all_list_path(path: &[String]) -> bool {
         || matches!(path, [first, second] if first == "policies" && second == "scsi_controllers")
         || matches!(path, [first, second] if first == "policies" && second == "iscsi_disks")
 }
+
+pub(super) fn is_presence_signaling_empty_mapping_path(path: &[String]) -> bool {
+    matches!(path, [first, second] if first == "options" && second == "guest_agent")
+}

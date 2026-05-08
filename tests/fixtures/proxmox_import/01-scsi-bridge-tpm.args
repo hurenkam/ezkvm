@@ -30,8 +30,6 @@ socket,id=tpmchar,server=on,wait=off,path=/var/run/qemu-server/200.swtpm
 emulator,id=tpmdev,chardev=tpmchar
 -device
 tpm-tis,tpmdev=tpmdev
--device
-virtio-balloon-pci
 -qmp
 unix:<RUNTIME_DIR>/ezkvm/e2e-scsi-bridge.qmp,server=on,wait=off
 -pidfile

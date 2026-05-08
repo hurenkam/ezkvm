@@ -13,7 +13,7 @@ use crate::config::{
     HugepagesConfig, InputDeviceConfig, IommuConfig, IvshmemConfig, MemoryConfig,
     NetworkBackendConfig, NetworkConfig, NumaConfig, RtcConfig, SataControllerConfig,
     ScsiControllerConfig, SerialConfig, SmbiosConfig, SpiceConfig, SystemConfig, TpmConfig,
-    UsbDeviceConfig, VmConfig, VmOptions, VncConfig, XhciControllerConfig,
+    UsbDeviceConfig, VmConfig, VmOptions, VncConfig,
 };
 use std::collections::BTreeSet;
 
@@ -68,8 +68,6 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     machine = topology_planner.apply_machine_and_readconfig(&machine, &mut readconfig);
     let legacy_root_bus = topology_planner.legacy_root_bus();
     let audio_bus = topology_planner.audio_controller_bus();
-    let xhci_bus = topology_planner.xhci_controller_bus();
-    let xhci_addr = topology_planner.xhci_controller_addr();
     let iommu = system::map_iommu(&machine_options, proxmox.scalars.get("args"));
 
     let memory = proxmox
@@ -105,18 +103,8 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
     let boot_indices = system::parse_boot_order(&proxmox.scalars);
     let smbios_uuid = system::parse_smbios_uuid(&proxmox.scalars);
 
-    let mut scsi_controllers =
+    let scsi_controllers =
         storage::map_scsi_controllers(&proxmox.scalars, &proxmox.disks, &mut warnings);
-    let scsi_controller_bus = topology_planner.scsi_controller_bus();
-    let scsi_controller_addr = topology_planner.scsi_controller_addr();
-    if let Some(controller) = scsi_controllers.first_mut() {
-        if controller.bus.is_none() {
-            controller.bus = scsi_controller_bus.map(str::to_string);
-        }
-        if controller.addr.is_none() {
-            controller.addr = scsi_controller_addr.map(str::to_string);
-        }
-    }
     let sata_controllers = storage::map_sata_controllers(&proxmox.disks);
     let inferred_vmid = helpers::infer_proxmox_vmid(proxmox);
     let mut drives = proxmox
@@ -196,14 +184,17 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             default_bus,
         ));
     }
-    let use_explicit_xhci = !proxmox.usb.is_empty();
     let host_usb = proxmox
         .usb
         .iter()
-        .map(|entry| devices::map_usb(entry, use_explicit_xhci))
+        .map(|entry| devices::map_usb(entry, true))
         .collect::<Vec<_>>();
 
-    let ballooning = system::map_ballooning(is_windows, legacy_root_bus);
+    let ballooning = if proxmox.scalars.contains_key("balloon") {
+        system::map_ballooning(is_windows, legacy_root_bus)
+    } else {
+        None
+    };
 
     let tpm = system::map_tpm(
         &proxmox.scalars,
@@ -276,18 +267,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
         controllers: ControllersConfig {
             scsi: scsi_controllers,
             sata: sata_controllers,
-            xhci: if use_explicit_xhci {
-                vec![XhciControllerConfig {
-                    id: String::new(),
-                    p2: None,
-                    p3: None,
-                    usb: Vec::new(),
-                    bus: xhci_bus.map(str::to_string),
-                    addr: xhci_addr.map(str::to_string),
-                }]
-            } else {
-                Vec::new()
-            },
+            xhci: Vec::new(),
         },
         host: HostConfig {
             pci: host_pci,

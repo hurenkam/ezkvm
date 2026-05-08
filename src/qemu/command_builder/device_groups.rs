@@ -2,36 +2,37 @@ use crate::qemu::{QemuManager, types::QemuArgs};
 
 impl QemuManager {
     pub(super) fn add_usb_args(&self, args: &mut QemuArgs) {
+        let has_q35_usb_topology = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+        let fallback_bus = if has_q35_usb_topology {
+            Some("pci.1")
+        } else {
+            None
+        };
+        let fallback_addr = if has_q35_usb_topology {
+            Some("0x1b")
+        } else {
+            None
+        };
+
         if !self.config.controllers_xhci().is_empty() {
             for xhci_controller in self.config.controllers_xhci() {
                 args.add_xhci_controller(
                     &xhci_controller.id,
                     xhci_controller.p2,
                     xhci_controller.p3,
-                    xhci_controller.bus.as_deref(),
-                    xhci_controller.addr.as_deref(),
+                    xhci_controller.bus.as_deref().or(fallback_bus),
+                    xhci_controller.addr.as_deref().or(fallback_addr),
                 );
             }
         } else if !self.config.host_usb().is_empty() {
             // When auto-synthesizing an XHCI controller, keep ADR-0005 preferred
             // placement for Q35-compatible topologies.
-            let has_q35_usb_topology = self
-                .config
-                .system
-                .readconfig
-                .iter()
-                .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
-            let bus = if has_q35_usb_topology {
-                Some("pci.1")
-            } else {
-                None
-            };
-            let addr = if has_q35_usb_topology {
-                Some("0x1b")
-            } else {
-                None
-            };
-            args.add_xhci_controller("xhci", None, None, bus, addr);
+            args.add_xhci_controller("xhci", None, None, fallback_bus, fallback_addr);
         }
 
         for usb_device in self.config.host_usb() {

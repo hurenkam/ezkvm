@@ -152,13 +152,14 @@ fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
         args.join("\n")
     );
 
-    // Sanity-check: the YAML must record bus values for the host PCI entries.
+    // Compact output may omit hostpci bus/addr when portable runtime reconstructs
+    // the same placement; command args above remain the source of truth.
     assert!(
-        yaml.contains("ich9-pcie-port-1"),
-        "YAML should contain ich9-pcie-port-1 bus assignment"
+        !yaml.contains("bus: ich9-pcie-port-1"),
+        "compact YAML should omit reconstructable hostpci bus assignment"
     );
     assert!(
-        yaml.contains("ich9-pcie-port-2"),
-        "YAML should contain ich9-pcie-port-2 bus assignment"
+        !yaml.contains("addr: 0x0.0"),
+        "compact YAML should omit reconstructable hostpci addr assignment"
     );
 }

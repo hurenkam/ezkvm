@@ -47,7 +47,13 @@ pub(super) fn compact_overlay_against_base(
 fn compact_value_without_base(overlay: &Value, path: &[String]) -> Option<Value> {
     match overlay {
         Value::Mapping(_) => {
-            compact_overlay_against_base(&Value::Mapping(Mapping::new()), overlay, path)
+            let compacted =
+                compact_overlay_against_base(&Value::Mapping(Mapping::new()), overlay, path);
+            if compacted.is_none() && super::paths::is_presence_signaling_empty_mapping_path(path) {
+                Some(Value::Mapping(Mapping::new()))
+            } else {
+                compacted
+            }
         }
         Value::Sequence(_) if super::paths::is_id_merge_list_path(path) => {
             compact_id_merge_sequence(&Value::Sequence(Vec::new()), overlay, path)

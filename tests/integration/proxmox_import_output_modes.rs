@@ -89,7 +89,8 @@ fn proxmox_import_output_modes_preserve_runtime_equivalence() {
 
     assert_ne!(canonical.yaml, compact.yaml);
     assert!(debug.yaml.contains("# from Proxmox ostype: win11"));
-    assert!(debug.yaml.contains("id: xhci"));
+    // USB device is present and references xhci (not synthesized as controller)
+    assert!(debug.yaml.contains("bus: xhci.0"));
 
     let canonical_cfg = with_repo_profiles(|| {
         VmConfig::from_str(&canonical.yaml).expect("canonical yaml should deserialize")

@@ -67,20 +67,6 @@ impl Q35TopologyPlanner {
         }
     }
 
-    pub(super) fn scsi_controller_bus(&self) -> Option<&'static str> {
-        if !self.needs_q35_compat {
-            return None;
-        }
-        Some("pci.0")
-    }
-
-    pub(super) fn scsi_controller_addr(&self) -> Option<&'static str> {
-        if !self.needs_q35_compat {
-            return None;
-        }
-        Some("0x5")
-    }
-
     pub(super) fn audio_controller_bus(&self) -> &'static str {
         if self.runtime_target == RuntimeTarget::PortableLinux
             || self.runtime_target == RuntimeTarget::ProxmoxParity
@@ -89,20 +75,6 @@ impl Q35TopologyPlanner {
         } else {
             "pci.0"
         }
-    }
-
-    pub(super) fn xhci_controller_bus(&self) -> Option<&'static str> {
-        if !self.needs_q35_compat {
-            return None;
-        }
-        Some("pci.1")
-    }
-
-    pub(super) fn xhci_controller_addr(&self) -> Option<&'static str> {
-        if !self.needs_q35_compat {
-            return None;
-        }
-        Some("0x1b")
     }
 
     pub(super) fn allocate_hostpci_default_bus(
