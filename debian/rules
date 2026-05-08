@@ -2,6 +2,16 @@
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
+RUST_TOOLCHAIN := $(shell awk -F'"' '/^channel[[:space:]]*=/{print $$2; exit}' rust-toolchain.toml 2>/dev/null)
+
+define run_cargo
+	if command -v rustup >/dev/null 2>&1 && [ -n "$(RUST_TOOLCHAIN)" ]; then \
+		rustup run "$(RUST_TOOLCHAIN)" cargo $(1); \
+	else \
+		cargo $(1); \
+	fi
+endef
+
 %:
 	dh $@ --buildsystem=cargo
 
@@ -10,11 +20,14 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 # is used directly until vendoring infrastructure is in place (K-02 follow-up).
 override_dh_auto_configure:
 
+override_dh_auto_clean:
+	$(call run_cargo,clean)
+
 override_dh_auto_build:
-	cargo build --release --locked
+	$(call run_cargo,build --release --locked)
 
 override_dh_auto_install:
 	install -Dm755 target/release/ezkvm debian/ezkvm/usr/bin/ezkvm
 
 override_dh_auto_test:
-	cargo test --locked
+	$(call run_cargo,test --locked)
