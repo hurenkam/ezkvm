@@ -1,0 +1,37 @@
+distro_label=ubuntu-26.04
+timestamp_utc=20260508T180911Z
+repo_root=/home/hurenkam/Workspace/ezkvm
+ezkvm_bin=/home/hurenkam/Workspace/ezkvm/target/debug/ezkvm
+storage_cfg=/home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/storage.cfg
+linux_conf=/home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/01-scsi-bridge-tpm.conf
+windows_conf=/home/hurenkam/Workspace/ezkvm/input/felucia/108.conf
+mixed_conf=/home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/11-nested-viommu-hidden.conf
+parity_conf=/home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/01-scsi-bridge-tpm.conf
+with_optional=0
+smoke_boot=1
+smoke_timeout_sec=120
+
+[os-release]
+PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+VERSION="26.04 (Resolute Raccoon)"
+VERSION_CODENAME=resolute
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=resolute
+LOGO=ubuntu-logo
+
+[tool-paths]
+qemu-system-x86_64=/usr/bin/qemu-system-x86_64
+swtpm=/usr/bin/swtpm
+qemu-bridge-helper=<missing>
+looking-glass-client=<missing>
+
+[tool-versions]
+QEMU emulator version 10.2.1 (Debian 1:10.2.1+ds-1ubuntu4)
+TPM emulator version 0.10.1, Copyright (c) 2014-2022 IBM Corp. and others

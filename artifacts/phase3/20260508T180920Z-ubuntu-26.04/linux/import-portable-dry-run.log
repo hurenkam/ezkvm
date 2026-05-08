@@ -1,0 +1,38 @@
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+# import-proxmox dry run
+# input: /home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/01-scsi-bridge-tpm.conf
+# output (not written): 01-scsi-bridge-tpm.yaml
+# output mode: Compact
+# runtime target: PortableLinux
+# capability precedence: cli > vm-override > profile-default > central-config > platform-default
+name: e2e-scsi-bridge
+backend: qemu
+profiles:
+  - proxmox-base
+  - proxmox-portable-q35
+  - proxmox-q35-uefi
+  - storage-virtio-scsi-single
+system:
+  machine: q35
+  memory:
+    size: 4096
+  cpu:
+    model: host
+    vcpus: 4
+  tpm:
+    version: '2.0'
+    backend: emulator
+    model: tpm-tis
+devices:
+  displays:
+    - {type: qxl, vram: 64}
+  networks:
+    - {id: net0, model: virtio-net, backend: {type: bridge, bridge: vmbr0, queues: 4}, mac: 52:54:00:12:34:56}
+  controllers:
+    scsi:
+      - type: virtio-scsi-pci
+        drives:
+          - {id: scsi0, path: local-lvm:vm-200-disk-0, boot_index: 100, type: disk, format: qcow2, discard: true, ssd: true, cache: none, rotation_rate: 1}
+

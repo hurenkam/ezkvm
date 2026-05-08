@@ -1,0 +1,10 @@
+Loading configuration from: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180911Z-ubuntu-26.04/mixed/mixed.portable.yaml
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+Starting VM: fixture-nested
+QEMU binary: qemu-system-x86_64
+Starting interactively...
+qemu-system-x86_64: -chardev socket,path=/var/run/ezkvm/fixture-nested.qga,server=on,wait=off,id=qga0: Failed to bind socket to /var/run/ezkvm/fixture-nested.qga: Permission denied
+✓ VM 'fixture-nested' finished with exit code 1

@@ -1,0 +1,45 @@
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+# import-proxmox dry run
+# input: /home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/11-nested-viommu-hidden.conf
+# output (not written): 11-nested-viommu-hidden.yaml
+# output mode: Compact
+# runtime target: PortableLinux
+# capability precedence: cli > vm-override > profile-default > central-config > platform-default
+# warnings (1):
+# - args: unsupported args token '-cpu' ignored
+name: fixture-nested
+backend: qemu
+profiles:
+  - proxmox-base
+  - proxmox-portable-q35
+  - proxmox-q35-uefi
+  - storage-virtio-scsi-pci
+  - linux-l26-common
+  - viommu
+  - hidden-hypervisor
+system:
+  machine: q35
+  machine_options:
+    - viommu=intel
+  memory:
+    size: 8192
+  cpu:
+    model: host
+    vcpus: 8
+    features:
+      - hidden=1
+devices:
+  displays:
+    - {type: virtio-gpu}
+  networks:
+    - {id: net0, model: virtio-net, backend: {type: bridge, bridge: vmbr0}, mac: 52:54:00:65:43:21}
+  controllers:
+    scsi:
+      - type: virtio-scsi-pci
+        drives:
+          - {id: scsi0, path: /var/lib/vm/nested.raw, discard: true, type: disk, format: raw}
+iommu:
+  type: intel
+

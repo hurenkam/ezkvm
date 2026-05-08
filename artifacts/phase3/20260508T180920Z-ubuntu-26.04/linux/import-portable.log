@@ -1,0 +1,7 @@
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+Import complete
+Input: /home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/01-scsi-bridge-tpm.conf
+Output: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/linux/linux.portable.yaml
+Output mode: Compact

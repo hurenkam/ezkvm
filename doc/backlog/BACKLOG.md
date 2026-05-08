@@ -787,6 +787,13 @@ Acceptance Criteria:
 - Any failures are categorized and linked to actionable follow-up work.
 Estimate: 2 days
 
+Completion Notes (2026-05-08):
+- Required Ubuntu 26.04 dry-run matrix completed with `Required failures: 0`.
+- Successful non-smoke artifact bundle: `artifacts/phase3/20260508T180721Z-ubuntu-26.04/`.
+- Successful full smoke-boot artifact bundle (root-run confirmation): `artifacts/phase3/20260508T180920Z-ubuntu-26.04/`.
+- Additional non-root smoke-boot attempt captured in `artifacts/phase3/20260508T180911Z-ubuntu-26.04/` showed Linux and Windows smoke failures while dry-run phases passed.
+- Ubuntu-specific setup deltas captured during execution: add `allow vmbr0` to `/etc/qemu/bridge.conf` for bridge-helper-backed preflight, and document that this host still required a root-run for smoke-boot success even after the ACL fix.
+
 ### B-55 Execute Arch Linux portable-runtime validation matrix and publish runbooks
 Scope:
 - Run the required Phase 3 matrix on Arch Linux as the path-variability stress case.

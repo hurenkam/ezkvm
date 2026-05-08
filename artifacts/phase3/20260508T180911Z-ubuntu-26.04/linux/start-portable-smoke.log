@@ -1,0 +1,6 @@
+Loading configuration from: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180911Z-ubuntu-26.04/linux/linux.portable.yaml
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+Error: Permission denied (os error 13)

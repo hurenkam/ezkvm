@@ -1,0 +1,19 @@
+linux	import-portable	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/linux/linux.portable.yaml
+linux	import-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/linux/import-portable-dry-run.log
+linux	start-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/linux/start-portable-dry-run.log
+linux	start-portable-smoke	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/linux/start-portable-smoke.log
+windows	import-portable	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/windows/windows.portable.yaml
+windows	import-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/windows/import-portable-dry-run.log
+windows	start-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/windows/start-portable-dry-run.log
+windows	start-portable-smoke	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/windows/start-portable-smoke.log
+mixed	import-portable	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/mixed/mixed.portable.yaml
+mixed	import-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/mixed/import-portable-dry-run.log
+mixed	start-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/mixed/start-portable-dry-run.log
+mixed	start-portable-smoke	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/mixed/start-portable-smoke.log
+parity-guard	import-parity-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/parity-guard/import-parity-dry-run.log
+optional	integration-checks	SKIP	enable with --with-optional
+
+Harness output: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04
+Summary file: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/summary.txt
+Environment file: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T180920Z-ubuntu-26.04/environment.txt
+Required failures: 0

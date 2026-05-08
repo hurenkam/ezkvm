@@ -1,0 +1,33 @@
+name: fixture-nested
+backend: qemu
+profiles:
+  - proxmox-base
+  - proxmox-portable-q35
+  - proxmox-q35-uefi
+  - storage-virtio-scsi-pci
+  - linux-l26-common
+  - viommu
+  - hidden-hypervisor
+system:
+  machine: q35
+  machine_options:
+    - viommu=intel
+  memory:
+    size: 8192
+  cpu:
+    model: host
+    vcpus: 8
+    features:
+      - hidden=1
+devices:
+  displays:
+    - {type: virtio-gpu}
+  networks:
+    - {id: net0, model: virtio-net, backend: {type: bridge, bridge: vmbr0}, mac: 52:54:00:65:43:21}
+  controllers:
+    scsi:
+      - type: virtio-scsi-pci
+        drives:
+          - {id: scsi0, path: /var/lib/vm/nested.raw, discard: true, type: disk, format: raw}
+iommu:
+  type: intel
