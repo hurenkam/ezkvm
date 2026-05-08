@@ -1080,6 +1080,20 @@ Acceptance Criteria:
 - Packaging regressions are blocked before release.
 Estimate: 2 days
 
+### K-06 Package non-root runtime group and directory ownership policy
+Scope:
+- During package installation, create system group `ezkvm`.
+- Ensure ezkvm runtime directories are created/maintained with `0775` permissions and group ownership `ezkvm`.
+- Update user documentation to state that user-mode execution requires membership in group `ezkvm`.
+- Optional: add udev automation to assign group `ezkvm` and mode `0770` for `/dev/mapper/*-vm--*` LVM device nodes.
+Dependencies: K-03
+Acceptance Criteria:
+- Package install/upgrade idempotently ensures `ezkvm` group exists and runtime directories have the expected permissions and group ownership.
+- Non-root user-mode runtime paths (sockets, pid files, logs) are writable when the user is in group `ezkvm`.
+- User-facing docs include explicit steps to add a user to group `ezkvm` and verify effective membership.
+- Optional udev automation is either implemented and documented, or explicitly deferred with rationale.
+Estimate: 2 days
+
 ---
 
 # Suggested Sprint Sequence

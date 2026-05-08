@@ -120,6 +120,7 @@ Source: doc/backlog/BACKLOG.md
 | K-03 | Harden dependency policy for cross-distro installability | K | Phase-3-Packaging | epic:packaging, phase:2-hardening, ready | K-02 | unassigned | Todo |
 | K-04 | Execute dual-distro package validation matrix | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
 | K-05 | Add packaging CI and release gate enforcement | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-04 | unassigned | Todo |
+| K-06 | Package non-root runtime group and directory ownership policy | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
 
 ## Dependency Graph
 
@@ -177,6 +178,7 @@ Source: doc/backlog/BACKLOG.md
 - D-01 -> D-02 -> D-03 -> D-04
 - (B-05 and C-05 and D-03) -> E-01 -> E-02 -> E-03
 - B-54 -> K-01 -> K-02 -> K-03 -> K-04 -> K-05
+- K-03 -> K-06
 
 ## Usage Notes
 
