@@ -1,0 +1,9 @@
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+Import complete
+Input: /home/hurenkam/Workspace/ezkvm/tests/fixtures/proxmox_import/11-nested-viommu-hidden.conf
+Output: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/mixed/mixed.portable.yaml
+Output mode: Compact
+Warnings (1):
+- args: unsupported args token '-cpu' ignored

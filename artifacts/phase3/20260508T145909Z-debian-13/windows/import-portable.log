@@ -1,0 +1,13 @@
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+Import complete
+Input: /home/hurenkam/Workspace/ezkvm/input/felucia/108.conf
+Output: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/windows/windows.portable.yaml
+Output mode: Compact

@@ -1,0 +1,40 @@
+Loading configuration from: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/linux/linux.portable.yaml
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+Starting VM: e2e-scsi-bridge
+QEMU binary: qemu-system-x86_64
+Dry run mode - would execute:
+qemu-system-x86_64 \
+  -name e2e-scsi-bridge \
+  -machine type=q35,hpet=off \
+  -cpu host \
+  -m 4096M \
+  -smp 4,sockets=1,cores=4,maxcpus=4 \
+  -readconfig /usr/share/ezkvm/ezkvm-q35.cfg \
+  -device virtio-scsi-pci,id=scsihw0 \
+  -drive file=local-lvm:vm-200-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap \
+  -device scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,scsi-id=0,rotation_rate=1,bootindex=100 \
+  -netdev type=bridge,id=net0,br=vmbr0,helper=/usr/lib/qemu/qemu-bridge-helper,queues=4 \
+  -device virtio-net,netdev=net0,mac=52:54:00:12:34:56,bus=pci.0,addr=0x12 \
+  -device qxl,vram_size_mb=64 \
+  -boot menu=on,strict=on,reboot-timeout=1000 \
+  -drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/ovmf/OVMF.fd \
+  -chardev socket,id=tpmchar,path=/run/user/1000/ezkvm/e2e-scsi-bridge.swtpm \
+  -tpmdev emulator,id=tpmdev,chardev=tpmchar \
+  -device tpm-tis,tpmdev=tpmdev \
+  -qmp unix:/run/user/1000/ezkvm/e2e-scsi-bridge.qmp,server=on,wait=off \
+  -pidfile /run/user/1000/ezkvm/e2e-scsi-bridge.pid \
+  -nodefaults \
+  -global kvm-pit.lost_tick_policy=discard \
+  -enable-kvm
+PID file: /run/user/1000/ezkvm/e2e-scsi-bridge.pid
+Auxiliary launch (swtpm): /usr/bin/swtpm socket --tpm2 --tpmstate dir=/run/user/1000/ezkvm/tpm-state --ctrl type=unixio,path=/run/user/1000/ezkvm/e2e-scsi-bridge.swtpm,mode=0600 --pid file=/run/user/1000/ezkvm/e2e-scsi-bridge.swtpm.pid --terminate --log file=/tmp/ezkvm-logs/e2e-scsi-bridge-swtpm.log,level=1 --daemon
+Capability resolution diagnostics:
+  mode: PortableLinux
+  runtime_root: source=central-config, value=/run/user/1000/ezkvm
+  swtpm_binary: source=central-config, value=/usr/bin/swtpm
+  ovmf_code: source=platform-default, value=/usr/share/ovmf/OVMF.fd
+  looking_glass_program: mode=Disabled, source=unresolved, value=<none>
+  network[net0]: mode=BridgeHelper, source=central-config, backend=bridge

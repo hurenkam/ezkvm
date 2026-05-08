@@ -1,0 +1,10 @@
+Loading configuration from: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/mixed/mixed.portable.yaml
+Warning: Drive path '/var/lib/vm/nested.raw' does not exist
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+Starting VM: fixture-nested
+QEMU binary: qemu-system-x86_64
+Starting interactively...
+qemu-system-x86_64: -drive file=/var/lib/vm/nested.raw,if=none,id=drive-scsi0,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap: Could not open '/var/lib/vm/nested.raw': No such file or directory
+✓ VM 'fixture-nested' finished with exit code 1

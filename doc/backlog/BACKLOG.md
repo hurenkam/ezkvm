@@ -768,6 +768,12 @@ Acceptance Criteria:
 - Debian-specific setup notes are captured for operator documentation updates.
 Estimate: 2 days
 
+Completion Notes (2026-05-08):
+- Required Phase 3 matrix completed on Debian Trixie with `Required failures: 0`.
+- Primary successful artifact bundle: `artifacts/phase3/20260508T145909Z-debian-13/`.
+- Secondary successful artifact bundle (root-run confirmation): `artifacts/phase3/20260508T150008Z-debian-13/`.
+- Setup deltas captured during execution: install packaged profile assets under `/etc/ezkvm/profiles.d`, provide `/etc/qemu/bridge.conf` ACL entry for bridge-helper use, and ensure runtime directory permissions are valid for non-root smoke runs.
+
 ### B-54 Execute Ubuntu 26.04 portable-runtime validation matrix
 Scope:
 - Run the same required Phase 3 matrix on Ubuntu 26.04 LTS.

@@ -1,0 +1,18 @@
+Loading configuration from: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/windows/windows.portable.yaml
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+[2m2026-05-08T14:59:09.252326Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0mLooking Glass shared memory path '/dev/kvmfr0' does not exist on this host
+Preflight warning: Looking Glass shared memory path '/dev/kvmfr0' does not exist on this host
+[2m2026-05-08T14:59:09.252359Z[0m [32m INFO[0m [2mezkvm::runtime::swtpm[0m[2m:[0m launching swtpm emulator [3mvm[0m[2m=[0mwakiza [3msocket[0m[2m=[0m/run/user/1000/ezkvm/wakiza.swtpm
+Launching swtpm: /usr/bin/swtpm socket --tpm2 --tpmstate dir=/run/user/1000/ezkvm/tpm-state --ctrl type=unixio,path=/run/user/1000/ezkvm/wakiza.swtpm,mode=0600 --pid file=/run/user/1000/ezkvm/wakiza.swtpm.pid --terminate --log file=/tmp/ezkvm-logs/wakiza-swtpm.log,level=1 --daemon
+[2m2026-05-08T14:59:09.302680Z[0m [32m INFO[0m [2mezkvm::runtime::swtpm[0m[2m:[0m swtpm emulator started [3msocket[0m[2m=[0m/run/user/1000/ezkvm/wakiza.swtpm
+✓ Started swtpm emulator using socket /run/user/1000/ezkvm/wakiza.swtpm
+Starting VM: wakiza
+QEMU binary: qemu-system-x86_64
+Starting interactively...
+qemu-system-x86_64: -drive file=vm1-pool:vm-108-boot,if=none,id=drive-scsi0,format=qcow2,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap: Unknown protocol 'vm1-pool'
+✓ VM 'wakiza' finished with exit code 1

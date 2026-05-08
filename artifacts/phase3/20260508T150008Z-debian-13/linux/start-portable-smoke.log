@@ -1,0 +1,14 @@
+Loading configuration from: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T150008Z-debian-13/linux/linux.portable.yaml
+Warning: Drive path 'local-lvm:vm-200-disk-0' does not exist
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+[2m2026-05-08T15:00:08.679324Z[0m [32m INFO[0m [2mezkvm::runtime::swtpm[0m[2m:[0m launching swtpm emulator [3mvm[0m[2m=[0me2e-scsi-bridge [3msocket[0m[2m=[0m/var/run/ezkvm/e2e-scsi-bridge.swtpm
+Launching swtpm: /usr/bin/swtpm socket --tpm2 --tpmstate dir=/var/run/ezkvm/tpm-state --ctrl type=unixio,path=/var/run/ezkvm/e2e-scsi-bridge.swtpm,mode=0600 --pid file=/var/run/ezkvm/e2e-scsi-bridge.swtpm.pid --terminate --log file=/var/log/ezkvm/e2e-scsi-bridge-swtpm.log,level=1 --daemon
+[2m2026-05-08T15:00:08.729594Z[0m [32m INFO[0m [2mezkvm::runtime::swtpm[0m[2m:[0m swtpm emulator started [3msocket[0m[2m=[0m/var/run/ezkvm/e2e-scsi-bridge.swtpm
+✓ Started swtpm emulator using socket /var/run/ezkvm/e2e-scsi-bridge.swtpm
+Starting VM: e2e-scsi-bridge
+QEMU binary: qemu-system-x86_64
+Starting interactively...
+qemu-system-x86_64: -drive file=local-lvm:vm-200-disk-0,if=none,id=drive-scsi0,format=qcow2,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap: Unknown protocol 'local-lvm'
+✓ VM 'e2e-scsi-bridge' finished with exit code 1

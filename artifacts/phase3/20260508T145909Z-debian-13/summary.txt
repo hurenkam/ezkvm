@@ -1,0 +1,19 @@
+linux	import-portable	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/linux/linux.portable.yaml
+linux	import-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/linux/import-portable-dry-run.log
+linux	start-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/linux/start-portable-dry-run.log
+linux	start-portable-smoke	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/linux/start-portable-smoke.log
+windows	import-portable	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/windows/windows.portable.yaml
+windows	import-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/windows/import-portable-dry-run.log
+windows	start-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/windows/start-portable-dry-run.log
+windows	start-portable-smoke	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/windows/start-portable-smoke.log
+mixed	import-portable	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/mixed/mixed.portable.yaml
+mixed	import-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/mixed/import-portable-dry-run.log
+mixed	start-portable-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/mixed/start-portable-dry-run.log
+mixed	start-portable-smoke	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/mixed/start-portable-smoke.log
+parity-guard	import-parity-dry-run	PASS	/home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/parity-guard/import-parity-dry-run.log
+optional	integration-checks	SKIP	enable with --with-optional
+
+Harness output: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13
+Summary file: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/summary.txt
+Environment file: /home/hurenkam/Workspace/ezkvm/artifacts/phase3/20260508T145909Z-debian-13/environment.txt
+Required failures: 0

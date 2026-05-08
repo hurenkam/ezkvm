@@ -1,0 +1,64 @@
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+Warning: UEFI vars path 'vm1-pool:vm-108-efidisk' does not exist
+Warning: Drive path 'vm1-pool:vm-108-boot' does not exist
+Warning: Drive path 'vm1-pool:vm-108-tmp' does not exist
+# import-proxmox dry run
+# input: /home/hurenkam/Workspace/ezkvm/input/felucia/108.conf
+# output (not written): 108.yaml
+# output mode: Compact
+# runtime target: PortableLinux
+# capability precedence: cli > vm-override > profile-default > central-config > platform-default
+name: wakiza
+backend: qemu
+profiles:
+  - proxmox-base
+  - proxmox-portable-q35
+  - proxmox-q35-uefi
+  - proxmox-windows
+  - windows-common
+  - windows-11
+  - looking-glass
+  - gpu-passthrough
+system:
+  memory:
+    size: 16384
+  cpu:
+    model: host
+    vcpus: 8
+  boot:
+    uefi_vars: vm1-pool:vm-108-efidisk
+  smbios:
+    uuid: 04d064c3-66a1-4aa7-9589-f8b3ecf91cd7
+    vm_generation_id: c13b46f3-9743-49f0-92e8-297b9feac497
+devices:
+  displays:
+    - {type: none}
+  networks:
+    - {id: net0, model: virtio-net-pci, backend: {type: bridge, bridge: vmbr0}, mac: BC:24:11:3A:21:B7, boot_index: 102}
+  controllers:
+    scsi:
+      - type: pvscsi
+        drives:
+          - {id: scsi0, path: vm1-pool:vm-108-boot, boot_index: 100, type: disk, format: qcow2, discard: true, ssd: true, rotation_rate: 1}
+          - {id: scsi1, path: vm1-pool:vm-108-tmp, rotation_rate: 1, type: disk, format: qcow2, discard: true, ssd: true}
+    ide:
+      - drives:
+          - {id: ide2, boot_index: 101, type: cdrom, format: raw}
+host:
+  pci:
+    - {device: 0000:03:00.0, pcie: true, multifunction: true}
+    - {device: 0000:03:00.1}
+  usb:
+    - {host: '', hostbus: '1', hostport: '2.2', bus: xhci.0, port: '1'}
+spice:
+  port: 5903
+  addr: 0.0.0.0
+  disable_ticketing: true
+options:
+  guest_agent: {}
+
