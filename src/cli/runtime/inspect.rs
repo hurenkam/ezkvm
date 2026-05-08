@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
+use std::sync::mpsc;
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,6 +145,211 @@ fn guest_network_interfaces_from_socket(socket_path: &str) -> Result<Vec<GuestNe
     }
 }
 
+fn qmp_socket_path(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+) -> Option<String> {
+    if let Some(qmp) = config.options_qmp()
+        && qmp.enabled
+    {
+        return match qmp.socket_type {
+            crate::config::QmpSocketType::Unix => Some(
+                qmp.socket_path
+                    .clone()
+                    .unwrap_or_else(|| "/var/run/qemu-monitor.sock".to_string()),
+            ),
+            crate::config::QmpSocketType::Tcp => None,
+        };
+    }
+
+    let overrides = crate::config::RuntimeCliOverrides::default();
+    let runtime_root =
+        crate::state::resolve_runtime_root_with_source(None, central_config, &overrides)
+            .value
+            .unwrap_or_else(|| "/tmp/ezkvm".to_string());
+
+    Some(format!("{}/{}.qmp", runtime_root, config.name))
+}
+
+fn qmp_socket_path_from_pid(pid: i32) -> Option<String> {
+    let cmdline_path = format!("/proc/{}/cmdline", pid);
+    let cmdline = std::fs::read(cmdline_path).ok()?;
+    find_qmp_socket_path_from_cmdline(&cmdline)
+}
+
+fn find_qmp_socket_path_from_cmdline(cmdline: &[u8]) -> Option<String> {
+    let args: Vec<String> = cmdline
+        .split(|byte| *byte == 0)
+        .filter(|chunk| !chunk.is_empty())
+        .map(|chunk| String::from_utf8_lossy(chunk).to_string())
+        .collect();
+
+    for pair in args.windows(2) {
+        if pair[0] == "-qmp"
+            && let Some(path) = parse_qmp_socket_path(&pair[1])
+        {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+fn parse_qmp_socket_path(spec: &str) -> Option<String> {
+    if let Some(rest) = spec.strip_prefix("unix:") {
+        return Some(rest.split(',').next().unwrap_or_default().to_string());
+    }
+
+    None
+}
+
+fn qmp_status_from_socket(socket_path: &str) -> Result<String> {
+    let mut stream = UnixStream::connect(socket_path)
+        .map_err(|e| anyhow!("failed to connect to QMP socket '{}': {}", socket_path, e))?;
+    stream
+        .set_read_timeout(Some(Duration::from_millis(1200)))
+        .map_err(|e| anyhow!("failed to configure QMP read timeout: {}", e))?;
+    stream
+        .set_write_timeout(Some(Duration::from_millis(1200)))
+        .map_err(|e| anyhow!("failed to configure QMP write timeout: {}", e))?;
+
+    let reader_stream = stream
+        .try_clone()
+        .map_err(|e| anyhow!("failed to clone QMP socket stream: {}", e))?;
+    let mut reader = BufReader::new(reader_stream);
+
+    let greeting = read_qmp_json_with_retry(&mut reader, "QMP greeting")?;
+    if greeting.get("QMP").is_none() {
+        return Err(anyhow!("invalid QMP greeting payload: {}", greeting));
+    }
+
+    stream
+        .write_all(b"{\"execute\":\"qmp_capabilities\"}\n")
+        .map_err(|e| anyhow!("failed to send qmp_capabilities: {}", e))?;
+    stream
+        .flush()
+        .map_err(|e| anyhow!("failed to flush qmp_capabilities: {}", e))?;
+
+    loop {
+        let msg = read_qmp_json_with_retry(&mut reader, "qmp_capabilities response")?;
+        if msg.get("return").is_some() {
+            break;
+        }
+        if let Some(err) = msg.get("error") {
+            return Err(anyhow!("qmp_capabilities failed: {}", err));
+        }
+    }
+
+    stream
+        .write_all(b"{\"execute\":\"query-status\"}\n")
+        .map_err(|e| anyhow!("failed to send query-status: {}", e))?;
+    stream
+        .flush()
+        .map_err(|e| anyhow!("failed to flush query-status: {}", e))?;
+
+    loop {
+        let msg = read_qmp_json_with_retry(&mut reader, "query-status response")?;
+        if let Some(ret) = msg.get("return") {
+            let status = ret
+                .get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let running = ret
+                .get("running")
+                .and_then(Value::as_bool)
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            return Ok(format!("status={}, running={}", status, running));
+        }
+        if let Some(err) = msg.get("error") {
+            return Err(anyhow!("query-status failed: {}", err));
+        }
+    }
+}
+
+fn qmp_status_from_socket_with_timeout(socket_path: &str, timeout: Duration) -> Result<String> {
+    let (tx, rx) = mpsc::channel();
+    let path = socket_path.to_string();
+    std::thread::spawn(move || {
+        let _ = tx.send(qmp_status_from_socket(&path));
+    });
+
+    match rx.recv_timeout(timeout) {
+        Ok(result) => result,
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            Err(anyhow!("timed out waiting for QMP status query"))
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Err(anyhow!("QMP status worker exited unexpectedly"))
+        }
+    }
+}
+
+fn read_qmp_json_with_retry(reader: &mut BufReader<UnixStream>, context: &str) -> Result<Value> {
+    const MAX_TIMEOUT_RETRIES: usize = 5;
+
+    let mut retries = 0usize;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) => {
+                return Err(anyhow!("QMP socket closed while waiting for {}", context));
+            }
+            Ok(_) => {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                return serde_json::from_str(trimmed).map_err(|e| {
+                    anyhow!(
+                        "invalid QMP JSON while waiting for {} '{}': {}",
+                        context,
+                        trimmed,
+                        e
+                    )
+                });
+            }
+            Err(err) if is_retryable_socket_timeout(&err) => {
+                retries += 1;
+                if retries > MAX_TIMEOUT_RETRIES {
+                    return Err(anyhow!("timed out waiting for {}: {}", context, err));
+                }
+            }
+            Err(err) => {
+                return Err(anyhow!("failed reading {}: {}", context, err));
+            }
+        }
+    }
+}
+
+fn is_retryable_socket_timeout(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+    )
+}
+
+fn print_qmp_status_details(
+    config: &crate::config::VmConfig,
+    central_config: &crate::config::CentralConfig,
+    pid: Option<i32>,
+) {
+    let socket_path = pid
+        .and_then(qmp_socket_path_from_pid)
+        .or_else(|| qmp_socket_path(config, central_config));
+
+    let Some(socket_path) = socket_path else {
+        println!("QMP: unavailable (tcp socket mode)");
+        return;
+    };
+
+    match qmp_status_from_socket_with_timeout(&socket_path, Duration::from_secs(2)) {
+        Ok(status) => println!("QMP: {}", status),
+        Err(err) => println!("QMP: unavailable at {} ({})", socket_path, err),
+    }
+}
+
 fn print_guest_agent_network_details(
     config: &crate::config::VmConfig,
     central_config: &crate::config::CentralConfig,
@@ -193,6 +399,7 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
                 println!("Status: {} (PID: {})", lifecycle_state.status_label(), pid);
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
+                print_qmp_status_details(&config, &central_config, Some(pid));
                 print_guest_agent_network_details(&config, &central_config);
                 return Ok(());
             }
@@ -211,6 +418,10 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
                 println!("Status: {}", lifecycle_state.status_label());
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
+                let pid = crate::qemu::process::find_qemu_processes(vm_name)
+                    .ok()
+                    .and_then(|pids| pids.into_iter().next());
+                print_qmp_status_details(&config, &central_config, pid);
                 print_guest_agent_network_details(&config, &central_config);
             } else {
                 println!("Status: {}", lifecycle_state.status_label());
@@ -308,7 +519,10 @@ pub(crate) async fn handle_validate(
 
 #[cfg(test)]
 mod tests {
-    use super::{guest_agent_socket_path, parse_guest_network_interfaces};
+    use super::{
+        find_qmp_socket_path_from_cmdline, guest_agent_socket_path, parse_guest_network_interfaces,
+        parse_qmp_socket_path,
+    };
 
     #[test]
     fn parse_guest_network_interfaces_extracts_addresses() {
@@ -386,5 +600,19 @@ mod tests {
             guest_agent_socket_path(&config, &central_config).as_deref(),
             Some("/run/ezkvm/test-vm.qga")
         );
+    }
+
+    #[test]
+    fn parse_qmp_socket_path_extracts_unix_path() {
+        let path = parse_qmp_socket_path("unix:/tmp/vm.qmp,server=on,wait=off");
+        assert_eq!(path.as_deref(), Some("/tmp/vm.qmp"));
+    }
+
+    #[test]
+    fn find_qmp_socket_path_from_cmdline_extracts_qmp_argument() {
+        let cmdline =
+            b"qemu-system-x86_64\0-name\0vm\0-qmp\0unix:/run/ezkvm/vm.qmp,server=on,wait=off\0";
+        let path = find_qmp_socket_path_from_cmdline(cmdline);
+        assert_eq!(path.as_deref(), Some("/run/ezkvm/vm.qmp"));
     }
 }

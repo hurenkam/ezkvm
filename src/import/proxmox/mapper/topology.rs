@@ -5,7 +5,7 @@ use super::{MappingWarning, helpers};
 const PROXMOX_Q35_CFG: &str = "/usr/share/qemu-server/pve-q35-4.0.cfg";
 const EZKVM_Q35_CFG: &str = "/usr/share/ezkvm/ezkvm-q35.cfg";
 // Must match the number of [device "ich9-pcie-port-*"] entries in share/ezkvm-q35.cfg.
-const MAX_PORTABLE_ROOT_PORTS: u8 = 8;
+const MAX_PORTABLE_ROOT_PORTS: u8 = 4;
 
 pub(super) struct Q35TopologyPlanner {
     runtime_target: RuntimeTarget,

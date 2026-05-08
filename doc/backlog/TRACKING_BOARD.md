@@ -102,6 +102,7 @@ Source: doc/backlog/BACKLOG.md
 | B-53 | Execute Debian Trixie portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Todo |
 | B-54 | Execute Ubuntu 26.04 portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Todo |
 | B-55 | Execute Arch Linux portable-runtime validation matrix and publish runbooks | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-53, B-54 | unassigned | Todo |
+| B-56 | Synthesize portable Q35 root ports dynamically per VM | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-55 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -169,6 +170,7 @@ Source: doc/backlog/BACKLOG.md
 - B-52 -> B-53
 - B-52 -> B-54
 - (B-53 and B-54) -> B-55
+- B-55 -> B-56
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

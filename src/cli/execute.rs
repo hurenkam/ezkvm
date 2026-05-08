@@ -70,6 +70,10 @@ pub async fn execute(cli: Cli) -> Result<()> {
             )
             .await
         }
+        Commands::InternalShutdownMonitor { socket } => {
+            crate::qemu::process::run_shutdown_monitor(&socket);
+            Ok(())
+        }
         Commands::Storage(cmd) => handle_storage(cmd).await,
         Commands::Device(cmd) => handle_device(cmd).await,
         Commands::Network(cmd) => handle_network(cmd).await,

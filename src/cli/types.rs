@@ -168,6 +168,14 @@ pub enum Commands {
         runtime_target: RuntimeTargetArg,
     },
 
+    /// Internal: monitor QMP shutdown events and request quit
+    #[command(hide = true, name = "internal-shutdown-monitor")]
+    InternalShutdownMonitor {
+        /// Path to the QMP unix socket to monitor
+        #[arg(long)]
+        socket: String,
+    },
+
     /// Storage management commands
     #[command(subcommand)]
     Storage(StorageCommands),

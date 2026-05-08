@@ -794,6 +794,19 @@ Acceptance Criteria:
 - Portable-mode support claim for Debian, Ubuntu, and Arch is backed by captured validation evidence.
 Estimate: 3 days
 
+### B-56 Synthesize portable Q35 root ports dynamically per VM
+Scope:
+- Replace fixed portable readconfig root-port fanout with per-VM root-port synthesis based on effective device placement.
+- Emit only the number of `ich9-pcie-port-*` bridges required by the resolved VM topology while preserving deterministic bus naming.
+- Keep Proxmox-parity behavior unchanged and avoid regressions in existing imported hostpci bus assignments.
+Dependencies: B-55
+Acceptance Criteria:
+- Portable Q35 output defines only required root ports instead of a static predeclared set.
+- Imported Windows passthrough fixtures no longer expose unused portable root ports in guest device manager.
+- Dry-run command snapshots remain deterministic for repeated runs with identical config.
+- Import and command-builder tests cover root-port synthesis and fallback behavior when required port count changes.
+Estimate: 3 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy

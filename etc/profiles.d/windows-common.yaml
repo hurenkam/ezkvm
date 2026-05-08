@@ -2,3 +2,6 @@ options:
   rtc:
     base: "localtime"
     driftfix: "slew"
+  global_options:
+    - "ICH9-LPC.disable_s3=1"
+    - "ICH9-LPC.disable_s4=1"

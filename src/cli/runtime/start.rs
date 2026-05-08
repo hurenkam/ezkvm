@@ -394,6 +394,14 @@ fn run_daemon_start(
         println!("✓ VM '{}' started (daemonized)", manager.config().name);
     }
 
+    if let Err(err) = spawn_daemon_shutdown_monitor(manager) {
+        tracing::warn!(
+            target: "ezkvm::shutdown_monitor",
+            error = %err,
+            "failed to launch detached shutdown monitor in daemon mode"
+        );
+    }
+
     if let Err(err) = spawn_remote_viewer(manager.config(), central_config, runtime_overrides) {
         report_auxiliary_warning("remote-viewer", &err);
     }
@@ -422,8 +430,14 @@ fn run_interactive_start(
 
     // Spawn QMP shutdown monitor: detects guest-initiated power-off and sends
     // `quit` to QEMU so the process exits instead of spinning indefinitely.
-    let qmp_socket = manager.auto_qmp_socket_path();
-    let _monitor = crate::qemu::process::spawn_shutdown_monitor(qmp_socket);
+    if let Some(qmp_socket) = monitor_qmp_socket_path(manager) {
+        let _monitor = crate::qemu::process::spawn_shutdown_monitor(qmp_socket);
+    } else {
+        tracing::warn!(
+            target: "ezkvm::shutdown_monitor",
+            "shutdown monitor disabled because QMP uses TCP socket type"
+        );
+    }
 
     let status = if let Some(log_file) = log_file {
         println!("Logging QEMU output to {}", log_file.display());
@@ -454,9 +468,56 @@ fn report_auxiliary_warning(component: &str, err: &dyn std::fmt::Display) {
     eprintln!("Warning: {}", err);
 }
 
+fn monitor_qmp_socket_path(manager: &crate::qemu::QemuManager) -> Option<String> {
+    if let Some(qmp) = manager.config().options_qmp()
+        && qmp.enabled
+    {
+        return match qmp.socket_type {
+            crate::config::QmpSocketType::Unix => Some(
+                qmp.socket_path
+                    .clone()
+                    .unwrap_or_else(|| "/var/run/qemu-monitor.sock".to_string()),
+            ),
+            crate::config::QmpSocketType::Tcp => None,
+        };
+    }
+
+    Some(manager.auto_qmp_socket_path())
+}
+
+fn spawn_daemon_shutdown_monitor(manager: &crate::qemu::QemuManager) -> Result<()> {
+    let Some(qmp_socket) = monitor_qmp_socket_path(manager) else {
+        tracing::warn!(
+            target: "ezkvm::shutdown_monitor",
+            "detached shutdown monitor not started because QMP uses TCP socket type"
+        );
+        return Ok(());
+    };
+
+    let executable = std::env::current_exe()?;
+    std::process::Command::new(executable)
+        .arg("internal-shutdown-monitor")
+        .arg("--socket")
+        .arg(&qmp_socket)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+
+    tracing::info!(
+        target: "ezkvm::shutdown_monitor",
+        socket = %qmp_socket,
+        "detached shutdown monitor started"
+    );
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::format_wrapped_qemu_command;
+    use super::{format_wrapped_qemu_command, monitor_qmp_socket_path};
+    use crate::config::{CentralConfig, QmpConfig, QmpSocketType, RuntimeCliOverrides, VmConfig};
+    use crate::qemu::QemuManager;
 
     #[test]
     fn wrapped_command_prints_each_flag_group_on_new_line() {
@@ -487,5 +548,144 @@ mod tests {
     fn wrapped_command_without_args_returns_binary_only() {
         let rendered = format_wrapped_qemu_command("/usr/bin/kvm", &[]);
         assert_eq!(rendered, "/usr/bin/kvm");
+    }
+
+    #[test]
+    fn monitor_socket_path_uses_auto_path_when_qmp_not_configured() {
+        let vm = VmConfig::from_str(
+            r#"
+name: "vm-monitor-auto"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+  cpu:
+    model: "host"
+    vcpus: 2
+"#,
+        )
+        .expect("vm config should parse");
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides {
+                run_dir: Some("/run/ezkvm".to_string()),
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(
+            monitor_qmp_socket_path(&manager).as_deref(),
+            Some("/run/ezkvm/vm-monitor-auto.qmp")
+        );
+    }
+
+    #[test]
+    fn monitor_socket_path_uses_explicit_unix_qmp_path() {
+        let mut vm = VmConfig::from_str(
+            r#"
+name: "vm-monitor-explicit"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+  cpu:
+    model: "host"
+    vcpus: 2
+"#,
+        )
+        .expect("vm config should parse");
+        vm.options.qmp = Some(QmpConfig {
+            enabled: true,
+            socket_path: Some("/tmp/custom-monitor.qmp".to_string()),
+            socket_type: QmpSocketType::Unix,
+        });
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+
+        assert_eq!(
+            monitor_qmp_socket_path(&manager).as_deref(),
+            Some("/tmp/custom-monitor.qmp")
+        );
+    }
+
+    #[test]
+    fn monitor_socket_path_uses_unix_default_when_enabled_without_path() {
+        let mut vm = VmConfig::from_str(
+            r#"
+name: "vm-monitor-default-unix"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+  cpu:
+    model: "host"
+    vcpus: 2
+"#,
+        )
+        .expect("vm config should parse");
+        vm.options.qmp = Some(QmpConfig {
+            enabled: true,
+            socket_path: None,
+            socket_type: QmpSocketType::Unix,
+        });
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+
+        assert_eq!(
+            monitor_qmp_socket_path(&manager).as_deref(),
+            Some("/var/run/qemu-monitor.sock")
+        );
+    }
+
+    #[test]
+    fn monitor_socket_path_is_none_for_tcp_qmp() {
+        let mut vm = VmConfig::from_str(
+            r#"
+name: "vm-monitor-tcp"
+backend: "qemu"
+
+system:
+  architecture: "x86_64"
+  machine: "q35"
+  memory:
+    size: 1024
+  cpu:
+    model: "host"
+    vcpus: 2
+"#,
+        )
+        .expect("vm config should parse");
+        vm.options.qmp = Some(QmpConfig {
+            enabled: true,
+            socket_path: Some("127.0.0.1:4444".to_string()),
+            socket_type: QmpSocketType::Tcp,
+        });
+
+        let manager = QemuManager::new_with_overrides(
+            vm,
+            CentralConfig::default(),
+            RuntimeCliOverrides::default(),
+        );
+
+        assert_eq!(monitor_qmp_socket_path(&manager), None);
     }
 }

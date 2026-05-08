@@ -1387,10 +1387,6 @@ fn portable_q35_warns_and_falls_back_when_root_ports_are_exhausted() {
             hostpci2: 0000:05:00.0,pcie=1
             hostpci3: 0000:06:00.0,pcie=1
             hostpci4: 0000:07:00.0,pcie=1
-            hostpci5: 0000:08:00.0,pcie=1
-            hostpci6: 0000:09:00.0,pcie=1
-            hostpci7: 0000:0a:00.0,pcie=1
-            hostpci8: 0000:0b:00.0,pcie=1
             "#,
     )
     .expect("parser should succeed");
@@ -1401,14 +1397,14 @@ fn portable_q35_warns_and_falls_back_when_root_ports_are_exhausted() {
     let mut cfg: VmConfig = serde_yaml::from_str(&mapped.yaml).expect("yaml should deserialize");
     cfg.assign_default_device_ids();
 
-    assert_eq!(cfg.host.pci.len(), 9);
-    assert_eq!(cfg.host.pci[7].bus.as_deref(), Some("ich9-pcie-port-8"));
-    assert_eq!(cfg.host.pci[8].bus.as_deref(), Some("pcie.0"));
+    assert_eq!(cfg.host.pci.len(), 5);
+    assert_eq!(cfg.host.pci[3].bus.as_deref(), Some("ich9-pcie-port-4"));
+    assert_eq!(cfg.host.pci[4].bus.as_deref(), Some("pcie.0"));
     assert!(
         mapped
             .warnings
             .iter()
-            .any(|warning| warning.source_field == "hostpci8"
+            .any(|warning| warning.source_field == "hostpci4"
                 && warning.message.contains("falling back to bus=pcie.0"))
     );
 }

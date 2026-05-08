@@ -20,19 +20,31 @@ use std::time::Duration;
 /// quit, or an error occurred).
 pub fn spawn_shutdown_monitor(socket_path: String) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
-        if let Err(e) = run_monitor(&socket_path) {
-            // Only log unexpected errors, not normal socket-closed cases.
-            if !is_connection_closed(&e) {
-                tracing::error!(target: "ezkvm::shutdown_monitor", error = %e, "shutdown monitor error");
-            }
-        }
+        log_run_monitor_result(run_monitor(&socket_path));
     })
+}
+
+/// Run the shutdown monitor synchronously until completion.
+pub fn run_shutdown_monitor(socket_path: &str) {
+    log_run_monitor_result(run_monitor(socket_path));
+}
+
+fn log_run_monitor_result(result: Result<(), MonitorError>) {
+    if let Err(e) = result {
+        // Only log unexpected errors, not normal socket-closed cases.
+        if !is_connection_closed(&e) {
+            tracing::error!(target: "ezkvm::shutdown_monitor", error = %e, "shutdown monitor error");
+        }
+    }
 }
 
 fn run_monitor(socket_path: &str) -> Result<(), MonitorError> {
     wait_for_socket(socket_path, 60)?;
     let stream = connect_with_retry(socket_path, 20)?;
     let reader_stream = stream.try_clone().map_err(MonitorError::Io)?;
+    reader_stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .map_err(MonitorError::Io)?;
     let mut reader = BufReader::new(reader_stream);
     let mut writer = stream;
 
@@ -93,18 +105,93 @@ fn monitor_events(
     writer: &mut UnixStream,
 ) -> Result<(), MonitorError> {
     loop {
-        let msg = read_json(reader)?;
-        if msg
-            .get("event")
-            .and_then(|e| e.as_str())
-            .is_some_and(|e| e == "SHUTDOWN")
-        {
-            // Guest has initiated shutdown. Send quit so QEMU exits cleanly
-            // instead of spinning while waiting for guest teardown to complete.
-            let _ = write_command(writer, r#"{"execute":"quit"}"#);
-            return Ok(());
+        match read_json(reader) {
+            Ok(msg) => {
+                tracing::debug!(
+                    target: "ezkvm::shutdown_monitor",
+                    message = %msg,
+                    "received QMP message"
+                );
+                if is_poweroff_event(&msg) {
+                    return issue_quit(writer);
+                }
+            }
+            Err(MonitorError::Io(err)) if is_timeout_io_error(&err) => {
+                if query_status_indicates_shutdown(reader, writer)? {
+                    return issue_quit(writer);
+                }
+            }
+            Err(err) => return Err(err),
         }
     }
+}
+
+fn is_poweroff_event(msg: &serde_json::Value) -> bool {
+    msg.get("event")
+        .and_then(|event| event.as_str())
+        .is_some_and(|event| matches!(event, "SHUTDOWN" | "POWERDOWN"))
+}
+
+fn issue_quit(writer: &mut UnixStream) -> Result<(), MonitorError> {
+    // Guest has initiated shutdown (or query-status reports shutdown).
+    // Send quit so QEMU exits cleanly instead of spinning while waiting
+    // for guest teardown to complete.
+    tracing::info!(
+        target: "ezkvm::shutdown_monitor",
+        "requesting QMP quit after guest shutdown detection"
+    );
+    write_command(writer, r#"{"execute":"quit"}"#)
+}
+
+fn is_timeout_io_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+    )
+}
+
+fn query_status_indicates_shutdown(
+    reader: &mut BufReader<UnixStream>,
+    writer: &mut UnixStream,
+) -> Result<bool, MonitorError> {
+    write_command(writer, r#"{"execute":"query-status"}"#)?;
+
+    loop {
+        match read_json(reader) {
+            Ok(msg) => {
+                tracing::debug!(
+                    target: "ezkvm::shutdown_monitor",
+                    message = %msg,
+                    "received QMP message while waiting for query-status"
+                );
+
+                if is_poweroff_event(&msg) {
+                    return Ok(true);
+                }
+
+                if is_shutdown_status_response(&msg) {
+                    tracing::info!(
+                        target: "ezkvm::shutdown_monitor",
+                        "query-status reported shutdown state"
+                    );
+                    return Ok(true);
+                }
+
+                if msg.get("return").is_some() {
+                    return Ok(false);
+                }
+            }
+            Err(MonitorError::Io(err)) if is_timeout_io_error(&err) => return Ok(false),
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+fn is_shutdown_status_response(msg: &serde_json::Value) -> bool {
+    msg.get("return")
+        .and_then(|ret| ret.get("status"))
+        .and_then(|status| status.as_str())
+        .is_some_and(|status| status == "shutdown")
 }
 
 fn write_command(writer: &mut UnixStream, cmd: &str) -> Result<(), MonitorError> {
@@ -152,5 +239,32 @@ impl std::fmt::Display for MonitorError {
             MonitorError::Protocol(msg) => write!(f, "Protocol error: {}", msg),
             MonitorError::Json(msg) => write!(f, "JSON error: {}", msg),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_poweroff_event, is_shutdown_status_response};
+
+    #[test]
+    fn poweroff_events_include_shutdown_and_powerdown() {
+        let shutdown = serde_json::json!({ "event": "SHUTDOWN" });
+        let powerdown = serde_json::json!({ "event": "POWERDOWN" });
+        let reset = serde_json::json!({ "event": "RESET" });
+
+        assert!(is_poweroff_event(&shutdown));
+        assert!(is_poweroff_event(&powerdown));
+        assert!(!is_poweroff_event(&reset));
+    }
+
+    #[test]
+    fn shutdown_status_response_detects_only_shutdown_state() {
+        let shutdown = serde_json::json!({ "return": { "status": "shutdown" } });
+        let running = serde_json::json!({ "return": { "status": "running" } });
+        let event = serde_json::json!({ "event": "SHUTDOWN" });
+
+        assert!(is_shutdown_status_response(&shutdown));
+        assert!(!is_shutdown_status_response(&running));
+        assert!(!is_shutdown_status_response(&event));
     }
 }
