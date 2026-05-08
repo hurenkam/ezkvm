@@ -1,11 +1,14 @@
-Loading configuration from: wakiza.yaml
+Loading configuration from: input/ezkvm/wakiza.yaml
 ✓ Configuration loaded and validated
 ✓ Central configuration loaded
 ✓ Runtime preflight checks passed
+[2m2026-05-08T08:10:07.008472Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0mnetwork 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
 Preflight warning: network 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
+[2m2026-05-08T08:10:07.008548Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0msystem.tpm.state_backend_uri resolves to local path '/dev/vm1/vm-108-tpmstate' but it does not exist on this host
 Preflight warning: system.tpm.state_backend_uri resolves to local path '/dev/vm1/vm-108-tpmstate' but it does not exist on this host
+[2m2026-05-08T08:10:07.008562Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0mLooking Glass shared memory path '/dev/kvmfr0' does not exist on this host
 Preflight warning: Looking Glass shared memory path '/dev/kvmfr0' does not exist on this host
-Warning: network 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
+[2m2026-05-08T08:10:07.009635Z[0m [33m WARN[0m [2mezkvm::qemu::network[0m[2m:[0m network resolution warning [3mwarning[0m[2m=[0mnetwork 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
 Starting VM: wakiza
 QEMU binary: qemu-system-x86_64
 Dry run mode - would execute:
@@ -58,6 +61,8 @@ qemu-system-x86_64 \
   -vga none \
   -nographic \
   -global kvm-pit.lost_tick_policy=discard \
+  -global ICH9-LPC.disable_s3=1 \
+  -global ICH9-LPC.disable_s4=1 \
   -rtc base=localtime,driftfix=slew \
   -enable-kvm
 PID file: /run/user/1000/ezkvm/wakiza.pid

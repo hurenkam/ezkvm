@@ -1,9 +1,7 @@
 ---
 name: "Backlog And Tracking Sync"
 description: "Use when editing doc/backlog/BACKLOG.md or doc/backlog/TRACKING_BOARD.md, or when completing a backlog ticket (for example A-01/B-38), to require same-task synchronization of ticket registry, dependency graph, and status between the planning documents."
-applyTo:
-  - "doc/backlog/BACKLOG.md"
-  - "doc/backlog/TRACKING_BOARD.md"
+applyTo: "doc/backlog/BACKLOG.md, doc/backlog/TRACKING_BOARD.md, doc/backlog/prepared_features/**, doc/backlog/in_progress_features/**, doc/backlog/implemented_features/**, doc/backlog/postponed_features/**"
 ---
 
 # Backlog And Tracking Sync
@@ -44,3 +42,20 @@ For edits affecting either file, run a final backlog-sync pass before the final 
 - report a concise backlog-sync delta summary
 
 Use the `Backlog Sync` custom agent when the change touches multiple tickets or when backlog and tracking board differ.
+
+## Feature Document Sync
+
+Feature design documents in `doc/backlog/` subdirectories must stay aligned with ticket status:
+
+| Directory | Expected ticket status |
+|---|---|
+| `doc/backlog/prepared_features/` | Todo or Ready (not yet started) |
+| `doc/backlog/in_progress_features/` | In Progress |
+| `doc/backlog/implemented_features/` | Done |
+| `doc/backlog/postponed_features/` | Blocked or Postponed |
+
+When completing a backlog ticket that has a feature document in `in_progress_features/`, move that document to `implemented_features/` in the same task.
+
+When starting work on a ticket that has a feature document in `prepared_features/`, move that document to `in_progress_features/` in the same task.
+
+When deferring a ticket, move its feature document to `postponed_features/` and add a brief deferral note to the document.

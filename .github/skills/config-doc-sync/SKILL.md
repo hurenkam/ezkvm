@@ -22,7 +22,6 @@ user-invocable: true
 ## Workflow
 1. Identify changed config surfaces and map affected docs:
    - `doc/user/config/` for detailed user config behavior
-   - `doc/CONFIGURATION.md` for repository-wide config reference
    - `README.md` when onboarding or CLI-facing behavior changed
 2. Update field descriptions, defaults, constraints, and examples in relevant docs.
 3. Update command usage docs when CLI flags or semantics changed.

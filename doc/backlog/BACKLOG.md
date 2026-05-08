@@ -362,7 +362,7 @@ Scope:
 Dependencies: B-23
 Acceptance Criteria:
 - At least 5 new profile inference rules added and tested.
-- Inference decision tree documented in CONFIGURATION.md profiles section.
+- Inference decision tree documented in `doc/user/config/profiles-and-merge.md`.
 - Representative fixtures validate correct inference across rule set with snapshot tests in compact and canonical/debug-canonical export paths.
 - No breaking changes to existing profile stack behavior or explicit output-mode semantics.
 Estimate: 2.5 days

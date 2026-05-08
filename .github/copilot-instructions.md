@@ -2,6 +2,24 @@
 
 Authoritative standard: follow doc/dev/CODING_GUIDELINES.md for all implementation and review work.
 
+## Feature Document Lifecycle
+
+Feature design documents live under `doc/backlog/` and follow a status-based directory convention:
+
+| Directory | Meaning |
+|---|---|
+| `doc/backlog/prepared_features/` | Design complete; ready to be picked up for implementation |
+| `doc/backlog/in_progress_features/` | Actively being implemented |
+| `doc/backlog/implemented_features/` | Fully implemented; kept for reference |
+| `doc/backlog/postponed_features/` | Deferred; not to be picked up in the near future |
+
+Reference and strategy documents (codebase analysis, phase roadmaps, historical comparisons) that are not feature specs stay in `doc/preparation/`.
+
+When creating a new feature design document, place it directly in the appropriate directory. When status changes:
+- Move to `in_progress_features/` when implementation begins.
+- Move to `implemented_features/` in the same task as marking the related backlog ticket(s) Done.
+- Move to `postponed_features/` when deferring; include a brief note explaining the reason.
+
 ## Required Workflow For Code Changes
 
 1. Before editing, consult the relevant sections of doc/dev/CODING_GUIDELINES.md.
@@ -9,10 +27,11 @@ Authoritative standard: follow doc/dev/CODING_GUIDELINES.md for all implementati
 3. After edits, perform documentation impact analysis and update user-facing docs in the same task when behavior/schema/defaults changed.
 4. For refactors and code-change tasks with multi-file impact, run the `Docs Sync` agent as a final docs pass before final response.
 5. When implementing or completing any backlog ticket (for example `A-01`, `B-38`, `D-02`), update `doc/backlog/TRACKING_BOARD.md` status in the same task even if no backlog document was explicitly requested.
-6. When editing `doc/backlog/BACKLOG.md` or `doc/backlog/TRACKING_BOARD.md`, perform a backlog/tracking sync pass in the same task.
-7. For backlog-ticket completion or backlog/tracking-board edits with dependency/status/registry impact, run the `Backlog Sync` agent before final response.
-8. After edits, perform a guideline audit of changed files and report pass/fail findings.
-9. If a guideline is intentionally not met, document a short justification in code comments or review notes.
+6. When implementing or completing any backlog ticket that has a feature document in `in_progress_features/`, move that document to `implemented_features/` in the same task.
+7. When editing `doc/backlog/BACKLOG.md` or `doc/backlog/TRACKING_BOARD.md`, perform a backlog/tracking sync pass in the same task.
+8. For backlog-ticket completion or backlog/tracking-board edits with dependency/status/registry impact, run the `Backlog Sync` agent before final response.
+9. After edits, perform a guideline audit of changed files and report pass/fail findings.
+10. If a guideline is intentionally not met, document a short justification in code comments or review notes.
 
 ## Rust Validation Requirements
 

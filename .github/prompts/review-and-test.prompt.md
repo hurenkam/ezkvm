@@ -18,7 +18,7 @@ Use workspace skills as needed:
 ## Workflow
 1. Inspect requested files, diff, or module and identify actual behavior being changed.
 2. Produce a findings-first review focused on correctness, regressions, schema risk, runtime behavior, docs drift, and missing tests.
-3. Check docs impact: if user-facing config shape/semantics changed, verify `doc/user/config/`, `doc/CONFIGURATION.md`, and `README.md` updates were made or explicitly deferred in backlog docs.
+3. Check docs impact: if user-facing config shape/semantics changed, verify `doc/user/config/` and `README.md` updates were made or explicitly deferred in backlog docs.
 4. Choose the narrowest useful validation path.
 5. Run validation before concluding when feasible.
 6. Report findings first, then validation result, then docs impact, then residual risk.

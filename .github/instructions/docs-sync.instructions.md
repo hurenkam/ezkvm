@@ -1,12 +1,7 @@
 ---
 name: "Documentation Sync Enforcement"
-description: "Use when refactoring or changing behavior in code/config paths to require documentation impact analysis and same-task documentation updates in doc/user, doc/CONFIGURATION.md, or README.md."
-applyTo:
-  - "src/**/*.rs"
-  - "tests/**/*.rs"
-  - "etc/**/*.yaml"
-  - "examples/**/*.yaml"
-  - "Cargo.toml"
+description: "Use when refactoring or changing behavior in code/config paths to require documentation impact analysis and same-task documentation updates in doc/user/ or README.md."
+applyTo: "src/**/*.rs, tests/**/*.rs, etc/**/*.yaml, examples/**/*.yaml, Cargo.toml"
 ---
 
 # Documentation Sync Enforcement
@@ -28,7 +23,6 @@ Check and update relevant docs from this list:
 
 - `doc/user/config/*.md` for end-user configuration behavior
 - `doc/user/config/troubleshooting.md` and distro/operator guides (for example `doc/user/UBUNTU_NETPLAN_BRIDGE.md`) for verified field fixes
-- `doc/CONFIGURATION.md` for schema/defaults/precedence changes
 - `README.md` for CLI usage, commands, and examples
 - `doc/preparation/*.md` or `doc/backlog/*.md` when architecture/backlog intent changes are part of the request
 

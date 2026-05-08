@@ -1,7 +1,7 @@
 ---
 name: "Cross-Distro Debian Package Guard"
 description: "Use when editing Debian packaging metadata, install/runtime paths, or package dependency policy to ensure one ezkvm .deb per architecture remains installable on both Debian Trixie and Ubuntu 26.04."
-applyTo: "debian/**, Cargo.toml, README.md, doc/CONFIGURATION.md, doc/user/**/*.md, etc/**/*.yaml"
+applyTo: "debian/**, Cargo.toml, README.md, doc/user/**/*.md, etc/**/*.yaml"
 ---
 
 # Cross-Distro Debian Package Guard

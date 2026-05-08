@@ -19,7 +19,6 @@ When invoked:
  - repeated field-debug outcomes worth codifying in troubleshooting docs
 3. Map impacted code paths to documentation targets:
 - `doc/user/config/*.md`
-- `doc/CONFIGURATION.md`
 - `README.md`
 - other docs explicitly referenced by the changed behavior
 4. Apply minimal documentation edits to reflect the current behavior.

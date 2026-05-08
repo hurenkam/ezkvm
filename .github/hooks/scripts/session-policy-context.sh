@@ -79,7 +79,6 @@ def detect_flags(paths):
 
         if (
             path.startswith("doc/user/")
-            or path == "doc/CONFIGURATION.md"
             or path == "README.md"
         ):
             flags["docs_touched"] = True
@@ -103,7 +102,7 @@ notes.append(f"Changed files: {changed_summary}.")
 
 if flags["config_touched"] and not flags["docs_touched"]:
     notes.append(
-        "Docs policy: config/import/CLI surfaces changed; verify doc impact and update doc/user, doc/CONFIGURATION.md, or README.md in the same task, or track explicit deferment in backlog docs."
+        "Docs policy: config/import/CLI surfaces changed; verify doc impact and update doc/user/ or README.md in the same task, or track explicit deferment in backlog docs."
     )
 
 if flags["backlog_pair_incomplete"]:

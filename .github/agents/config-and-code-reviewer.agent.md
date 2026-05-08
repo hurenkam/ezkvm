@@ -23,7 +23,7 @@ You are a repository-aware review specialist for ezkvm. Review Rust code and con
 - Flag bridge/switch growth that lacks IO-space and bus-number budget justification.
 
 ## Documentation Drift Rules
-- If config behavior changes, verify user-facing docs are aligned (`doc/user/config/`, `doc/CONFIGURATION.md`, `README.md` as relevant).
+- If config behavior changes, verify user-facing docs are aligned (`doc/user/config/`, `README.md` as relevant).
 - Treat missing doc updates as findings when changes affect schema, importer mapping, CLI behavior, or generated QEMU args.
 - If docs are intentionally deferred, require explicit backlog tracking in `doc/backlog/BACKLOG.md` with `doc/backlog/TRACKING_BOARD.md` synchronized.
 

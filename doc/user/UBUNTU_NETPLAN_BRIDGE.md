@@ -2,7 +2,7 @@
 
 This guide shows how to create a Linux bridge with Netplan on Ubuntu 26.04 and run a DHCP server on that bridge.
 
-Use this setup for local VMs/containers attached to an isolated bridge network.
+Use this setup for local VMs/containers attached to an isolated bridge network. (e.g. a laptop with a wifi interface that can't be bridged)
 
 If you use ezkvm or raw QEMU with `qemu-bridge-helper`, you must also allow the bridge in `/etc/qemu/bridge.conf`. The helper error `access denied by acl file` means the bridge exists but is not whitelisted there.
 
