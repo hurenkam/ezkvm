@@ -228,11 +228,10 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
     let Some(Value::Sequence(drives)) = devices_map.remove(&drives_key) else {
         root.insert(devices_key, Value::Mapping(devices_map));
         root.insert(controllers_key, Value::Mapping(controllers_map));
-        return serde_yaml::to_string(&Value::Mapping(root)).map_err(|e| {
-            ImportError::ParseError(format!(
-                "failed to serialize rendered YAML for B-35 reshape: {e}"
-            ))
-        });
+        return serialize_vm_root_mapping(
+            root,
+            "failed to serialize rendered YAML for B-35 reshape",
+        );
     };
 
     let mut scsi_controllers = match controllers_map.remove(&scsi_key) {
@@ -345,11 +344,61 @@ fn rewrite_drives_under_storage_controllers(input_yaml: &str) -> Result<String, 
         root.insert(controllers_key, Value::Mapping(controllers_map));
     }
 
-    serde_yaml::to_string(&Value::Mapping(root)).map_err(|e| {
-        ImportError::ParseError(format!(
-            "failed to serialize rendered YAML for B-35 reshape: {e}"
-        ))
-    })
+    serialize_vm_root_mapping(root, "failed to serialize rendered YAML for B-35 reshape")
+}
+
+fn serialize_vm_root_mapping(
+    root: serde_yaml::Mapping,
+    context: &str,
+) -> Result<String, ImportError> {
+    let ordered_root = reorder_vm_root_mapping(root);
+    serde_yaml::to_string(&serde_yaml::Value::Mapping(ordered_root))
+        .map_err(|e| ImportError::ParseError(format!("{}: {e}", context)))
+}
+
+fn reorder_vm_root_mapping(mut root: serde_yaml::Mapping) -> serde_yaml::Mapping {
+    use serde_yaml::Value;
+
+    const PREFERRED_ROOT_KEYS: &[&str] = &[
+        "name",
+        "backend",
+        "profiles",
+        "system",
+        "devices",
+        "controllers",
+        "host",
+        "spice",
+        "vnc",
+        "options",
+        "hyperv",
+        "iommu",
+        "iscsi_disks",
+    ];
+
+    let mut ordered = serde_yaml::Mapping::new();
+    for key in PREFERRED_ROOT_KEYS {
+        let key_value = Value::String((*key).to_string());
+        if let Some(value) = root.remove(&key_value) {
+            ordered.insert(key_value, value);
+        }
+    }
+
+    let mut remaining = root.into_iter().collect::<Vec<_>>();
+    remaining.sort_by(|(left, _), (right, _)| {
+        yaml_key_sort_label(left).cmp(&yaml_key_sort_label(right))
+    });
+    for (key, value) in remaining {
+        ordered.insert(key, value);
+    }
+
+    ordered
+}
+
+fn yaml_key_sort_label(key: &serde_yaml::Value) -> String {
+    match key {
+        serde_yaml::Value::String(value) => format!("s:{value}"),
+        _ => format!("o:{key:?}"),
+    }
 }
 
 fn controller_effective_ids(controllers: &[serde_yaml::Value], prefix: &str) -> Vec<String> {

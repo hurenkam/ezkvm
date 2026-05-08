@@ -29,6 +29,9 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Create and validate a VM configuration
+    #[command(
+        after_help = "Examples:\n  ezkvm create examples/basic-vm.yaml\n  ezkvm create examples/basic-vm.yaml --validate-only"
+    )]
     Create {
         /// Path to the YAML configuration file
         config: String,
@@ -39,6 +42,9 @@ pub enum Commands {
     },
 
     /// Start a virtual machine
+    #[command(
+        after_help = "Examples:\n  ezkvm start examples/basic-vm.yaml\n  ezkvm start examples/basic-vm.yaml --daemon\n  ezkvm start examples/basic-vm.yaml --dry-run"
+    )]
     Start {
         /// Path to the YAML configuration file
         config: String,
@@ -108,6 +114,9 @@ pub enum Commands {
     },
 
     /// Validate a configuration file
+    #[command(
+        after_help = "Examples:\n  ezkvm validate examples/basic-vm.yaml\n  ezkvm validate examples/basic-vm.yaml --show-resolved-config\n  ezkvm validate examples/basic-vm.yaml --show-machine-layout"
+    )]
     Validate {
         /// Path to the YAML configuration file
         config: String,
