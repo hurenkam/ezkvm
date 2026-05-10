@@ -39,6 +39,7 @@ backend: "qemu"
 profiles:
   - "proxmox-q35-uefi"
   - "windows-common"
+  - "q35-disable-s3s4" # optional; only when explicit Q35 sleep-state disable is needed
   - "windows-11"
   - "looking-glass"
   - "gpu-passthrough"
