@@ -88,6 +88,11 @@ impl QemuArgs {
         self.push_str("-nodefaults");
     }
 
+    /// Keep QEMU running after guest poweroff until monitor issues `quit`.
+    pub fn add_no_shutdown(&mut self) {
+        self.push_str("-no-shutdown");
+    }
+
     /// Disable emulated VGA output.
     pub fn add_vga_none(&mut self) {
         self.push_str("-vga");
