@@ -47,6 +47,18 @@ impl QemuManager {
         )?;
         args.add_pidfile(&pid_file.to_string_lossy());
 
+        // Match Proxmox lifecycle semantics: keep QEMU alive after guest shutdown
+        // and let the shutdown monitor issue explicit `quit` over unix QMP.
+        let uses_unix_qmp = if let Some(qmp) = self.config.options_qmp() {
+            qmp.enabled && matches!(qmp.socket_type, crate::config::QmpSocketType::Unix)
+        } else {
+            // Auto QMP sockets are unix.
+            true
+        };
+        if uses_unix_qmp {
+            args.add_no_shutdown();
+        }
+
         if self.config.options.nodefaults {
             args.add_nodefaults();
         }

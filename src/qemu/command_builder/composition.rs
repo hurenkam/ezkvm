@@ -382,7 +382,7 @@ impl QemuManager {
     }
 
     pub(crate) fn add_monitoring_and_identity_args(&self, args: &mut QemuArgs) {
-        let uses_unix_qmp = if let Some(qmp) = self.config.options_qmp()
+        if let Some(qmp) = self.config.options_qmp()
             && qmp.enabled
         {
             let socket_type = match qmp.socket_type {
@@ -390,19 +390,11 @@ impl QemuManager {
                 QmpSocketType::Unix => "unix",
             };
             args.add_qmp(qmp.socket_path.as_deref(), socket_type);
-            matches!(qmp.socket_type, QmpSocketType::Unix)
         } else {
             // Auto-add a QMP unix socket so the shutdown monitor can detect
             // guest-initiated power-off and send `quit` to QEMU.
             let socket_path = self.auto_qmp_socket_path();
             args.add_qmp(Some(&socket_path), "unix");
-            true
-        };
-
-        if uses_unix_qmp {
-            // Match Proxmox behavior: keep VM process alive after guest shutdown
-            // so the shutdown monitor can issue an explicit `quit`.
-            args.add_no_shutdown();
         }
 
         if let Some(smbios) = self.config.system_smbios() {
