@@ -31,6 +31,25 @@ pub fn get_pid_file_at(vm_name: &str, custom_path: Option<&str>) -> Result<PathB
     Ok(state_dir.join(format!("{}.pid", vm_name)))
 }
 
+/// Get the shutdown marker path for a VM.
+pub fn get_shutdown_marker_file_at(
+    vm_name: &str,
+    custom_pid_path: Option<&str>,
+) -> Result<PathBuf> {
+    if let Some(custom_pid_path) = custom_pid_path {
+        let custom_pid_path = PathBuf::from(custom_pid_path);
+        let marker_dir = custom_pid_path
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        fs::create_dir_all(&marker_dir)?;
+        return Ok(marker_dir.join(format!("{}.shutdown", vm_name)));
+    }
+
+    let state_dir = get_state_dir()?;
+    Ok(state_dir.join(format!("{}.shutdown", vm_name)))
+}
+
 /// Get the config cache path for a VM
 pub fn get_config_cache(vm_name: &str) -> Result<PathBuf> {
     let state_dir = get_state_dir()?;

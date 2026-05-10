@@ -183,6 +183,10 @@ pub enum Commands {
         /// Path to the QMP unix socket to monitor
         #[arg(long)]
         socket: String,
+
+        /// Path to the shutdown marker file to update
+        #[arg(long)]
+        marker_path: String,
     },
 
     /// Storage management commands

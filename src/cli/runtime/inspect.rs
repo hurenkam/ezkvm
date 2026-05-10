@@ -387,6 +387,9 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
 
     let vm_name = &config.name;
     println!("Status of VM: {}", vm_name);
+    let shutdown_marker =
+        crate::state::get_shutdown_marker_file_at(vm_name, config.options.pid_file.as_deref())?;
+    let shutdown_observed = crate::state::shutdown_marker_exists(&shutdown_marker);
 
     let mut lifecycle_state = crate::state::VmState::Stopped;
 
@@ -396,15 +399,23 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
                 lifecycle_state = lifecycle_state
                     .transition(crate::state::VmStateEvent::StartCommandIssued)?
                     .transition(crate::state::VmStateEvent::ProcessObserved { pid: Some(pid) })?;
+                if shutdown_observed {
+                    lifecycle_state = lifecycle_state
+                        .transition(crate::state::VmStateEvent::GuestShutdownObserved)?;
+                }
                 println!("Status: {} (PID: {})", lifecycle_state.status_label(), pid);
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
+                if shutdown_observed {
+                    println!("Shutdown: guest shutdown observed; waiting for QEMU to exit");
+                }
                 print_qmp_status_details(&config, &central_config, Some(pid));
                 print_guest_agent_network_details(&config, &central_config);
                 return Ok(());
             }
             _ => {
                 let _ = crate::state::delete_pid_at(vm_name, config.options.pid_file.as_deref());
+                let _ = crate::state::delete_shutdown_marker(&shutdown_marker);
             }
         }
     }
@@ -415,15 +426,23 @@ pub(crate) async fn handle_status(config_path: &str) -> Result<()> {
                 lifecycle_state = lifecycle_state
                     .transition(crate::state::VmStateEvent::StartCommandIssued)?
                     .transition(crate::state::VmStateEvent::ProcessObserved { pid: None })?;
+                if shutdown_observed {
+                    lifecycle_state = lifecycle_state
+                        .transition(crate::state::VmStateEvent::GuestShutdownObserved)?;
+                }
                 println!("Status: {}", lifecycle_state.status_label());
                 println!("Memory: {} MiB", config.system.memory.size);
                 println!("vCPUs: {}", config.system.cpu.vcpus);
+                if shutdown_observed {
+                    println!("Shutdown: guest shutdown observed; waiting for QEMU to exit");
+                }
                 let pid = crate::qemu::process::find_qemu_processes(vm_name)
                     .ok()
                     .and_then(|pids| pids.into_iter().next());
                 print_qmp_status_details(&config, &central_config, pid);
                 print_guest_agent_network_details(&config, &central_config);
             } else {
+                let _ = crate::state::delete_shutdown_marker(&shutdown_marker);
                 println!("Status: {}", lifecycle_state.status_label());
             }
         }

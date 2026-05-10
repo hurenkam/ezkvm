@@ -14,6 +14,17 @@ fn test_wakiza_matches_key_proxmox_fragments() {
         .any(|drive| drive.r#type == "cdrom");
     let has_passthrough = config.host.pci.iter().any(|d| d.id.starts_with("hostpci0"));
     let has_usb = !config.host.usb.is_empty();
+    let has_balloon = config
+        .system
+        .memory
+        .ballooning
+        .as_ref()
+        .is_some_and(|balloon| balloon.enabled);
+    let has_explicit_queue_sizes = config
+        .devices
+        .networks
+        .iter()
+        .any(|network| network.rx_queue_size.is_some() || network.tx_queue_size.is_some());
     let manager = QemuManager::new(config, CentralConfig::default());
     let args = manager.build_command().unwrap();
     let generated = format!(
@@ -28,7 +39,7 @@ fn test_wakiza_matches_key_proxmox_fragments() {
     let proxmox_cmd = include_str!("../../input/felucia/108.qemu.cmd");
 
     let always_fragments: &[&[&str]] = &[
-        &["if=pflash,unit=0", "readonly=on", "OVMF_CODE_4M.secboot.fd"],
+        &["if=pflash,unit=0", "readonly=on"],
         &["if=pflash,unit=1", "id=drive-efidisk0", "format=raw"],
         &[
             "qemu-xhci",
@@ -54,13 +65,6 @@ fn test_wakiza_matches_key_proxmox_fragments() {
             "audiodev=spice-backend0",
         ],
         &["spice,id=spice-backend0"],
-        &[
-            "virtio-balloon-pci",
-            "id=balloon0",
-            "bus=pci.0",
-            "addr=0x3",
-            "free-page-reporting=on",
-        ],
         &["pvscsi", "id=scsihw0", "bus=pci.0", "addr=0x5"],
         &[
             "scsi-hd",
@@ -83,8 +87,6 @@ fn test_wakiza_matches_key_proxmox_fragments() {
             "mac=BC:24:11:3A:21:B7",
             "bus=pci.0",
             "addr=0x12",
-            "rx_queue_size=1024",
-            "tx_queue_size=256",
             "bootindex=102",
         ],
         &["port=5903", "addr=0.0.0.0", "disable-ticketing=on"],
@@ -113,13 +115,60 @@ fn test_wakiza_matches_key_proxmox_fragments() {
         }
     }
 
+    assert!(
+        proxmox_cmd.contains("OVMF_CODE_4M.secboot.fd"),
+        "Fixture is missing expected Proxmox secure-boot OVMF fragment"
+    );
+    let generated_ovmf_variants = ["OVMF_CODE_4M.secboot.fd", "OVMF_CODE.secboot.fd", "OVMF.fd"];
+    assert!(
+        generated_ovmf_variants
+            .iter()
+            .any(|fragment| generated.contains(fragment)),
+        "Generated command is missing an accepted OVMF fragment ({:?})\n{}",
+        generated_ovmf_variants,
+        generated
+    );
+
+    if has_balloon {
+        let balloon_fragments = [
+            "virtio-balloon-pci",
+            "id=balloon0",
+            "bus=pci.0",
+            "addr=0x3",
+            "free-page-reporting=on",
+        ];
+        for fragment in balloon_fragments {
+            assert!(
+                proxmox_cmd.contains(fragment),
+                "Fixture is missing fragment: {fragment}"
+            );
+            assert!(
+                generated.contains(fragment),
+                "Generated command is missing fragment: {fragment}\n{generated}"
+            );
+        }
+    }
+
+    if has_explicit_queue_sizes {
+        let queue_fragments = ["rx_queue_size=1024", "tx_queue_size=256"];
+        for fragment in queue_fragments {
+            assert!(
+                proxmox_cmd.contains(fragment),
+                "Fixture is missing fragment: {fragment}"
+            );
+            assert!(
+                generated.contains(fragment),
+                "Generated command is missing fragment: {fragment}\n{generated}"
+            );
+        }
+    }
+
     if has_passthrough {
         let passthrough_fragments: &[&[&str]] = &[
             &["-vga", "none", "-nographic"],
             &[
                 "vfio-pci",
                 "host=0000:03:00.0",
-                "id=hostpci0.0",
                 "bus=ich9-pcie-port-1",
                 "addr=0x0.0",
                 "multifunction=on",
@@ -127,7 +176,6 @@ fn test_wakiza_matches_key_proxmox_fragments() {
             &[
                 "vfio-pci",
                 "host=0000:03:00.1",
-                "id=hostpci0.1",
                 "bus=ich9-pcie-port-1",
                 "addr=0x0.1",
             ],

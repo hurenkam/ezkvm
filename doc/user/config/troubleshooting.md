@@ -179,6 +179,8 @@ When display handoff is ambiguous, isolate display variables before changing sto
 - ezkvm automatically monitors QMP `SHUTDOWN` events and sends `quit` to QEMU when the
   guest initiates power-off. This prevents the indefinite spin that happens when GPU
   passthrough teardown hangs (common with AMD RDNA2/3 on Windows).
+- When the guest has already reported shutdown but QEMU is still alive, `ezkvm status`
+   reports `Stopping` and prints `Shutdown: guest shutdown observed; waiting for QEMU to exit`.
 - If the VM is still alive after the screen goes dark, the auto-quit should fire within
   a few seconds. If it does not, the QMP socket may not have been created (check `ezkvm
   status` output and `/var/run/ezkvm/` for `<name>.qmp`).
@@ -258,6 +260,71 @@ can sometimes clear it without a reboot for RDNA1 but has limited support for RD
    controller path, and guest-agent/serial topology.
 2. Confirm no recent forced-stop path left the GPU in a stale state (host reboot
    remains the safest reset for this class of issue).
+
+## Repeated EHCI warning lines during interactive start
+
+### Symptoms
+
+- `ezkvm start <vm.yaml>` prints repeated lines similar to:
+   - `ehci: PERIODIC list base register set while periodic schedule is enabled and HC is enabled`
+- VM otherwise appears to keep running.
+
+### What it means
+
+- This is typically QEMU guest-warning output from the emulated ICH9 EHCI controller.
+- For Proxmox-style Q35 topologies (for example with `system.readconfig` set to
+   `/usr/share/ezkvm/ezkvm-q35.cfg` or `pve-q35-*`), these warnings can appear even
+   when topology and placement are correct.
+- In most cases this is non-fatal noise, not a startup failure.
+
+### Why it is visible
+
+- Interactive mode inherits QEMU stderr directly in the terminal.
+- In daemonized workflows, the same warnings are usually less visible because output
+   is redirected to logs.
+
+### Checks
+
+1. Confirm VM process is actually running:
+    ```bash
+    sudo ./target/debug/ezkvm status <vm.yaml>
+    ps -ef | grep '[q]emu-system'
+    ```
+
+2. Confirm the Q35 readconfig path exists on this host:
+    ```bash
+    yq '.system.readconfig[]' <vm.yaml>
+    ls -la /usr/share/ezkvm/ezkvm-q35.cfg
+    ```
+
+3. If the guest is expected to boot with no local display (`type: none`), verify guest
+    liveness through network, serial, or agent rather than terminal silence.
+
+### Escalate when
+
+- QEMU exits shortly after these warnings.
+- `ezkvm status` shows the VM is not running.
+- Additional hard errors appear (for example `Bus '...' not found`, failed device
+   creation, or QMP startup failures).
+
+## Pre-start hostpci slot conflict error
+
+### Symptoms
+
+- `ezkvm start` fails before QEMU launch with an error like:
+   - `hostpci slot conflict before QEMU start: ... both use bus='...', addr='...'`
+
+### What it means
+
+- Two passthrough devices resolve to the same guest PCI location.
+- Resolution includes both explicit config and runtime-filled defaults for missing
+   hostpci placement on Q35 bridge-backed topologies.
+
+### Fix
+
+1. Ensure each `host.pci` device has a unique `(bus,addr)` pair.
+2. For multi-function devices (for example `.0` and `.1`), place both functions on
+    the same root port with different function addresses (`0x0.0`, `0x0.1`).
 3. Validate portable-mode capability resolution and runtime assets with
    diagnostics before changing guest-visible passthrough flags.
 
@@ -280,46 +347,6 @@ can sometimes clear it without a reboot for RDNA1 but has limited support for RD
 2. Ensure target root disk has the lowest valid boot index
 
 3. See [import-proxmox.md#post-import-validation-checklist](import-proxmox.md#post-import-validation-checklist)
-
-## TPM emulator fails with CMD_INIT or mode-change errors
-
-### Symptoms
-
-- QEMU exits with `tpm-emulator: TPM result for CMD_INIT: 0x9 operation failed`
-- swtpm log contains messages like `Could not open file: Permission denied` or
-   `Could not change mode bits: Operation not permitted`
-
-### Likely Causes
-
-- `system.tpm.state_backend_uri` points to a local device node (for example
-   `/dev/vm1/vm-108-tpmstate` -> `/dev/dm-*`) while swtpm runs unprivileged.
-- The backend path is valid and writable, but mode changes on that device node
-   are not allowed for the current user.
-
-### Checks
-
-1. Inspect swtpm log for backend open/chmod failures:
-    ```bash
-    tail -n 80 /var/log/ezkvm/<vm-name>-swtpm.log
-    ```
-
-2. Confirm backend target and ownership:
-    ```bash
-    readlink -f /dev/vm1/vm-108-tpmstate
-    ls -l /dev/dm-*
-    ```
-
-3. Confirm whether mode changes are allowed for the current user:
-    ```bash
-    chmod 600 /dev/dm-<n>
-    ```
-
-### Notes
-
-- For `state_backend_uri`, ezkvm appends `,mode=0600` by default for regular-file
-   backends and skips default mode append for local device-node backends.
-- If backend mode errors persist, use a regular-file TPM state path (or `state_dir`)
-   owned by the VM-launch user.
 
 ## PCI passthrough does not attach
 

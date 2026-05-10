@@ -932,6 +932,36 @@ Acceptance Criteria:
 - Rollback plan validated.
 Estimate: 1 day
 
+### E-04 Promote shutdown monitor into a VM-scoped lifecycle supervisor
+Scope:
+- Turn the detached shutdown monitor into the per-VM owner for QMP shutdown, query-status reconciliation, and cleanup until the VM exits.
+- Keep the lifecycle path shared between interactive and daemon starts.
+Dependencies: none
+Acceptance Criteria:
+- A VM-scoped companion process owns shutdown observation until exit.
+- QMP SHUTDOWN/POWERDOWN and process-exit transitions are handled in one place.
+Estimate: 3 days
+
+### E-05 Reconcile guest shutdown state with QMP and PID state
+Scope:
+- Distinguish "guest UI is gone" from "QEMU process still running" in status and stop flows.
+- Surface QMP query-status, PID state, and shutdown reason in one output path.
+Dependencies: E-04
+Acceptance Criteria:
+- `ezkvm status` can report QMP running versus shutdown instead of only process liveness.
+- Tests cover running, shutdown, and socket-missing states.
+Estimate: 2 days
+
+### E-06 Add shutdown lifecycle regression tests and traces
+Scope:
+- Add tests and fixtures for shutdown event handling, delayed QMP shutdown, and companion-process exit.
+- Capture logging or traces for shutdown stalls so the guest-versus-QEMU state gap is visible.
+Dependencies: E-05
+Acceptance Criteria:
+- Tests cover both SHUTDOWN event and timeout/query-status fallback.
+- Logging shows the transition from guest shutdown request to QEMU exit or stall.
+Estimate: 2 days
+
 ---
 
 # Later-Stage Backlog (Phase 3)

@@ -1,6 +1,6 @@
 # Convergence Tracking Board
 
-Date: 2026-05-08  
+Date: 2026-05-10  
 Scope: Epics A-E (Phase 0 to Phase 2)  
 Source: doc/backlog/BACKLOG.md
 
@@ -115,6 +115,9 @@ Source: doc/backlog/BACKLOG.md
 | E-01 | Regression suite expansion | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | B-05, C-05, D-03 | unassigned | Todo |
 | E-02 | Performance and stability checks | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-01 | unassigned | Todo |
 | E-03 | Beta release gating | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-01, E-02 | unassigned | Todo |
+| E-04 | Promote shutdown monitor into a VM-scoped lifecycle supervisor | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | None | unassigned | In Progress |
+| E-05 | Reconcile guest shutdown state with QMP and PID state | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-04 | unassigned | In Progress |
+| E-06 | Add shutdown lifecycle regression tests and traces | E | Phase-2-Hardening | epic:hardening, phase:2-hardening | E-05 | unassigned | Todo |
 | K-01 | Build packaging baseline inventory and contract | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | B-54 | unassigned | Done |
 | K-02 | Create Debian packaging skeleton for ezkvm | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-01 | unassigned | Done |
 | K-03 | Harden dependency policy for cross-distro installability | K | Phase-3-Packaging | epic:packaging, phase:2-hardening, ready | K-02 | unassigned | Todo |
@@ -177,6 +180,7 @@ Source: doc/backlog/BACKLOG.md
 - (C-02 and C-03) -> C-04 -> C-05
 - D-01 -> D-02 -> D-03 -> D-04
 - (B-05 and C-05 and D-03) -> E-01 -> E-02 -> E-03
+- E-04 -> E-05 -> E-06
 - B-54 -> K-01 -> K-02 -> K-03 -> K-04 -> K-05
 - K-03 -> K-06
 

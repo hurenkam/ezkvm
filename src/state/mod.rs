@@ -25,6 +25,7 @@ mod network_resolver;
 mod paths;
 mod pid;
 mod runtime_resolver;
+mod shutdown;
 mod tpm_resolver;
 mod vm_state;
 
@@ -52,7 +53,7 @@ pub use network_resolver::{
 #[allow(unused_imports)]
 pub use paths::{
     create_session_log_file, get_config_cache, get_log_file, get_log_file_at, get_logs_dir,
-    get_logs_dir_at, get_pid_file, get_pid_file_at, get_state_dir,
+    get_logs_dir_at, get_pid_file, get_pid_file_at, get_shutdown_marker_file_at, get_state_dir,
 };
 #[allow(unused_imports)]
 pub use pid::{delete_pid, delete_pid_at, read_pid, read_pid_at, save_pid, save_pid_at};
@@ -62,6 +63,8 @@ pub use runtime_resolver::{
     resolve_runtime_guest_agent_socket, resolve_runtime_root, resolve_runtime_root_with_source,
     resolve_runtime_tpm_socket,
 };
+#[allow(unused_imports)]
+pub use shutdown::{delete_shutdown_marker, save_shutdown_marker, shutdown_marker_exists};
 #[allow(unused_imports)]
 pub use tpm_resolver::{
     CentralTpmCapabilityResolver, TpmCapabilityResolver, TpmPlacementMode, resolve_swtpm_binary,
@@ -115,6 +118,17 @@ mod tests {
         delete_pid_at("custom-vm", Some(&custom_str)).unwrap();
         let pid = read_pid_at("custom-vm", Some(&custom_str)).unwrap();
         assert_eq!(pid, None);
+        let _ = fs::remove_dir_all(custom_dir);
+    }
+
+    #[test]
+    fn test_shutdown_marker_path_follows_pid_directory() {
+        let custom_dir = std::env::temp_dir().join("ezkvm-shutdown-marker-tests");
+        let custom_pid = custom_dir.join("vm.pid");
+        let marker =
+            get_shutdown_marker_file_at("custom-vm", Some(&custom_pid.to_string_lossy())).unwrap();
+
+        assert_eq!(marker, custom_dir.join("custom-vm.shutdown"));
         let _ = fs::remove_dir_all(custom_dir);
     }
 

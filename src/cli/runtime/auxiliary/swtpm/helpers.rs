@@ -179,6 +179,13 @@ fn should_append_default_backend_mode(normalized_backend_uri: &str) -> bool {
         return true;
     };
 
+    // Treat /dev/* backend paths as device-node style backends even if the
+    // current host cannot stat the exact path. This keeps behavior stable
+    // across environments and avoids best-effort chmod on device namespaces.
+    if local_path.starts_with("/dev/") {
+        return false;
+    }
+
     // For device nodes, swtpm mode changes can fail for unprivileged users even when
     // read/write access is granted through group permissions.
     if let Ok(metadata) = std::fs::metadata(&local_path) {
@@ -306,7 +313,7 @@ mod tests {
 
         let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
             .expect("building tpmstate arg should succeed");
-        assert_eq!(arg, "backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600");
+        assert_eq!(arg, "backend-uri=file:///dev/vm1/vm-108-tpmstate");
     }
 
     #[test]

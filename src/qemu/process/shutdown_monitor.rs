@@ -10,6 +10,7 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Spawn the QMP shutdown monitor thread.
@@ -18,15 +19,18 @@ use std::time::Duration;
 /// then monitors QMP events. On a `SHUTDOWN` event it sends `quit` and exits.
 /// The thread silently exits if the socket closes for any reason (QEMU already
 /// quit, or an error occurred).
-pub fn spawn_shutdown_monitor(socket_path: String) -> std::thread::JoinHandle<()> {
+pub fn spawn_shutdown_monitor(
+    socket_path: String,
+    marker_path: PathBuf,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
-        log_run_monitor_result(run_monitor(&socket_path));
+        log_run_monitor_result(run_monitor(&socket_path, &marker_path));
     })
 }
 
 /// Run the shutdown monitor synchronously until completion.
-pub fn run_shutdown_monitor(socket_path: &str) {
-    log_run_monitor_result(run_monitor(socket_path));
+pub fn run_shutdown_monitor(socket_path: &str, marker_path: &std::path::Path) {
+    log_run_monitor_result(run_monitor(socket_path, marker_path));
 }
 
 fn log_run_monitor_result(result: Result<(), MonitorError>) {
@@ -38,7 +42,7 @@ fn log_run_monitor_result(result: Result<(), MonitorError>) {
     }
 }
 
-fn run_monitor(socket_path: &str) -> Result<(), MonitorError> {
+fn run_monitor(socket_path: &str, marker_path: &std::path::Path) -> Result<(), MonitorError> {
     wait_for_socket(socket_path, 60)?;
     let stream = connect_with_retry(socket_path, 20)?;
     let reader_stream = stream.try_clone().map_err(MonitorError::Io)?;
@@ -49,7 +53,7 @@ fn run_monitor(socket_path: &str) -> Result<(), MonitorError> {
     let mut writer = stream;
 
     negotiate_capabilities(&mut reader, &mut writer)?;
-    monitor_events(&mut reader, &mut writer)
+    monitor_events(&mut reader, &mut writer, marker_path)
 }
 
 fn wait_for_socket(socket_path: &str, max_half_seconds: u32) -> Result<(), MonitorError> {
@@ -103,6 +107,7 @@ fn negotiate_capabilities(
 fn monitor_events(
     reader: &mut BufReader<UnixStream>,
     writer: &mut UnixStream,
+    marker_path: &std::path::Path,
 ) -> Result<(), MonitorError> {
     loop {
         match read_json(reader) {
@@ -113,12 +118,12 @@ fn monitor_events(
                     "received QMP message"
                 );
                 if is_poweroff_event(&msg) {
-                    return issue_quit(writer);
+                    return issue_quit(writer, marker_path);
                 }
             }
             Err(MonitorError::Io(err)) if is_timeout_io_error(&err) => {
                 if query_status_indicates_shutdown(reader, writer)? {
-                    return issue_quit(writer);
+                    return issue_quit(writer, marker_path);
                 }
             }
             Err(err) => return Err(err),
@@ -132,21 +137,65 @@ fn is_poweroff_event(msg: &serde_json::Value) -> bool {
         .is_some_and(|event| matches!(event, "SHUTDOWN" | "POWERDOWN"))
 }
 
-fn issue_quit(writer: &mut UnixStream) -> Result<(), MonitorError> {
+fn issue_quit(writer: &mut UnixStream, marker_path: &std::path::Path) -> Result<(), MonitorError> {
     // Guest has initiated shutdown (or query-status reports shutdown).
     // Send quit so QEMU exits cleanly instead of spinning while waiting
     // for guest teardown to complete.
+    let _ = crate::state::save_shutdown_marker(marker_path);
     tracing::info!(
         target: "ezkvm::shutdown_monitor",
         "requesting QMP quit after guest shutdown detection"
     );
-    write_command(writer, r#"{"execute":"quit"}"#)
+    write_command(writer, r#"{"execute":"quit"}"#)?;
+
+    wait_for_shutdown_socket_close(writer, marker_path)
+}
+
+fn wait_for_shutdown_socket_close(
+    reader_or_writer: &mut UnixStream,
+    marker_path: &std::path::Path,
+) -> Result<(), MonitorError> {
+    let reader_stream = reader_or_writer.try_clone().map_err(MonitorError::Io)?;
+    let mut reader = BufReader::new(reader_stream);
+
+    loop {
+        match read_json(&mut reader) {
+            Ok(msg) => {
+                tracing::debug!(
+                    target: "ezkvm::shutdown_monitor",
+                    message = %msg,
+                    "received QMP message while waiting for shutdown exit"
+                );
+            }
+            Err(MonitorError::SocketClosed) => {
+                let _ = crate::state::delete_shutdown_marker(marker_path);
+                return Ok(());
+            }
+            Err(MonitorError::Io(err)) if is_socket_close_io_error(&err) => {
+                let _ = crate::state::delete_shutdown_marker(marker_path);
+                return Ok(());
+            }
+            Err(MonitorError::Io(err)) if is_timeout_io_error(&err) => continue,
+            Err(err) => return Err(err),
+        }
+    }
 }
 
 fn is_timeout_io_error(err: &std::io::Error) -> bool {
     matches!(
         err.kind(),
         std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+    )
+}
+
+fn is_socket_close_io_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::ConnectionReset
+            | std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::BrokenPipe
+            | std::io::ErrorKind::UnexpectedEof
+            | std::io::ErrorKind::NotConnected
     )
 }
 
@@ -218,7 +267,11 @@ fn read_json(reader: &mut BufReader<UnixStream>) -> Result<serde_json::Value, Mo
 }
 
 fn is_connection_closed(e: &MonitorError) -> bool {
-    matches!(e, MonitorError::SocketClosed | MonitorError::SocketNotFound)
+    match e {
+        MonitorError::SocketClosed | MonitorError::SocketNotFound => true,
+        MonitorError::Io(err) => is_socket_close_io_error(err),
+        _ => false,
+    }
 }
 
 #[derive(Debug)]

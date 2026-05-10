@@ -12,6 +12,7 @@ pub enum VmState {
 pub enum VmStateEvent {
     StartCommandIssued,
     ProcessObserved { pid: Option<i32> },
+    GuestShutdownObserved,
     StopCommandIssued,
     ForceKillIssued,
     ProcessExited,
@@ -27,8 +28,10 @@ impl VmState {
             (VmState::Running { .. }, VmStateEvent::ProcessObserved { pid }) => {
                 Ok(VmState::Running { pid })
             }
+            (VmState::Running { .. }, VmStateEvent::GuestShutdownObserved) => Ok(VmState::Stopping),
             (VmState::Running { .. }, VmStateEvent::StopCommandIssued)
             | (VmState::Running { .. }, VmStateEvent::ForceKillIssued) => Ok(VmState::Stopping),
+            (VmState::Stopping, VmStateEvent::GuestShutdownObserved) => Ok(VmState::Stopping),
             (VmState::Stopping, VmStateEvent::ProcessExited)
             | (VmState::Running { .. }, VmStateEvent::ProcessExited)
             | (VmState::Starting, VmStateEvent::ProcessExited) => Ok(VmState::Stopped),
@@ -105,5 +108,14 @@ mod tests {
             .expect("pid refresh should succeed");
 
         assert_eq!(state, VmState::Running { pid: Some(2) });
+    }
+
+    #[test]
+    fn guest_shutdown_observation_transitions_running_to_stopping() {
+        let state = VmState::Running { pid: Some(1) }
+            .transition(VmStateEvent::GuestShutdownObserved)
+            .expect("guest shutdown observation should succeed");
+
+        assert_eq!(state, VmState::Stopping);
     }
 }

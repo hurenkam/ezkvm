@@ -33,6 +33,15 @@ pub(crate) async fn handle_start(
 
     prepare_auxiliary_runtime(&config, &central_config, &runtime_overrides, dry_run)?;
 
+    let shutdown_marker = crate::state::get_shutdown_marker_file_at(
+        &config.name,
+        config.options.pid_file.as_deref(),
+    )?;
+
+    if !dry_run {
+        let _ = crate::state::delete_shutdown_marker(&shutdown_marker);
+    }
+
     let central_config_clone = central_config.clone();
     crate::state::cache_config(&config.name, &config)?;
 
@@ -69,6 +78,7 @@ pub(crate) async fn handle_start(
             log_file.as_ref(),
             &central_config_clone,
             &runtime_overrides,
+            shutdown_marker.as_path(),
         )?;
     } else {
         run_interactive_start(
@@ -77,6 +87,7 @@ pub(crate) async fn handle_start(
             log_file.as_ref(),
             &central_config_clone,
             &runtime_overrides,
+            shutdown_marker.as_path(),
         )?;
     }
 
@@ -356,6 +367,7 @@ fn run_daemon_start(
     log_file: Option<&std::path::PathBuf>,
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
+    shutdown_marker: &Path,
 ) -> Result<()> {
     println!("Starting in daemon mode...");
     if let Some(log_file) = log_file {
@@ -394,7 +406,7 @@ fn run_daemon_start(
         println!("✓ VM '{}' started (daemonized)", manager.config().name);
     }
 
-    if let Err(err) = spawn_daemon_shutdown_monitor(manager) {
+    if let Err(err) = spawn_daemon_shutdown_monitor(manager, shutdown_marker) {
         tracing::warn!(
             target: "ezkvm::shutdown_monitor",
             error = %err,
@@ -418,6 +430,7 @@ fn run_interactive_start(
     log_file: Option<&std::path::PathBuf>,
     central_config: &crate::config::CentralConfig,
     runtime_overrides: &crate::config::RuntimeCliOverrides,
+    shutdown_marker: &Path,
 ) -> Result<()> {
     println!("Starting interactively...");
 
@@ -431,7 +444,8 @@ fn run_interactive_start(
     // Spawn QMP shutdown monitor: detects guest-initiated power-off and sends
     // `quit` to QEMU so the process exits instead of spinning indefinitely.
     if let Some(qmp_socket) = monitor_qmp_socket_path(manager) {
-        let _monitor = crate::qemu::process::spawn_shutdown_monitor(qmp_socket);
+        let _monitor =
+            crate::qemu::process::spawn_shutdown_monitor(qmp_socket, shutdown_marker.to_path_buf());
     } else {
         tracing::warn!(
             target: "ezkvm::shutdown_monitor",
@@ -449,6 +463,7 @@ fn run_interactive_start(
         &manager.config().name,
         manager.config().options.pid_file.as_deref(),
     );
+    let _ = crate::state::delete_shutdown_marker(shutdown_marker);
     println!(
         "✓ VM '{}' finished with exit code {}",
         manager.config().name,
@@ -485,7 +500,10 @@ fn monitor_qmp_socket_path(manager: &crate::qemu::QemuManager) -> Option<String>
     Some(manager.auto_qmp_socket_path())
 }
 
-fn spawn_daemon_shutdown_monitor(manager: &crate::qemu::QemuManager) -> Result<()> {
+fn spawn_daemon_shutdown_monitor(
+    manager: &crate::qemu::QemuManager,
+    shutdown_marker: &Path,
+) -> Result<()> {
     let Some(qmp_socket) = monitor_qmp_socket_path(manager) else {
         tracing::warn!(
             target: "ezkvm::shutdown_monitor",
@@ -499,6 +517,8 @@ fn spawn_daemon_shutdown_monitor(manager: &crate::qemu::QemuManager) -> Result<(
         .arg("internal-shutdown-monitor")
         .arg("--socket")
         .arg(&qmp_socket)
+        .arg("--marker-path")
+        .arg(shutdown_marker)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

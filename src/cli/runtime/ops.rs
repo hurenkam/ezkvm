@@ -7,6 +7,10 @@ pub(crate) async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
     println!("✓ Configuration loaded");
 
     println!("Stopping VM: {}", config.name);
+    let shutdown_marker = crate::state::get_shutdown_marker_file_at(
+        &config.name,
+        config.options.pid_file.as_deref(),
+    )?;
 
     let mut lifecycle_state = crate::state::VmState::Running { pid: None };
 
@@ -29,6 +33,7 @@ pub(crate) async fn handle_stop(config_path: &str, force: bool) -> Result<()> {
     tracing::debug!(target: "ezkvm::lifecycle", vm = %config.name, state = ?lifecycle_state, "vm stop path completed");
 
     let _ = crate::state::delete_pid_at(&config.name, config.options.pid_file.as_deref());
+    let _ = crate::state::delete_shutdown_marker(&shutdown_marker);
 
     Ok(())
 }
@@ -40,6 +45,10 @@ pub(crate) async fn handle_kill(config_path: &str) -> Result<()> {
     println!("✓ Configuration loaded");
 
     println!("Killing VM: {}", config.name);
+    let shutdown_marker = crate::state::get_shutdown_marker_file_at(
+        &config.name,
+        config.options.pid_file.as_deref(),
+    )?;
 
     let mut lifecycle_state = crate::state::VmState::Running { pid: None };
     lifecycle_state = lifecycle_state.transition(crate::state::VmStateEvent::ForceKillIssued)?;
@@ -51,6 +60,7 @@ pub(crate) async fn handle_kill(config_path: &str) -> Result<()> {
     tracing::debug!(target: "ezkvm::lifecycle", vm = %config.name, state = ?lifecycle_state, "vm kill path completed");
 
     let _ = crate::state::delete_pid_at(&config.name, config.options.pid_file.as_deref());
+    let _ = crate::state::delete_shutdown_marker(&shutdown_marker);
 
     Ok(())
 }
