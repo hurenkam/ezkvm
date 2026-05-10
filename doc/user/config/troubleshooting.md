@@ -281,6 +281,46 @@ can sometimes clear it without a reboot for RDNA1 but has limited support for RD
 
 3. See [import-proxmox.md#post-import-validation-checklist](import-proxmox.md#post-import-validation-checklist)
 
+## TPM emulator fails with CMD_INIT or mode-change errors
+
+### Symptoms
+
+- QEMU exits with `tpm-emulator: TPM result for CMD_INIT: 0x9 operation failed`
+- swtpm log contains messages like `Could not open file: Permission denied` or
+   `Could not change mode bits: Operation not permitted`
+
+### Likely Causes
+
+- `system.tpm.state_backend_uri` points to a local device node (for example
+   `/dev/vm1/vm-108-tpmstate` -> `/dev/dm-*`) while swtpm runs unprivileged.
+- The backend path is valid and writable, but mode changes on that device node
+   are not allowed for the current user.
+
+### Checks
+
+1. Inspect swtpm log for backend open/chmod failures:
+    ```bash
+    tail -n 80 /var/log/ezkvm/<vm-name>-swtpm.log
+    ```
+
+2. Confirm backend target and ownership:
+    ```bash
+    readlink -f /dev/vm1/vm-108-tpmstate
+    ls -l /dev/dm-*
+    ```
+
+3. Confirm whether mode changes are allowed for the current user:
+    ```bash
+    chmod 600 /dev/dm-<n>
+    ```
+
+### Notes
+
+- For `state_backend_uri`, ezkvm appends `,mode=0600` by default for regular-file
+   backends and skips default mode append for local device-node backends.
+- If backend mode errors persist, use a regular-file TPM state path (or `state_dir`)
+   owned by the VM-launch user.
+
 ## PCI passthrough does not attach
 
 ### Symptoms

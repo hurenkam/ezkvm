@@ -113,6 +113,13 @@ system:
     state_backend_uri: /var/lib/ezkvm/vm-301-tpmstate
 ```
 
+Notes:
+
+- For regular-file backends like `/var/lib/ezkvm/vm-301-tpmstate`, ezkvm appends
+  `,mode=0600` by default when building swtpm `--tpmstate backend-uri=...`.
+- For local device-node backends like `/dev/vm1/vm-301-tpmstate`, ezkvm does not
+  append a default mode, which avoids unprivileged mode-change failures.
+
 ## See Also
 
 - [System and Boot](system-and-boot.md)

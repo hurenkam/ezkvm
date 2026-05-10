@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use std::os::unix::fs::FileTypeExt;
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -132,7 +133,7 @@ pub(super) fn build_tpmstate_arg(
         } else {
             format!("backend-uri={}", normalized)
         };
-        if !backend.contains(",mode=") {
+        if !backend.contains(",mode=") && should_append_default_backend_mode(&normalized) {
             backend.push_str(",mode=0600");
         }
         return Ok(backend);
@@ -171,6 +172,36 @@ fn normalize_tpm_backend_uri(uri: &str) -> String {
         return format!("file:///dev/{}", stripped);
     }
     no_options.to_string()
+}
+
+fn should_append_default_backend_mode(normalized_backend_uri: &str) -> bool {
+    let Some(local_path) = local_backend_path(normalized_backend_uri) else {
+        return true;
+    };
+
+    // For device nodes, swtpm mode changes can fail for unprivileged users even when
+    // read/write access is granted through group permissions.
+    if let Ok(metadata) = std::fs::metadata(&local_path) {
+        let file_type = metadata.file_type();
+        if file_type.is_block_device() || file_type.is_char_device() {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn local_backend_path(normalized_backend_uri: &str) -> Option<PathBuf> {
+    if normalized_backend_uri.starts_with('/') {
+        return Some(PathBuf::from(normalized_backend_uri));
+    }
+
+    let uri = normalized_backend_uri.strip_prefix("file://")?;
+    if !uri.starts_with('/') {
+        return None;
+    }
+
+    Some(PathBuf::from(uri))
 }
 
 #[cfg(test)]
@@ -276,5 +307,21 @@ mod tests {
         let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
             .expect("building tpmstate arg should succeed");
         assert_eq!(arg, "backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600");
+    }
+
+    #[test]
+    fn omits_default_mode_for_device_backend_uri() {
+        let tpm = TpmConfig {
+            version: "2.0".to_string(),
+            backend: "emulator".to_string(),
+            state_path: None,
+            state_dir: None,
+            state_backend_uri: Some("file:///dev/null".to_string()),
+            model: "tpm-tis".to_string(),
+        };
+
+        let arg = build_tpmstate_arg(&tpm, Path::new("/unused"), true)
+            .expect("building tpmstate arg should succeed");
+        assert_eq!(arg, "backend-uri=file:///dev/null");
     }
 }
