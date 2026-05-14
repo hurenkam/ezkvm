@@ -184,6 +184,10 @@ pub enum Commands {
         #[arg(long)]
         socket: String,
 
+        /// Optional path to the guest-agent unix socket to observe lifecycle
+        #[arg(long)]
+        guest_agent_socket: Option<String>,
+
         /// Path to the shutdown marker file to update
         #[arg(long)]
         marker_path: String,

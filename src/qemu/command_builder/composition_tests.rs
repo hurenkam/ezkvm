@@ -39,9 +39,10 @@ devices:
         args.iter()
             .any(|arg| arg == "virtio-serial,id=qga0,bus=pci.0,addr=0x8")
     );
-    assert!(args.iter().any(|arg| {
-        arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0"
-    }));
+    assert!(
+        args.iter()
+            .any(|arg| { arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0" })
+    );
     assert!(
         args.iter()
             .any(|arg| arg == "virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x9")

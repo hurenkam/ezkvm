@@ -57,6 +57,15 @@ impl QemuManager {
         };
         if uses_unix_qmp {
             args.add_no_shutdown();
+            tracing::info!(
+                target: "ezkvm::shutdown_monitor",
+                "enabled -no-shutdown (unix QMP monitor flow active)"
+            );
+        } else {
+            tracing::info!(
+                target: "ezkvm::shutdown_monitor",
+                "skipped -no-shutdown (QMP socket type is TCP)"
+            );
         }
 
         if self.config.options.nodefaults {

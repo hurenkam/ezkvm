@@ -406,7 +406,9 @@ fn run_daemon_start(
         println!("✓ VM '{}' started (daemonized)", manager.config().name);
     }
 
-    if let Err(err) = spawn_daemon_shutdown_monitor(manager, shutdown_marker) {
+    if let Err(err) =
+        spawn_daemon_shutdown_monitor(manager, central_config, runtime_overrides, shutdown_marker)
+    {
         tracing::warn!(
             target: "ezkvm::shutdown_monitor",
             error = %err,
@@ -444,8 +446,13 @@ fn run_interactive_start(
     // Spawn QMP shutdown monitor: detects guest-initiated power-off and sends
     // `quit` to QEMU so the process exits instead of spinning indefinitely.
     if let Some(qmp_socket) = monitor_qmp_socket_path(manager) {
-        let _monitor =
-            crate::qemu::process::spawn_shutdown_monitor(qmp_socket, shutdown_marker.to_path_buf());
+        let guest_agent_socket =
+            monitor_guest_agent_socket_path(manager, central_config, runtime_overrides);
+        let _monitor = crate::qemu::process::spawn_shutdown_monitor(
+            qmp_socket,
+            shutdown_marker.to_path_buf(),
+            guest_agent_socket,
+        );
     } else {
         tracing::warn!(
             target: "ezkvm::shutdown_monitor",
@@ -502,6 +509,8 @@ fn monitor_qmp_socket_path(manager: &crate::qemu::QemuManager) -> Option<String>
 
 fn spawn_daemon_shutdown_monitor(
     manager: &crate::qemu::QemuManager,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
     shutdown_marker: &Path,
 ) -> Result<()> {
     let Some(qmp_socket) = monitor_qmp_socket_path(manager) else {
@@ -511,18 +520,24 @@ fn spawn_daemon_shutdown_monitor(
         );
         return Ok(());
     };
+    let guest_agent_socket =
+        monitor_guest_agent_socket_path(manager, central_config, runtime_overrides);
 
     let executable = std::env::current_exe()?;
-    std::process::Command::new(executable)
+    let mut command = std::process::Command::new(executable);
+    command
         .arg("internal-shutdown-monitor")
         .arg("--socket")
         .arg(&qmp_socket)
         .arg("--marker-path")
         .arg(shutdown_marker)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    if let Some(socket_path) = guest_agent_socket {
+        command.arg("--guest-agent-socket").arg(socket_path);
+    }
+    command.spawn()?;
 
     tracing::info!(
         target: "ezkvm::shutdown_monitor",
@@ -531,6 +546,40 @@ fn spawn_daemon_shutdown_monitor(
     );
 
     Ok(())
+}
+
+fn monitor_guest_agent_socket_path(
+    manager: &crate::qemu::QemuManager,
+    central_config: &crate::config::CentralConfig,
+    runtime_overrides: &crate::config::RuntimeCliOverrides,
+) -> Option<String> {
+    let guest_agent = manager.config().options_guest_agent()?;
+    if !guest_agent.enabled {
+        return None;
+    }
+
+    let is_portable_mode = crate::state::detect_runtime_capability_mode(manager.config())
+        == crate::state::RuntimeCapabilityMode::PortableLinux;
+    if let Some(socket_path) = guest_agent.socket_path.clone()
+        && {
+            let is_proxmox_qga_path = socket_path.starts_with("/var/run/qemu-server/");
+            let is_generic_proxmox_qga = socket_path == "/var/run/qemu-server/qga.sock";
+            let proxmox_runtime_available = std::path::Path::new("/var/run/qemu-server").exists();
+            !(is_generic_proxmox_qga
+                || (is_proxmox_qga_path && (is_portable_mode || !proxmox_runtime_available)))
+        }
+    {
+        return Some(socket_path);
+    }
+
+    Some(
+        crate::state::resolve_runtime_guest_agent_socket(
+            &manager.config().name,
+            central_config,
+            runtime_overrides,
+        )
+        .unwrap_or_else(|_| format!("/tmp/ezkvm/{}.qga", manager.config().name)),
+    )
 }
 
 #[cfg(test)]

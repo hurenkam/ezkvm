@@ -1,25 +1,59 @@
 use crate::qemu::types::QemuArgs;
 
 impl QemuArgs {
-    /// Add QMP monitoring
+    /// Add QMP monitoring with separate control and event sockets (Proxmox-style)
+    /// This uses two monitors to prevent event starvation: control socket for commands,
+    /// event socket for async SHUTDOWN/POWERDOWN events.
     pub fn add_qmp(&mut self, socket_path: Option<&str>, socket_type: &str) {
-        self.push_str("-qmp");
-
-        let socket_spec = match socket_type {
+        match socket_type {
             "tcp" => {
-                // QEMU should listen for QMP connections rather than attempting to connect to a pre-existing peer.
-                socket_path
+                let control_spec = socket_path
                     .map(|p| format!("tcp:{},server=on,wait=off", p))
-                    .unwrap_or_else(|| "tcp:127.0.0.1:4444,server=on,wait=off".to_string())
-            }
-            _ => socket_path
-                .map(|p| format!("unix:{},server=on,wait=off", p))
-                .unwrap_or_else(|| {
-                    "unix:/var/run/qemu-monitor.sock,server=on,wait=off".to_string()
-                }),
-        };
+                    .unwrap_or_else(|| "tcp:127.0.0.1:4444,server=on,wait=off".to_string());
+                let event_port = socket_path
+                    .and_then(|p| p.split(':').last())
+                    .and_then(|port| port.parse::<u16>().ok())
+                    .map(|p| p + 1)
+                    .unwrap_or(4445);
+                let event_spec = format!("tcp:127.0.0.1:{},server=on,wait=off", event_port);
 
-        self.push(socket_spec);
+                self.push_str("-chardev");
+                self.push(format!("socket,id=qmp,{}", control_spec));
+                self.push_str("-mon");
+                self.push("chardev=qmp,mode=control".to_string());
+
+                self.push_str("-chardev");
+                self.push(format!("socket,id=qmp-event,{}", event_spec));
+                self.push_str("-mon");
+                self.push("chardev=qmp-event,mode=control".to_string());
+            }
+            _ => {
+                // Unix sockets: control and event
+                let control_path = socket_path.unwrap_or("/var/run/qemu-monitor.sock");
+                let event_path = if let Some(p) = socket_path {
+                    let base = p.trim_end_matches(".qmp").trim_end_matches("/qmp");
+                    format!("{}-event.sock", base)
+                } else {
+                    "/var/run/qemu-monitor-event.sock".to_string()
+                };
+
+                self.push_str("-chardev");
+                self.push(format!(
+                    "socket,id=qmp,path={},server=on,wait=off",
+                    control_path
+                ));
+                self.push_str("-mon");
+                self.push("chardev=qmp,mode=control".to_string());
+
+                self.push_str("-chardev");
+                self.push(format!(
+                    "socket,id=qmp-event,path={},server=on,wait=off",
+                    event_path
+                ));
+                self.push_str("-mon");
+                self.push("chardev=qmp-event,mode=control".to_string());
+            }
+        }
     }
 
     /// Add SMBIOS system information

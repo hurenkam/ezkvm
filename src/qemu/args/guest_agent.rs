@@ -63,12 +63,12 @@ fn build_guest_agent_chardev_spec(socket_path: Option<&str>, chardev_id: &str) -
 
 fn build_guest_agent_channel_spec(
     chardev_id: &str,
-    controller_id: &str,
+    _controller_id: &str,
     freeze_cpu: bool,
 ) -> String {
     let mut channel_spec = format!(
-        "virtserialport,chardev={},name=org.qemu.guest_agent.0,bus={}.0",
-        chardev_id, controller_id
+        "virtserialport,chardev={},name=org.qemu.guest_agent.0",
+        chardev_id
     );
     if freeze_cpu {
         channel_spec.push_str(",freeze=on");

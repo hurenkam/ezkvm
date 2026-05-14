@@ -123,7 +123,7 @@ fn test_guest_agent_with_bus_and_addr() {
     assert!(
         built
             .iter()
-            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0")
+            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0")
     );
 }
 

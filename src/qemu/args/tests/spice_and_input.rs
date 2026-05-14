@@ -148,7 +148,7 @@ fn test_spice_vdagent_reuses_existing_serial_controller() {
     assert!(
         built
             .iter()
-            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0")
+            .any(|arg| arg == "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0")
     );
 }
 
