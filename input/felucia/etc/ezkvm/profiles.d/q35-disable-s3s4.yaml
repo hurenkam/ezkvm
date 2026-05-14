@@ -1,0 +1,9 @@
+# Profile: q35-disable-s3s4
+#
+# Optional machine-level compatibility profile.
+# Use when a guest requires explicit ACPI sleep-state disable on Q35.
+
+options:
+  global_options:
+    - "ICH9-LPC.disable_s3=1"
+    - "ICH9-LPC.disable_s4=1"

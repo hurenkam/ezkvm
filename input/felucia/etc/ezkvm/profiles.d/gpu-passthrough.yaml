@@ -1,0 +1,5 @@
+controllers:
+  xhci:
+    - id: "xhci"
+      p2: 15
+      p3: 15

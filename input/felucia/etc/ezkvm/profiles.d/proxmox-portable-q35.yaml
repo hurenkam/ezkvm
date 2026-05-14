@@ -1,0 +1,28 @@
+# Profile: proxmox-portable-q35
+#
+# Overrides network placement defaults for portable-linux imports. Portable
+# imports use backend type `bridge`, and load `/usr/share/ezkvm/ezkvm-q35.cfg`
+# which defines legacy `pci.0..pci.3` buses.
+#
+# Applied after proxmox-base for all portable-linux Q35 imports so that network
+# devices are placed explicitly on `pci.0` (Proxmox-compatible guest topology).
+#
+# Do NOT assign to parity-mode imports; those use pci.0 via the Proxmox bridge
+# topology defined in pve-q35-4.0.cfg.
+system:
+  machine: pc-q35-8.1
+  readconfig:
+    - /usr/share/ezkvm/ezkvm-q35.cfg
+
+policies:
+  networks:
+    - match:
+        backend_type: bridge
+      defaults:
+        bus: pci.0
+      placement:
+        addr:
+          scope: bus
+          bus: pci.0
+          start: "0x12"
+          step: 1

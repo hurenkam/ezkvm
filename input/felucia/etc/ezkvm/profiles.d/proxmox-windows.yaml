@@ -1,0 +1,25 @@
+# Profile: proxmox-windows
+#
+# Provides Proxmox-specific HV CPU flags for Windows guests.
+# Proxmox applies these at runtime for Windows OS types but does not
+# store them in the .conf file.
+#
+# Assign this profile to Windows VMs imported from Proxmox.
+
+system:
+  cpu:
+    features:
+      - hv_ipi
+      - hv_relaxed
+      - hv_reset
+      - hv_runtime
+      - hv_spinlocks=0x1fff
+      - hv_stimer
+      - hv_synic
+      - hv_time
+      - hv_vapic
+      - hv_vendor_id=proxmox
+      - hv_vpindex
+      - kvm=off
+      - +kvm_pv_eoi
+      - +kvm_pv_unhalt

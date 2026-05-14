@@ -1,0 +1,4 @@
+options:
+  rtc:
+    base: "localtime"
+    driftfix: "slew"

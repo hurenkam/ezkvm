@@ -1,0 +1,60 @@
+# Profile: proxmox-base
+#
+# Provides guest-semantic runtime defaults that Proxmox applies when launching VMs
+# but does not store in the .conf file. All fields in this profile are guest-visible
+# or guest-affect semantics that must remain stable across import targets.
+#
+# Host-runtime-specific Proxmox literals (boot splash asset, pve-bridge scripts) are
+# isolated in proxmox-parity-runtime.yaml and are only applied for parity-mode imports.
+#
+# Assign this profile to all VMs imported from Proxmox.
+
+system:
+  boot:
+    menu: true
+    strict: true
+    reboot_timeout: 1000
+
+options:
+  global_options:
+    - kvm-pit.lost_tick_policy=discard
+    # Keep these disabled by default for VM108 parity: its captured Proxmox
+    # launch command does not include them. Uncomment if a specific guest needs
+    # explicit S3/S4 disable behavior on non-Proxmox hosts.
+    # - ICH9-LPC.disable_s3=1
+    # - ICH9-LPC.disable_s4=1
+
+policies:
+  drives:
+    - match:
+        interface: scsi
+      defaults:
+        cache: none
+        aio: io_uring
+        detect_zeroes: unmap
+    - match:
+        interface: scsi
+        type: disk
+      placement:
+        scsi_id:
+          scope: controller
+          start: 0
+          step: 1
+  networks:
+    - match:
+        backend_type: tap
+      defaults:
+        # bus: pci.0 is correct for Proxmox-parity mode.
+        # For portable-linux Q35 imports the command builder normalizes
+        # pci.N bus references to pcie.0 at emit time via normalize_legacy_root_bus.
+        bus: pci.0
+        rx_queue_size: 1024
+        tx_queue_size: 256
+        backend:
+          vhost: true
+      placement:
+        addr:
+          scope: bus
+          bus: pci.0
+          start: "0x12"
+          step: 1

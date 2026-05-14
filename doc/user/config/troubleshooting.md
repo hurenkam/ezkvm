@@ -179,6 +179,11 @@ When display handoff is ambiguous, isolate display variables before changing sto
 - ezkvm automatically monitors QMP `SHUTDOWN` events and sends `quit` to QEMU when the
   guest initiates power-off. This prevents the indefinite spin that happens when GPU
   passthrough teardown hangs (common with AMD RDNA2/3 on Windows).
+- During Windows shutdown, `qemu-ga` often stops before QEMU reaches a terminal
+   power-off state. This is expected because guest-agent is just another guest
+   service.
+- `Guest Agent: unavailable` during shutdown is not, by itself, a host/runtime
+   failure.
 - When the guest has already reported shutdown but QEMU is still alive, `ezkvm status`
    reports `Stopping` and prints `Shutdown: guest shutdown observed; waiting for QEMU to exit`.
 - If the VM is still alive after the screen goes dark, the auto-quit should fire within
@@ -187,6 +192,26 @@ When display handoff is ambiguous, isolate display variables before changing sto
 - This pattern can also be a delayed guest shutdown path (service/update/finalization),
   not an ezkvm host-runtime leak.
 - Confirm final state using `ezkvm status`; if it transitions to `Not running`, shutdown completed.
+
+### How to interpret shutdown signals
+
+Use QMP as the source of truth for terminal shutdown state:
+
+- `QMP: status=running, running=true` means QEMU still considers the guest active,
+   even if the display is dark and guest-agent already stopped.
+- `guest agent stopped` plus `QMP running` usually means shutdown is still in
+   progress inside the guest, or stalled in late teardown.
+- Rebooting/starting again before shutdown reaches terminal state can produce a
+   next-boot spinner that looks like an unclean shutdown recovery path.
+
+Recent monitor instrumentation logs are useful for classifying this path:
+
+- `Shutdown monitor: QMP status -> '<status>' (<class>)`
+- `guest agent remains stopped while QMP status stays running`
+
+If the second line repeats for a long period with high host CPU, treat the case
+as guest/device teardown stall and continue topology/device-path debugging rather
+than guest-agent debugging.
 
 ### Checks
 

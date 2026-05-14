@@ -807,18 +807,55 @@ Acceptance Criteria:
 - Portable-mode support claim for Debian, Ubuntu, and Arch is backed by captured validation evidence.
 Estimate: 3 days
 
-### B-56 Synthesize portable Q35 root ports dynamically per VM
+## Epic Q: Dynamic Q35 Topology Synthesis
+
+### Q-01 Define hierarchy-first Q35 topology schema and normalization
 Scope:
-- Replace fixed portable readconfig root-port fanout with per-VM root-port synthesis based on effective device placement.
-- Emit only the number of `ich9-pcie-port-*` bridges required by the resolved VM topology while preserving deterministic bus naming.
-- Keep Proxmox-parity behavior unchanged and avoid regressions in existing imported hostpci bus assignments.
+- Introduce a hierarchy-first machine layout model where parent bus is implied by nesting.
+- Add normalization from existing flat placement inputs to canonical tree form.
+- Preserve backward compatibility with existing VM/profile shapes.
 Dependencies: B-55
 Acceptance Criteria:
-- Portable Q35 output defines only required root ports instead of a static predeclared set.
-- Imported Windows passthrough fixtures no longer expose unused portable root ports in guest device manager.
-- Dry-run command snapshots remain deterministic for repeated runs with identical config.
-- Import and command-builder tests cover root-port synthesis and fallback behavior when required port count changes.
+- Hierarchy-first topology schema is parsed and validated.
+- Validation rejects invalid topology graphs (duplicate IDs, cycles, broken parent links).
+- Existing configs remain valid without requiring migration.
+Estimate: 2 days
+
+### Q-02 Implement dynamic Q35 port and bridge synthesizer
+Scope:
+- Generate required `ich9-pcie-port-*` root ports from resolved endpoint demand.
+- Generate required `pci.N` legacy islands via `pcidmi` only when referenced.
+- Generate required `uhci-*` companions only for active EHCI complexes.
+Dependencies: Q-01
+Acceptance Criteria:
+- Portable Q35 output emits only required root ports, legacy PCI islands, and UHCI companions.
+- Generated IDs, addresses, and emission order are deterministic for identical inputs.
+- Existing explicit bus/address assignments remain authoritative.
 Estimate: 3 days
+
+### Q-03 Integrate synthesized topology into portable command-builder path
+Scope:
+- Route portable Q35 topology resolution through synthesized hierarchy output.
+- Keep Proxmox parity path unchanged.
+- Align preflight checks with synthesized effective topology.
+Dependencies: Q-02
+Acceptance Criteria:
+- Portable dry-run command output uses synthesized topology.
+- Proxmox parity fixtures remain unchanged.
+- Preflight warnings/errors reference synthesized buses and ports correctly.
+Estimate: 2 days
+
+### Q-04 Add tests, snapshots, and docs for dynamic topology behavior
+Scope:
+- Add unit/integration coverage for on-demand generation of `ich9-pcie-port-*`, `pci.N`, and `uhci-*`.
+- Add deterministic snapshot coverage for repeated runs.
+- Document hierarchy-first model and migration guidance.
+Dependencies: Q-03
+Acceptance Criteria:
+- Tests cover minimal and passthrough-heavy fixtures.
+- Snapshot outputs remain stable across repeated runs.
+- User/developer docs explain the dynamic synthesis behavior and constraints.
+Estimate: 2 days
 
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 

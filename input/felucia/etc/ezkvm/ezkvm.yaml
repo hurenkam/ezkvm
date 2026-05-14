@@ -1,0 +1,42 @@
+tools:
+  qemu: "/usr/bin/qemu-system-x86_64"
+
+locations:
+  vm_dir: "/etc/ezkvm/vms.d"
+  profile_dir: "/etc/ezkvm/profiles.d"
+
+host_capabilities:
+  runtime:
+    # `root_directory` is the preferred key; `run_dir` is kept for compatibility.
+    root_directory: "/trixie/var/run/ezkvm"
+    log_dir: "/var/log/ezkvm"
+  firmware:
+    ovmf_dir: "/mnt/trixie/usr/share/pve-edk2-firmware"
+    search_paths:
+      - "/mnt/trixie/usr/share/pve-edk2-firmware"
+    #  - "/usr/share/ovmf"
+    #  - "/usr/share/ovmf"
+    #  - "/usr/share/OVMF"
+    #  - "/usr/share/edk2/ovmf"
+    secure_boot_code_files:
+      - "OVMF_CODE_4M.secboot.fd"
+      - "OVMF_CODE.secboot.fd"
+      - "OVMF.fd"
+    code_files:
+      - "OVMF_CODE_4M.fd"
+      - "OVMF_CODE.fd"
+      - "OVMF.fd"
+  network:
+    preferred_backend: "bridge"
+    bridge_helper: "/usr/lib/qemu/qemu-bridge-helper"
+    bridge_name: "br0"
+  tpm:
+    swtpm_binary: "/usr/bin/swtpm"
+    placement_mode: "socket"
+  integrations:
+    remote_viewer:
+      program: "/usr/bin/remote-viewer"
+    looking_glass:
+      program: "/usr/bin/looking-glass-client"
+      shared_memory_device: "/dev/kvmfr0"
+

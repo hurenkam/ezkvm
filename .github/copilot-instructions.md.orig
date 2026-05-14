@@ -77,9 +77,3 @@ For review-style requests, present:
 
 - For packaging-related edits, apply `.github/instructions/cross-distro-deb-package-guard.instructions.md`.
 - Treat dual-distro validation status (`pass`, `partial`, `not run`) as required final-response output for packaging changes.
-
-### Input Reference Data Guard
-
-- For changes to `src/**/*.rs`, `input/**/etc/**`, or `etc/**/*.yaml`, apply `.github/instructions/input-reference-data.instructions.md`.
-- Immutable files (`input/**/*.conf`, `input/**/*.qemu.cmd`, `input/**/*.swtpm.cmd`) must never be modified.
-- Derived files (`input/**/*.yaml`, `input/**/*.ezkvm.qemu.cmd`, `input/**/*.ezkvm.swtpm.cmd`) may need regeneration; **always ask the user before regenerating**.

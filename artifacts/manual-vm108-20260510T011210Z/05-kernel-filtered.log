@@ -1,0 +1,210 @@
+May 10 02:36:51 felucia kernel: Command line: BOOT_IMAGE=/boot/vmlinuz-7.0.0-14-generic root=/dev/mapper/vm0-ubuntu_resolute ro quiet splash resume=UUID=ff81baf7-8259-4d6e-86c3-bcba7d220115 amdgpu.dcdebugmask=0x410 crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+May 10 02:36:51 felucia kernel: Kernel command line: BOOT_IMAGE=/boot/vmlinuz-7.0.0-14-generic root=/dev/mapper/vm0-ubuntu_resolute ro quiet splash resume=UUID=ff81baf7-8259-4d6e-86c3-bcba7d220115 amdgpu.dcdebugmask=0x410 crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+May 10 02:36:51 felucia kernel: ACPI: USB4 _OSC: OS supports USB3+ DisplayPort+ PCIe+ XDomain+
+May 10 02:36:51 felucia kernel: ACPI: USB4 _OSC: OS controls USB3+ DisplayPort+ PCIe+ XDomain+
+May 10 02:36:51 felucia kernel: acpi PNP0A08:00: _OSC: platform does not support [SHPCHotplug AER]
+May 10 02:36:51 felucia kernel: acpi PNP0A08:00: _OSC: OS now controls [PCIeHotplug PME PCIeCapability LTR DPC]
+May 10 02:36:51 felucia kernel: pci 0000:00:01.1: [1022:14ed] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:01.2: [1022:14ed] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:02.2: [1022:14ee] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:03.1: [1022:14ef] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:04.1: [1022:14ef] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:08.1: [1022:14eb] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:08.2: [1022:14eb] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:00:08.3: [1022:14eb] type 01 class 0x060400 PCIe Root Port
+May 10 02:36:51 felucia kernel: pci 0000:01:00.0: [1002:1478] type 01 class 0x060400 PCIe Switch Upstream Port
+May 10 02:36:51 felucia kernel: pci 0000:02:00.0: [1002:1479] type 01 class 0x060400 PCIe Switch Downstream Port
+May 10 02:36:51 felucia kernel: pci 0000:03:00.0: [1002:7480] type 00 class 0x030000 PCIe Legacy Endpoint
+May 10 02:36:51 felucia kernel: pci 0000:03:00.1: [1002:ab30] type 00 class 0x040300 PCIe Legacy Endpoint
+May 10 02:36:51 felucia kernel: pci 0000:04:00.0: [1987:5021] type 00 class 0x010802 PCIe Endpoint
+May 10 02:36:51 felucia kernel: pci 0000:05:00.0: [14c3:0616] type 00 class 0x028000 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.0: [1002:15bf] type 00 class 0x030000 PCIe Legacy Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.1: [1002:1640] type 00 class 0x040300 PCIe Legacy Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.2: [1022:15c7] type 00 class 0x108000 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.3: [1022:15b9] type 00 class 0x0c0330 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.4: [1022:15ba] type 00 class 0x0c0330 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.5: [1022:15e2] type 00 class 0x048000 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.6: [1022:15e3] type 00 class 0x040300 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c5:00.0: [1022:14ec] type 00 class 0x130000 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c5:00.1: [1022:1502] type 00 class 0x118000 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.0: [1022:14ec] type 00 class 0x130000 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.3: [1022:15c0] type 00 class 0x0c0330 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.4: [1022:15c1] type 00 class 0x0c0330 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.5: [1022:1668] type 00 class 0x0c0340 PCIe Endpoint
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.6: [1022:1669] type 00 class 0x0c0340 PCIe Endpoint
+May 10 02:36:52 felucia kernel: iommu: Default domain type: Translated
+May 10 02:36:52 felucia kernel: iommu: DMA domain TLB invalidation policy: lazy mode
+May 10 02:36:52 felucia kernel: SCSI subsystem initialized
+May 10 02:36:52 felucia kernel: pci 0000:00:00.2: AMD-Vi: IOMMU performance counters supported
+May 10 02:36:52 felucia kernel: pci 0000:00:01.0: Adding to iommu group 0
+May 10 02:36:52 felucia kernel: pci 0000:00:01.1: Adding to iommu group 1
+May 10 02:36:52 felucia kernel: pci 0000:00:01.2: Adding to iommu group 2
+May 10 02:36:52 felucia kernel: pci 0000:00:02.0: Adding to iommu group 3
+May 10 02:36:52 felucia kernel: pci 0000:00:02.2: Adding to iommu group 4
+May 10 02:36:52 felucia kernel: pci 0000:00:03.0: Adding to iommu group 5
+May 10 02:36:52 felucia kernel: pci 0000:00:03.1: Adding to iommu group 5
+May 10 02:36:52 felucia kernel: pci 0000:00:04.0: Adding to iommu group 6
+May 10 02:36:52 felucia kernel: pci 0000:00:04.1: Adding to iommu group 6
+May 10 02:36:52 felucia kernel: pci 0000:00:08.0: Adding to iommu group 7
+May 10 02:36:52 felucia kernel: pci 0000:00:08.1: Adding to iommu group 8
+May 10 02:36:52 felucia kernel: pci 0000:00:08.2: Adding to iommu group 9
+May 10 02:36:52 felucia kernel: pci 0000:00:08.3: Adding to iommu group 10
+May 10 02:36:52 felucia kernel: pci 0000:00:14.0: Adding to iommu group 11
+May 10 02:36:52 felucia kernel: pci 0000:00:14.3: Adding to iommu group 11
+May 10 02:36:52 felucia kernel: pci 0000:00:18.0: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.1: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.2: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.3: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.4: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.5: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.6: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:00:18.7: Adding to iommu group 12
+May 10 02:36:52 felucia kernel: pci 0000:01:00.0: Adding to iommu group 13
+May 10 02:36:52 felucia kernel: pci 0000:02:00.0: Adding to iommu group 14
+May 10 02:36:52 felucia kernel: pci 0000:03:00.0: Adding to iommu group 15
+May 10 02:36:52 felucia kernel: pci 0000:03:00.1: Adding to iommu group 16
+May 10 02:36:52 felucia kernel: pci 0000:04:00.0: Adding to iommu group 17
+May 10 02:36:52 felucia kernel: pci 0000:05:00.0: Adding to iommu group 18
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.0: Adding to iommu group 19
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.1: Adding to iommu group 20
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.2: Adding to iommu group 21
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.3: Adding to iommu group 22
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.4: Adding to iommu group 23
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.5: Adding to iommu group 24
+May 10 02:36:52 felucia kernel: pci 0000:c4:00.6: Adding to iommu group 25
+May 10 02:36:52 felucia kernel: pci 0000:c5:00.0: Adding to iommu group 26
+May 10 02:36:52 felucia kernel: pci 0000:c5:00.1: Adding to iommu group 27
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.0: Adding to iommu group 28
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.3: Adding to iommu group 29
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.4: Adding to iommu group 30
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.5: Adding to iommu group 31
+May 10 02:36:52 felucia kernel: pci 0000:c6:00.6: Adding to iommu group 32
+May 10 02:36:52 felucia kernel: perf/amd_iommu: Detected AMD IOMMU #0 (2 banks, 4 counters/bank).
+May 10 02:36:52 felucia kernel: Block layer SCSI generic (bsg) driver version 0.4 loaded (major 242)
+May 10 02:36:52 felucia kernel: pcieport 0000:00:01.1: PME: Signaling with IRQ 38
+May 10 02:36:52 felucia kernel: pcieport 0000:00:01.1: pciehp: Slot #0 AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug+ Surprise+ Interlock- NoCompl+ IbPresDis- LLActRep+
+May 10 02:36:52 felucia kernel: pcieport 0000:00:01.2: PME: Signaling with IRQ 39
+May 10 02:36:52 felucia kernel: pcieport 0000:00:02.2: PME: Signaling with IRQ 40
+May 10 02:36:52 felucia kernel: pcieport 0000:00:03.1: PME: Signaling with IRQ 41
+May 10 02:36:52 felucia kernel: pcieport 0000:00:03.1: pciehp: Slot #0 AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug+ Surprise+ Interlock- NoCompl+ IbPresDis- LLActRep+
+May 10 02:36:52 felucia kernel: pcieport 0000:00:04.1: PME: Signaling with IRQ 42
+May 10 02:36:52 felucia kernel: pcieport 0000:00:04.1: pciehp: Slot #0 AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug+ Surprise+ Interlock- NoCompl+ IbPresDis- LLActRep+
+May 10 02:36:52 felucia kernel: pcieport 0000:00:08.1: PME: Signaling with IRQ 43
+May 10 02:36:52 felucia kernel: pcieport 0000:00:08.2: PME: Signaling with IRQ 44
+May 10 02:36:52 felucia kernel: pcieport 0000:00:08.3: PME: Signaling with IRQ 45
+May 10 02:36:52 felucia kernel: x86/amd: Previous system reset reason [0x00080800]: software wrote 0x6 to reset control register 0xCF9
+May 10 02:36:52 felucia kernel: pcie_bwctrl 0000:00:08.2:pcie010: hash matches
+May 10 02:36:52 felucia systemd[1]: systemd 259.5-0ubuntu3 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +IPE +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF -XKBCOMMON -UTMP +SYSVINIT +LIBARCHIVE)
+May 10 02:36:52 felucia kernel: scsi host0: uas
+May 10 02:36:52 felucia kernel: scsi 0:0:0:0: Direct-Access     FRMW     1TB Card         DL17 PQ: 0 ANSI: 6
+May 10 02:36:52 felucia kernel: sd 0:0:0:0: Attached scsi generic sg0 type 0
+May 10 02:36:52 felucia kernel: sd 0:0:0:0: [sda] Attached SCSI disk
+May 10 02:36:52 felucia kernel: nvme 0000:04:00.0: platform quirk: setting simple suspend
+May 10 02:36:52 felucia kernel: nvme nvme0: pci function 0000:04:00.0
+May 10 02:36:52 felucia kernel: nvme nvme0: allocated 64 MiB host memory buffer (1 segment).
+May 10 02:36:52 felucia kernel: nvme nvme0: 16/0/0 default/read/poll queues
+May 10 02:36:52 felucia kernel:  nvme0n1: p1 p2 p3 p4 p5
+May 10 02:36:55 felucia systemd[1]: systemd 259.5-0ubuntu3 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +IPE +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF -XKBCOMMON -UTMP +SYSVINIT +LIBARCHIVE)
+May 10 02:36:55 felucia systemd[1]: Listening on systemd-factory-reset.socket - Factory Reset Management.
+May 10 02:36:56 felucia kernel: VFIO - User Level meta-driver version: 0.3
+May 10 02:36:56 felucia kernel: vfio_pci: unknown parameter 'x-no-kvm-intx' ignored
+May 10 02:36:56 felucia kernel: vfio_pci: add [1002:ab30[ffffffff:ffffffff]] class 0x000000/00000000
+May 10 02:36:56 felucia kernel: vfio-pci 0000:03:00.0: vgaarb: VGA decodes changed: olddecodes=io+mem,decodes=none:owns=none
+May 10 02:36:56 felucia kernel: vfio_pci: add [1002:7480[ffffffff:ffffffff]] class 0x000000/00000000
+May 10 02:36:58 felucia kernel: amdgpu: vga_switcheroo: detected switching method \_SB_.PCI0.GP17.VGA_.ATPX handle
+May 10 02:36:58 felucia kernel: amdgpu: ATPX version 1, functions 0x00000801
+May 10 02:36:58 felucia kernel: amdgpu: ATPX Hybrid Graphics
+May 10 02:36:58 felucia kernel: amdgpu: Virtual CRAT table created for CPU
+May 10 02:36:58 felucia kernel: amdgpu: Topology: Add CPU node
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: enabling device (0006 -> 0007)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: initializing kernel modesetting (IP DISCOVERY 0x1002:0x15BF 0xF111:0x0005 0xC1).
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: register mmio base: 0x90500000
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: register mmio size: 524288
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 0 <common_v1_0_0> (soc21_common)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 1 <gmc_v11_0_0> (gmc_v11_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 2 <ih_v6_0_0> (ih_v6_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 3 <psp_v13_0_4> (psp)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 4 <smu_v13_0_0> (smu)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 5 <dce_v1_0_0> (dm)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 6 <gfx_v11_0_0> (gfx_v11_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 7 <sdma_v6_0_0> (sdma_v6_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 8 <vcn_v4_0_0> (vcn_v4_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 9 <jpeg_v4_0_0> (jpeg_v4_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: detected ip block number 10 <mes_v11_0_0> (mes_v11_0)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: Fetched VBIOS from VFCT
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [drm] ATOM BIOS: 113-PHXGENERIC-001
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: vgaarb: deactivate vga console
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: Trusted Memory Zone (TMZ) feature enabled
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: vm size is 262144 GB, 4 levels, block size is 9-bit, fragment size is 9-bit
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: VRAM: 8192M 0x0000008000000000 - 0x00000081FFFFFFFF (8192M used)
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: GART: 512M 0x00007FFF00000000 - 0x00007FFF1FFFFFFF
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [drm] Detected VRAM RAM=8192M, BAR=8192M
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [drm] RAM width 128bits DDR5
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0:  8192M of VRAM memory ready
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0:  27378M of GTT memory ready.
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [drm] GART: num cpu pages 131072, num gpu pages 131072
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [drm] PCIE GART of 512M enabled (table at 0x00000081FFD00000).
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [drm] Loading DMUB firmware via PSP: version=0x08005700
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: [VCN instance 0] Found VCN firmware Version ENC: 1.24 DEC: 9 VEP: 0 Revision: 16
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: MES: vmid_mask_mmhub 0x0000ff00, vmid_mask_gfxhub 0x0000ff00
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: MES: gfx_hqd_mask 0x00000002, compute_hqd_mask 0x0000000c, sdma_hqd_mask 0x000000fc
+May 10 02:36:58 felucia kernel: amdgpu 0000:c4:00.0: reserve 0x4000000 from 0x81f8000000 for PSP TMR
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: RAS: optional ras ta ucode is not available
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: RAP: optional rap ta ucode is not available
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: SECUREDISPLAY: optional securedisplay ta ucode is not available
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: SMU is initialized successfully!
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: [drm] Display Core v3.2.369 initialized on DCN 3.1.4
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: [drm] DP-HDMI FRL PCON supported
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: [drm] DMUB hardware initialized: version=0x08005700
+May 10 02:36:59 felucia kernel: snd_hda_intel 0000:c4:00.1: bound 0000:c4:00.0 (ops amdgpu_dm_audio_component_bind_ops [amdgpu])
+May 10 02:36:59 felucia kernel: amdgpu: Virtual CRAT table created for GPU
+May 10 02:36:59 felucia kernel: amdgpu: Topology: Add GPU node [0x1002:0x15bf]
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: SE 1, SH per SE 2, CU per SH 6, active_cu_number 12
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring gfx_0.0.0 uses VM inv eng 0 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.0.0 uses VM inv eng 1 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.1.0 uses VM inv eng 4 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.2.0 uses VM inv eng 6 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.3.0 uses VM inv eng 7 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.0.1 uses VM inv eng 8 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.1.1 uses VM inv eng 9 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.2.1 uses VM inv eng 10 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring comp_1.3.1 uses VM inv eng 11 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring sdma0 uses VM inv eng 12 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring vcn_unified_0 uses VM inv eng 0 on hub 8
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring jpeg_dec uses VM inv eng 1 on hub 8
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: ring mes_kiq_3.1.0 uses VM inv eng 13 on hub 0
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: Runtime PM not available
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: [drm] Using custom brightness curve
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: [drm] Registered 4 planes with drm panic
+May 10 02:36:59 felucia kernel: [drm] Initialized amdgpu 3.64.0 for 0000:c4:00.0 on minor 1
+May 10 02:36:59 felucia kernel: fbcon: amdgpudrmfb (fb0) is primary device
+May 10 02:36:59 felucia kernel: amdgpu 0000:c4:00.0: [drm] fb0: amdgpudrmfb frame buffer device
+May 10 02:37:10 felucia kernel: nvme nvme0: using unchecked data buffer
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.0: enabling device (0000 -> 0003)
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.1: enabling device (0000 -> 0002)
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.1: resetting
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 02:48:40 felucia kernel: vfio-pci 0000:03:00.1: reset done
+May 10 03:00:04 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 03:00:04 felucia kernel: vfio-pci 0000:03:00.1: resetting
+May 10 03:00:04 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 03:00:04 felucia kernel: vfio-pci 0000:03:00.1: reset done
+May 10 03:00:20 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 03:00:20 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 03:00:20 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 03:00:20 felucia kernel: vfio-pci 0000:03:00.1: resetting
+May 10 03:00:20 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 03:00:20 felucia kernel: vfio-pci 0000:03:00.1: reset done
+May 10 03:17:23 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 03:17:23 felucia kernel: vfio-pci 0000:03:00.1: resetting
+May 10 03:17:23 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 03:17:23 felucia kernel: vfio-pci 0000:03:00.1: reset done
+May 10 03:19:00 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 03:19:00 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 03:19:00 felucia kernel: vfio-pci 0000:03:00.0: resetting
+May 10 03:19:00 felucia kernel: vfio-pci 0000:03:00.1: resetting
+May 10 03:19:00 felucia kernel: vfio-pci 0000:03:00.0: reset done
+May 10 03:19:00 felucia kernel: vfio-pci 0000:03:00.1: reset done

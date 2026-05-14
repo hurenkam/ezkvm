@@ -1,0 +1,35 @@
+spice:
+  enabled: true
+  audio: true
+  vdagent: true
+
+devices:
+  displays: []
+  input:
+    - type: "virtio-mouse"
+    - type: "virtio-keyboard"
+  audio:
+    - type: "ich9-intel-hda"
+      id: "audiodev0"
+      bus: "pci.2"
+      addr: "0xc"
+    - type: "hda-micro"
+      id: "audiodev0-codec0"
+      bus: "audiodev0.0"
+      cad: 0
+      audiodev: "spice-backend0"
+    - type: "hda-duplex"
+      id: "audiodev0-codec1"
+      bus: "audiodev0.0"
+      cad: 1
+      audiodev: "spice-backend0"
+
+system:
+  memory:
+    ivshmem:
+      enabled: true
+      size: 128
+      vectors: 1
+      id: "ivshmem0"
+      bus: "pcie.0"
+      mem_path: /dev/kvmfr0

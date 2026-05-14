@@ -1,7 +1,7 @@
 # Convergence Tracking Board
 
-Date: 2026-05-10  
-Scope: Epics A-E (Phase 0 to Phase 2)  
+Date: 2026-05-12  
+Scope: Epics A-E, K, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
 ## Board Columns
@@ -19,6 +19,7 @@ Source: doc/backlog/BACKLOG.md
 - epic:extensibility
 - epic:hardening
 - epic:packaging
+- epic:q35-topology
 - phase:0-foundation
 - phase:1-features
 - phase:2-hardening
@@ -102,7 +103,10 @@ Source: doc/backlog/BACKLOG.md
 | B-53 | Execute Debian Trixie portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Done |
 | B-54 | Execute Ubuntu 26.04 portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Done |
 | B-55 | Execute Arch Linux portable-runtime validation matrix and publish runbooks | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-53, B-54 | unassigned | Todo |
-| B-56 | Synthesize portable Q35 root ports dynamically per VM | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-55 | unassigned | Todo |
+| Q-01 | Define hierarchy-first Q35 topology schema and normalization | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | B-55 | unassigned | Todo |
+| Q-02 | Implement dynamic Q35 port and bridge synthesizer | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-01 | unassigned | Todo |
+| Q-03 | Integrate synthesized topology into portable command-builder path | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-02 | unassigned | Todo |
+| Q-04 | Add tests, snapshots, and docs for dynamic topology behavior | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-03 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -174,7 +178,7 @@ Source: doc/backlog/BACKLOG.md
 - B-52 -> B-53
 - B-52 -> B-54
 - (B-53 and B-54) -> B-55
-- B-55 -> B-56
+- B-55 -> Q-01 -> Q-02 -> Q-03 -> Q-04
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05
