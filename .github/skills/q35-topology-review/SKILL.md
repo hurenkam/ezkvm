@@ -41,6 +41,8 @@ Scope: Focused skill for Q35 topology correctness and compatibility review.
 - Hotplug model matches device class and path
 - Imported slot identity is stable or explicitly migration-documented
 - Dry-run parity and fixture updates cover topology changes
+- HostPCI addr rendering expectations are verified when placement logic changes (including function-0 addr defaults)
+- Topology test expectations are reviewed for guest-visible slot/addr formatting drift before completion
 
 ## Output Expectations
 

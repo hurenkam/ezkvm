@@ -44,6 +44,44 @@ When Rust code changes, run and report:
 
 If any command cannot be run, state why and list what was verified instead.
 
+## Validation Lifecycle Requirements
+
+For refactors or behavior-changing Rust tasks, validation is a two-phase gate:
+
+1. **Intake baseline (before edits)**
+	- Run and report:
+	  - cargo fmt --all --check
+	  - cargo clippy --all-targets --all-features -- -D warnings
+	  - cargo test --quiet
+	- Record whether each command is pass/fail.
+
+2. **Exit validation (after edits)**
+	- Re-run the same commands.
+	- Report pass/fail for each command.
+	- Report the delta: newly failing checks/tests, newly fixed checks/tests, unchanged failing checks/tests.
+
+3. **Completion gate**
+	- Do not finalize as complete if exit validation regresses versus intake baseline.
+	- If intake already had failures, unresolved failures must be explicitly handled per the unresolved-failure escalation rule.
+
+## Unresolved-Failure Escalation Rule
+
+If a failing check/test appears unrelated to current refactoring work:
+
+1. Do not ignore it or silently defer it.
+2. Ask the user whether to fix it in the current task.
+3. Do not mark the task complete until one of the following is true:
+	- the failure is fixed in the current task, or
+	- the user explicitly approves deferral and the failure is documented with a tracking reference.
+
+When deferral is approved, include in the response:
+- failing test/check identifier
+- exact reproduce command
+- suspected first bad commit (if known)
+- short rationale for unrelated classification
+- user-approved deferral note
+- tracking reference (for example `doc/backlog/TRACKING_BOARD.md` row or ticket)
+
 ## Review Output Contract
 
 For review-style requests, present:

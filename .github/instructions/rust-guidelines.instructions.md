@@ -21,9 +21,30 @@ Always validate changed Rust files against doc/dev/CODING_GUIDELINES.md.
 ## Execution Expectations
 
 For implementation tasks that touch Rust files:
-- Run format, clippy, and tests.
+- Run format, clippy, and tests at intake and exit for refactors/behavior changes.
 - Report what was run and the result.
 - If a check is skipped, explain why and provide a safe alternative verification.
+
+Validation commands:
+- cargo fmt --all --check
+- cargo clippy --all-targets --all-features -- -D warnings
+- cargo test --quiet
+
+Required reporting format:
+- Intake: pass/fail per command
+- Exit: pass/fail per command
+- Delta: newly failing, newly fixed, unchanged failing
+
+Completion rule:
+- Do not finalize as complete when exit validation regresses versus intake baseline.
+
+If unresolved failures remain (including failures believed unrelated), include an explicit deferral block:
+- Identifier: <failing test/check>
+- Reproduce: <exact command>
+- Suspected first bad commit: <sha or unknown>
+- Unrelated rationale: <one line>
+- User decision: <fix now | defer>
+- Tracking reference: <ticket or board row>
 
 ## Review Expectations
 

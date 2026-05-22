@@ -69,6 +69,30 @@ This skill captures a systematic review methodology for comparing Proxmox-genera
 - review comments include both technical findings and user impact
 - suggestions consider ezkvm's design philosophy and constraints
 
+## Validation Lifecycle Reporting
+
+For refactor or behavior-changing Rust reviews, include validation lifecycle results:
+
+- Intake baseline (before edits):
+   - cargo fmt --all --check
+   - cargo clippy --all-targets --all-features -- -D warnings
+   - cargo test --quiet
+- Exit validation (after edits): same commands
+- Delta summary: newly failing, newly fixed, unchanged failing
+
+Do not mark review completion if exit results regress versus intake baseline.
+
+## Unresolved Failure Reporting
+
+When any failure remains unresolved, add an explicit section:
+
+- Identifier: failing test/check name
+- Reproduce: exact command
+- Suspected first bad commit: sha or unknown
+- Unrelated rationale: short justification when classified unrelated
+- User decision: fix now or approved deferral
+- Tracking reference: backlog/tracking ticket or row
+
 ## Proxmox Configuration Analysis
 
 ### Common .conf File Sections
