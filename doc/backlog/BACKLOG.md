@@ -1098,6 +1098,13 @@ Acceptance Criteria:
 - User docs capture flag behavior and expected output differences.
 Estimate: 2 days
 
+Completion Notes (2026-05-23):
+- Added qemu-cmd runtime-target contract and plumbing across CLI, import I/O options, and mapper execution path (`portable-linux` default, `proxmox-parity` explicit opt-in).
+- Added `--runtime-target` support to `import-qemu-cmd` command parsing and command handler output reporting.
+- Implemented runtime-target mapping branch for netdev helper paths: `portable-linux` omits Proxmox-specific helper script paths while `proxmox-parity` preserves source parity fields.
+- Added mapper and integration coverage to verify runtime-target branching behavior and preserve existing import/validate/command-build flows.
+- Updated qemu-cmd user guide with runtime-target semantics, examples, and expected output differences.
+
 ### N-04 Converge Proxmox and qemu-cmd imports on shared Q35 placement planner
 Scope:
 - Extract/import common Q35 placement planner so both importers use one allocation model.

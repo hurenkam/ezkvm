@@ -1,5 +1,7 @@
 use super::*;
-use ezkvm::import::qemu_cmd::{ImportOutputMode, ImportRunOptions, run_import_from_files};
+use ezkvm::import::qemu_cmd::{
+    ImportOutputMode, ImportRunOptions, RuntimeTarget, run_import_from_files,
+};
 use std::path::{Path, PathBuf};
 
 struct QemuCmdFixtureCase {
@@ -48,6 +50,7 @@ fn qemu_cmd_import_fixtures_support_validate_and_dry_run_command_build() {
                 strict: false,
                 dry_run: true,
                 output_mode: ImportOutputMode::Compact,
+                runtime_target: RuntimeTarget::PortableLinux,
             },
         )
         .unwrap_or_else(|err| panic!("fixture '{}' import failed: {err}", case.name));
@@ -127,9 +130,71 @@ fn qemu_cmd_import_strict_mode_fails_on_warning_rich_fixture() {
             strict: true,
             dry_run: true,
             output_mode: ImportOutputMode::Compact,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect_err("strict mode should fail when fixture emits mapping warnings");
 
     assert!(err.to_string().contains("strict import failed"));
+}
+
+#[test]
+fn qemu_cmd_import_runtime_target_branches_netdev_helper_mapping() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let input_path = fixture_path("qemu_cmd_import/01-wakiza.qemu.cmd");
+
+    let portable = run_import_from_files(
+        &input_path.to_string_lossy(),
+        &ImportRunOptions {
+            output_path: None,
+            strict: false,
+            dry_run: true,
+            output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::PortableLinux,
+        },
+    )
+    .expect("portable target import should succeed");
+
+    let parity = run_import_from_files(
+        &input_path.to_string_lossy(),
+        &ImportRunOptions {
+            output_path: None,
+            strict: false,
+            dry_run: true,
+            output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::ProxmoxParity,
+        },
+    )
+    .expect("parity target import should succeed");
+
+    let portable_cfg =
+        VmConfig::from_str(&portable.yaml).expect("portable yaml should deserialize");
+    let parity_cfg = VmConfig::from_str(&parity.yaml).expect("parity yaml should deserialize");
+
+    let portable_backend = portable_cfg
+        .devices
+        .networks
+        .first()
+        .and_then(|network| network.backend.as_ref())
+        .expect("portable backend must exist");
+    let parity_backend = parity_cfg
+        .devices
+        .networks
+        .first()
+        .and_then(|network| network.backend.as_ref())
+        .expect("parity backend must exist");
+
+    assert_eq!(portable_backend.script, None);
+    assert_eq!(portable_backend.downscript, None);
+    assert_eq!(
+        parity_backend.script.as_deref(),
+        Some("/usr/libexec/qemu-server/pve-bridge")
+    );
+    assert_eq!(
+        parity_backend.downscript.as_deref(),
+        Some("/usr/libexec/qemu-server/pve-bridgedown")
+    );
 }

@@ -77,7 +77,18 @@ pub async fn execute(cli: Cli) -> Result<()> {
             dry_run,
             strict,
             output_mode,
-        } => handle_import_qemu_cmd(&input, output.as_deref(), dry_run, strict, output_mode).await,
+            runtime_target,
+        } => {
+            handle_import_qemu_cmd(
+                &input,
+                output.as_deref(),
+                dry_run,
+                strict,
+                output_mode,
+                runtime_target,
+            )
+            .await
+        }
         Commands::InternalShutdownMonitor {
             socket,
             guest_agent_socket,

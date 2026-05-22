@@ -16,12 +16,20 @@ pub enum ImportOutputMode {
     DebugCanonical,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeTarget {
+    #[default]
+    PortableLinux,
+    ProxmoxParity,
+}
+
 #[derive(Debug, Clone)]
 pub struct ImportRunOptions {
     pub output_path: Option<String>,
     pub strict: bool,
     pub dry_run: bool,
     pub output_mode: ImportOutputMode,
+    pub runtime_target: RuntimeTarget,
 }
 
 #[derive(Debug, Clone)]
@@ -40,7 +48,7 @@ pub fn run_import_from_files(
     })?;
 
     let parsed = parse_qemu_cmd(&input)?;
-    let mapped = map_qemu_cmd_to_canonical_yaml(&parsed)?;
+    let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, options.runtime_target)?;
 
     validate_generated_vm_yaml(&mapped.yaml).map_err(ImportError::ParseError)?;
 
@@ -107,7 +115,7 @@ fn build_debug_source_comments(parsed: &QemuCmdModel, warnings: &[MappingWarning
 
 #[cfg(test)]
 mod tests {
-    use super::{ImportOutputMode, ImportRunOptions, run_import_from_files};
+    use super::{ImportOutputMode, ImportRunOptions, RuntimeTarget, run_import_from_files};
 
     fn create_temp_input_file(prefix: &str, content: &str) -> std::path::PathBuf {
         let unique = format!(
@@ -138,6 +146,7 @@ mod tests {
                 strict: true,
                 dry_run: true,
                 output_mode: ImportOutputMode::Canonical,
+                runtime_target: RuntimeTarget::PortableLinux,
             },
         );
 
@@ -168,6 +177,7 @@ mod tests {
                 strict: false,
                 dry_run: true,
                 output_mode: ImportOutputMode::Canonical,
+                runtime_target: RuntimeTarget::PortableLinux,
             },
         )
         .expect("dry-run import should succeed");
@@ -202,6 +212,7 @@ mod tests {
                 strict: false,
                 dry_run: false,
                 output_mode: ImportOutputMode::DebugCanonical,
+                runtime_target: RuntimeTarget::PortableLinux,
             },
         )
         .expect("non-dry-run import should succeed");

@@ -1,5 +1,7 @@
 use super::*;
-use ezkvm::import::qemu_cmd::{ImportOutputMode, ImportRunOptions, run_import_from_files};
+use ezkvm::import::qemu_cmd::{
+    ImportOutputMode, ImportRunOptions, RuntimeTarget, run_import_from_files,
+};
 use serde_yaml::Value;
 use std::path::Path;
 
@@ -42,6 +44,7 @@ fn qemu_cmd_profile_inference_covers_windows_linux_and_macos_workloads() {
             strict: false,
             dry_run: true,
             output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect("windows fixture import should succeed");
@@ -52,6 +55,7 @@ fn qemu_cmd_profile_inference_covers_windows_linux_and_macos_workloads() {
             strict: false,
             dry_run: true,
             output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect("linux fixture import should succeed");
@@ -62,6 +66,7 @@ fn qemu_cmd_profile_inference_covers_windows_linux_and_macos_workloads() {
             strict: false,
             dry_run: true,
             output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect("macos fixture import should succeed");

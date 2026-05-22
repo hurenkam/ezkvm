@@ -186,6 +186,38 @@ This section captures the implementation artifacts completed for `N-02`.
 - Added mapper-level regression assertions for representative host PCI and storage/controller placement extraction.
 - Added integration assertions in qemu-cmd fixture flows (`01-wakiza`, `03-felucia-505`) to ensure mapped host PCI and storage/controller placement survive import-to-validate-to-command-build flow.
 
+### N-03 Deliverables
+
+Status: Done (2026-05-23)
+
+This section captures the implementation artifacts completed for `N-03`.
+
+#### 1. Runtime-target contract and plumbing
+
+- Added qemu-cmd runtime-target support aligned with Proxmox import surface:
+	- `portable-linux` (default)
+	- `proxmox-parity` (explicit opt-in)
+- Threaded runtime target through:
+	- CLI command arguments (`import-qemu-cmd`)
+	- qemu-cmd import I/O options contract
+	- qemu-cmd mapper decisions
+
+#### 2. Mapper runtime-target branching behavior
+
+- Added runtime-target aware netdev helper-path handling:
+	- `portable-linux` omits Proxmox-specific `-netdev` helper script paths (`script`, `downscript`, `helper`) from mapped output to keep YAML host-independent.
+	- `proxmox-parity` preserves source helper script fields for strict parity comparisons.
+- Branching behavior is explicit and warning-backed rather than silent.
+
+#### 3. Regression and integration coverage
+
+- Added mapper-level runtime-target branching assertions.
+- Added integration test coverage verifying qemu-cmd import output differs by runtime-target for representative fixture flow while keeping import/validate/command-build path green.
+
+#### 4. Documentation updates
+
+- Updated `doc/user/config/import-qemu-cmd.md` with runtime-target flag semantics, examples, and expected output differences.
+
 ### Phase 2: qemu-cmd parity completion
 
 - Add runtime-target support to qemu-cmd import CLI and pipeline.

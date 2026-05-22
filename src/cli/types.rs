@@ -205,6 +205,15 @@ pub enum Commands {
             help = "Output mode: canonical (full), compact (profile-overlay), debug (canonical + source comments)"
         )]
         output_mode: ImportOutputModeArg,
+
+        /// Runtime target for normalization behavior
+        #[arg(
+            long,
+            value_enum,
+            default_value_t = RuntimeTargetArg::PortableLinux,
+            help = "Target runtime model: portable-linux (default, host-independent) or proxmox-parity (explicit opt-in for strict Proxmox parity)"
+        )]
+        runtime_target: RuntimeTargetArg,
     },
 
     /// Internal: monitor QMP shutdown events and request quit

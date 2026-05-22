@@ -1,5 +1,6 @@
 use crate::cli::ImportOutputModeArg;
 use crate::cli::commands::CliResult;
+use crate::cli::types::RuntimeTargetArg;
 
 pub(crate) async fn handle_import_qemu_cmd(
     input: &str,
@@ -7,6 +8,7 @@ pub(crate) async fn handle_import_qemu_cmd(
     dry_run: bool,
     strict: bool,
     output_mode: ImportOutputModeArg,
+    runtime_target: RuntimeTargetArg,
 ) -> CliResult {
     let output_mode = match output_mode {
         ImportOutputModeArg::Canonical => crate::import::qemu_cmd::ImportOutputMode::Canonical,
@@ -19,6 +21,14 @@ pub(crate) async fn handle_import_qemu_cmd(
         strict,
         dry_run,
         output_mode,
+        runtime_target: match runtime_target {
+            RuntimeTargetArg::PortableLinux => {
+                crate::import::qemu_cmd::RuntimeTarget::PortableLinux
+            }
+            RuntimeTargetArg::ProxmoxParity => {
+                crate::import::qemu_cmd::RuntimeTarget::ProxmoxParity
+            }
+        },
     };
 
     let result = crate::import::qemu_cmd::run_import_from_files(input, &options)
@@ -29,6 +39,7 @@ pub(crate) async fn handle_import_qemu_cmd(
         println!("# input: {}", input);
         println!("# output (not written): {}", result.output_path);
         println!("# output mode: {:?}", output_mode);
+        println!("# runtime target: {:?}", options.runtime_target);
         if !result.warnings.is_empty() {
             println!("# warnings ({}):", result.warnings.len());
             for warning in &result.warnings {

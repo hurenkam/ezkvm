@@ -1,5 +1,7 @@
 use super::*;
-use ezkvm::import::qemu_cmd::{ImportOutputMode, ImportRunOptions, run_import_from_files};
+use ezkvm::import::qemu_cmd::{
+    ImportOutputMode, ImportRunOptions, RuntimeTarget, run_import_from_files,
+};
 use std::path::Path;
 
 fn strip_yaml_comments(input: &str) -> String {
@@ -28,6 +30,7 @@ fn qemu_cmd_import_output_modes_preserve_runtime_equivalence() {
             strict: false,
             dry_run: true,
             output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect("canonical import should succeed");
@@ -39,6 +42,7 @@ fn qemu_cmd_import_output_modes_preserve_runtime_equivalence() {
             strict: false,
             dry_run: true,
             output_mode: ImportOutputMode::Compact,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect("compact import should succeed");
@@ -50,6 +54,7 @@ fn qemu_cmd_import_output_modes_preserve_runtime_equivalence() {
             strict: false,
             dry_run: true,
             output_mode: ImportOutputMode::DebugCanonical,
+            runtime_target: RuntimeTarget::PortableLinux,
         },
     )
     .expect("debug import should succeed");
@@ -123,6 +128,7 @@ fn qemu_cmd_import_selected_fixtures_have_stable_dry_run_args() {
                 strict: false,
                 dry_run: true,
                 output_mode: ImportOutputMode::Canonical,
+                runtime_target: RuntimeTarget::PortableLinux,
             },
         )
         .expect("first import should succeed");
@@ -134,6 +140,7 @@ fn qemu_cmd_import_selected_fixtures_have_stable_dry_run_args() {
                 strict: false,
                 dry_run: true,
                 output_mode: ImportOutputMode::Canonical,
+                runtime_target: RuntimeTarget::PortableLinux,
             },
         )
         .expect("second import should succeed");

@@ -6,6 +6,25 @@ Use this mode when you have a captured QEMU command file (for example `input/<ho
 
 This workflow is independent from Proxmox config import. For `.conf` source files, use [import-proxmox.md](import-proxmox.md).
 
+## Runtime Target Selection
+
+`import-qemu-cmd` supports the same runtime-target flag family as Proxmox import:
+
+| Target | Use when | Behavior |
+| --- | --- | --- |
+| `portable-linux` (default) | You want host-independent YAML as the primary output | Omits Proxmox-specific netdev helper paths (`script`, `downscript`, `helper`) during mapping so imported network intent remains portable. |
+| `proxmox-parity` | You need strict source parity for migration/validation comparisons | Preserves source Proxmox netdev helper path fields in mapped YAML. |
+
+Examples:
+
+```bash
+# default portable behavior
+ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --runtime-target portable-linux --dry-run
+
+# parity-preserving behavior
+ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --runtime-target proxmox-parity --dry-run
+```
+
 ## Separation Contract
 
 `import-qemu-cmd` is intentionally separate from `import-proxmox`:
@@ -40,6 +59,8 @@ Unsupported or ambiguous option families are not silently dropped. They are surf
 
 When source command placement fields are representable, importer output preserves them (for example host PCI `bus/addr` and drive/controller attachment fields).
 
+For `portable-linux`, importer output may intentionally omit Proxmox-only network helper script paths while preserving bridge and device intent.
+
 ## CLI Usage
 
 Basic dry run:
@@ -66,6 +87,13 @@ Output modes:
 ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --output-mode canonical --dry-run
 ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --output-mode compact --dry-run
 ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --output-mode debug --dry-run
+```
+
+Runtime-target variants:
+
+```bash
+ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --runtime-target portable-linux --dry-run
+ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --runtime-target proxmox-parity --dry-run
 ```
 
 ## Output Modes

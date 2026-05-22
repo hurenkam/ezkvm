@@ -1,4 +1,5 @@
 use super::error::ImportError;
+use super::io::RuntimeTarget;
 use super::model::{QemuCmdModel, QemuCmdOption, QemuCmdOptionValue, QemuCsvPart};
 use crate::config::{
     BootConfig, ControllersConfig, CpuConfig, DeviceConfig, DriveConfig, HostConfig, HostPciConfig,
@@ -47,6 +48,7 @@ struct DriveSource {
 
 pub fn map_qemu_cmd_to_canonical_yaml(
     qemu_cmd: &QemuCmdModel,
+    runtime_target: RuntimeTarget,
 ) -> Result<CanonicalMappingResult, ImportError> {
     let mut warnings = Vec::new();
 
@@ -58,7 +60,7 @@ pub fn map_qemu_cmd_to_canonical_yaml(
     let (cpu_model, cpu_features) =
         map_cpu(qemu_cmd).unwrap_or_else(|| ("host".to_string(), Vec::new()));
 
-    let netdev_definitions = map_netdev_definitions(qemu_cmd, &mut warnings);
+    let netdev_definitions = map_netdev_definitions(qemu_cmd, runtime_target, &mut warnings);
     let networks = map_networks(qemu_cmd, &netdev_definitions, &mut warnings);
     let host_pci = map_host_pci_devices(qemu_cmd, &mut warnings);
     let (drives, scsi_controllers, sata_controllers) =
@@ -270,6 +272,7 @@ fn map_cpu(qemu_cmd: &QemuCmdModel) -> Option<(String, Vec<String>)> {
 
 fn map_netdev_definitions(
     qemu_cmd: &QemuCmdModel,
+    runtime_target: RuntimeTarget,
     warnings: &mut Vec<MappingWarning>,
 ) -> BTreeMap<String, NetdevDefinition> {
     let mut definitions = BTreeMap::new();
@@ -309,15 +312,25 @@ fn map_netdev_definitions(
             }
         }
 
+        let mut script = csv_value(parts, "script").map(ToString::to_string);
+        let mut downscript = csv_value(parts, "downscript").map(ToString::to_string);
+        let mut helper = csv_value(parts, "helper").map(ToString::to_string);
+
+        if runtime_target == RuntimeTarget::PortableLinux {
+            strip_proxmox_netdev_helper_path("script", &mut script, warnings);
+            strip_proxmox_netdev_helper_path("downscript", &mut downscript, warnings);
+            strip_proxmox_netdev_helper_path("helper", &mut helper, warnings);
+        }
+
         let backend = NetworkBackendConfig {
             backend_type,
             ifname: csv_value(parts, "ifname").map(ToString::to_string),
             bridge: csv_value(parts, "br")
                 .or_else(|| csv_value(parts, "bridge"))
                 .map(ToString::to_string),
-            script: csv_value(parts, "script").map(ToString::to_string),
-            downscript: csv_value(parts, "downscript").map(ToString::to_string),
-            helper: csv_value(parts, "helper").map(ToString::to_string),
+            script,
+            downscript,
+            helper,
             vhost,
             queues,
             hostfwd: csv_values(parts, "hostfwd"),
@@ -331,6 +344,30 @@ fn map_netdev_definitions(
     }
 
     definitions
+}
+
+fn strip_proxmox_netdev_helper_path(
+    field_name: &str,
+    value: &mut Option<String>,
+    warnings: &mut Vec<MappingWarning>,
+) {
+    let Some(path) = value.as_ref() else {
+        return;
+    };
+
+    if !path.starts_with("/usr/libexec/qemu-server/") {
+        return;
+    }
+
+    warnings.push(MappingWarning {
+        source_field: "-netdev".to_string(),
+        kind: MappingWarningKind::UnsupportedValue,
+        message: format!(
+            "portable-linux runtime target omitted proxmox-specific netdev {} path '{}'",
+            field_name, path
+        ),
+    });
+    *value = None;
 }
 
 fn map_networks(
@@ -1082,6 +1119,7 @@ fn has_tpm_signal(qemu_cmd: &QemuCmdModel) -> bool {
 mod tests {
     use super::{MappingWarningKind, map_qemu_cmd_to_canonical_yaml};
     use crate::import::common::validate::validate_generated_vm_yaml;
+    use crate::import::qemu_cmd::io::RuntimeTarget;
     use crate::import::qemu_cmd::parser::parse_qemu_cmd;
 
     fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
@@ -1118,7 +1156,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapping should succeed");
 
         assert!(mapped.warnings.is_empty());
         with_repo_profiles(|| {
@@ -1142,7 +1181,8 @@ mod tests {
             parse_qemu_cmd("/usr/bin/kvm -incoming defer -device virtio-net-pci,netdev=missing0")
                 .expect("parser should succeed");
 
-        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapping should succeed");
 
         assert!(
             mapped
@@ -1165,7 +1205,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapping should succeed");
         let config = with_repo_profiles(|| {
             crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
         });
@@ -1181,7 +1222,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapping should succeed");
         let config = with_repo_profiles(|| {
             crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
         });
@@ -1197,7 +1239,8 @@ mod tests {
         )
         .expect("parser should succeed");
 
-        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("mapping should succeed");
         let config = with_repo_profiles(|| {
             crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
         });
@@ -1217,7 +1260,8 @@ mod tests {
         for fixture in fixtures {
             let input = std::fs::read_to_string(fixture).expect("fixture should read");
             let parsed = parse_qemu_cmd(&input).expect("fixture should parse");
-            let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("fixture should map");
+            let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+                .expect("fixture should map");
 
             with_repo_profiles(|| {
                 validate_generated_vm_yaml(&mapped.yaml)
@@ -1234,7 +1278,8 @@ mod tests {
         .expect("fixture should read");
 
         let parsed = parse_qemu_cmd(&input).expect("fixture should parse");
-        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("fixture should map");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux)
+            .expect("fixture should map");
         let config = with_repo_profiles(|| {
             crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
         });
@@ -1259,5 +1304,49 @@ mod tests {
                 && drive.controller.as_deref() == Some("scsihw0")
                 && drive.boot_index == Some(100)
         }));
+    }
+
+    #[test]
+    fn strips_proxmox_netdev_helper_paths_only_for_portable_linux_target() {
+        let parsed = parse_qemu_cmd(
+            "/usr/bin/kvm -name vm-a -netdev type=tap,id=net0,ifname=tap0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown -device virtio-net-pci,netdev=net0,id=net0",
+        )
+        .expect("parser should succeed");
+
+        let portable =
+            map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::PortableLinux).expect("map");
+        let parity =
+            map_qemu_cmd_to_canonical_yaml(&parsed, RuntimeTarget::ProxmoxParity).expect("map");
+
+        let portable_cfg = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&portable.yaml).expect("portable yaml")
+        });
+        let parity_cfg = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&parity.yaml).expect("parity yaml")
+        });
+
+        let portable_backend = portable_cfg
+            .devices
+            .networks
+            .first()
+            .and_then(|network| network.backend.as_ref())
+            .expect("portable backend");
+        let parity_backend = parity_cfg
+            .devices
+            .networks
+            .first()
+            .and_then(|network| network.backend.as_ref())
+            .expect("parity backend");
+
+        assert_eq!(portable_backend.script, None);
+        assert_eq!(portable_backend.downscript, None);
+        assert_eq!(
+            parity_backend.script.as_deref(),
+            Some("/usr/libexec/qemu-server/pve-bridge")
+        );
+        assert_eq!(
+            parity_backend.downscript.as_deref(),
+            Some("/usr/libexec/qemu-server/pve-bridgedown")
+        );
     }
 }

@@ -53,12 +53,17 @@ fn parses_import_qemu_cmd_defaults() {
             dry_run,
             strict,
             output_mode,
+            runtime_target,
         } => {
             assert_eq!(input, "input/felucia/108.qemu.cmd");
             assert_eq!(output, None);
             assert!(!dry_run);
             assert!(!strict);
             assert_eq!(output_mode, crate::cli::ImportOutputModeArg::Compact);
+            assert_eq!(
+                runtime_target,
+                crate::cli::types::RuntimeTargetArg::PortableLinux
+            );
         }
         _ => panic!("expected ImportQemuCmd command variant"),
     }
@@ -78,6 +83,8 @@ fn parses_import_qemu_cmd_with_flags() {
         "--strict",
         "--output-mode",
         "debug",
+        "--runtime-target",
+        "proxmox-parity",
     ])
     .expect("cli parse should succeed");
 
@@ -88,12 +95,17 @@ fn parses_import_qemu_cmd_with_flags() {
             dry_run,
             strict,
             output_mode,
+            runtime_target,
         } => {
             assert_eq!(input, "input/coruscant/505.qemu.cmd");
             assert_eq!(output.as_deref(), Some("505.yaml"));
             assert!(dry_run);
             assert!(strict);
             assert_eq!(output_mode, crate::cli::ImportOutputModeArg::Debug);
+            assert_eq!(
+                runtime_target,
+                crate::cli::types::RuntimeTargetArg::ProxmoxParity
+            );
         }
         _ => panic!("expected ImportQemuCmd command variant"),
     }

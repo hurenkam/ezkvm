@@ -8,4 +8,6 @@ pub mod model;
 pub mod parser;
 
 pub use error::ImportError;
-pub use io::{ImportOutputMode, ImportRunOptions, ImportRunResult, run_import_from_files};
+pub use io::{
+    ImportOutputMode, ImportRunOptions, ImportRunResult, RuntimeTarget, run_import_from_files,
+};
