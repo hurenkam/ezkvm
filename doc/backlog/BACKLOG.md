@@ -887,6 +887,12 @@ Acceptance Criteria:
 - No public API regressions for `import-proxmox` command.
 Estimate: 2 days
 
+Completion Notes (2026-05-20):
+- Added importer-common module under `src/import/common/` with shared `io_contract`, `render`, and `validate` helpers.
+- Refactored `src/import/proxmox/io.rs` to consume shared validation, strict-warning, output-path/write, and render post-processing primitives.
+- Kept Proxmox-specific mapping/render behavior in Proxmox modules; no `import-proxmox` API shape change.
+- Focused importer test suites remained green after refactor.
+
 ### M-03 Implement qemu-cmd parser and intermediate model
 Scope:
 - Add qemu-cmd parser/model modules under `src/import/qemu_cmd/`.

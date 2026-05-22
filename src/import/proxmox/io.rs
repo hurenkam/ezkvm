@@ -12,8 +12,12 @@ use super::{
     storage_parser::parse_proxmox_storage_config,
     yaml_compact::compact_sequence_mappings,
 };
-use crate::config::{VmConfig, validation};
-use std::path::Path;
+use crate::config::VmConfig;
+use crate::import::common::{
+    io_contract::{default_output_path, enforce_strict_mode, write_output_if_needed},
+    render::{apply_optional_compaction, prepend_preamble},
+    validate::validate_generated_vm_yaml,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ImportOutputMode {
@@ -80,35 +84,26 @@ pub fn run_import_from_files(
         None => map_proxmox_to_canonical_yaml(&parsed, options.runtime_target)?,
     };
 
-    let config = VmConfig::from_str(&mapped.yaml).map_err(|e| {
-        ImportError::ParseError(format!(
-            "generated canonical YAML failed to deserialize or merge profiles: {e}"
-        ))
-    })?;
-    validation::validate_config(&config).map_err(|e| {
-        ImportError::ParseError(format!("generated canonical YAML failed validation: {e}"))
-    })?;
+    validate_generated_vm_yaml(&mapped.yaml).map_err(ImportError::ParseError)?;
 
-    if options.strict && !mapped.warnings.is_empty() {
-        return Err(ImportError::ParseError(format!(
-            "strict import failed due to {} warning(s): {}",
-            mapped.warnings.len(),
-            format_warnings(&mapped.warnings)
-        )));
-    }
+    enforce_strict_mode(options.strict, &mapped.warnings, |warning| {
+        format!("{}: {}", warning.source_field, warning.message)
+    })
+    .map_err(ImportError::ParseError)?;
 
     let mut rendered_yaml = render_export_yaml(&parsed, &mapped.yaml, options)?;
     rendered_yaml = rewrite_drives_under_storage_controllers(&rendered_yaml)?;
 
-    if options.compact_lists {
-        rendered_yaml = compact_sequence_mappings(&rendered_yaml)?;
-    }
+    rendered_yaml = apply_optional_compaction(
+        rendered_yaml,
+        options.compact_lists,
+        compact_sequence_mappings,
+    )?;
 
     if options.output_mode == ImportOutputMode::DebugCanonical {
-        rendered_yaml = format!(
-            "{}\n{}",
-            build_debug_source_comments(&parsed, &mapped.warnings),
-            rendered_yaml
+        rendered_yaml = prepend_preamble(
+            rendered_yaml,
+            Some(&build_debug_source_comments(&parsed, &mapped.warnings)),
         );
     }
 
@@ -117,39 +112,14 @@ pub fn run_import_from_files(
         .clone()
         .unwrap_or_else(|| default_output_path(input_path));
 
-    if !options.dry_run {
-        std::fs::write(&output_path, &rendered_yaml).map_err(|e| {
-            ImportError::ParseError(format!(
-                "unable to write output file '{}': {}",
-                output_path, e
-            ))
-        })?;
-    }
+    write_output_if_needed(&output_path, &rendered_yaml, options.dry_run)
+        .map_err(ImportError::ParseError)?;
 
     Ok(ImportRunResult {
         output_path,
         yaml: rendered_yaml,
         warnings: mapped.warnings,
     })
-}
-
-fn default_output_path(input_path: &str) -> String {
-    let input = Path::new(input_path);
-    let stem = input
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .filter(|s| !s.is_empty())
-        .unwrap_or("imported-vm");
-
-    format!("{}.yaml", stem)
-}
-
-fn format_warnings(warnings: &[MappingWarning]) -> String {
-    warnings
-        .iter()
-        .map(|warning| format!("{}: {}", warning.source_field, warning.message))
-        .collect::<Vec<_>>()
-        .join("; ")
 }
 
 fn render_export_yaml(

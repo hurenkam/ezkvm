@@ -116,6 +116,58 @@ Must remain importer-specific:
 - Source intermediate model.
 - Source-to-canonical mapping and warning classification.
 
+## M-02 Deliverables
+
+Status: Done (2026-05-20)
+
+This section captures the implementation artifacts required by `M-02`.
+
+### 1. Introduced importer-common module
+
+Added neutral shared orchestration helpers under `src/import/common/**`:
+- `src/import/common/io_contract.rs`
+- `src/import/common/render.rs`
+- `src/import/common/validate.rs`
+
+Module wiring update:
+- `src/import/mod.rs` now exports `common` and `proxmox` peer modules.
+
+### 2. Extracted shared orchestration primitives
+
+The following importer-agnostic concerns moved into `src/import/common/**`:
+- Output path derivation:
+	- default output file naming from input path.
+- Output write contract:
+	- dry-run aware write helper with deterministic error context.
+- Strict-warning enforcement:
+	- generic strict-mode warning gate with caller-provided warning formatting.
+- Validation contract:
+	- canonical YAML deserialize + validate helper based on `VmConfig` + config validation.
+- Render post-processing helpers:
+	- optional compact-list pass helper.
+	- optional preamble injection helper.
+
+### 3. Proxmox importer refactor
+
+`src/import/proxmox/io.rs` now consumes shared helpers for:
+- generated YAML validation,
+- strict warning failure handling,
+- output-path derivation,
+- dry-run aware output write,
+- render post-processing orchestration.
+
+Kept Proxmox-specific in Proxmox importer:
+- source parse/mapping flow,
+- Proxmox compact/canonical/debug rendering rules,
+- Proxmox-specific post-processing (`omit_reconstructable_hostpci_bus_addr`, `omit_default_spice_addr`, and controller/drive reshape).
+
+### 4. Behavioral validation summary
+
+No public `import-proxmox` API changes were introduced.
+Focused importer tests passed after refactor:
+- Proxmox import I/O tests (`import::proxmox::io::tests`).
+- Broader Proxmox importer test subset (`import::proxmox::`).
+
 ## Implementation Plan
 
 1. Define hard module boundaries.
