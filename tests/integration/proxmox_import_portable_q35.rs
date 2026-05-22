@@ -65,6 +65,20 @@ fn run_portable_fixture(conf: &str) -> (String, Vec<String>) {
     (result.yaml, args)
 }
 
+fn topology_snapshot(args: &[String]) -> String {
+    args.iter()
+        .filter(|arg| {
+            arg.starts_with("pcie-root-port,id=ich9-pcie-port-")
+                || arg.starts_with("i82801b11-bridge,id=pcidmi")
+                || arg.starts_with("pci-bridge,id=pci.")
+                || arg.starts_with("ich9-usb-ehci")
+                || arg.starts_with("ich9-usb-uhci")
+        })
+        .map(|arg| arg.as_str())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn portable_q35_planner_allocates_root_ports_and_synthesizes_required_topology() {
     let _guard = env_lock()
@@ -179,4 +193,79 @@ fn portable_q35_planner_allocates_root_ports_and_synthesizes_required_topology()
         !yaml.contains("addr: 0x0.0"),
         "compact YAML should omit reconstructable hostpci addr assignment"
     );
+}
+
+#[test]
+fn portable_q35_minimal_fixture_synthesizes_only_required_legacy_topology() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let (_yaml, args) = run_portable_fixture("proxmox_import/13-portable-q35-minimal.conf");
+
+    assert!(
+        !args.contains(&"/usr/share/ezkvm/ezkvm-q35.cfg".to_string()),
+        "did not expect ezkvm-q35.cfg in portable synthesized args; args:\n{}",
+        args.join("\n")
+    );
+
+    assert!(
+        !args
+            .iter()
+            .any(|arg| arg.starts_with("pcie-root-port,id=ich9-pcie-port-")),
+        "minimal fixture should not synthesize root ports when no hostpci devices require them; args:\n{}",
+        args.join("\n")
+    );
+
+    assert!(
+        args.iter()
+            .any(|arg| arg == "i82801b11-bridge,id=pcidmi,bus=pcie.0,addr=1e.0"),
+        "expected synthesized pcidmi bridge for legacy pci.0 placement; args:\n{}",
+        args.join("\n")
+    );
+
+    assert!(
+        args.iter()
+            .any(|arg| arg == "pci-bridge,id=pci.0,bus=pcidmi,addr=1.0,chassis_nr=1"),
+        "expected synthesized pci.0 legacy island; args:\n{}",
+        args.join("\n")
+    );
+
+    assert!(
+        !args.iter().any(|arg| arg.starts_with("ich9-usb-ehci")),
+        "minimal fixture should not synthesize EHCI when unused; args:\n{}",
+        args.join("\n")
+    );
+
+    assert!(
+        !args.iter().any(|arg| arg.starts_with("ich9-usb-uhci")),
+        "minimal fixture should not synthesize UHCI companions when EHCI is inactive; args:\n{}",
+        args.join("\n")
+    );
+}
+
+#[test]
+fn portable_q35_topology_snapshot_is_deterministic_across_repeated_runs() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let fixtures = [
+        "proxmox_import/13-portable-q35-minimal.conf",
+        "proxmox_import/12-portable-q35-hostpci.conf",
+    ];
+
+    for fixture in fixtures {
+        let (_yaml_first, args_first) = run_portable_fixture(fixture);
+        let (_yaml_second, args_second) = run_portable_fixture(fixture);
+
+        let snapshot_first = topology_snapshot(&args_first);
+        let snapshot_second = topology_snapshot(&args_second);
+
+        assert_eq!(
+            snapshot_first, snapshot_second,
+            "topology snapshot changed between repeated runs for fixture '{}':\nfirst:\n{}\nsecond:\n{}",
+            fixture, snapshot_first, snapshot_second
+        );
+    }
 }

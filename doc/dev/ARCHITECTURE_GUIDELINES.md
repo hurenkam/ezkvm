@@ -119,7 +119,9 @@ Planner contract:
 
 | Decision | PortableLinux | ProxmoxParity |
 |---|---|---|
-| `readconfig` injected | `/usr/share/ezkvm/ezkvm-q35.cfg` | `/usr/share/qemu-server/pve-q35-4.0.cfg` |
+| `readconfig` marker in imported config | `/usr/share/ezkvm/ezkvm-q35.cfg` (marker only) | `/usr/share/qemu-server/pve-q35-4.0.cfg` |
+| Runtime topology source | hierarchy-first synthesis from resolved endpoint demand | static readconfig template + explicit endpoint args |
+| `-readconfig /usr/share/ezkvm/ezkvm-q35.cfg` emitted at runtime | No (portable synthesis path skips it) | N/A |
 | Machine string rewritten | No (kept as-is) | Yes (`+pve0` appended) |
 | `legacy_root_bus()` | `pci.0` | `pci.0` |
 | `audio_controller_bus()` | `pci.2` | `pci.2` |
@@ -127,8 +129,21 @@ Planner contract:
 | hostpci without explicit bus | Auto-allocates `ich9-pcie-port-1..8` | Auto-allocates `ich9-pcie-port-1..4` |
 | Root-port budget | 8 (`MAX_PORTABLE_ROOT_PORTS`) | 4 |
 
-The PortableLinux 8-port budget matches the port definitions in `share/ezkvm-q35.cfg`. Changing either requires updating both.
+The PortableLinux 8-port budget must remain aligned with runtime synthesis logic and portability expectations documented for `ich9-pcie-port-1..8`.
 The ProxmoxParity 4-port budget matches the port definitions in `/usr/share/qemu-server/pve-q35-4.0.cfg`. Changing either requires updating both.
+
+Hierarchy-first synthesis constraints for PortableLinux runtime:
+
+- Emit only required `pcie-root-port` devices based on resolved host PCI endpoint demand.
+- Emit `i82801b11-bridge` and only referenced `pci.N` legacy islands.
+- Emit EHCI/UHCI complexes only when an active endpoint references those buses.
+- Keep explicit bus/address assignments authoritative over synthesized defaults.
+- Keep emission order deterministic for identical inputs (required for dry-run parity and snapshot stability).
+
+Determinism contract:
+
+- identical resolved inputs must emit identical topology `-device` sequences
+- repeated-run drift is treated as a regression, not expected runtime variance
 
 Q35 device placement policy:
 
@@ -152,7 +167,7 @@ Topology validation checklist for Q35 changes:
 - Hotplug behavior reviewed (native PCIe vs bridge-based semantics).
 - Dry-run parity checked against captured Proxmox command lines.
 - Imported guest-visible slot identities preserved or migration-noted.
-- `MAX_PORTABLE_ROOT_PORTS` and `share/ezkvm-q35.cfg` port count kept in sync.
+- `MAX_PORTABLE_ROOT_PORTS` and synthesized portable root-port policy kept in sync with portability docs/tests.
 
 ## 3. Layering / Packaging
 

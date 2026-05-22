@@ -287,6 +287,15 @@ Portable Q35 bus layout used by import defaults:
   DMI-to-PCI at `0x1e`) feeding `pci-bridge` subordinates, emitted only for the
   legacy `pci.N` islands that are actually referenced by resolved endpoint demand
 
+Synthesis determinism contract:
+
+- root ports are allocated deterministically from `ich9-pcie-port-1..8` for
+  unresolved PCIe passthrough demand
+- legacy islands are emitted in ascending `pci.N` order from resolved demand
+- EHCI/UHCI sets are emitted only for active complexes, in fixed controller order
+
+For identical resolved inputs, emitted topology args are stable across repeated runs.
+
 Current portable Q35 placement defaults for imported Proxmox VMs:
 
 - Audio controller (`ich9-intel-hda`): `bus: pci.2`, `addr: 0xc`
@@ -311,6 +320,31 @@ single `-readconfig /usr/share/ezkvm/ezkvm-q35.cfg` argument.
 When SPICE is enabled, compact output omits `spice.addr` if it is the ezkvm
 default (`127.0.0.1`), and keeps explicit non-default values (for example
 `0.0.0.0`).
+
+### Hierarchy-First Migration Guidance
+
+When migrating existing Q35 configs that relied on static bridge templates:
+
+1. Keep explicit bus/addr values only where guest-visible slot identity must be fixed.
+2. Prefer removing redundant default bus/addr values from portable imports so runtime
+  synthesis can reconstruct deterministic placement.
+3. Validate topology with dry-run and machine-layout output after import changes:
+
+```bash
+ezkvm import-proxmox <vm.conf> --runtime-target portable-linux --dry-run
+ezkvm validate <vm.yaml> --show-machine-layout
+ezkvm start <vm.yaml> --dry-run
+```
+
+4. If a device still references unexpected legacy buses (`pci.N`) or root ports,
+  treat it as an explicit placement override and review whether it is intentional.
+
+Portable hierarchy-first synthesis guarantees deterministic emission order for
+identical inputs, but preserves explicit placement fields as authoritative when
+they are present.
+
+If migration to portable mode fails, keep parity mode until preflight/runtime gaps
+are resolved on the target host, then re-run the migration checks above.
 
 ## Import Mapping Reference
 

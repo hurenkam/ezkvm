@@ -71,6 +71,29 @@ When synthesis is active:
 - Optional integrations (remote-viewer, Looking Glass) emit warnings and degrade gracefully instead of failing startup.
 - `ezkvm status <vm.yaml>` now includes a guest-agent section when QEMU guest agent is reachable, including interface/IP information from `guest-network-get-interfaces`.
 
+## Portable Q35 topology snapshot differences
+
+### Symptoms
+
+- Repeated `ezkvm start <vm.yaml> --dry-run` runs show different topology `-device`
+  output for `pcie-root-port`, `pci-bridge`, or EHCI/UHCI devices.
+
+### Likely Causes
+
+- Config changed between runs (explicit bus/addr overrides, hostpci changes).
+- Runtime target or profile set changed.
+- Regression in topology synthesis ordering.
+
+### Checks
+
+1. Confirm resolved config and runtime target are unchanged.
+2. Compare topology-only dry-run output across repeated runs:
+   ```bash
+   ezkvm start <vm.yaml> --dry-run | grep -E 'pcie-root-port|i82801b11-bridge|pci-bridge|ich9-usb-(ehci|uhci)'
+   ```
+3. If output still drifts with unchanged input, treat this as a regression and
+   capture both outputs for comparison.
+
 ## VM fails with memory backend or hugepages errors
 
 ### Symptoms

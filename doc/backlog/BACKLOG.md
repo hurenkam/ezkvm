@@ -879,6 +879,12 @@ Acceptance Criteria:
 - User/developer docs explain the dynamic synthesis behavior and constraints.
 Estimate: 2 days
 
+Completion Notes (2026-05-23):
+- Extended portable Q35 integration coverage with a minimal fixture (`12-mixed-storage-buses.conf`) and a passthrough-heavy fixture (`12-portable-q35-hostpci.conf`) to verify on-demand synthesis of root ports, legacy islands, and EHCI/UHCI sets.
+- Added deterministic topology snapshot checks across repeated runs for both minimal and passthrough-heavy portable fixtures.
+- Updated developer architecture guidance to document hierarchy-first runtime synthesis contract, constraints, and determinism requirements.
+- Updated user migration guidance for portable Q35 hierarchy-first synthesis and validation workflow (`import-proxmox`, `validate --show-machine-layout`, `start --dry-run`).
+
 ## Epic M: QEMU Command Import
 
 ### M-01 Define qemu-cmd importer boundary and public contracts

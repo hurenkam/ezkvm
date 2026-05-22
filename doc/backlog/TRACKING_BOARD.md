@@ -1,6 +1,6 @@
 # Convergence Tracking Board
 
-Date: 2026-05-22  
+Date: 2026-05-23  
 Scope: Epics A-E, K, M, N, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
@@ -108,7 +108,7 @@ Source: doc/backlog/BACKLOG.md
 | Q-01 | Define hierarchy-first Q35 topology schema and normalization | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | B-55 | unassigned | Done |
 | Q-02 | Implement dynamic Q35 port and bridge synthesizer | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-01 | unassigned | Done |
 | Q-03 | Integrate synthesized topology into portable command-builder path | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-02 | unassigned | Done |
-| Q-04 | Add tests, snapshots, and docs for dynamic topology behavior | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-03 | unassigned | Todo |
+| Q-04 | Add tests, snapshots, and docs for dynamic topology behavior | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-03 | unassigned | Done |
 | M-01 | Define qemu-cmd importer boundary and public contracts | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | B-40 | unassigned | Done |
 | M-02 | Extract importer-common orchestration helpers | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Done |
 | M-03 | Implement qemu-cmd parser and intermediate model | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Done |
