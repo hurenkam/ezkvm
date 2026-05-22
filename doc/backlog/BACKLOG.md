@@ -996,6 +996,11 @@ Acceptance Criteria:
 - User docs cross-links are valid and consistent.
 Estimate: 1 day
 
+Completion Notes (2026-05-21):
+- Added standalone user guide at `doc/user/config/import-qemu-cmd.md` covering scope, separation contract, first-release limitations, CLI examples, warning model, and post-import validation checklist.
+- Updated config docs index at `doc/user/config/README.md` to include `import-qemu-cmd.md` as a separate special-topic entry alongside Proxmox import.
+- Added quick-link and table cross-references so users can discover qemu-cmd import flow without relying on Proxmox documentation.
+
 ### M-09 Harden qemu-cmd profile inference and parity assertions
 Scope:
 - Add targeted tests for profile inference from qemu-cmd imports.

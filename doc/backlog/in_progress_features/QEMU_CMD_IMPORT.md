@@ -421,6 +421,41 @@ Wired new modules in:
 
 This keeps qemu-cmd integration coverage in the same integration test entrypoint used by existing importer suites.
 
+## M-08 Deliverables
+
+Status: Done (2026-05-21)
+
+This section captures the implementation artifacts required by `M-08`.
+
+### 1. Added standalone user documentation page
+
+Introduced dedicated qemu-cmd import guide:
+- `doc/user/config/import-qemu-cmd.md`
+
+Guide content includes:
+- workflow separation from Proxmox import,
+- first-release mapping scope and limitations,
+- CLI usage examples,
+- output-mode behavior,
+- warning taxonomy and interpretation,
+- post-import validation checklist and troubleshooting pointers.
+
+### 2. Updated user docs index and cross-links
+
+Updated:
+- `doc/user/config/README.md`
+
+Changes include:
+- separate special-topic entry for `import-qemu-cmd.md`,
+- quick-link entry for captured QEMU command import,
+- reference-table row for qemu-cmd import guide.
+
+### 3. Independence contract reflected in user docs
+
+Documentation now allows users to execute qemu-cmd import workflow without reading Proxmox import guide.
+
+Proxmox and qemu-cmd guides remain separate and cross-linked only as related alternatives.
+
 ## Implementation Plan
 
 1. Define hard module boundaries.

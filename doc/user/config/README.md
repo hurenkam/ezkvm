@@ -21,7 +21,8 @@ This directory contains the user-facing configuration reference for ezkvm.
 
 **Special Topics:**
 10. [import-proxmox.md](import-proxmox.md) — Proxmox import plus portable runtime operator guidance
-11. [troubleshooting.md](troubleshooting.md) — Common issues and diagnostic checks
+11. [import-qemu-cmd.md](import-qemu-cmd.md) — QEMU command import workflow, warnings, and validation
+12. [troubleshooting.md](troubleshooting.md) — Common issues and diagnostic checks
 
 ## Canonical First
 
@@ -52,6 +53,7 @@ Do not use legacy top-level sections (`general`, `gpu`, `display`, `storage`, `n
 - **Profiles**: Learn about layering in [profiles-and-merge.md](profiles-and-merge.md)
 - **Hardware Passthrough**: See [devices.md](devices.md)
 - **Migrating from Proxmox**: Check [import-proxmox.md](import-proxmox.md)
+- **Importing Captured QEMU Commands**: Check [import-qemu-cmd.md](import-qemu-cmd.md)
 - **Debugging Issues**: Use [troubleshooting.md](troubleshooting.md)
 - **Field Reference**: See [field-reference.md](field-reference.md) for complete tables
 
@@ -71,4 +73,5 @@ Each document focuses on a specific area:
 | [code-backed-shapes.md](code-backed-shapes.md) | Schema examples from serde implementation |
 | [field-reference.md](field-reference.md) | Legacy field tables and auto-ID rules |
 | [import-proxmox.md](import-proxmox.md) | Proxmox config mapping and checklist |
+| [import-qemu-cmd.md](import-qemu-cmd.md) | QEMU command import workflow and warning model |
 | [troubleshooting.md](troubleshooting.md) | Memory, display, boot, PCI, USB issues |
