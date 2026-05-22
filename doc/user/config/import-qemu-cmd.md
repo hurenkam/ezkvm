@@ -127,6 +127,14 @@ ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --runtime-target proxmox-parity
 
 `debug` mode is useful for reviewing how warnings relate to source options.
 
+Compact-mode contract for portable target:
+
+- Compact output is replay-safe and deterministic across repeated imports of the same input.
+- Round-tripping compact YAML through parse and command-build preserves deterministic runtime args.
+- Portable compact output does not persist Proxmox host runtime literals (for example `/var/run/qemu-server/*` and `/usr/libexec/qemu-server/*`).
+
+Host-specific path resolution remains a runtime concern.
+
 ## Warning Model
 
 Warnings include `source_field` and message text. Warning categories currently include:

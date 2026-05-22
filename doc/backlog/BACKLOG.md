@@ -879,7 +879,7 @@ Acceptance Criteria:
 - User/developer docs explain the dynamic synthesis behavior and constraints.
 Estimate: 2 days
 
-Completion Notes (2026-05-23):
+Completion Notes (2026-05-22):
 - Extended portable Q35 integration coverage with a minimal fixture (`12-mixed-storage-buses.conf`) and a passthrough-heavy fixture (`12-portable-q35-hostpci.conf`) to verify on-demand synthesis of root ports, legacy islands, and EHCI/UHCI sets.
 - Added deterministic topology snapshot checks across repeated runs for both minimal and passthrough-heavy portable fixtures.
 - Updated developer architecture guidance to document hierarchy-first runtime synthesis contract, constraints, and determinism requirements.
@@ -1153,6 +1153,12 @@ Acceptance Criteria:
 - Compact output remains deterministic and replay-safe.
 - Docs updated for placement precedence, compaction behavior, and host-specific runtime resolution.
 Estimate: 2 days
+
+Completion Notes (2026-05-22):
+- Added output-mode hardening regression coverage for both importers to assert compact replay-safety and runtime-argument determinism across repeated imports.
+- Added portable target host-independence assertions ensuring compact outputs do not persist Proxmox host runtime paths (for example `/var/run/qemu-server` and `/usr/libexec/qemu-server/*`) into portable topology intent.
+- Preserved output-mode runtime equivalence checks (canonical/compact/debug) while extending deterministic compact round-trip guarantees on representative fixtures.
+- Updated user docs to describe compact determinism and host-independence behavior alongside placement precedence and runtime-target semantics.
 
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 

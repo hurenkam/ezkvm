@@ -1,6 +1,6 @@
 # Convergence Tracking Board
 
-Date: 2026-05-23  
+Date: 2026-05-22  
 Scope: Epics A-E, K, M, N, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
@@ -123,7 +123,7 @@ Source: doc/backlog/BACKLOG.md
 | N-03 | Add runtime-target support to qemu-cmd importer | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-02, B-40 | unassigned | Done |
 | N-04 | Converge Proxmox and qemu-cmd imports on shared Q35 placement planner | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-03 | unassigned | Done |
 | N-05 | Add shared placement conflict validator and precedence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-04 | unassigned | Done |
-| N-06 | Harden compact export determinism and host-independence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-05 | unassigned | Todo |
+| N-06 | Harden compact export determinism and host-independence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-05 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |

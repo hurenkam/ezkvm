@@ -36,6 +36,16 @@ flowchart TD
 
 Portable mode enforces capability validation. Parity mode keeps parity defaults and does not enforce portable capability gates.
 
+## Compact Export Determinism And Host-Independence
+
+Portable imports are validated for replay safety:
+
+- Repeated imports of the same source with the same runtime target produce deterministic compact YAML output.
+- Rebuilding runtime args from compact output preserves equivalent command semantics to canonical/debug output.
+- Portable compact output keeps topology intent and must not persist Proxmox host runtime literals (for example `/var/run/qemu-server/*` and `/usr/libexec/qemu-server/*`).
+
+Host paths and helper binaries are resolved at runtime from capability precedence, not hardcoded during import.
+
 ## Host Requirements By Distro
 
 ### Debian Trixie (example)

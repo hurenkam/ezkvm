@@ -119,3 +119,78 @@ fn proxmox_import_output_modes_preserve_runtime_equivalence() {
     assert_eq!(canonical_args, compact_args);
     assert_eq!(canonical_args, debug_args);
 }
+
+#[test]
+fn proxmox_compact_output_is_replay_safe_and_host_independent_for_portable_target() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let input = "input/felucia/108.conf";
+    let storage = Some("input/felucia/storage.cfg".to_string());
+
+    let first = with_repo_profiles(|| {
+        run_import_from_files(
+            input,
+            &ImportRunOptions {
+                output_path: None,
+                storage_path: storage.clone(),
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+                output_mode: ImportOutputMode::Compact,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+            },
+        )
+        .expect("first compact import should succeed")
+    });
+    let second = with_repo_profiles(|| {
+        run_import_from_files(
+            input,
+            &ImportRunOptions {
+                output_path: None,
+                storage_path: storage,
+                strict: false,
+                dry_run: true,
+                compact_lists: false,
+                output_mode: ImportOutputMode::Compact,
+                runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+            },
+        )
+        .expect("second compact import should succeed")
+    });
+
+    assert_eq!(
+        first.yaml, second.yaml,
+        "compact output must be deterministic"
+    );
+    assert!(
+        !first.yaml.contains("/var/run/qemu-server"),
+        "portable compact output must not persist proxmox runtime socket/pid paths"
+    );
+    assert!(
+        !first.yaml.contains("/usr/libexec/qemu-server/"),
+        "portable compact output must not persist proxmox network helper paths"
+    );
+
+    let first_cfg = with_repo_profiles(|| {
+        VmConfig::from_str(&first.yaml).expect("first compact yaml should deserialize")
+    });
+    let second_cfg = with_repo_profiles(|| {
+        VmConfig::from_str(&second.yaml).expect("second compact yaml should deserialize")
+    });
+
+    let first_args = QemuManager::new(first_cfg, CentralConfig::default())
+        .build_command()
+        .expect("first compact command build")
+        .into_inner();
+    let second_args = QemuManager::new(second_cfg, CentralConfig::default())
+        .build_command()
+        .expect("second compact command build")
+        .into_inner();
+
+    assert_eq!(
+        first_args, second_args,
+        "compact round-trip command args must stay deterministic"
+    );
+}

@@ -279,6 +279,29 @@ This section captures the implementation artifacts completed for `N-05`.
 	- PCI slot conflict diagnostics,
 	- drive attachment conflict diagnostics.
 
+### N-06 Deliverables
+
+Status: Done (2026-05-22)
+
+This section captures the implementation artifacts completed for `N-06`.
+
+#### 1. Compact replay-safety hardening coverage
+
+- Added integration regression assertions for both importers that run compact import repeatedly on representative fixtures and require byte-stable YAML output.
+- Added command-build round-trip assertions from compact YAML to ensure repeated parse/build cycles produce identical runtime argument vectors.
+
+#### 2. Host-independence contract checks
+
+- Added portable-target assertions that compact output does not persist Proxmox host runtime literals, including:
+	- `/var/run/qemu-server`
+	- `/usr/libexec/qemu-server/*`
+- Contract remains: persisted YAML captures topology intent, while host-specific paths are resolved at runtime.
+
+#### 3. Output-mode parity preservation
+
+- Preserved existing canonical/compact/debug runtime-equivalence assertions and warning-stability expectations.
+- Extended compact-mode determinism checks without changing importer warning semantics.
+
 ### Phase 2: qemu-cmd parity completion
 
 - Add runtime-target support to qemu-cmd import CLI and pipeline.
@@ -293,9 +316,9 @@ This section captures the implementation artifacts completed for `N-05`.
 
 ### Phase 4: Compact/profile determinism hardening
 
-- Implement and test precedence contract.
-- Ensure compact export strips only safe semantic defaults.
-- Add round-trip determinism tests.
+- Implement and test precedence contract. (completed in N-05)
+- Ensure compact export strips only safe semantic defaults. (completed in N-06)
+- Add round-trip determinism tests. (completed in N-06)
 
 ### Phase 5: Optional advanced topology synthesis
 
