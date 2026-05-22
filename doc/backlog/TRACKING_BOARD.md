@@ -1,6 +1,6 @@
 # Convergence Tracking Board
 
-Date: 2026-05-20  
+Date: 2026-05-21  
 Scope: Epics A-E, K, M, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
@@ -112,8 +112,8 @@ Source: doc/backlog/BACKLOG.md
 | M-02 | Extract importer-common orchestration helpers | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Done |
 | M-03 | Implement qemu-cmd parser and intermediate model | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Done |
 | M-04 | Implement qemu-cmd mapper and warning taxonomy | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-03 | unassigned | Done |
-| M-05 | Implement qemu-cmd import I/O pipeline | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-02, M-04 | unassigned | Todo |
-| M-06 | Add import-qemu-cmd CLI command | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-05 | unassigned | Todo |
+| M-05 | Implement qemu-cmd import I/O pipeline | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-02, M-04 | unassigned | Done |
+| M-06 | Add import-qemu-cmd CLI command | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-05 | unassigned | Done |
 | M-07 | Add qemu-cmd fixtures and integration coverage | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Todo |
 | M-08 | Publish standalone qemu-cmd import documentation | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Todo |
 | M-09 | Harden qemu-cmd profile inference and parity assertions | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-07 | unassigned | Todo |

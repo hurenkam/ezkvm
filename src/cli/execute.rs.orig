@@ -1,8 +1,7 @@
 use anyhow::Result;
 
 use super::commands::{
-    handle_create, handle_device, handle_import_proxmox, handle_import_qemu_cmd, handle_network,
-    handle_storage,
+    handle_create, handle_device, handle_import_proxmox, handle_network, handle_storage,
 };
 use super::runtime::{
     handle_console, handle_kill, handle_list, handle_start, handle_status, handle_stop,
@@ -71,13 +70,6 @@ pub async fn execute(cli: Cli) -> Result<()> {
             )
             .await
         }
-        Commands::ImportQemuCmd {
-            input,
-            output,
-            dry_run,
-            strict,
-            output_mode,
-        } => handle_import_qemu_cmd(&input, output.as_deref(), dry_run, strict, output_mode).await,
         Commands::InternalShutdownMonitor {
             socket,
             guest_agent_socket,

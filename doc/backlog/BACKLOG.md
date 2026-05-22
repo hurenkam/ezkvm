@@ -942,6 +942,12 @@ Acceptance Criteria:
 - Canonical output path behavior is deterministic.
 Estimate: 2 days
 
+Completion Notes (2026-05-21):
+- Added qemu-cmd I/O pipeline module at `src/import/qemu_cmd/io.rs` implementing `read -> parse -> map -> validate -> render -> write/dry-run` orchestration.
+- Added qemu-cmd specific run contracts: `ImportRunOptions`, `ImportRunResult`, and `ImportOutputMode`.
+- Reused importer-common helpers for strict-mode warning enforcement, output-path derivation, dry-run-aware write behavior, and generated YAML validation.
+- Added focused I/O tests covering strict-mode failure on warnings, deterministic default output path behavior, dry-run non-write behavior, and non-dry-run output writing.
+
 ### M-06 Add `import-qemu-cmd` CLI command
 Scope:
 - Add dedicated CLI subcommand and handler.
@@ -953,6 +959,12 @@ Acceptance Criteria:
 - Command supports dry-run and output mode flags.
 - Error messages are deterministic and actionable.
 Estimate: 1 day
+
+Completion Notes (2026-05-21):
+- Added dedicated `import-qemu-cmd` CLI subcommand in `src/cli/types.rs` with mode-specific help/examples.
+- Implemented command handler at `src/cli/commands/import_qemu_cmd.rs` and wired dispatch in `src/cli/execute.rs`.
+- Reused qemu-cmd import run contracts from `src/import/qemu_cmd/io.rs` with deterministic dry-run and non-dry-run output reporting.
+- Added CLI parse tests covering default and explicit `import-qemu-cmd` flags in `src/cli/tests/mod.rs`.
 
 ### M-07 Add qemu-cmd fixtures and integration coverage
 Scope:

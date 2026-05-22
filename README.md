@@ -189,6 +189,8 @@ See the `examples/` directory for complete configuration examples:
 - `ezkvm console <config.yaml>` - Attach to VM console
 - `ezkvm validate <config.yaml>` - Validate configuration file
 - `ezkvm validate <config.yaml> --show-machine-layout` - Print machine/device layout tree derived from generated QEMU args and loaded `-readconfig` templates
+- `ezkvm import-proxmox <vm.conf> --dry-run` - Import a Proxmox VM config into ezkvm YAML
+- `ezkvm import-qemu-cmd <vm.qemu.cmd> --dry-run` - Import a captured QEMU command line into ezkvm YAML
 
 ### Storage Management
 - `ezkvm storage create <name> --size <GB>` - Create a QCOW2 disk image

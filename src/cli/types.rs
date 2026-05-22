@@ -177,6 +177,36 @@ pub enum Commands {
         runtime_target: RuntimeTargetArg,
     },
 
+    /// Import a captured QEMU command line into canonical ezkvm YAML
+    #[command(
+        after_help = "Examples:\n  ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --dry-run\n  ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --output-mode canonical --dry-run\n  ezkvm import-qemu-cmd input/felucia/108.qemu.cmd --output-mode debug --dry-run"
+    )]
+    ImportQemuCmd {
+        /// Path to captured QEMU command file (for example input/<host>/<vmid>.qemu.cmd)
+        input: String,
+
+        /// Optional output path for generated canonical YAML
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Dry run: print generated YAML and do not write files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Fail if mapper emits warnings
+        #[arg(long)]
+        strict: bool,
+
+        /// Output mode for generated YAML
+        #[arg(
+            long,
+            value_enum,
+            default_value_t = ImportOutputModeArg::Compact,
+            help = "Output mode: canonical (full), compact (profile-overlay), debug (canonical + source comments)"
+        )]
+        output_mode: ImportOutputModeArg,
+    },
+
     /// Internal: monitor QMP shutdown events and request quit
     #[command(hide = true, name = "internal-shutdown-monitor")]
     InternalShutdownMonitor {

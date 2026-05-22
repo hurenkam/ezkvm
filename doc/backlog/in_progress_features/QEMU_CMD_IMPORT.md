@@ -288,6 +288,93 @@ Validation results during implementation:
 - Focused qemu-cmd parser+mapper subset passed (`cargo test --quiet import::qemu_cmd::`).
 - Generated YAML from supported fixture mapping paths deserialized and passed config validation in mapper tests.
 
+## M-05 Deliverables
+
+Status: Done (2026-05-21)
+
+This section captures the implementation artifacts required by `M-05`.
+
+### 1. Added qemu-cmd I/O pipeline module
+
+Introduced `src/import/qemu_cmd/io.rs` with high-level orchestration contract:
+- `run_import_from_files(input_path, options)`
+
+Pipeline sequence implemented:
+- read input file,
+- parse via `parse_qemu_cmd`,
+- map via `map_qemu_cmd_to_canonical_yaml`,
+- validate generated YAML,
+- enforce strict-warning policy,
+- render output-mode YAML,
+- write output unless dry-run.
+
+### 2. Added qemu-cmd run contracts
+
+`src/import/qemu_cmd/io.rs` now defines qemu-cmd specific contracts:
+- `ImportOutputMode` (`Canonical`, `Compact`, `DebugCanonical`),
+- `ImportRunOptions` (`output_path`, `strict`, `dry_run`, `output_mode`),
+- `ImportRunResult` (`output_path`, `yaml`, `warnings`).
+
+Module wiring update:
+- `src/import/qemu_cmd/mod.rs` now exports `io` and re-exports high-level qemu-cmd run contracts.
+
+### 3. Reused importer-common helpers only
+
+The qemu-cmd I/O flow reuses importer-common helpers for shared concerns:
+- strict-mode enforcement,
+- default output-path derivation,
+- dry-run-aware write behavior,
+- generated YAML validation,
+- debug preamble rendering.
+
+No Proxmox parser/model/mapper internals are referenced in qemu-cmd I/O orchestration.
+
+### 4. Focused M-05 tests added
+
+Added I/O-focused tests in `src/import/qemu_cmd/io.rs` for:
+- strict mode failure when warnings are present,
+- deterministic default output-path behavior,
+- dry-run success without writing output,
+- non-dry-run output file write behavior.
+
+## M-06 Deliverables
+
+Status: Done (2026-05-21)
+
+This section captures the implementation artifacts required by `M-06`.
+
+### 1. Added dedicated CLI subcommand
+
+Introduced `import-qemu-cmd` in `src/cli/types.rs` with mode-specific examples and flags:
+- positional input path (`<vm>.qemu.cmd`),
+- `--output` optional output path,
+- `--dry-run`,
+- `--strict`,
+- `--output-mode {canonical|compact|debug}`.
+
+### 2. Added qemu-cmd command handler and dispatch wiring
+
+Added handler module:
+- `src/cli/commands/import_qemu_cmd.rs`
+
+Wired module exports and execute dispatch:
+- `src/cli/commands/mod.rs`
+- `src/cli/execute.rs`
+
+Handler behavior mirrors existing importer UX:
+- deterministic dry-run preamble and YAML emission,
+- deterministic non-dry-run completion summary,
+- structured warning printing in both modes,
+- actionable command-level error prefix (`qemu-cmd import failed: ...`).
+
+### 3. Added CLI parse coverage for M-06 flags
+
+Added CLI parser tests in `src/cli/tests/mod.rs` for:
+- default `import-qemu-cmd` invocation shape,
+- explicit flag parsing (`--output`, `--dry-run`, `--strict`, `--output-mode debug`).
+
+These tests verify command/flag wiring independently of mapper/runtime behavior.
+
 ## Implementation Plan
 
 1. Define hard module boundaries.

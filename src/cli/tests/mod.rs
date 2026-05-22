@@ -37,3 +37,64 @@ spice:
 mod looking_glass;
 mod remote_viewer;
 mod runtime_aux;
+
+#[test]
+fn parses_import_qemu_cmd_defaults() {
+    use clap::Parser;
+
+    let cli =
+        crate::cli::Cli::try_parse_from(["ezkvm", "import-qemu-cmd", "input/felucia/108.qemu.cmd"])
+            .expect("cli parse should succeed");
+
+    match cli.command {
+        crate::cli::Commands::ImportQemuCmd {
+            input,
+            output,
+            dry_run,
+            strict,
+            output_mode,
+        } => {
+            assert_eq!(input, "input/felucia/108.qemu.cmd");
+            assert_eq!(output, None);
+            assert!(!dry_run);
+            assert!(!strict);
+            assert_eq!(output_mode, crate::cli::ImportOutputModeArg::Compact);
+        }
+        _ => panic!("expected ImportQemuCmd command variant"),
+    }
+}
+
+#[test]
+fn parses_import_qemu_cmd_with_flags() {
+    use clap::Parser;
+
+    let cli = crate::cli::Cli::try_parse_from([
+        "ezkvm",
+        "import-qemu-cmd",
+        "input/coruscant/505.qemu.cmd",
+        "--output",
+        "505.yaml",
+        "--dry-run",
+        "--strict",
+        "--output-mode",
+        "debug",
+    ])
+    .expect("cli parse should succeed");
+
+    match cli.command {
+        crate::cli::Commands::ImportQemuCmd {
+            input,
+            output,
+            dry_run,
+            strict,
+            output_mode,
+        } => {
+            assert_eq!(input, "input/coruscant/505.qemu.cmd");
+            assert_eq!(output.as_deref(), Some("505.yaml"));
+            assert!(dry_run);
+            assert!(strict);
+            assert_eq!(output_mode, crate::cli::ImportOutputModeArg::Debug);
+        }
+        _ => panic!("expected ImportQemuCmd command variant"),
+    }
+}
