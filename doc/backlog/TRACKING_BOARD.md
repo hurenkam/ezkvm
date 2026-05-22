@@ -121,7 +121,7 @@ Source: doc/backlog/BACKLOG.md
 | N-01 | Define Q35 parity acceptance matrix and invariants | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | M-09 | unassigned | Done |
 | N-02 | Extend qemu-cmd importer with host PCI and storage placement mapping | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-01 | unassigned | Done |
 | N-03 | Add runtime-target support to qemu-cmd importer | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-02, B-40 | unassigned | Done |
-| N-04 | Converge Proxmox and qemu-cmd imports on shared Q35 placement planner | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-03 | unassigned | Todo |
+| N-04 | Converge Proxmox and qemu-cmd imports on shared Q35 placement planner | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-03 | unassigned | Done |
 | N-05 | Add shared placement conflict validator and precedence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-04 | unassigned | Todo |
 | N-06 | Harden compact export determinism and host-independence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-05 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |

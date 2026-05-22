@@ -1117,6 +1117,13 @@ Acceptance Criteria:
 - No regression in existing Proxmox parity fixtures.
 Estimate: 3 days
 
+Completion Notes (2026-05-23):
+- Extracted shared Q35 placement planner into `src/import/common/q35_placement.rs` with importer-agnostic runtime-target and host PCI root-port allocation contracts.
+- Refactored Proxmox importer topology planner (`src/import/proxmox/mapper/topology.rs`) to delegate machine/readconfig handling, legacy bus selection, and host PCI default bus allocation through the shared planner.
+- Updated qemu-cmd importer host PCI placement path (`src/import/qemu_cmd/mapper.rs`) to use the shared planner for Q35 portable root-port allocation decisions.
+- Added cross-import integration parity coverage in `tests/integration/qemu_cmd_import.rs` verifying overlapping host PCI placement semantics remain aligned between Proxmox and qemu-cmd imports for representative wakiza fixture flow.
+- Preserved existing Proxmox import behavior while converging placement decision logic into a single shared planner module.
+
 ### N-05 Add shared placement conflict validator and precedence contract
 Scope:
 - Add pre-export validation for bus/address collisions after profile merge and explicit placement resolution.

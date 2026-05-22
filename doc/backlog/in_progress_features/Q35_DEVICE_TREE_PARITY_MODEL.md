@@ -218,6 +218,34 @@ This section captures the implementation artifacts completed for `N-03`.
 
 - Updated `doc/user/config/import-qemu-cmd.md` with runtime-target flag semantics, examples, and expected output differences.
 
+### N-04 Deliverables
+
+Status: Done (2026-05-23)
+
+This section captures the implementation artifacts completed for `N-04`.
+
+#### 1. Shared Q35 placement planner extraction
+
+- Added importer-agnostic Q35 placement planner module:
+	- `src/import/common/q35_placement.rs`
+- Shared module now owns converged placement decisions for:
+	- Q35 machine/readconfig normalization hooks
+	- portable vs parity legacy-root/audio bus selection
+	- portable Q35 host PCI root-port allocation and fallback behavior
+
+#### 2. Proxmox importer convergence
+
+- Refactored `src/import/proxmox/mapper/topology.rs` to delegate planner decisions to shared `import/common` placement logic.
+- Preserved existing Proxmox behavior while removing duplicated placement policy logic.
+
+#### 3. qemu-cmd importer convergence
+
+- Updated qemu-cmd host PCI placement mapping path in `src/import/qemu_cmd/mapper.rs` to consume the shared Q35 planner decisions for portable root-port assignment.
+
+#### 4. Cross-import parity coverage
+
+- Added integration parity test in `tests/integration/qemu_cmd_import.rs` validating overlapping host PCI placement semantics between Proxmox and qemu-cmd imports on representative wakiza fixture flow.
+
 ### Phase 2: qemu-cmd parity completion
 
 - Add runtime-target support to qemu-cmd import CLI and pipeline.

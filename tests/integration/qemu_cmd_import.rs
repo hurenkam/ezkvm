@@ -33,6 +33,29 @@ fn fixture_path(relative: &str) -> PathBuf {
         .join(relative)
 }
 
+fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
+    let old = std::env::var_os("EZKVM_CONFIG");
+    let central_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("etc/ezkvm.yaml");
+
+    unsafe {
+        std::env::set_var("EZKVM_CONFIG", &central_path);
+    }
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(run));
+
+    unsafe {
+        match old {
+            Some(value) => std::env::set_var("EZKVM_CONFIG", value),
+            None => std::env::remove_var("EZKVM_CONFIG"),
+        }
+    }
+
+    match result {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
 #[test]
 fn qemu_cmd_import_fixtures_support_validate_and_dry_run_command_build() {
     let _guard = env_lock()
@@ -197,4 +220,70 @@ fn qemu_cmd_import_runtime_target_branches_netdev_helper_mapping() {
         parity_backend.downscript.as_deref(),
         Some("/usr/libexec/qemu-server/pve-bridgedown")
     );
+}
+
+#[test]
+fn q35_hostpci_placement_parity_matches_between_proxmox_and_qemu_cmd_imports() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let storage_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("input")
+        .join("felucia")
+        .join("storage.cfg");
+    let proxmox_input = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("input")
+        .join("felucia")
+        .join("108.conf");
+    let qemu_cmd_input = fixture_path("qemu_cmd_import/01-wakiza.qemu.cmd");
+
+    let proxmox_result = ezkvm::import::proxmox::run_import_from_files(
+        &proxmox_input.to_string_lossy(),
+        &ezkvm::import::proxmox::ImportRunOptions {
+            output_path: None,
+            storage_path: Some(storage_path.to_string_lossy().to_string()),
+            strict: false,
+            dry_run: true,
+            compact_lists: false,
+            output_mode: ezkvm::import::proxmox::ImportOutputMode::Canonical,
+            runtime_target: ezkvm::import::proxmox::RuntimeTarget::PortableLinux,
+        },
+    )
+    .expect("proxmox import should succeed");
+
+    let qemu_cmd_result = run_import_from_files(
+        &qemu_cmd_input.to_string_lossy(),
+        &ImportRunOptions {
+            output_path: None,
+            strict: false,
+            dry_run: true,
+            output_mode: ImportOutputMode::Canonical,
+            runtime_target: RuntimeTarget::PortableLinux,
+        },
+    )
+    .expect("qemu-cmd import should succeed");
+
+    let proxmox_cfg = with_repo_profiles(|| {
+        VmConfig::from_str(&proxmox_result.yaml).expect("proxmox yaml should parse")
+    });
+    let qemu_cmd_cfg = with_repo_profiles(|| {
+        VmConfig::from_str(&qemu_cmd_result.yaml).expect("qemu-cmd yaml should parse")
+    });
+
+    let proxmox_gpu = proxmox_cfg
+        .host
+        .pci
+        .iter()
+        .find(|entry| entry.device == "0000:03:00.0")
+        .expect("proxmox import should include gpu function 0");
+    let qemu_cmd_gpu = qemu_cmd_cfg
+        .host
+        .pci
+        .iter()
+        .find(|entry| entry.device == "0000:03:00.0")
+        .expect("qemu-cmd import should include gpu function 0");
+
+    assert_eq!(proxmox_gpu.bus.as_deref(), Some("ich9-pcie-port-1"));
+    assert_eq!(qemu_cmd_gpu.bus.as_deref(), Some("ich9-pcie-port-1"));
 }

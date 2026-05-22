@@ -1,16 +1,15 @@
 use super::super::RuntimeTarget;
 use super::super::model::{ProxmoxHostPciEntry, ProxmoxVmConfig};
 use super::{MappingWarning, helpers};
+use crate::import::common::q35_placement::{
+    HostPciBusAllocation, ImportRuntimeTarget, Q35PlacementPlanner,
+};
 
 const PROXMOX_Q35_CFG: &str = "/usr/share/qemu-server/pve-q35-4.0.cfg";
 const EZKVM_Q35_CFG: &str = "/usr/share/ezkvm/ezkvm-q35.cfg";
-// Must match the number of [device "ich9-pcie-port-*"] entries in share/ezkvm-q35.cfg.
-const MAX_PORTABLE_ROOT_PORTS: u8 = 4;
 
 pub(super) struct Q35TopologyPlanner {
-    runtime_target: RuntimeTarget,
-    needs_q35_compat: bool,
-    next_root_port: u8,
+    planner: Q35PlacementPlanner,
 }
 
 impl Q35TopologyPlanner {
@@ -20,11 +19,13 @@ impl Q35TopologyPlanner {
         runtime_target: RuntimeTarget,
     ) -> Self {
         let needs_q35_compat = detect_q35_compat_requirements(proxmox, machine);
+        let runtime_target = match runtime_target {
+            RuntimeTarget::PortableLinux => ImportRuntimeTarget::PortableLinux,
+            RuntimeTarget::ProxmoxParity => ImportRuntimeTarget::ProxmoxParity,
+        };
 
         Self {
-            runtime_target,
-            needs_q35_compat,
-            next_root_port: 1,
+            planner: Q35PlacementPlanner::new(runtime_target, needs_q35_compat),
         }
     }
 
@@ -33,48 +34,20 @@ impl Q35TopologyPlanner {
         machine: &str,
         readconfig: &mut Vec<String>,
     ) -> String {
-        if !self.needs_q35_compat {
-            return machine.to_string();
-        }
-
-        match self.runtime_target {
-            RuntimeTarget::ProxmoxParity => {
-                push_unique(readconfig, PROXMOX_Q35_CFG);
-                if machine.contains("+pve") {
-                    machine.to_string()
-                } else if machine == "q35" {
-                    "pc-q35-8.1+pve0".to_string()
-                } else {
-                    format!("{}+pve0", machine)
-                }
-            }
-            RuntimeTarget::PortableLinux => {
-                push_unique(readconfig, EZKVM_Q35_CFG);
-                machine.to_string()
-            }
-        }
+        self.planner.apply_machine_and_readconfig(
+            machine,
+            readconfig,
+            PROXMOX_Q35_CFG,
+            EZKVM_Q35_CFG,
+        )
     }
 
     pub(super) fn legacy_root_bus(&self) -> &'static str {
-        if self.runtime_target == RuntimeTarget::PortableLinux {
-            if self.needs_q35_compat {
-                "pci.0"
-            } else {
-                "pcie.0"
-            }
-        } else {
-            "pci.0"
-        }
+        self.planner.legacy_root_bus()
     }
 
     pub(super) fn audio_controller_bus(&self) -> &'static str {
-        if self.runtime_target == RuntimeTarget::PortableLinux
-            || self.runtime_target == RuntimeTarget::ProxmoxParity
-        {
-            "pci.2"
-        } else {
-            "pci.0"
-        }
+        self.planner.audio_controller_bus()
     }
 
     pub(super) fn allocate_hostpci_default_bus(
@@ -82,31 +55,23 @@ impl Q35TopologyPlanner {
         entry: &ProxmoxHostPciEntry,
         warnings: &mut Vec<MappingWarning>,
     ) -> Option<String> {
-        if entry.options.contains_key("bus")
-            || !self.needs_q35_compat
-            || self.runtime_target != RuntimeTarget::PortableLinux
-        {
-            return None;
+        match self.planner.allocate_hostpci_default_bus(
+            entry.options.contains_key("bus"),
+            helpers::is_enabled(entry.options.get("pcie")),
+        ) {
+            Some(HostPciBusAllocation::Assigned(bus)) => Some(bus),
+            Some(HostPciBusAllocation::Fallback(bus)) => {
+                warnings.push(MappingWarning {
+                    source_field: entry.key.clone(),
+                    message: format!(
+                        "no dedicated root port left in portable q35 template ({}); falling back to bus={}",
+                        EZKVM_Q35_CFG, bus
+                    ),
+                });
+                Some(bus)
+            }
+            None => None,
         }
-
-        if !helpers::is_enabled(entry.options.get("pcie")) {
-            return None;
-        }
-
-        if self.next_root_port <= MAX_PORTABLE_ROOT_PORTS {
-            let bus = format!("ich9-pcie-port-{}", self.next_root_port);
-            self.next_root_port += 1;
-            return Some(bus);
-        }
-
-        warnings.push(MappingWarning {
-            source_field: entry.key.clone(),
-            message: format!(
-                "no dedicated root port left in portable q35 template ({}); falling back to bus=pcie.0",
-                EZKVM_Q35_CFG
-            ),
-        });
-        Some("pcie.0".to_string())
     }
 }
 
@@ -135,10 +100,4 @@ fn detect_q35_compat_requirements(proxmox: &ProxmoxVmConfig, machine: &str) -> b
         });
 
     has_pve_machine_hint || has_topology_bus_hints
-}
-
-fn push_unique(readconfig: &mut Vec<String>, path: &str) {
-    if !readconfig.iter().any(|entry| entry == path) {
-        readconfig.push(path.to_string());
-    }
 }

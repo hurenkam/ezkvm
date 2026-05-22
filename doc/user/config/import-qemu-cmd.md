@@ -61,6 +61,8 @@ When source command placement fields are representable, importer output preserve
 
 For `portable-linux`, importer output may intentionally omit Proxmox-only network helper script paths while preserving bridge and device intent.
 
+Q35 host PCI placement now follows the same shared placement planner used by Proxmox import. For overlapping source semantics, Proxmox and qemu-cmd imports converge on equivalent Q35 root-port assignment behavior.
+
 ## CLI Usage
 
 Basic dry run:

@@ -6,6 +6,9 @@ use crate::config::{
     MemoryConfig, NetworkBackendConfig, NetworkConfig, SataControllerConfig, ScsiControllerConfig,
     SystemConfig, VmConfig, VmOptions,
 };
+use crate::import::common::q35_placement::{
+    HostPciBusAllocation, ImportRuntimeTarget, Q35PlacementPlanner,
+};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -62,7 +65,7 @@ pub fn map_qemu_cmd_to_canonical_yaml(
 
     let netdev_definitions = map_netdev_definitions(qemu_cmd, runtime_target, &mut warnings);
     let networks = map_networks(qemu_cmd, &netdev_definitions, &mut warnings);
-    let host_pci = map_host_pci_devices(qemu_cmd, &mut warnings);
+    let host_pci = map_host_pci_devices(qemu_cmd, runtime_target, machine.as_str(), &mut warnings);
     let (drives, scsi_controllers, sata_controllers) =
         map_storage_topology(qemu_cmd, &mut warnings);
     let profiles = infer_profile_names(qemu_cmd);
@@ -484,9 +487,18 @@ fn map_spice(
 
 fn map_host_pci_devices(
     qemu_cmd: &QemuCmdModel,
+    runtime_target: RuntimeTarget,
+    machine: &str,
     warnings: &mut Vec<MappingWarning>,
 ) -> Vec<HostPciConfig> {
     let mut host_pci = Vec::new();
+    let mut planner = Q35PlacementPlanner::new(
+        match runtime_target {
+            RuntimeTarget::PortableLinux => ImportRuntimeTarget::PortableLinux,
+            RuntimeTarget::ProxmoxParity => ImportRuntimeTarget::ProxmoxParity,
+        },
+        machine.contains("q35"),
+    );
 
     for option in qemu_cmd.options_for_flag("-device") {
         let Some(parts) = csv_parts(option) else {
@@ -506,10 +518,19 @@ fn map_host_pci_devices(
             continue;
         };
 
-        let bus = csv_value(parts, "bus").map(ToString::to_string);
+        let mut bus = csv_value(parts, "bus").map(ToString::to_string);
         let pcie = csv_value(parts, "pcie")
             .and_then(parse_on_off_bool)
             .unwrap_or_else(|| bus.as_ref().is_some_and(|value| value.contains("pcie")));
+
+        if let Some(allocation) = planner.allocate_hostpci_default_bus(bus.is_some(), pcie) {
+            match allocation {
+                HostPciBusAllocation::Assigned(allocated_bus)
+                | HostPciBusAllocation::Fallback(allocated_bus) => {
+                    bus = Some(allocated_bus);
+                }
+            }
+        }
 
         host_pci.push(HostPciConfig {
             device,
