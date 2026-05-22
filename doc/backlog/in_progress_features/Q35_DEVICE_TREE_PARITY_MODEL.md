@@ -246,6 +246,39 @@ This section captures the implementation artifacts completed for `N-04`.
 
 - Added integration parity test in `tests/integration/qemu_cmd_import.rs` validating overlapping host PCI placement semantics between Proxmox and qemu-cmd imports on representative wakiza fixture flow.
 
+### N-05 Deliverables
+
+Status: Done (2026-05-23)
+
+This section captures the implementation artifacts completed for `N-05`.
+
+#### 1. Shared placement conflict validator
+
+- Added shared validator to `src/import/common/q35_placement.rs` that checks merged effective placement for deterministic conflict conditions before export:
+	- PCI slot collisions (`bus` + `addr`) across host PCI, networks, controllers, displays/audio, and runtime auxiliary devices with explicit placement.
+	- Drive attachment collisions for duplicate `bus+unit` and duplicate `bus+scsi_id` assignments.
+
+#### 2. Precedence contract codification
+
+- Added importer-common precedence helper implementing contract order:
+	- explicit placement
+	- profile defaults
+	- normalization fallback
+- Applied helper in qemu-cmd host PCI placement resolution to codify explicit-over-normalized behavior in shared contract code.
+
+#### 3. Shared importer invocation path
+
+- Wired placement conflict validation via `src/import/common/validate.rs`, which is already used by both import pipelines.
+- Result: both Proxmox and qemu-cmd import fail before export on conflicting placement assignments, with deterministic diagnostics.
+
+#### 4. Tests
+
+- Added shared validator unit coverage for:
+	- precedence ordering behavior,
+	- non-conflicting placement acceptance,
+	- PCI slot conflict diagnostics,
+	- drive attachment conflict diagnostics.
+
 ### Phase 2: qemu-cmd parity completion
 
 - Add runtime-target support to qemu-cmd import CLI and pipeline.
@@ -255,7 +288,7 @@ This section captures the implementation artifacts completed for `N-04`.
 ### Phase 3: Shared placement convergence
 
 - Extract shared Q35 placement planner for both importers.
-- Add shared pre-export conflict validator.
+- Add shared pre-export conflict validator (completed in N-05).
 - Align importer and runtime root-port policy or document/test intentional divergence.
 
 ### Phase 4: Compact/profile determinism hardening

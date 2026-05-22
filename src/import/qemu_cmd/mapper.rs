@@ -7,7 +7,7 @@ use crate::config::{
     SystemConfig, VmConfig, VmOptions,
 };
 use crate::import::common::q35_placement::{
-    HostPciBusAllocation, ImportRuntimeTarget, Q35PlacementPlanner,
+    HostPciBusAllocation, ImportRuntimeTarget, Q35PlacementPlanner, resolve_placement_precedence,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -523,13 +523,16 @@ fn map_host_pci_devices(
             .and_then(parse_on_off_bool)
             .unwrap_or_else(|| bus.as_ref().is_some_and(|value| value.contains("pcie")));
 
-        if let Some(allocation) = planner.allocate_hostpci_default_bus(bus.is_some(), pcie) {
-            match allocation {
-                HostPciBusAllocation::Assigned(allocated_bus)
-                | HostPciBusAllocation::Fallback(allocated_bus) => {
-                    bus = Some(allocated_bus);
-                }
-            }
+        let normalized_bus = match planner.allocate_hostpci_default_bus(bus.is_some(), pcie) {
+            Some(HostPciBusAllocation::Assigned(allocated_bus))
+            | Some(HostPciBusAllocation::Fallback(allocated_bus)) => Some(allocated_bus),
+            None => None,
+        };
+
+        if let Some((resolved_bus, _source)) =
+            resolve_placement_precedence(bus.as_deref(), None, normalized_bus.as_deref())
+        {
+            bus = Some(resolved_bus);
         }
 
         host_pci.push(HostPciConfig {

@@ -63,6 +63,25 @@ For `portable-linux`, importer output may intentionally omit Proxmox-only networ
 
 Q35 host PCI placement now follows the same shared placement planner used by Proxmox import. For overlapping source semantics, Proxmox and qemu-cmd imports converge on equivalent Q35 root-port assignment behavior.
 
+## Placement Conflict Validation and Precedence
+
+Before import output is rendered, ezkvm validates merged effective placement for conflicts.
+
+Current conflict checks include:
+
+- PCI placement collisions (`bus` + `addr`) for explicitly placed devices.
+- Drive attachment collisions (`bus` + `unit`, and `bus` + `scsi_id`).
+
+When a conflict is detected, import fails before export with deterministic diagnostics listing conflicting assignment owners.
+
+Placement precedence contract is:
+
+1. Explicit placement from source/config
+2. Profile defaults
+3. Normalization fallback
+
+Conflicts are rejected; they are not auto-normalized away.
+
 ## CLI Usage
 
 Basic dry run:

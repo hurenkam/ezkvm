@@ -1136,6 +1136,12 @@ Acceptance Criteria:
 - Both importers invoke the shared validator.
 Estimate: 2 days
 
+Completion Notes (2026-05-23):
+- Added shared placement conflict validator in `src/import/common/q35_placement.rs` that checks merged effective config for PCI bus/address collisions and drive attachment conflicts before export.
+- Codified placement precedence contract in importer-common (`explicit > profile-default > normalization`) and applied it in qemu-cmd host PCI placement resolution.
+- Wired shared placement validation through `src/import/common/validate.rs`, so both Proxmox and qemu-cmd import pipelines fail early with deterministic, actionable diagnostics.
+- Added shared validator unit coverage for precedence ordering and conflict diagnostics.
+
 ### N-06 Harden compact export determinism and host-independence contract
 Scope:
 - Ensure compact mode omits only semantic defaults guaranteed by active profiles.

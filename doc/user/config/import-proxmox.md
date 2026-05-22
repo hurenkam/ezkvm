@@ -343,6 +343,25 @@ Portable hierarchy-first synthesis guarantees deterministic emission order for
 identical inputs, but preserves explicit placement fields as authoritative when
 they are present.
 
+### Placement Conflict Validation and Precedence
+
+Before import output is rendered, ezkvm validates merged effective placement for deterministic conflicts.
+
+Current conflict checks include:
+
+- PCI placement collisions (`bus` + `addr`) for explicitly placed devices.
+- Drive attachment collisions (`bus` + `unit`, and `bus` + `scsi_id`).
+
+When a conflict is detected, import fails before export with deterministic diagnostics listing the conflicting assignment owners.
+
+Placement precedence contract is:
+
+1. Explicit placement from source/config
+2. Profile defaults
+3. Normalization fallback
+
+Conflicts are rejected; they are not auto-normalized away.
+
 If migration to portable mode fails, keep parity mode until preflight/runtime gaps
 are resolved on the target host, then re-run the migration checks above.
 
