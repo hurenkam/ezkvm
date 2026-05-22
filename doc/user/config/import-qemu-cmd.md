@@ -28,10 +28,17 @@ Current qemu-cmd mapping focuses on core representable options:
 - Network pairing:
   - `-netdev`
   - `-device ... netdev=<id>`
+- Host PCI placement:
+  - `-device vfio-pci,...`
+- Storage/controller placement:
+  - controller extraction from `-device` (for example `virtio-scsi-pci`, `pvscsi`, `ahci`)
+  - drive attachment mapping from `-device` plus `-drive`/`-blockdev` source nodes
 - SPICE basics:
   - `-spice`
 
 Unsupported or ambiguous option families are not silently dropped. They are surfaced as structured warnings in import output.
+
+When source command placement fields are representable, importer output preserves them (for example host PCI `bus/addr` and drive/controller attachment fields).
 
 ## CLI Usage
 

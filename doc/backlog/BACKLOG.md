@@ -1080,6 +1080,12 @@ Acceptance Criteria:
 - New fixture and integration tests cover mapped and warning paths.
 Estimate: 3 days
 
+Completion Notes (2026-05-23):
+- Extended `src/import/qemu_cmd/mapper.rs` to map `-device vfio-pci` into canonical `host.pci` entries, preserving explicit bus/addr/id/multifunction/x-vga/romfile fields when provided.
+- Added storage/controller placement mapping for representative qemu-cmd shapes: SCSI/SATA controllers from `-device`, and drive attachment mapping from `-device` plus `-drive`/`-blockdev` sources into canonical `devices.drives` with controller, bus, unit, scsi_id, boot_index, and rotation_rate placement fields.
+- Added structured warnings for ambiguous or unsupported storage mapping cases (for example unresolved drive-node references and malformed storage placement values).
+- Added mapper and integration coverage to validate host PCI and storage/controller mapping on representative fixtures (`01-wakiza`, `03-felucia-505`) while keeping qemu-cmd import/command-build test flows green.
+
 ### N-03 Add runtime-target support to qemu-cmd importer
 Scope:
 - Add qemu-cmd import runtime-target selection aligned with existing Proxmox import semantics.

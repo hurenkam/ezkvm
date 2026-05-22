@@ -151,6 +151,41 @@ This section defines the Phase 1 acceptance baseline for Q35 parity and determin
 - Any change in resolved Q35 bus/address outcomes after round-trip import and runtime build.
 - Any change in warning class/meaning for the same fixture and target.
 
+### N-02 Deliverables
+
+Status: Done (2026-05-23)
+
+This section captures the implementation artifacts completed for `N-02`.
+
+#### 1. Host PCI placement mapping (qemu-cmd)
+
+- Added qemu-cmd host PCI mapping from `-device vfio-pci,...` into canonical `host.pci` entries.
+- Preserved explicit source placement fields when representable:
+	- `bus`
+	- `addr`
+	- `id`
+	- `multifunction`
+	- `x-vga`
+	- `romfile`
+
+#### 2. Storage/controller placement mapping (qemu-cmd)
+
+- Added controller mapping from `-device` records:
+	- SCSI controller families (`virtio-scsi-pci`, `pvscsi`, `lsi*`, `megasas*`) into canonical `controllers.scsi`.
+	- `ahci` into canonical `controllers.sata`.
+- Added drive mapping from `-device` attachment records with `-drive` and `-blockdev` source resolution:
+	- canonical `devices.drives` now receives placement fields when present: `controller`, `bus`, `unit`, `scsi_id`, `boot_index`, `rotation_rate`.
+- Preserved explicit source placement fields where representable, and left unsupported shapes as warnings rather than silent drops.
+
+#### 3. Warning-path hardening
+
+- Added structured warnings for unsupported/ambiguous placement cases, including unresolved drive-node references and malformed storage placement values.
+
+#### 4. Regression coverage
+
+- Added mapper-level regression assertions for representative host PCI and storage/controller placement extraction.
+- Added integration assertions in qemu-cmd fixture flows (`01-wakiza`, `03-felucia-505`) to ensure mapped host PCI and storage/controller placement survive import-to-validate-to-command-build flow.
+
 ### Phase 2: qemu-cmd parity completion
 
 - Add runtime-target support to qemu-cmd import CLI and pipeline.

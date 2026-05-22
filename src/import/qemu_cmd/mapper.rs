@@ -1,9 +1,11 @@
 use super::error::ImportError;
 use super::model::{QemuCmdModel, QemuCmdOption, QemuCmdOptionValue, QemuCsvPart};
 use crate::config::{
-    BootConfig, ControllersConfig, CpuConfig, DeviceConfig, HostConfig, MemoryConfig,
-    NetworkBackendConfig, NetworkConfig, SystemConfig, VmConfig, VmOptions,
+    BootConfig, ControllersConfig, CpuConfig, DeviceConfig, DriveConfig, HostConfig, HostPciConfig,
+    MemoryConfig, NetworkBackendConfig, NetworkConfig, SataControllerConfig, ScsiControllerConfig,
+    SystemConfig, VmConfig, VmOptions,
 };
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +34,17 @@ struct NetdevDefinition {
     backend: NetworkBackendConfig,
 }
 
+#[derive(Debug, Clone)]
+struct DriveSource {
+    path: String,
+    format: String,
+    readonly: bool,
+    discard: bool,
+    cache: Option<String>,
+    aio: Option<String>,
+    detect_zeroes: Option<String>,
+}
+
 pub fn map_qemu_cmd_to_canonical_yaml(
     qemu_cmd: &QemuCmdModel,
 ) -> Result<CanonicalMappingResult, ImportError> {
@@ -47,6 +60,9 @@ pub fn map_qemu_cmd_to_canonical_yaml(
 
     let netdev_definitions = map_netdev_definitions(qemu_cmd, &mut warnings);
     let networks = map_networks(qemu_cmd, &netdev_definitions, &mut warnings);
+    let host_pci = map_host_pci_devices(qemu_cmd, &mut warnings);
+    let (drives, scsi_controllers, sata_controllers) =
+        map_storage_topology(qemu_cmd, &mut warnings);
     let profiles = infer_profile_names(qemu_cmd);
 
     let vm_config = VmConfig {
@@ -77,15 +93,22 @@ pub fn map_qemu_cmd_to_canonical_yaml(
             machine_layout: None,
         },
         devices: DeviceConfig {
-            drives: Vec::new(),
+            drives,
             networks,
             displays: Vec::new(),
             serials: Vec::new(),
             input: Vec::new(),
             audio: Vec::new(),
         },
-        controllers: ControllersConfig::default(),
-        host: HostConfig::default(),
+        controllers: ControllersConfig {
+            scsi: scsi_controllers,
+            sata: sata_controllers,
+            xhci: Vec::new(),
+        },
+        host: HostConfig {
+            pci: host_pci,
+            usb: Vec::new(),
+        },
         spice: map_spice(qemu_cmd, &mut warnings),
         vnc: None,
         iscsi_disks: Vec::new(),
@@ -422,10 +445,446 @@ fn map_spice(
     Some(spice)
 }
 
+fn map_host_pci_devices(
+    qemu_cmd: &QemuCmdModel,
+    warnings: &mut Vec<MappingWarning>,
+) -> Vec<HostPciConfig> {
+    let mut host_pci = Vec::new();
+
+    for option in qemu_cmd.options_for_flag("-device") {
+        let Some(parts) = csv_parts(option) else {
+            continue;
+        };
+
+        if csv_first_bare(parts) != Some("vfio-pci") {
+            continue;
+        }
+
+        let Some(device) = csv_value(parts, "host").map(ToString::to_string) else {
+            warnings.push(MappingWarning {
+                source_field: "-device".to_string(),
+                kind: MappingWarningKind::UnsupportedValue,
+                message: "vfio-pci is missing required 'host=' assignment".to_string(),
+            });
+            continue;
+        };
+
+        let bus = csv_value(parts, "bus").map(ToString::to_string);
+        let pcie = csv_value(parts, "pcie")
+            .and_then(parse_on_off_bool)
+            .unwrap_or_else(|| bus.as_ref().is_some_and(|value| value.contains("pcie")));
+
+        host_pci.push(HostPciConfig {
+            device,
+            id: csv_value(parts, "id").unwrap_or_default().to_string(),
+            pcie,
+            x_vga: csv_value(parts, "x-vga")
+                .and_then(parse_on_off_bool)
+                .unwrap_or(false),
+            bus,
+            addr: csv_value(parts, "addr").map(ToString::to_string),
+            multifunction: csv_value(parts, "multifunction")
+                .and_then(parse_on_off_bool)
+                .unwrap_or(false),
+            romfile: csv_value(parts, "romfile").map(ToString::to_string),
+        });
+    }
+
+    host_pci
+}
+
+fn map_storage_topology(
+    qemu_cmd: &QemuCmdModel,
+    warnings: &mut Vec<MappingWarning>,
+) -> (
+    Vec<DriveConfig>,
+    Vec<ScsiControllerConfig>,
+    Vec<SataControllerConfig>,
+) {
+    let drive_sources = collect_drive_sources(qemu_cmd, warnings);
+    let mut drives = Vec::new();
+    let mut scsi_controllers = Vec::new();
+    let mut sata_controllers = Vec::new();
+
+    for option in qemu_cmd.options_for_flag("-device") {
+        let Some(parts) = csv_parts(option) else {
+            continue;
+        };
+
+        let Some(model) = csv_first_bare(parts) else {
+            continue;
+        };
+
+        if is_scsi_controller_model(model) {
+            scsi_controllers.push(map_scsi_controller(parts, scsi_controllers.len()));
+            continue;
+        }
+
+        if model == "ahci" {
+            sata_controllers.push(map_sata_controller(parts, sata_controllers.len()));
+            continue;
+        }
+
+        if let Some(drive) =
+            map_storage_device(model, parts, &drive_sources, warnings, drives.len())
+        {
+            drives.push(drive);
+        }
+    }
+
+    (drives, scsi_controllers, sata_controllers)
+}
+
+fn collect_drive_sources(
+    qemu_cmd: &QemuCmdModel,
+    warnings: &mut Vec<MappingWarning>,
+) -> BTreeMap<String, DriveSource> {
+    let mut sources = BTreeMap::new();
+
+    for option in qemu_cmd.options_for_flag("-drive") {
+        let Some(parts) = csv_parts(option) else {
+            continue;
+        };
+
+        let Some(id) = csv_value(parts, "id") else {
+            if csv_value(parts, "if") == Some("none") {
+                warnings.push(MappingWarning {
+                    source_field: "-drive".to_string(),
+                    kind: MappingWarningKind::UnsupportedValue,
+                    message: "if=none drive is missing required id=".to_string(),
+                });
+            }
+            continue;
+        };
+
+        sources.insert(
+            id.to_string(),
+            DriveSource {
+                path: csv_value(parts, "file").unwrap_or_default().to_string(),
+                format: csv_value(parts, "format").unwrap_or("raw").to_string(),
+                readonly: csv_value(parts, "readonly")
+                    .and_then(parse_on_off_bool)
+                    .unwrap_or(false),
+                discard: csv_value(parts, "discard")
+                    .map(is_discard_enabled)
+                    .unwrap_or(false),
+                cache: csv_value(parts, "cache").map(ToString::to_string),
+                aio: csv_value(parts, "aio").map(ToString::to_string),
+                detect_zeroes: csv_value(parts, "detect-zeroes")
+                    .or_else(|| csv_value(parts, "detect_zeroes"))
+                    .map(ToString::to_string),
+            },
+        );
+    }
+
+    for option in qemu_cmd.options_for_flag("-blockdev") {
+        let QemuCmdOptionValue::Json(value) = &option.value else {
+            warnings.push(MappingWarning {
+                source_field: "-blockdev".to_string(),
+                kind: MappingWarningKind::UnsupportedValue,
+                message: "expected JSON payload for -blockdev".to_string(),
+            });
+            continue;
+        };
+
+        if let Some((id, source)) = blockdev_source_from_json(value) {
+            sources.insert(id, source);
+        } else {
+            warnings.push(MappingWarning {
+                source_field: "-blockdev".to_string(),
+                kind: MappingWarningKind::UnsupportedValue,
+                message: "unable to derive node-name/path from -blockdev payload".to_string(),
+            });
+        }
+    }
+
+    sources
+}
+
+fn map_storage_device(
+    model: &str,
+    parts: &[QemuCsvPart],
+    drive_sources: &BTreeMap<String, DriveSource>,
+    warnings: &mut Vec<MappingWarning>,
+    index: usize,
+) -> Option<DriveConfig> {
+    if !is_supported_storage_device_model(model) {
+        return None;
+    }
+
+    let interface = storage_interface_for_model(model).to_string();
+    let drive_type = if is_cdrom_model(model) {
+        "cdrom".to_string()
+    } else {
+        "disk".to_string()
+    };
+
+    let drive_ref = csv_value(parts, "drive").map(ToString::to_string);
+    let source = drive_ref
+        .as_ref()
+        .and_then(|node| drive_sources.get(node))
+        .cloned();
+
+    if drive_ref.is_some() && source.is_none() && drive_type == "disk" {
+        warnings.push(MappingWarning {
+            source_field: "-device".to_string(),
+            kind: MappingWarningKind::AmbiguousPairing,
+            message: format!(
+                "storage device '{}' references unknown drive node '{}",
+                model,
+                drive_ref.as_deref().unwrap_or_default()
+            ),
+        });
+        return None;
+    }
+
+    let id = csv_value(parts, "id")
+        .map(ToString::to_string)
+        .or_else(|| {
+            drive_ref
+                .as_deref()
+                .map(strip_drive_prefix)
+                .map(ToString::to_string)
+        })
+        .unwrap_or_else(|| format!("{}{}", interface, index));
+
+    let bus = csv_value(parts, "bus").map(ToString::to_string);
+    let controller = if interface == "scsi" {
+        bus.as_deref().and_then(controller_from_bus)
+    } else {
+        None
+    };
+
+    let unit = csv_value(parts, "unit").and_then(|value| value.parse::<u32>().ok());
+    if csv_value(parts, "unit").is_some() && unit.is_none() {
+        warnings.push(MappingWarning {
+            source_field: "-device".to_string(),
+            kind: MappingWarningKind::UnsupportedValue,
+            message: format!("unable to parse unit value for storage device '{id}'"),
+        });
+    }
+
+    Some(DriveConfig {
+        id,
+        path: source
+            .as_ref()
+            .map(|value| value.path.clone())
+            .unwrap_or_default(),
+        interface,
+        r#type: drive_type,
+        format: source
+            .as_ref()
+            .map(|value| value.format.clone())
+            .unwrap_or_else(|| "raw".to_string()),
+        readonly: source.as_ref().map(|value| value.readonly).unwrap_or(false),
+        discard: source.as_ref().map(|value| value.discard).unwrap_or(false),
+        ssd: csv_value(parts, "rotation_rate") == Some("1"),
+        cache: source.as_ref().and_then(|value| value.cache.clone()),
+        aio: source.as_ref().and_then(|value| value.aio.clone()),
+        detect_zeroes: source
+            .as_ref()
+            .and_then(|value| value.detect_zeroes.clone()),
+        controller,
+        boot_index: csv_value(parts, "bootindex").and_then(|value| value.parse::<u32>().ok()),
+        scsi_id: csv_value(parts, "scsi-id").and_then(|value| value.parse::<u32>().ok()),
+        rotation_rate: csv_value(parts, "rotation_rate")
+            .and_then(|value| value.parse::<u32>().ok()),
+        bus,
+        unit,
+    })
+}
+
+fn map_scsi_controller(parts: &[QemuCsvPart], index: usize) -> ScsiControllerConfig {
+    ScsiControllerConfig {
+        id: csv_value(parts, "id")
+            .unwrap_or(&format!("scsihw{index}"))
+            .to_string(),
+        r#type: csv_first_bare(parts)
+            .unwrap_or("virtio-scsi-pci")
+            .to_string(),
+        iothread: csv_value(parts, "iothread").map(ToString::to_string),
+        max_targets: csv_value(parts, "max_targets").and_then(|value| value.parse::<u32>().ok()),
+        bus: csv_value(parts, "bus").map(ToString::to_string),
+        addr: csv_value(parts, "addr").map(ToString::to_string),
+    }
+}
+
+fn map_sata_controller(parts: &[QemuCsvPart], index: usize) -> SataControllerConfig {
+    SataControllerConfig {
+        id: csv_value(parts, "id")
+            .unwrap_or(&format!("sata{index}"))
+            .to_string(),
+        r#type: "ahci".to_string(),
+        bus: csv_value(parts, "bus").map(ToString::to_string),
+        addr: csv_value(parts, "addr").map(ToString::to_string),
+    }
+}
+
+fn blockdev_source_from_json(value: &Value) -> Option<(String, DriveSource)> {
+    let id = json_find_string(value, "node-name")?.to_string();
+
+    Some((
+        id,
+        DriveSource {
+            path: json_find_string(value, "filename")
+                .unwrap_or_default()
+                .to_string(),
+            format: infer_blockdev_drive_format(value),
+            readonly: json_find_bool(value, "read-only").unwrap_or(false),
+            discard: json_find_string(value, "discard")
+                .map(is_discard_enabled)
+                .unwrap_or(false),
+            cache: json_find_string(value, "cache").map(ToString::to_string),
+            aio: json_find_string(value, "aio").map(ToString::to_string),
+            detect_zeroes: json_find_string(value, "detect-zeroes")
+                .or_else(|| json_find_string(value, "detect_zeroes"))
+                .map(ToString::to_string),
+        },
+    ))
+}
+
+fn json_find_string<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    match value {
+        Value::Object(map) => {
+            if let Some(found) = map.get(key).and_then(Value::as_str) {
+                return Some(found);
+            }
+
+            for child in map.values() {
+                if let Some(found) = json_find_string(child, key) {
+                    return Some(found);
+                }
+            }
+
+            None
+        }
+        Value::Array(values) => {
+            for child in values {
+                if let Some(found) = json_find_string(child, key) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn json_find_bool(value: &Value, key: &str) -> Option<bool> {
+    match value {
+        Value::Object(map) => {
+            if let Some(found) = map.get(key).and_then(Value::as_bool) {
+                return Some(found);
+            }
+
+            for child in map.values() {
+                if let Some(found) = json_find_bool(child, key) {
+                    return Some(found);
+                }
+            }
+
+            None
+        }
+        Value::Array(values) => {
+            for child in values {
+                if let Some(found) = json_find_bool(child, key) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn infer_blockdev_drive_format(value: &Value) -> String {
+    let mut formats = Vec::new();
+    collect_json_string_values(value, "driver", &mut formats);
+    formats
+        .into_iter()
+        .find(|driver| matches!(driver.as_str(), "raw" | "qcow2" | "vmdk" | "vdi"))
+        .unwrap_or_else(|| "raw".to_string())
+}
+
+fn collect_json_string_values(value: &Value, key: &str, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            if let Some(found) = map.get(key).and_then(Value::as_str) {
+                out.push(found.to_string());
+            }
+
+            for child in map.values() {
+                collect_json_string_values(child, key, out);
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                collect_json_string_values(child, key, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn controller_from_bus(bus: &str) -> Option<String> {
+    bus.strip_suffix(".0").map(ToString::to_string)
+}
+
+fn strip_drive_prefix(value: &str) -> &str {
+    value.strip_prefix("drive-").unwrap_or(value)
+}
+
+fn is_scsi_controller_model(model: &str) -> bool {
+    matches!(
+        model,
+        "virtio-scsi-single"
+            | "virtio-scsi-pci"
+            | "pvscsi"
+            | "lsi"
+            | "lsi53c895a"
+            | "megasas"
+            | "megasas-gen2"
+    )
+}
+
+fn is_supported_storage_device_model(model: &str) -> bool {
+    matches!(
+        model,
+        "scsi-hd" | "scsi-cd" | "ide-hd" | "ide-cd" | "virtio-blk-pci" | "nvme"
+    )
+}
+
+fn storage_interface_for_model(model: &str) -> &'static str {
+    match model {
+        "scsi-hd" | "scsi-cd" => "scsi",
+        "ide-hd" | "ide-cd" => "ide",
+        "virtio-blk-pci" => "virtio",
+        "nvme" => "nvme",
+        _ => "scsi",
+    }
+}
+
+fn is_cdrom_model(model: &str) -> bool {
+    matches!(model, "scsi-cd" | "ide-cd")
+}
+
+fn is_discard_enabled(value: &str) -> bool {
+    matches!(value, "on" | "yes" | "true" | "1" | "unmap")
+}
+
 fn collect_unsupported_flag_warnings(qemu_cmd: &QemuCmdModel, warnings: &mut Vec<MappingWarning>) {
     let supported_flags: BTreeSet<&str> = [
-        "-name", "-machine", "-cpu", "-m", "-smp", "-netdev", "-device", "-spice", "-drive",
+        "-name",
+        "-machine",
+        "-cpu",
+        "-m",
+        "-smp",
+        "-netdev",
+        "-device",
+        "-spice",
+        "-drive",
         "-smbios",
+        "-blockdev",
     ]
     .into_iter()
     .collect();
@@ -765,5 +1224,40 @@ mod tests {
                     .expect("mapped fixture yaml should deserialize and validate");
             });
         }
+    }
+
+    #[test]
+    fn maps_hostpci_and_storage_placement_for_wakiza_fixture() {
+        let input = std::fs::read_to_string(
+            "/home/hurenkam/Workspace/ezkvm/tests/fixtures/qemu_cmd_import/01-wakiza.qemu.cmd",
+        )
+        .expect("fixture should read");
+
+        let parsed = parse_qemu_cmd(&input).expect("fixture should parse");
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("fixture should map");
+        let config = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
+        });
+
+        assert!(!config.host.pci.is_empty());
+        assert!(config.host.pci.iter().any(|device| {
+            device.device == "0000:03:00.0"
+                && device.bus.as_deref() == Some("ich9-pcie-port-1")
+                && device.addr.as_deref() == Some("0x0.0")
+        }));
+
+        assert!(!config.controllers.scsi.is_empty());
+        assert!(config.controllers.scsi.iter().any(|controller| {
+            controller.id == "scsihw0"
+                && controller.r#type == "pvscsi"
+                && controller.bus.as_deref() == Some("pci.0")
+        }));
+
+        assert!(config.devices.drives.iter().any(|drive| {
+            drive.id == "scsi0"
+                && drive.interface == "scsi"
+                && drive.controller.as_deref() == Some("scsihw0")
+                && drive.boot_index == Some(100)
+        }));
     }
 }

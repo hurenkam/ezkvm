@@ -55,6 +55,42 @@ fn qemu_cmd_import_fixtures_support_validate_and_dry_run_command_build() {
         let config = VmConfig::from_str(&result.yaml)
             .unwrap_or_else(|err| panic!("fixture '{}' yaml invalid: {err}", case.name));
 
+        if case.name == "wakiza" {
+            assert!(config.host.pci.iter().any(|device| {
+                device.device == "0000:03:00.0"
+                    && device.bus.as_deref() == Some("ich9-pcie-port-1")
+                    && device.addr.as_deref() == Some("0x0.0")
+            }));
+            assert!(
+                config.controllers.scsi.iter().any(|controller| {
+                    controller.id == "scsihw0" && controller.r#type == "pvscsi"
+                })
+            );
+            assert!(config.devices.drives.iter().any(|drive| {
+                drive.id == "scsi0" && drive.interface == "scsi" && drive.boot_index == Some(100)
+            }));
+        }
+
+        if case.name == "felucia-505" {
+            assert!(
+                config
+                    .host
+                    .pci
+                    .iter()
+                    .any(|device| device.device == "0000:43:00.0")
+            );
+            assert!(config.controllers.scsi.iter().any(|controller| {
+                controller.id == "virtioscsi0" && controller.r#type == "virtio-scsi-pci"
+            }));
+            assert!(
+                config
+                    .devices
+                    .drives
+                    .iter()
+                    .any(|drive| drive.id == "scsi0" && drive.interface == "scsi")
+            );
+        }
+
         let command_result = QemuManager::new(config, CentralConfig::default()).build_command();
         if let Err(error) = command_result {
             failures.push(format!(
