@@ -1054,13 +1054,19 @@ Completion Notes (2026-05-21):
 Scope:
 - Define acceptance baselines for Proxmox import, qemu-cmd import, and runtime command generation parity for Q35 bus/address assignments.
 - Capture representative fixtures and expected deterministic placement outcomes.
-- Link this baseline to `doc/backlog/prepared_features/Q35_DEVICE_TREE_PARITY_MODEL.md` as implementation contract.
+- Link this baseline to `doc/backlog/in_progress_features/Q35_DEVICE_TREE_PARITY_MODEL.md` as implementation contract.
 Dependencies: M-09
 Acceptance Criteria:
 - Baseline matrix covers at least one Linux, one Windows, and one passthrough-heavy fixture.
 - Invariants for placement determinism and parity are documented and testable.
 - Regression expectations are explicit for compact and canonical output modes.
 Estimate: 1 day
+
+Completion Notes (2026-05-23):
+- Added N-01 acceptance matrix baseline and invariants to `doc/backlog/in_progress_features/Q35_DEVICE_TREE_PARITY_MODEL.md`.
+- Baseline matrix now includes Linux, Windows, and passthrough-heavy fixtures across Proxmox import, qemu-cmd import, and runtime command generation parity checks.
+- Defined explicit, testable invariants for Q35 bus/address determinism and cross-import parity.
+- Added explicit compact/canonical output-mode regression expectations and allowed-difference contract.
 
 ### N-02 Extend qemu-cmd importer with host PCI and storage placement mapping
 Scope:

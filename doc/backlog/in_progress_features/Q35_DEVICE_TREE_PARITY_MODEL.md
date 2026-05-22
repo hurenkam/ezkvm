@@ -105,6 +105,52 @@ Compaction rule:
 - Capture current importer and runtime behavior for representative fixtures.
 - Define explicit parity checks and determinism criteria.
 
+### N-01 Baseline Acceptance Matrix and Invariants
+
+This section defines the Phase 1 acceptance baseline for Q35 parity and determinism.
+
+#### Representative Fixture Matrix
+
+| Workload class | Source fixture | Import path | Output modes | Baseline parity expectations |
+|---|---|---|---|---|
+| Linux | `tests/fixtures/proxmox_import/12-mixed-storage-buses.conf` | Proxmox import | canonical, compact | Imported storage/controller placement is deterministic; runtime args preserve effective Q35 bus/address intent across repeated runs. |
+| Windows | `tests/fixtures/qemu_cmd_import/01-wakiza.qemu.cmd` | qemu-cmd import | canonical, compact | Imported machine/device placement is deterministic; repeated import + command build yields stable Q35 placement semantics. |
+| Passthrough-heavy | `tests/fixtures/proxmox_import/12-portable-q35-hostpci.conf` and `tests/fixtures/qemu_cmd_import/03-felucia-505.qemu.cmd` | Proxmox import and qemu-cmd import | canonical, compact | Host PCI placement intent is preserved when representable; generated runtime args retain deterministic bus/address outcomes for passthrough-relevant devices. |
+
+#### Testable Invariants
+
+1. Deterministic import invariant
+- For a fixed source fixture and runtime-target, repeated import runs produce semantically equivalent placement assignments.
+
+2. Deterministic runtime invariant
+- For a fixed imported config and profile set, repeated dry-run command generation produces equivalent Q35 bus/address placement outcomes.
+
+3. Cross-import parity invariant
+- Where Proxmox and qemu-cmd inputs encode overlapping topology intent, normalized placement intent must match after import.
+
+4. Explicit placement precedence invariant
+- Explicit source placement values (bus/address) are preserved unless invalid by contract.
+
+5. Warning stability invariant
+- Output-mode differences do not change warning meaning or placement semantics.
+
+#### Compact vs Canonical Regression Expectations
+
+1. Canonical mode
+- Must emit all explicit placement fields required to reconstruct the same Q35 intent without profile assumptions.
+
+2. Compact mode
+- May omit only semantic defaults guaranteed by active profiles.
+- Must not omit values whose removal changes deterministic replay or placement intent.
+
+3. Allowed differences between modes
+- Field omission where the omitted value is profile-guaranteed.
+- Ordering/formatting differences that do not alter reconstructed placement semantics.
+
+4. Disallowed differences between modes
+- Any change in resolved Q35 bus/address outcomes after round-trip import and runtime build.
+- Any change in warning class/meaning for the same fixture and target.
+
 ### Phase 2: qemu-cmd parity completion
 
 - Add runtime-target support to qemu-cmd import CLI and pipeline.
@@ -177,7 +223,7 @@ Update in same task as behavior changes:
 When this feature is picked up:
 
 - Ensure related backlog tickets and tracking-board registry/dependency/status are synced in the same task.
-- Move this feature doc from prepared_features to in_progress_features when implementation starts.
+- Keep this feature doc in `in_progress_features` while linked tickets are active.
 - Move to implemented_features when all linked tickets are complete.
 
 ## Risks and Mitigations
