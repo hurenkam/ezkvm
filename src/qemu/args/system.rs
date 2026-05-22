@@ -11,7 +11,7 @@ impl QemuArgs {
                     .map(|p| format!("tcp:{},server=on,wait=off", p))
                     .unwrap_or_else(|| "tcp:127.0.0.1:4444,server=on,wait=off".to_string());
                 let event_port = socket_path
-                    .and_then(|p| p.split(':').last())
+                    .and_then(|p| p.split(':').next_back())
                     .and_then(|port| port.parse::<u16>().ok())
                     .map(|p| p + 1)
                     .unwrap_or(4445);

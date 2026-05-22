@@ -30,8 +30,14 @@ socket,id=tpmchar,server=on,wait=off,path=/var/run/qemu-server/200.swtpm
 emulator,id=tpmdev,chardev=tpmchar
 -device
 tpm-tis,tpmdev=tpmdev
--qmp
-unix:<RUNTIME_DIR>/ezkvm/e2e-scsi-bridge.qmp,server=on,wait=off
+-chardev
+socket,id=qmp,path=<RUNTIME_DIR>/ezkvm/e2e-scsi-bridge.qmp,server=on,wait=off
+-mon
+chardev=qmp,mode=control
+-chardev
+socket,id=qmp-event,path=<RUNTIME_DIR>/ezkvm/e2e-scsi-bridge-event.sock,server=on,wait=off
+-mon
+chardev=qmp-event,mode=control
 -pidfile
 /var/run/qemu-server/200.pid
 -no-shutdown

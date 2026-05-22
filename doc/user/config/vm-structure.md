@@ -48,6 +48,7 @@ Preferred canonical locations:
 - `system.memory.size`
 - `system.memory.ballooning`
 - `system.memory.ivshmem`
+- `system.machine_layout`
 - `options.guest_agent`
 - `options.qmp`
 - `controllers.scsi`

@@ -821,6 +821,14 @@ Acceptance Criteria:
 - Existing configs remain valid without requiring migration.
 Estimate: 2 days
 
+Completion Notes (2026-05-22):
+- Added hierarchy-first machine layout schema under `system.machine_layout` with nested `buses` and `devices` in `src/config/vm_schema/machine_layout.rs`.
+- Added flat-node normalization input (`system.machine_layout.nodes`) with normalization into canonical hierarchy-first tree.
+- Added topology validation for duplicate IDs, cycle detection, parent-child kind compatibility, and broken parent links.
+- Wired validation to run through `VmConfig::canonical_machine_layout()` during config validation.
+- Preserved backward compatibility by deriving inferred machine layout from existing flat bus/address placement data when `system.machine_layout` is absent.
+- Added coverage in `src/config/tests/machine_layout.rs` for hierarchy parsing, node normalization, and invalid graph rejection cases.
+
 ### Q-02 Implement dynamic Q35 port and bridge synthesizer
 Scope:
 - Generate required `ich9-pcie-port-*` root ports from resolved endpoint demand.

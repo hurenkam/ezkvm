@@ -14,6 +14,10 @@ use super::super::{
     SataControllerConfig, ScsiControllerConfig, SmbiosConfig, SpiceConfig, TpmConfig,
     UsbDeviceConfig, VmOptions, VncConfig, XhciControllerConfig,
 };
+use super::machine_layout::{
+    FlatPlacementEntry, MachineLayoutConfig, normalize_declared_layout,
+    normalize_from_flat_placements,
+};
 use super::{BootConfig, DeviceConfig, SystemConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -158,6 +162,105 @@ impl VmConfig {
 
     pub fn devices_audio(&self) -> &[AudioDeviceConfig] {
         &self.devices.audio
+    }
+
+    pub fn canonical_machine_layout(&self) -> anyhow::Result<MachineLayoutConfig> {
+        if let Some(layout) = &self.system.machine_layout {
+            return normalize_declared_layout(layout);
+        }
+
+        let placements = self.collect_flat_machine_layout_entries();
+        Ok(normalize_from_flat_placements(&placements))
+    }
+
+    fn collect_flat_machine_layout_entries(&self) -> Vec<FlatPlacementEntry> {
+        let mut entries = Vec::new();
+
+        for controller in &self.controllers.scsi {
+            entries.push(FlatPlacementEntry {
+                id: controller.id.clone(),
+                driver: controller.r#type.clone(),
+                bus: controller.bus.clone(),
+                addr: controller.addr.clone(),
+            });
+        }
+        for controller in &self.controllers.sata {
+            entries.push(FlatPlacementEntry {
+                id: controller.id.clone(),
+                driver: "ahci".to_string(),
+                bus: controller.bus.clone(),
+                addr: controller.addr.clone(),
+            });
+        }
+        for controller in &self.controllers.xhci {
+            entries.push(FlatPlacementEntry {
+                id: controller.id.clone(),
+                driver: "qemu-xhci".to_string(),
+                bus: controller.bus.clone(),
+                addr: controller.addr.clone(),
+            });
+        }
+        for (index, hostpci) in self.host.pci.iter().enumerate() {
+            entries.push(FlatPlacementEntry {
+                id: if hostpci.id.trim().is_empty() {
+                    format!("hostpci{}", index)
+                } else {
+                    hostpci.id.clone()
+                },
+                driver: "vfio-pci".to_string(),
+                bus: hostpci.bus.clone(),
+                addr: hostpci.addr.clone(),
+            });
+        }
+        for network in &self.devices.networks {
+            entries.push(FlatPlacementEntry {
+                id: network.id.clone(),
+                driver: network.model.clone(),
+                bus: network.bus.clone(),
+                addr: network.addr.clone(),
+            });
+        }
+        for (index, audio) in self.devices.audio.iter().enumerate() {
+            entries.push(FlatPlacementEntry {
+                id: if audio.id.trim().is_empty() {
+                    format!("audio{}", index)
+                } else {
+                    audio.id.clone()
+                },
+                driver: audio.r#type.clone(),
+                bus: audio.bus.clone(),
+                addr: audio.addr.clone(),
+            });
+        }
+        if let Some(guest_agent) = self.options.guest_agent.as_ref() {
+            entries.push(FlatPlacementEntry {
+                id: "qga0".to_string(),
+                driver: "virtio-serial".to_string(),
+                bus: guest_agent.bus.clone(),
+                addr: guest_agent.addr.clone(),
+            });
+        }
+        if let Some(ballooning) = self.system.memory.ballooning.as_ref() {
+            entries.push(FlatPlacementEntry {
+                id: ballooning
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| "balloon0".to_string()),
+                driver: ballooning.model.clone(),
+                bus: ballooning.bus.clone(),
+                addr: ballooning.addr.clone(),
+            });
+        }
+        if let Some(ivshmem) = self.system.memory.ivshmem.as_ref() {
+            entries.push(FlatPlacementEntry {
+                id: ivshmem.id.clone(),
+                driver: "ivshmem-plain".to_string(),
+                bus: ivshmem.bus.clone(),
+                addr: ivshmem.addr.clone(),
+            });
+        }
+
+        entries
     }
 
     fn load_vm_value_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<serde_yaml::Value> {

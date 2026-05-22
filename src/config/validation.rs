@@ -82,6 +82,9 @@ fn validate_core_sections(config: &VmConfig) -> Result<()> {
     validate_system_config(&config.system)?;
     validate_boot_config(&config.system.boot)?;
     validate_device_config(&config.devices)?;
+    config
+        .canonical_machine_layout()
+        .map_err(|err| anyhow!("Invalid system.machine_layout: {}", err))?;
     Ok(())
 }
 

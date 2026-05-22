@@ -26,8 +26,14 @@ menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.j
 qemu-xhci,id=xhci
 -device
 usb-host,hostbus=3,hostport=1.4,id=usb0,bus=xhci.0,port=1
--qmp
-unix:<RUNTIME_DIR>/ezkvm/e2e-warning.qmp,server=on,wait=off
+-chardev
+socket,id=qmp,path=<RUNTIME_DIR>/ezkvm/e2e-warning.qmp,server=on,wait=off
+-mon
+chardev=qmp,mode=control
+-chardev
+socket,id=qmp-event,path=<RUNTIME_DIR>/ezkvm/e2e-warning-event.sock,server=on,wait=off
+-mon
+chardev=qmp-event,mode=control
 -pidfile
 /var/run/qemu-server/500.pid
 -no-shutdown

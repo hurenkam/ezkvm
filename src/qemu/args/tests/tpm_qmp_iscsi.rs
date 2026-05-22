@@ -74,7 +74,10 @@ fn test_qmp_uses_listening_unix_socket() {
 
     let built = args.build();
     assert_eq!(built[0], "-chardev");
-    assert_eq!(built[1], format!("socket,id=qmp,path={},server=on,wait=off", qmp_sock_str));
+    assert_eq!(
+        built[1],
+        format!("socket,id=qmp,path={},server=on,wait=off", qmp_sock_str)
+    );
     assert_eq!(built[2], "-mon");
     assert_eq!(built[3], "chardev=qmp,mode=control");
     assert_eq!(built[4], "-chardev");

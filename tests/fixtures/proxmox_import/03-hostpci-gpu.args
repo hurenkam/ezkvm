@@ -22,8 +22,14 @@ vfio-pci,host=0000:03:00.0,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0.0,multifunc
 vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1
 -device
 qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b
--qmp
-unix:<RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.qmp,server=on,wait=off
+-chardev
+socket,id=qmp,path=<RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.qmp,server=on,wait=off
+-mon
+chardev=qmp,mode=control
+-chardev
+socket,id=qmp-event,path=<RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu-event.sock,server=on,wait=off
+-mon
+chardev=qmp-event,mode=control
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.pid
 -no-shutdown

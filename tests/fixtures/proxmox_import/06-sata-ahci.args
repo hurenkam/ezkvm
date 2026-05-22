@@ -26,8 +26,14 @@ e1000,netdev=net0,mac=52:54:00:aa:bb:cc
 cirrus
 -boot
 menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg
--qmp
-unix:<RUNTIME_DIR>/ezkvm/e2e-sata-ahci.qmp,server=on,wait=off
+-chardev
+socket,id=qmp,path=<RUNTIME_DIR>/ezkvm/e2e-sata-ahci.qmp,server=on,wait=off
+-mon
+chardev=qmp,mode=control
+-chardev
+socket,id=qmp-event,path=<RUNTIME_DIR>/ezkvm/e2e-sata-ahci-event.sock,server=on,wait=off
+-mon
+chardev=qmp-event,mode=control
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-sata-ahci.pid
 -no-shutdown

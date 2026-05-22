@@ -6,6 +6,7 @@ use super::super::{
     TpmConfig,
 };
 use super::BootConfig;
+use super::MachineLayoutConfig;
 
 /// System-level configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +50,11 @@ pub struct SystemConfig {
     /// PCI/PCIe bridge buses (pci.0, pci.1, ich9-pcie-port-*, etc.)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readconfig: Vec<String>,
+
+    /// Optional hierarchy-first machine layout.
+    /// Parent bus is implied by nesting under devices and bus nodes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine_layout: Option<MachineLayoutConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

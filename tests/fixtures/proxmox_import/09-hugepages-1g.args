@@ -34,8 +34,14 @@ cpu,node-id=0,socket-id=1
 cpu,node-id=0,socket-id=2
 -numa
 cpu,node-id=0,socket-id=3
--qmp
-unix:<RUNTIME_DIR>/ezkvm/e2e-hugepages-1g.qmp,server=on,wait=off
+-chardev
+socket,id=qmp,path=<RUNTIME_DIR>/ezkvm/e2e-hugepages-1g.qmp,server=on,wait=off
+-mon
+chardev=qmp,mode=control
+-chardev
+socket,id=qmp-event,path=<RUNTIME_DIR>/ezkvm/e2e-hugepages-1g-event.sock,server=on,wait=off
+-mon
+chardev=qmp-event,mode=control
 -pidfile
 /var/run/qemu-server/300.pid
 -no-shutdown

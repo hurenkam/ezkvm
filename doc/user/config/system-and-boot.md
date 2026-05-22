@@ -40,6 +40,38 @@ Rules:
 
 - `system.memory` object must include `size`.
 
+## system.machine_layout
+
+Optional hierarchy-first machine topology model.
+
+- Parent bus is implied by nesting (`buses -> devices -> buses`).
+- Use this when you need explicit, deterministic topology representation in config.
+
+Hierarchy-first form:
+
+```yaml
+system:
+  machine_layout:
+    buses:
+      - id: pcie.0
+        devices:
+          - id: ich9-pcie-port-1
+            driver: pcie-root-port
+            addr: "1c.0"
+            buses:
+              - id: ich9-pcie-port-1.0
+                devices:
+                  - id: hostpci0
+                    driver: vfio-pci
+                    addr: "0x0.0"
+```
+
+Compatibility normalization form:
+
+- `system.machine_layout.nodes` accepts a flat node list with `parent_id` links.
+- ezkvm normalizes this into the hierarchy-first `buses` tree before validation.
+- Validation rejects duplicate IDs, cycles, and broken `parent_id` links.
+
 ## system.boot
 
 `system.boot` fields:

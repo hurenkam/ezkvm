@@ -105,7 +105,7 @@ Source: doc/backlog/BACKLOG.md
 | B-53 | Execute Debian Trixie portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Done |
 | B-54 | Execute Ubuntu 26.04 portable-runtime validation matrix | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-52 | unassigned | Done |
 | B-55 | Execute Arch Linux portable-runtime validation matrix and publish runbooks | B | Phase-2-Hardening | epic:proxmox, phase:2-hardening | B-53, B-54 | unassigned | Todo |
-| Q-01 | Define hierarchy-first Q35 topology schema and normalization | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | B-55 | unassigned | Todo |
+| Q-01 | Define hierarchy-first Q35 topology schema and normalization | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | B-55 | unassigned | Done |
 | Q-02 | Implement dynamic Q35 port and bridge synthesizer | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-01 | unassigned | Todo |
 | Q-03 | Integrate synthesized topology into portable command-builder path | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-02 | unassigned | Todo |
 | Q-04 | Add tests, snapshots, and docs for dynamic topology behavior | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-03 | unassigned | Todo |

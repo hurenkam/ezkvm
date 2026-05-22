@@ -255,6 +255,7 @@ pub fn map_proxmox_to_canonical_yaml_with_storage(
             smbios,
             applesmc,
             readconfig,
+            machine_layout: None,
         },
         devices: DeviceConfig {
             drives,

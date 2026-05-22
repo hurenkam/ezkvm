@@ -74,6 +74,7 @@ pub fn map_qemu_cmd_to_canonical_yaml(
             smbios: None,
             applesmc: None,
             readconfig: Vec::new(),
+            machine_layout: None,
         },
         devices: DeviceConfig {
             drives: Vec::new(),
