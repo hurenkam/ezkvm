@@ -1,7 +1,7 @@
 # Convergence Tracking Board
 
-Date: 2026-05-12  
-Scope: Epics A-E, K, Q (Phase 0 to Phase 3)  
+Date: 2026-05-20  
+Scope: Epics A-E, K, M, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
 ## Board Columns
@@ -20,6 +20,7 @@ Source: doc/backlog/BACKLOG.md
 - epic:hardening
 - epic:packaging
 - epic:q35-topology
+- epic:qemu-cmd-import
 - phase:0-foundation
 - phase:1-features
 - phase:2-hardening
@@ -107,6 +108,15 @@ Source: doc/backlog/BACKLOG.md
 | Q-02 | Implement dynamic Q35 port and bridge synthesizer | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-01 | unassigned | Todo |
 | Q-03 | Integrate synthesized topology into portable command-builder path | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-02 | unassigned | Todo |
 | Q-04 | Add tests, snapshots, and docs for dynamic topology behavior | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-03 | unassigned | Todo |
+| M-01 | Define qemu-cmd importer boundary and public contracts | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | B-40 | unassigned | Todo |
+| M-02 | Extract importer-common orchestration helpers | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Todo |
+| M-03 | Implement qemu-cmd parser and intermediate model | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Todo |
+| M-04 | Implement qemu-cmd mapper and warning taxonomy | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-03 | unassigned | Todo |
+| M-05 | Implement qemu-cmd import I/O pipeline | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-02, M-04 | unassigned | Todo |
+| M-06 | Add import-qemu-cmd CLI command | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-05 | unassigned | Todo |
+| M-07 | Add qemu-cmd fixtures and integration coverage | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Todo |
+| M-08 | Publish standalone qemu-cmd import documentation | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Todo |
+| M-09 | Harden qemu-cmd profile inference and parity assertions | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-07 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -179,6 +189,12 @@ Source: doc/backlog/BACKLOG.md
 - B-52 -> B-54
 - (B-53 and B-54) -> B-55
 - B-55 -> Q-01 -> Q-02 -> Q-03 -> Q-04
+- B-40 -> M-01
+- M-01 -> M-02
+- M-01 -> M-03 -> M-04
+- (M-02 and M-04) -> M-05 -> M-06
+- M-06 -> M-07 -> M-09
+- M-06 -> M-08
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

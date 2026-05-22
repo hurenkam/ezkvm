@@ -857,6 +857,115 @@ Acceptance Criteria:
 - User/developer docs explain the dynamic synthesis behavior and constraints.
 Estimate: 2 days
 
+## Epic M: QEMU Command Import
+
+### M-01 Define qemu-cmd importer boundary and public contracts
+Scope:
+- Define strict separation rules between `src/import/qemu_cmd/` and `src/import/proxmox/`.
+- Specify qemu-cmd high-level API contracts (`run options`, `result`, `warnings`, `errors`).
+- Document importer-common extraction criteria (what is generic vs Proxmox-specific).
+Dependencies: B-40
+Acceptance Criteria:
+- Boundary contract documented and linked from feature design notes.
+- qemu-cmd importer API shape approved for implementation.
+- Common-extraction checklist added for review use.
+Estimate: 1 day
+
+### M-02 Extract importer-common orchestration helpers
+Scope:
+- Extract importer-agnostic logic into `src/import/common/` (validation, render pipeline helpers, output-path and strict-warning handling primitives).
+- Refactor Proxmox importer to consume extracted helpers without behavior regressions.
+Dependencies: M-01
+Acceptance Criteria:
+- `src/import/common/` introduced with neutral naming and no Proxmox semantics.
+- Proxmox importer uses shared helpers and existing tests remain green.
+- No public API regressions for `import-proxmox` command.
+Estimate: 2 days
+
+### M-03 Implement qemu-cmd parser and intermediate model
+Scope:
+- Add qemu-cmd parser/model modules under `src/import/qemu_cmd/`.
+- Support shell-quoted tokenization, repeated flags, and JSON payload options.
+- Parse representative command families (`-drive`, `-blockdev`, `-device`, `-netdev`, `-chardev`, `-machine`, `-cpu`, `-object`, `-spice`).
+Dependencies: M-01
+Acceptance Criteria:
+- Parser converts representative `input/<host>/*.qemu.cmd` samples into intermediate model.
+- Malformed input yields actionable parser errors.
+- Unit tests cover quoting and complex option payloads.
+Estimate: 3 days
+
+### M-04 Implement qemu-cmd mapper and warning taxonomy
+Scope:
+- Map qemu-cmd intermediate model to canonical `VmConfig`.
+- Define qemu-cmd-specific warning taxonomy for unsupported and ambiguous options.
+- Keep profile inference logic independent from Proxmox mapper implementation.
+Dependencies: M-03
+Acceptance Criteria:
+- Generated YAML deserializes into `VmConfig` and passes validation for supported fixtures.
+- Unsupported options are surfaced via structured warnings.
+- Mapper code has no dependency on Proxmox parser/model/mapper modules.
+Estimate: 3 days
+
+### M-05 Implement qemu-cmd import I/O pipeline
+Scope:
+- Add high-level qemu-cmd import orchestration (`read -> parse -> map -> validate -> render -> write/dry-run`).
+- Reuse only extracted `src/import/common/` helpers for shared behavior.
+- Provide qemu-cmd specific run options and result contracts.
+Dependencies: M-02, M-04
+Acceptance Criteria:
+- qemu-cmd import run function supports dry-run, strict mode, and output-path selection.
+- Strict mode fails when warnings are present.
+- Canonical output path behavior is deterministic.
+Estimate: 2 days
+
+### M-06 Add `import-qemu-cmd` CLI command
+Scope:
+- Add dedicated CLI subcommand and handler.
+- Wire clap types, command dispatch, and import invocation flow.
+- Keep help/examples specific to qemu-cmd import workflow.
+Dependencies: M-05
+Acceptance Criteria:
+- `ezkvm --help` includes `import-qemu-cmd` with examples.
+- Command supports dry-run and output mode flags.
+- Error messages are deterministic and actionable.
+Estimate: 1 day
+
+### M-07 Add qemu-cmd fixtures and integration coverage
+Scope:
+- Add fixture set under `tests/fixtures/qemu_cmd_import/` from representative `.qemu.cmd` captures.
+- Add integration tests for import-to-validate-to-dry-run flow.
+- Add output-mode equivalence and round-trip semantic checks.
+Dependencies: M-06
+Acceptance Criteria:
+- Fixture-driven integration tests pass for representative Linux and Windows command captures.
+- Output modes (`canonical`, `compact`, `debug`) preserve runtime equivalence.
+- Snapshot drift is deterministic and reviewable.
+Estimate: 3 days
+
+### M-08 Publish standalone qemu-cmd import documentation
+Scope:
+- Add dedicated user guide for qemu-cmd import under `doc/user/config/`.
+- Update docs index so qemu-cmd and Proxmox import are separate entries.
+- Document separation contract and limitations for first release scope.
+Dependencies: M-06
+Acceptance Criteria:
+- New qemu-cmd doc is complete without requiring Proxmox import doc.
+- Docs include examples, warning model, and post-import validation checklist.
+- User docs cross-links are valid and consistent.
+Estimate: 1 day
+
+### M-09 Harden qemu-cmd profile inference and parity assertions
+Scope:
+- Add targeted tests for profile inference from qemu-cmd imports.
+- Add assertions for stable runtime parity behavior on selected fixtures.
+- Ensure warning/report output remains stable across output modes.
+Dependencies: M-07
+Acceptance Criteria:
+- Profile inference tests cover at least 3 distinct workload classes.
+- Parity assertions catch regressions in generated dry-run arguments.
+- Warning field assertions are stable across output modes.
+Estimate: 2 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
