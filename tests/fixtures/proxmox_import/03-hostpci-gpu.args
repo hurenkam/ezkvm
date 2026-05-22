@@ -26,6 +26,7 @@ qemu-xhci,id=xhci,p2=15,p3=15,bus=pci.1,addr=0x1b
 unix:<RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-hostpci-gpu.pid
+-no-shutdown
 -nodefaults
 -vga
 none

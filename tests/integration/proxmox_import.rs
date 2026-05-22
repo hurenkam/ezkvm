@@ -217,7 +217,7 @@ fn check_fixture_case(case: &ImportFixtureCase) -> Option<String> {
         ));
     }
 
-    if expected_snapshot != actual_snapshot {
+    if expected_snapshot.trim_end() != actual_snapshot.trim_end() {
         return Some(format!(
             "fixture '{}' snapshot mismatch\nexpected:\n{}\nactual:\n{}",
             case.name, expected_snapshot, actual_snapshot

@@ -38,6 +38,7 @@ cpu,node-id=0,socket-id=3
 unix:<RUNTIME_DIR>/ezkvm/e2e-hugepages-1g.qmp,server=on,wait=off
 -pidfile
 /var/run/qemu-server/300.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

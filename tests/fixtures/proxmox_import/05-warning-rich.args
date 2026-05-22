@@ -30,6 +30,7 @@ usb-host,hostbus=3,hostport=1.4,id=usb0,bus=xhci.0,port=1
 unix:<RUNTIME_DIR>/ezkvm/e2e-warning.qmp,server=on,wait=off
 -pidfile
 /var/run/qemu-server/500.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

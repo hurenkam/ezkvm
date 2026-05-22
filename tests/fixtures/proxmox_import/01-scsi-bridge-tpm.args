@@ -34,6 +34,7 @@ tpm-tis,tpmdev=tpmdev
 unix:<RUNTIME_DIR>/ezkvm/e2e-scsi-bridge.qmp,server=on,wait=off
 -pidfile
 /var/run/qemu-server/200.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

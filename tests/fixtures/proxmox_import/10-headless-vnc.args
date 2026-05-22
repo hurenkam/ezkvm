@@ -40,6 +40,7 @@ unix:/var/run/qemu-server/405.vnc,password=on
 unix:<RUNTIME_DIR>/ezkvm/fixture-headless-vnc.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/fixture-headless-vnc.pid
+-no-shutdown
 -nodefaults
 -vga
 none

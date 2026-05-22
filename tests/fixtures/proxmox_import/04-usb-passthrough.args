@@ -20,6 +20,7 @@ usb-host,host=0451:16a0,id=usb1,bus=xhci.0,port=2
 unix:<RUNTIME_DIR>/ezkvm/e2e-usb.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-usb.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

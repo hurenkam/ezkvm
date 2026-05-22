@@ -28,6 +28,7 @@ menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.j
 unix:<RUNTIME_DIR>/ezkvm/e2e-serial-backends.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-serial-backends.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

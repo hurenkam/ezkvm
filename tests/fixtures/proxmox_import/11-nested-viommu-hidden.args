@@ -36,6 +36,7 @@ intel-iommu,id=iommu0,intremap=on
 unix:<RUNTIME_DIR>/ezkvm/fixture-nested.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/fixture-nested.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard

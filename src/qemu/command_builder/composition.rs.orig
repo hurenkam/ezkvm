@@ -84,31 +84,6 @@ impl QemuManager {
             .readconfig
             .iter()
             .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
-        for drive in &mut devices.drives {
-            if drive.interface != "ide" {
-                continue;
-            }
-
-            if let Some((fallback_bus, fallback_unit)) =
-                infer_ide_attachment_from_drive_id(&drive.id)
-            {
-                if drive.bus.is_none() {
-                    drive.bus = Some(fallback_bus);
-                }
-                if drive.unit.is_none() {
-                    drive.unit = Some(fallback_unit);
-                }
-                continue;
-            }
-
-            if has_q35_bridge_readconfig && drive.bus.is_none() {
-                drive.bus = Some("ide.1".to_string());
-            }
-            if drive.unit.is_none() {
-                drive.unit = Some(0);
-            }
-        }
-
         if has_q35_bridge_readconfig {
             for display in &mut devices.displays {
                 if display.r#type == "virtio-gpu" {
@@ -248,21 +223,6 @@ impl QemuManager {
             .readconfig
             .iter()
             .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
-
-        let mut function_count_by_base: HashMap<String, usize> = HashMap::new();
-        let mut multifunction_hint_by_base: HashMap<String, bool> = HashMap::new();
-        let mut root_port_required_by_base: HashMap<String, bool> = HashMap::new();
-        for hostpci in self.config.host_pci() {
-            if let Some((base, _)) = parse_pci_device_function(&hostpci.device) {
-                *function_count_by_base.entry(base.clone()).or_insert(0) += 1;
-                if hostpci.multifunction || hostpci.x_vga {
-                    multifunction_hint_by_base.insert(base.clone(), true);
-                }
-                if hostpci.pcie || hostpci.multifunction || hostpci.x_vga {
-                    root_port_required_by_base.insert(base, true);
-                }
-            }
-        }
 
         let mut used_root_ports: HashSet<u8> = self
             .config
@@ -555,13 +515,6 @@ fn parse_pci_device_function(device: &str) -> Option<(String, u8)> {
 fn address_for_function(base_addr: &str, function: u8) -> Option<String> {
     let (slot, _) = base_addr.rsplit_once('.')?;
     Some(format!("{}.{}", slot, function))
-}
-
-fn infer_ide_attachment_from_drive_id(id: &str) -> Option<(String, u32)> {
-    let slot = id.strip_prefix("ide")?.parse::<u32>().ok()?;
-    let controller = slot / 2;
-    let unit = slot % 2;
-    Some((format!("ide.{controller}"), unit))
 }
 
 #[cfg(test)]

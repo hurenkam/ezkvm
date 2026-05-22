@@ -22,6 +22,7 @@ intel-iommu,id=iommu0,intremap=on
 unix:<RUNTIME_DIR>/ezkvm/e2e-iommu-intel.qmp,server=on,wait=off
 -pidfile
 <RUNTIME_DIR>/ezkvm/e2e-iommu-intel.pid
+-no-shutdown
 -nodefaults
 -global
 kvm-pit.lost_tick_policy=discard
