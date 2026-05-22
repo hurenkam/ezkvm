@@ -80,14 +80,9 @@ pub async fn execute(cli: Cli) -> Result<()> {
         } => handle_import_qemu_cmd(&input, output.as_deref(), dry_run, strict, output_mode).await,
         Commands::InternalShutdownMonitor {
             socket,
-            guest_agent_socket,
             marker_path,
         } => {
-            crate::qemu::process::run_shutdown_monitor(
-                &socket,
-                std::path::Path::new(&marker_path),
-                guest_agent_socket.as_deref(),
-            );
+            crate::qemu::process::run_shutdown_monitor(&socket, std::path::Path::new(&marker_path));
             Ok(())
         }
         Commands::Storage(cmd) => handle_storage(cmd).await,
