@@ -456,6 +456,33 @@ Documentation now allows users to execute qemu-cmd import workflow without readi
 
 Proxmox and qemu-cmd guides remain separate and cross-linked only as related alternatives.
 
+## M-09 Deliverables
+
+Status: Done (2026-05-21)
+
+This section captures the implementation artifacts required by `M-09`.
+
+### 1. Added qemu-cmd profile inference hardening
+
+Updated `src/import/qemu_cmd/mapper.rs` to infer profiles from qemu-cmd-native signals:
+- `windows-common` and `windows-11` for Hyper-V + secure-boot + TPM style workloads,
+- `linux-l26-common` for guest-agent Linux-style workloads without Windows/macOS signals,
+- `macos-kvm` when Apple SMC or SMBIOS type-2 signals are present.
+
+The implementation remains independent from Proxmox parser/model/mapper internals.
+
+### 2. Added targeted profile inference tests
+
+Added coverage in both mapper unit tests and integration tests:
+- mapper unit tests validate inference branches directly,
+- `tests/integration/qemu_cmd_import_profiles.rs` validates three distinct workload classes (Windows, Linux, macOS) from captured command fixtures.
+
+### 3. Added parity and warning stability assertions
+
+Extended `tests/integration/qemu_cmd_import_output_modes.rs` to assert:
+- warning `source_field` stability across `canonical`, `compact`, and `debug` output modes,
+- deterministic dry-run parity behavior by requiring stable generated QEMU args across repeated imports for selected fixtures.
+
 ## Implementation Plan
 
 1. Define hard module boundaries.

@@ -47,11 +47,12 @@ pub fn map_qemu_cmd_to_canonical_yaml(
 
     let netdev_definitions = map_netdev_definitions(qemu_cmd, &mut warnings);
     let networks = map_networks(qemu_cmd, &netdev_definitions, &mut warnings);
+    let profiles = infer_profile_names(qemu_cmd);
 
     let vm_config = VmConfig {
         name,
         backend: "qemu".to_string(),
-        profiles: Vec::new(),
+        profiles,
         system: SystemConfig {
             architecture: "x86_64".to_string(),
             machine,
@@ -422,7 +423,8 @@ fn map_spice(
 
 fn collect_unsupported_flag_warnings(qemu_cmd: &QemuCmdModel, warnings: &mut Vec<MappingWarning>) {
     let supported_flags: BTreeSet<&str> = [
-        "-name", "-machine", "-cpu", "-m", "-smp", "-netdev", "-device", "-spice",
+        "-name", "-machine", "-cpu", "-m", "-smp", "-netdev", "-device", "-spice", "-drive",
+        "-smbios",
     ]
     .into_iter()
     .collect();
@@ -531,11 +533,123 @@ fn is_known_spice_key(key: &str) -> bool {
     matches!(key, "port" | "addr" | "disable-ticketing")
 }
 
+fn infer_profile_names(qemu_cmd: &QemuCmdModel) -> Vec<String> {
+    let is_macos = has_macos_signals(qemu_cmd);
+    let is_windows = !is_macos && has_windows_signals(qemu_cmd);
+    let has_guest_agent = has_guest_agent_signal(qemu_cmd);
+    let has_secure_boot = has_secure_boot_pflash_signal(qemu_cmd);
+    let has_tpm = has_tpm_signal(qemu_cmd);
+
+    let mut profiles = Vec::new();
+    if is_macos {
+        profiles.push("macos-kvm".to_string());
+    } else if is_windows {
+        profiles.push("windows-common".to_string());
+        if has_secure_boot && has_tpm {
+            profiles.push("windows-11".to_string());
+        }
+    } else if has_guest_agent {
+        profiles.push("linux-l26-common".to_string());
+    }
+
+    profiles
+}
+
+fn has_windows_signals(qemu_cmd: &QemuCmdModel) -> bool {
+    qemu_cmd.options_for_flag("-cpu").any(|option| {
+        let Some(parts) = csv_parts(option) else {
+            return false;
+        };
+
+        parts.iter().any(|part| match part {
+            QemuCsvPart::Bare(value) => value.starts_with("hv_") || value == "kvm=off",
+            QemuCsvPart::KeyValue { key, .. } => key.starts_with("hv_") || key == "kvm",
+        })
+    })
+}
+
+fn has_macos_signals(qemu_cmd: &QemuCmdModel) -> bool {
+    let has_applesmc = qemu_cmd.options_for_flag("-device").any(|option| {
+        csv_parts(option)
+            .and_then(csv_first_bare)
+            .is_some_and(|model| model == "isa-applesmc")
+    });
+
+    let has_smbios_type2 = qemu_cmd.options_for_flag("-smbios").any(|option| {
+        let value = option
+            .raw_value
+            .as_deref()
+            .or_else(|| scalar_value(option))
+            .unwrap_or_default();
+        value.split(',').any(|part| part.trim() == "type=2")
+    });
+
+    has_applesmc || has_smbios_type2
+}
+
+fn has_guest_agent_signal(qemu_cmd: &QemuCmdModel) -> bool {
+    qemu_cmd.options_for_flag("-device").any(|option| {
+        let Some(parts) = csv_parts(option) else {
+            return false;
+        };
+
+        let model = csv_first_bare(parts);
+        let channel_name = csv_value(parts, "name");
+        model == Some("virtserialport") && channel_name == Some("org.qemu.guest_agent.0")
+    })
+}
+
+fn has_secure_boot_pflash_signal(qemu_cmd: &QemuCmdModel) -> bool {
+    qemu_cmd.options_for_flag("-drive").any(|option| {
+        let value = option
+            .raw_value
+            .as_deref()
+            .or_else(|| scalar_value(option))
+            .unwrap_or_default();
+        value.contains("OVMF_CODE_4M.secboot.fd") || value.contains("OVMF_CODE.secboot.fd")
+    })
+}
+
+fn has_tpm_signal(qemu_cmd: &QemuCmdModel) -> bool {
+    qemu_cmd.options_for_flag("-device").any(|option| {
+        csv_parts(option)
+            .and_then(csv_first_bare)
+            .is_some_and(|model| model == "tpm-tis")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{MappingWarningKind, map_qemu_cmd_to_canonical_yaml};
     use crate::import::common::validate::validate_generated_vm_yaml;
     use crate::import::qemu_cmd::parser::parse_qemu_cmd;
+
+    fn with_repo_profiles<T>(run: impl FnOnce() -> T) -> T {
+        let _guard = crate::test_support::env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let old = std::env::var_os("EZKVM_CONFIG");
+        let central_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("etc/ezkvm.yaml");
+
+        unsafe {
+            std::env::set_var("EZKVM_CONFIG", &central_path);
+        }
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(run));
+
+        unsafe {
+            match old {
+                Some(value) => std::env::set_var("EZKVM_CONFIG", value),
+                None => std::env::remove_var("EZKVM_CONFIG"),
+            }
+        }
+
+        match result {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
 
     #[test]
     fn maps_core_options_and_validates() {
@@ -547,9 +661,13 @@ mod tests {
         let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
 
         assert!(mapped.warnings.is_empty());
-        validate_generated_vm_yaml(&mapped.yaml).expect("mapped yaml should validate");
+        with_repo_profiles(|| {
+            validate_generated_vm_yaml(&mapped.yaml).expect("mapped yaml should validate");
+        });
 
-        let config = crate::config::VmConfig::from_str(&mapped.yaml).expect("vm config parse");
+        let config = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&mapped.yaml).expect("vm config parse")
+        });
         assert_eq!(config.name, "vm-a");
         assert_eq!(config.system.machine, "q35");
         assert_eq!(config.system.memory.size, 4096);
@@ -581,6 +699,54 @@ mod tests {
     }
 
     #[test]
+    fn infers_windows_profiles_from_hyperv_tpm_and_secure_boot_signals() {
+        let parsed = parse_qemu_cmd(
+            "/usr/bin/kvm -name win-vm -cpu host,hv_time,hv_vapic,hv_spinlocks=0x1fff,kvm=off -drive if=pflash,file=/usr/share/OVMF_CODE_4M.secboot.fd -device tpm-tis,tpmdev=tpm0",
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let config = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
+        });
+
+        assert!(config.profiles.contains(&"windows-common".to_string()));
+        assert!(config.profiles.contains(&"windows-11".to_string()));
+    }
+
+    #[test]
+    fn infers_linux_profile_from_guest_agent_without_windows_or_macos_signals() {
+        let parsed = parse_qemu_cmd(
+            "/usr/bin/kvm -name linux-vm -cpu host,+kvm_pv_eoi -device virtio-serial,id=qga0 -device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let config = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
+        });
+
+        assert!(config.profiles.contains(&"linux-l26-common".to_string()));
+        assert!(!config.profiles.contains(&"windows-common".to_string()));
+    }
+
+    #[test]
+    fn infers_macos_profile_with_applesmc_or_smbios_type_2() {
+        let parsed = parse_qemu_cmd(
+            "/usr/bin/kvm -name macos-vm -device isa-applesmc,osk=<OSK> -smbios type=2 -cpu Penryn",
+        )
+        .expect("parser should succeed");
+
+        let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("mapping should succeed");
+        let config = with_repo_profiles(|| {
+            crate::config::VmConfig::from_str(&mapped.yaml).expect("yaml should deserialize")
+        });
+
+        assert!(config.profiles.contains(&"macos-kvm".to_string()));
+        assert!(!config.profiles.contains(&"windows-common".to_string()));
+    }
+
+    #[test]
     fn maps_representative_fixtures_and_validates_supported_shape() {
         let fixtures = [
             "/home/hurenkam/Workspace/ezkvm/input/felucia/108.qemu.cmd",
@@ -593,8 +759,10 @@ mod tests {
             let parsed = parse_qemu_cmd(&input).expect("fixture should parse");
             let mapped = map_qemu_cmd_to_canonical_yaml(&parsed).expect("fixture should map");
 
-            validate_generated_vm_yaml(&mapped.yaml)
-                .expect("mapped fixture yaml should deserialize and validate");
+            with_repo_profiles(|| {
+                validate_generated_vm_yaml(&mapped.yaml)
+                    .expect("mapped fixture yaml should deserialize and validate");
+            });
         }
     }
 }

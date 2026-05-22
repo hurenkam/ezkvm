@@ -32,6 +32,8 @@ mod proxmox_import_wakiza;
 mod qemu_cmd_import;
 #[path = "integration/qemu_cmd_import_output_modes.rs"]
 mod qemu_cmd_import_output_modes;
+#[path = "integration/qemu_cmd_import_profiles.rs"]
+mod qemu_cmd_import_profiles;
 #[path = "integration/runtime_preflight.rs"]
 mod runtime_preflight;
 #[path = "integration/wakiza.rs"]

@@ -1013,6 +1013,13 @@ Acceptance Criteria:
 - Warning field assertions are stable across output modes.
 Estimate: 2 days
 
+Completion Notes (2026-05-21):
+- Added qemu-cmd profile inference in `src/import/qemu_cmd/mapper.rs` for three workload classes: Windows (`windows-common` + `windows-11`), Linux (`linux-l26-common`), and macOS (`macos-kvm`) using qemu-cmd-local signals.
+- Added mapper unit tests covering profile inference heuristics and kept validation on representative fixtures with repo profile context.
+- Added integration profile-inference coverage in `tests/integration/qemu_cmd_import_profiles.rs` validating distinct Windows/Linux/macOS fixture classes.
+- Expanded output-mode integration assertions in `tests/integration/qemu_cmd_import_output_modes.rs` to enforce warning-field stability across `canonical`, `compact`, and `debug` modes.
+- Added deterministic dry-run parity assertions on selected qemu-cmd fixtures by requiring repeated import+command-build argument equality.
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy

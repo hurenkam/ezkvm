@@ -116,7 +116,7 @@ Source: doc/backlog/BACKLOG.md
 | M-06 | Add import-qemu-cmd CLI command | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-05 | unassigned | Done |
 | M-07 | Add qemu-cmd fixtures and integration coverage | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Done |
 | M-08 | Publish standalone qemu-cmd import documentation | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Done |
-| M-09 | Harden qemu-cmd profile inference and parity assertions | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-07 | unassigned | Todo |
+| M-09 | Harden qemu-cmd profile inference and parity assertions | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-07 | unassigned | Done |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |

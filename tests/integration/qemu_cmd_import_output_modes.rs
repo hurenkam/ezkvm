@@ -57,6 +57,25 @@ fn qemu_cmd_import_output_modes_preserve_runtime_equivalence() {
     assert_eq!(canonical.yaml, compact.yaml);
     assert!(debug.yaml.contains("# from qemu executable:"));
 
+    let canonical_warning_fields = canonical
+        .warnings
+        .iter()
+        .map(|warning| warning.source_field.clone())
+        .collect::<Vec<_>>();
+    let compact_warning_fields = compact
+        .warnings
+        .iter()
+        .map(|warning| warning.source_field.clone())
+        .collect::<Vec<_>>();
+    let debug_warning_fields = debug
+        .warnings
+        .iter()
+        .map(|warning| warning.source_field.clone())
+        .collect::<Vec<_>>();
+
+    assert_eq!(canonical_warning_fields, compact_warning_fields);
+    assert_eq!(canonical_warning_fields, debug_warning_fields);
+
     let canonical_cfg =
         VmConfig::from_str(&canonical.yaml).expect("canonical yaml should deserialize");
     let compact_cfg = VmConfig::from_str(&compact.yaml).expect("compact yaml should deserialize");
@@ -78,4 +97,63 @@ fn qemu_cmd_import_output_modes_preserve_runtime_equivalence() {
 
     assert_eq!(canonical_args, compact_args);
     assert_eq!(canonical_args, debug_args);
+}
+
+#[test]
+fn qemu_cmd_import_selected_fixtures_have_stable_dry_run_args() {
+    let _guard = env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let fixtures = [
+        "qemu_cmd_import/01-wakiza.qemu.cmd",
+        "qemu_cmd_import/03-felucia-505.qemu.cmd",
+    ];
+
+    for fixture in fixtures {
+        let input = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join(fixture);
+
+        let first = run_import_from_files(
+            &input.to_string_lossy(),
+            &ImportRunOptions {
+                output_path: None,
+                strict: false,
+                dry_run: true,
+                output_mode: ImportOutputMode::Canonical,
+            },
+        )
+        .expect("first import should succeed");
+
+        let second = run_import_from_files(
+            &input.to_string_lossy(),
+            &ImportRunOptions {
+                output_path: None,
+                strict: false,
+                dry_run: true,
+                output_mode: ImportOutputMode::Canonical,
+            },
+        )
+        .expect("second import should succeed");
+
+        let first_cfg = VmConfig::from_str(&first.yaml).expect("first yaml should deserialize");
+        let second_cfg = VmConfig::from_str(&second.yaml).expect("second yaml should deserialize");
+
+        let first_args = QemuManager::new(first_cfg, CentralConfig::default())
+            .build_command()
+            .expect("first command build")
+            .into_inner();
+        let second_args = QemuManager::new(second_cfg, CentralConfig::default())
+            .build_command()
+            .expect("second command build")
+            .into_inner();
+
+        assert_eq!(
+            first_args, second_args,
+            "fixture '{}' must be stable",
+            fixture
+        );
+    }
 }
