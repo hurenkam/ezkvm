@@ -871,6 +871,11 @@ Acceptance Criteria:
 - Common-extraction checklist added for review use.
 Estimate: 1 day
 
+Completion Notes (2026-05-20):
+- Feature document moved to in-progress: `doc/backlog/in_progress_features/QEMU_CMD_IMPORT.md`.
+- Added explicit importer boundary contract, qemu-cmd public API contract, and importer-common extraction checklist.
+- M-02 and M-03 can proceed using the documented contracts.
+
 ### M-02 Extract importer-common orchestration helpers
 Scope:
 - Extract importer-agnostic logic into `src/import/common/` (validation, render pipeline helpers, output-path and strict-warning handling primitives).

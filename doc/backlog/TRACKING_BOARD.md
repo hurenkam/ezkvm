@@ -108,7 +108,7 @@ Source: doc/backlog/BACKLOG.md
 | Q-02 | Implement dynamic Q35 port and bridge synthesizer | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-01 | unassigned | Todo |
 | Q-03 | Integrate synthesized topology into portable command-builder path | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-02 | unassigned | Todo |
 | Q-04 | Add tests, snapshots, and docs for dynamic topology behavior | Q | Phase-2-Hardening | epic:q35-topology, phase:2-hardening | Q-03 | unassigned | Todo |
-| M-01 | Define qemu-cmd importer boundary and public contracts | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | B-40 | unassigned | Todo |
+| M-01 | Define qemu-cmd importer boundary and public contracts | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | B-40 | unassigned | Done |
 | M-02 | Extract importer-common orchestration helpers | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Todo |
 | M-03 | Implement qemu-cmd parser and intermediate model | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Todo |
 | M-04 | Implement qemu-cmd mapper and warning taxonomy | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-03 | unassigned | Todo |

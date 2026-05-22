@@ -32,6 +32,90 @@ Keep documentation separate as two distinct user workflows.
 3. Independent documentation:
 - qemu-cmd import docs are standalone and do not require reading Proxmox docs.
 
+## M-01 Deliverables
+
+Status: Done (2026-05-20)
+
+This section captures the implementation contract artifacts required by `M-01`.
+
+### 1. Importer Boundary Contract
+
+Module ownership:
+- `src/import/proxmox/**`: Proxmox-only parsing/mapping behavior.
+- `src/import/qemu_cmd/**`: qemu-cmd-only parsing/mapping behavior.
+- `src/import/common/**`: importer-agnostic orchestration helpers.
+
+Separation rules:
+- `src/import/qemu_cmd/**` must not import from:
+	- `crate::import::proxmox::parser`
+	- `crate::import::proxmox::model`
+	- `crate::import::proxmox::mapper`
+- `src/import/proxmox/**` must not import qemu-cmd parser/model/mapper internals.
+- Cross-importer reuse is only allowed through `src/import/common/**`.
+
+Allowed coupling points:
+- Both importers may depend on shared app-level modules such as:
+	- `crate::config::*`
+	- `crate::qemu::*` (for validation/parity tests)
+	- `crate::import::common::*`
+
+Review gate for separation:
+- Any PR touching qemu-cmd importer must include a quick audit note confirming no Proxmox parser/model/mapper dependency was introduced.
+
+### 2. qemu-cmd Public API Contract
+
+Public module contract (`src/import/qemu_cmd/mod.rs`):
+- Re-export only high-level API:
+	- `ImportRunOptions`
+	- `ImportRunResult`
+	- `ImportOutputMode` (qemu-cmd scoped or importer-common alias)
+	- `ImportError`
+	- `run_import_from_file(input_path: &str, options: &ImportRunOptions) -> Result<ImportRunResult, ImportError>`
+
+Public type contract:
+- `ImportRunOptions`:
+	- `output_path: Option<String>`
+	- `strict: bool`
+	- `dry_run: bool`
+	- `compact_lists: bool`
+	- `output_mode: ImportOutputMode`
+- `ImportRunResult`:
+	- `output_path: String`
+	- `yaml: String`
+	- `warnings: Vec<MappingWarning>`
+- `MappingWarning` minimum fields:
+	- `source_field: String`
+	- `message: String`
+
+Error taxonomy contract:
+- Parse failures: malformed/unsupported command-line syntax.
+- Mapping failures: unsupported shape that cannot be represented.
+- Validation failures: generated YAML fails deserialize/validate.
+- I/O failures: file read/write issues.
+
+Surface restriction:
+- Parser/model/mapper implementation modules remain non-public to keep refactor freedom for M-02+.
+
+### 3. Importer-Common Extraction Criteria (Checklist)
+
+A function may move to `src/import/common/**` only if all checks pass:
+- No Proxmox-only field assumptions.
+- No qemu-cmd-only token/model assumptions.
+- Name and API are source-agnostic.
+- Works with canonical YAML/`VmConfig` contracts only.
+- Has tests that cover reuse from at least one importer path, with second importer adoption planned.
+
+Candidate common areas for M-02:
+- Strict-warning evaluation helper.
+- Output-path derivation helper.
+- Generated YAML deserialize + validate helper.
+- Output-mode render post-processing hooks (generic only).
+
+Must remain importer-specific:
+- Source parser/tokenization.
+- Source intermediate model.
+- Source-to-canonical mapping and warning classification.
+
 ## Implementation Plan
 
 1. Define hard module boundaries.
