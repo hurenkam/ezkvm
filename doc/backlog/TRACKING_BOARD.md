@@ -1,7 +1,7 @@
 # Convergence Tracking Board
 
-Date: 2026-05-21  
-Scope: Epics A-E, K, M, Q (Phase 0 to Phase 3)  
+Date: 2026-05-22  
+Scope: Epics A-E, K, M, N, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
 ## Board Columns
@@ -20,6 +20,7 @@ Source: doc/backlog/BACKLOG.md
 - epic:hardening
 - epic:packaging
 - epic:q35-topology
+- epic:q35-parity
 - epic:qemu-cmd-import
 - phase:0-foundation
 - phase:1-features
@@ -117,6 +118,12 @@ Source: doc/backlog/BACKLOG.md
 | M-07 | Add qemu-cmd fixtures and integration coverage | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Done |
 | M-08 | Publish standalone qemu-cmd import documentation | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Done |
 | M-09 | Harden qemu-cmd profile inference and parity assertions | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-07 | unassigned | Done |
+| N-01 | Define Q35 parity acceptance matrix and invariants | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | M-09 | unassigned | Todo |
+| N-02 | Extend qemu-cmd importer with host PCI and storage placement mapping | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-01 | unassigned | Todo |
+| N-03 | Add runtime-target support to qemu-cmd importer | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-02, B-40 | unassigned | Todo |
+| N-04 | Converge Proxmox and qemu-cmd imports on shared Q35 placement planner | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-03 | unassigned | Todo |
+| N-05 | Add shared placement conflict validator and precedence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-04 | unassigned | Todo |
+| N-06 | Harden compact export determinism and host-independence contract | N | Phase-2-Hardening | epic:q35-parity, phase:2-hardening | N-05 | unassigned | Todo |
 | C-01 | Define hook contract and execution policy | C | Phase-1-Features | epic:hooks, phase:1-features | A-01 | unassigned | Todo |
 | C-02 | Implement hook runner service | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
 | C-03 | Add schema support for hook definitions | C | Phase-1-Features | epic:hooks, phase:1-features | C-01 | unassigned | Todo |
@@ -195,6 +202,8 @@ Source: doc/backlog/BACKLOG.md
 - (M-02 and M-04) -> M-05 -> M-06
 - M-06 -> M-07 -> M-09
 - M-06 -> M-08
+- M-09 -> N-01 -> N-02
+- (N-02 and B-40) -> N-03 -> N-04 -> N-05 -> N-06
 - C-01 -> C-02
 - C-01 -> C-03
 - (C-02 and C-03) -> C-04 -> C-05

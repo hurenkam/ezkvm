@@ -1020,6 +1020,80 @@ Completion Notes (2026-05-21):
 - Expanded output-mode integration assertions in `tests/integration/qemu_cmd_import_output_modes.rs` to enforce warning-field stability across `canonical`, `compact`, and `debug` modes.
 - Added deterministic dry-run parity assertions on selected qemu-cmd fixtures by requiring repeated import+command-build argument equality.
 
+## Epic N: Q35 Device Tree Parity Model
+
+### N-01 Define Q35 parity acceptance matrix and invariants
+Scope:
+- Define acceptance baselines for Proxmox import, qemu-cmd import, and runtime command generation parity for Q35 bus/address assignments.
+- Capture representative fixtures and expected deterministic placement outcomes.
+- Link this baseline to `doc/backlog/prepared_features/Q35_DEVICE_TREE_PARITY_MODEL.md` as implementation contract.
+Dependencies: M-09
+Acceptance Criteria:
+- Baseline matrix covers at least one Linux, one Windows, and one passthrough-heavy fixture.
+- Invariants for placement determinism and parity are documented and testable.
+- Regression expectations are explicit for compact and canonical output modes.
+Estimate: 1 day
+
+### N-02 Extend qemu-cmd importer with host PCI and storage placement mapping
+Scope:
+- Map qemu-cmd host PCI devices and storage/controller placement details into canonical config shape.
+- Preserve explicit source bus/address assignments when present and valid.
+- Add structured warnings for unsupported placement/device patterns.
+Dependencies: N-01
+Acceptance Criteria:
+- Imported qemu-cmd configs include host PCI and storage/controller placement for representative fixtures.
+- Mapping preserves explicit placement fields from source command where representable.
+- New fixture and integration tests cover mapped and warning paths.
+Estimate: 3 days
+
+### N-03 Add runtime-target support to qemu-cmd importer
+Scope:
+- Add qemu-cmd import runtime-target selection aligned with existing Proxmox import semantics.
+- Thread runtime target through CLI, IO pipeline, and mapper decisions.
+- Keep default behavior deterministic and documented.
+Dependencies: N-02, B-40
+Acceptance Criteria:
+- `import-qemu-cmd` supports runtime target selection for portable-linux and proxmox-parity semantics.
+- Integration tests verify runtime-target branching behavior.
+- User docs capture flag behavior and expected output differences.
+Estimate: 2 days
+
+### N-04 Converge Proxmox and qemu-cmd imports on shared Q35 placement planner
+Scope:
+- Extract/import common Q35 placement planner so both importers use one allocation model.
+- Align planner behavior with runtime command-builder constraints and deterministic ordering.
+- Preserve existing importer boundary rules while sharing importer-agnostic placement logic.
+Dependencies: N-03
+Acceptance Criteria:
+- Both importers call shared placement planner module.
+- Cross-import parity tests show equivalent placement for overlapping source semantics.
+- No regression in existing Proxmox parity fixtures.
+Estimate: 3 days
+
+### N-05 Add shared placement conflict validator and precedence contract
+Scope:
+- Add pre-export validation for bus/address collisions after profile merge and explicit placement resolution.
+- Define and implement precedence contract: explicit placement first, then profile defaults, then allowed normalization.
+- Emit actionable validation errors when conflicts are detected.
+Dependencies: N-04
+Acceptance Criteria:
+- Conflicting placement assignments fail before export with deterministic diagnostics.
+- Precedence rules are codified in code and tests.
+- Both importers invoke the shared validator.
+Estimate: 2 days
+
+### N-06 Harden compact export determinism and host-independence contract
+Scope:
+- Ensure compact mode omits only semantic defaults guaranteed by active profiles.
+- Add round-trip checks for import -> compact YAML -> runtime args determinism.
+- Verify host-specific paths stay runtime-resolved and are not persisted into portable topology intent.
+Dependencies: N-05
+Acceptance Criteria:
+- Round-trip parity tests pass for representative fixtures across output modes.
+- Compact output remains deterministic and replay-safe.
+- Docs updated for placement precedence, compaction behavior, and host-specific runtime resolution.
+Estimate: 2 days
+
 ## Epic C: Flexible Lifecycle Hooks (from v1)
 
 ### C-01 Define hook contract and execution policy
