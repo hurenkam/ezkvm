@@ -905,6 +905,12 @@ Acceptance Criteria:
 - Unit tests cover quoting and complex option payloads.
 Estimate: 3 days
 
+Completion Notes (2026-05-20):
+- Added qemu-cmd parser/model foundation under `src/import/qemu_cmd/{error,model,parser}.rs` and wired module export via `src/import/mod.rs`.
+- Implemented shell-quoted tokenization, repeated-flag capture, JSON payload parsing (`-blockdev`/JSON `-object`), and CSV decomposition for representative command families (`-drive`, `-blockdev`, `-device`, `-netdev`, `-chardev`, `-machine`, `-cpu`, `-object`, `-spice`).
+- Added unit coverage for malformed quotes, invalid JSON payloads, repeated flags, and CSV decomposition, plus representative fixture parsing for `input/felucia/108.qemu.cmd`, `input/zbp-server-mh2/201.qemu.cmd`, and `input/coruscant/505.qemu.cmd`.
+- Focused parser and Proxmox regression subsets were green after implementation.
+
 ### M-04 Implement qemu-cmd mapper and warning taxonomy
 Scope:
 - Map qemu-cmd intermediate model to canonical `VmConfig`.

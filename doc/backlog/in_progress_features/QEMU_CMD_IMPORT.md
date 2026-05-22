@@ -168,6 +168,71 @@ Focused importer tests passed after refactor:
 - Proxmox import I/O tests (`import::proxmox::io::tests`).
 - Broader Proxmox importer test subset (`import::proxmox::`).
 
+## M-03 Deliverables
+
+Status: Done (2026-05-20)
+
+This section captures the implementation artifacts required by `M-03`.
+
+### 1. Added qemu-cmd parser/model modules
+
+Introduced qemu-cmd parser/model foundation under `src/import/qemu_cmd/**`:
+- `src/import/qemu_cmd/mod.rs`
+- `src/import/qemu_cmd/error.rs`
+- `src/import/qemu_cmd/model.rs`
+- `src/import/qemu_cmd/parser.rs`
+
+Module wiring update:
+- `src/import/mod.rs` now exports `qemu_cmd` alongside `common` and `proxmox`.
+
+### 2. Parser capabilities implemented
+
+`parse_qemu_cmd` now supports:
+- shell-quoted tokenization with single quotes, double quotes, and escaped characters,
+- repeated flags preserved in ordered option list,
+- JSON payload parsing for structured option families (for example `-blockdev` and JSON-form `-object`),
+- CSV-style argument decomposition for option families such as:
+	- `-drive`
+	- `-device`
+	- `-netdev`
+	- `-chardev`
+	- `-machine`
+	- `-cpu`
+	- `-object`
+	- `-spice`
+
+The intermediate model preserves:
+- executable path,
+- ordered option groups,
+- raw option values,
+- parsed value shapes (`None`, `Scalar`, `Csv`, `Json`).
+
+### 3. Error handling and malformed-input diagnostics
+
+Parser returns actionable parse errors for malformed input, including:
+- unterminated quoted strings,
+- unterminated escape sequences,
+- invalid JSON payloads for JSON-targeted options,
+- unexpected non-flag tokens in option position.
+
+### 4. Validation summary
+
+Added parser unit tests that cover:
+- quoted tokenization,
+- repeated flags,
+- JSON payload parsing,
+- CSV decomposition into bare/key-value parts,
+- malformed input diagnostics.
+
+Added representative fixture parsing test over captured command lines:
+- `input/felucia/108.qemu.cmd`
+- `input/zbp-server-mh2/201.qemu.cmd`
+- `input/coruscant/505.qemu.cmd`
+
+Validation results during implementation:
+- Focused qemu-cmd parser test subset passed (`cargo test --quiet import::qemu_cmd::`).
+- Focused Proxmox importer regression subset remained green (`cargo test --quiet import::proxmox::`).
+
 ## Implementation Plan
 
 1. Define hard module boundaries.
