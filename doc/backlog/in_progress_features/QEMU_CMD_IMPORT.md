@@ -233,6 +233,61 @@ Validation results during implementation:
 - Focused qemu-cmd parser test subset passed (`cargo test --quiet import::qemu_cmd::`).
 - Focused Proxmox importer regression subset remained green (`cargo test --quiet import::proxmox::`).
 
+## M-04 Deliverables
+
+Status: Done (2026-05-21)
+
+This section captures the implementation artifacts required by `M-04`.
+
+### 1. Added independent qemu-cmd mapper module
+
+Introduced qemu-cmd mapping module under `src/import/qemu_cmd/mapper.rs` and wired it through `src/import/qemu_cmd/mod.rs`.
+
+High-level contract added:
+- `map_qemu_cmd_to_canonical_yaml(&QemuCmdModel) -> Result<CanonicalMappingResult, ImportError>`
+
+### 2. Implemented warning taxonomy
+
+Added qemu-cmd specific structured warning model:
+- `MappingWarning { source_field, kind, message }`
+- `MappingWarningKind` variants:
+	- `UnsupportedFlag`
+	- `UnsupportedValue`
+	- `AmbiguousPairing`
+
+Warning taxonomy use cases now covered:
+- unsupported option flags that are not yet mapped,
+- invalid/unsupported option payload values,
+- ambiguous `-device`/`-netdev` pairings.
+
+### 3. Implemented initial canonical mapping surface
+
+Mapper now converts qemu-cmd intermediate model into canonical `VmConfig` YAML for supported option families:
+- VM identity and core system shape:
+	- `-name`, `-machine`, `-cpu`, `-m`, `-smp`
+- network backend/device mapping:
+	- `-netdev` + matching `-device ... netdev=<id>`
+- SPICE mapping:
+	- `-spice`
+
+Network mapping behavior:
+- maps supported models and backend fields into canonical `NetworkConfig` + `NetworkBackendConfig`,
+- skips unsupported/ambiguous network forms with structured warnings.
+
+### 4. Validation and test evidence
+
+Added mapper-focused tests in `src/import/qemu_cmd/mapper.rs` for:
+- canonical mapping of core/system/network/spice options,
+- structured warnings for unsupported and ambiguous inputs,
+- representative fixture mapping + canonical YAML validation for:
+	- `input/felucia/108.qemu.cmd`
+	- `input/zbp-server-mh2/201.qemu.cmd`
+	- `input/coruscant/505.qemu.cmd`
+
+Validation results during implementation:
+- Focused qemu-cmd parser+mapper subset passed (`cargo test --quiet import::qemu_cmd::`).
+- Generated YAML from supported fixture mapping paths deserialized and passed config validation in mapper tests.
+
 ## Implementation Plan
 
 1. Define hard module boundaries.

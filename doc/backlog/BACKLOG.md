@@ -923,6 +923,13 @@ Acceptance Criteria:
 - Mapper code has no dependency on Proxmox parser/model/mapper modules.
 Estimate: 3 days
 
+Completion Notes (2026-05-21):
+- Added independent qemu-cmd mapper module at `src/import/qemu_cmd/mapper.rs` and wired it via `src/import/qemu_cmd/mod.rs`.
+- Implemented canonical mapping for core/system options (`-name`, `-machine`, `-cpu`, `-m`, `-smp`), network pairing (`-netdev` + `-device ... netdev=<id>`), and `-spice`.
+- Added structured warning taxonomy (`MappingWarningKind::{UnsupportedFlag, UnsupportedValue, AmbiguousPairing}`) and warning records with source field + message.
+- Added mapper tests verifying canonical YAML validation for supported fixture mappings from `input/felucia/108.qemu.cmd`, `input/zbp-server-mh2/201.qemu.cmd`, and `input/coruscant/505.qemu.cmd`.
+- Mapper implementation is isolated to qemu-cmd modules and does not import Proxmox parser/model/mapper internals.
+
 ### M-05 Implement qemu-cmd import I/O pipeline
 Scope:
 - Add high-level qemu-cmd import orchestration (`read -> parse -> map -> validate -> render -> write/dry-run`).

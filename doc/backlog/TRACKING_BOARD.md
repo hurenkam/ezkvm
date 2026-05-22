@@ -111,7 +111,7 @@ Source: doc/backlog/BACKLOG.md
 | M-01 | Define qemu-cmd importer boundary and public contracts | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | B-40 | unassigned | Done |
 | M-02 | Extract importer-common orchestration helpers | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Done |
 | M-03 | Implement qemu-cmd parser and intermediate model | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-01 | unassigned | Done |
-| M-04 | Implement qemu-cmd mapper and warning taxonomy | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-03 | unassigned | Todo |
+| M-04 | Implement qemu-cmd mapper and warning taxonomy | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-03 | unassigned | Done |
 | M-05 | Implement qemu-cmd import I/O pipeline | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-02, M-04 | unassigned | Todo |
 | M-06 | Add import-qemu-cmd CLI command | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-05 | unassigned | Todo |
 | M-07 | Add qemu-cmd fixtures and integration coverage | M | Phase-2-Hardening | epic:qemu-cmd-import, phase:2-hardening | M-06 | unassigned | Todo |
