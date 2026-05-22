@@ -978,6 +978,12 @@ Acceptance Criteria:
 - Snapshot drift is deterministic and reviewable.
 Estimate: 3 days
 
+Completion Notes (2026-05-21):
+- Added representative fixture set under `tests/fixtures/qemu_cmd_import/` from captured command lines (`01-wakiza`, `02-zbp-201`, `03-felucia-505`).
+- Added fixture-driven integration coverage in `tests/integration/qemu_cmd_import.rs` for import -> YAML validate -> QEMU dry-run command build flow.
+- Added output-mode runtime equivalence test in `tests/integration/qemu_cmd_import_output_modes.rs` comparing `canonical`, `compact`, and `debug` command generation.
+- Wired new integration modules via `tests/integration_tests.rs` and verified focused qemu-cmd integration suites pass.
+
 ### M-08 Publish standalone qemu-cmd import documentation
 Scope:
 - Add dedicated user guide for qemu-cmd import under `doc/user/config/`.

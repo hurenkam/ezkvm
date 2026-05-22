@@ -375,6 +375,52 @@ Added CLI parser tests in `src/cli/tests/mod.rs` for:
 
 These tests verify command/flag wiring independently of mapper/runtime behavior.
 
+## M-07 Deliverables
+
+Status: Done (2026-05-21)
+
+This section captures the implementation artifacts required by `M-07`.
+
+### 1. Added representative qemu-cmd fixture set
+
+Introduced fixture directory:
+- `tests/fixtures/qemu_cmd_import/`
+
+Added representative captured command fixtures:
+- `01-wakiza.qemu.cmd`
+- `02-zbp-201.qemu.cmd`
+- `03-felucia-505.qemu.cmd`
+
+These fixtures cover warning-rich and mixed-option command lines including repeated flags, CSV payloads, and JSON payload options.
+
+### 2. Added fixture-driven integration flow coverage
+
+Added integration module:
+- `tests/integration/qemu_cmd_import.rs`
+
+Coverage includes:
+- import run over each qemu-cmd fixture,
+- generated YAML deserialize + validation,
+- command-builder dry-run path (`QemuManager::build_command`) from imported config,
+- strict-mode failure behavior on warning-rich fixture input.
+
+### 3. Added output-mode runtime equivalence coverage
+
+Added integration module:
+- `tests/integration/qemu_cmd_import_output_modes.rs`
+
+Coverage includes:
+- `canonical`, `compact`, and `debug` import output modes,
+- debug comment stripping for semantic load,
+- command generation equivalence assertion across modes.
+
+### 4. Integration harness wiring
+
+Wired new modules in:
+- `tests/integration_tests.rs`
+
+This keeps qemu-cmd integration coverage in the same integration test entrypoint used by existing importer suites.
+
 ## Implementation Plan
 
 1. Define hard module boundaries.
