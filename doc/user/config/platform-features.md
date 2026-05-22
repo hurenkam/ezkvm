@@ -31,6 +31,9 @@ Other fields:
 - `freeze_cpu` (default false)
 - optional placement: `bus`, `addr`
 
+For Q35 with bridge topology (loaded readconfig or portable synthesized mode),
+omitted guest-agent `bus`/`addr` default to `pci.0` and `0x8`.
+
 ## options.qmp (canonical)
 
 - `enabled` (default true)
@@ -71,6 +74,8 @@ Feature flags for Windows optimization:
 When Q35 bridge readconfig is loaded (`pve-q35-*` or `ezkvm-q35.cfg`), omitted
 `bus`/`addr` default to `pcie.0` and `0x8` for `ivshmem-plain` emission.
 Portable Q35 mode keeps this same default placement through synthesized topology.
+This default is applied at runtime for both parity/static and portable-synthesized
+Q35 topology modes.
 For virtio-gpu placement defaults, see `devices.displays` in
 [Devices, controllers, and host passthrough](devices.md).
 

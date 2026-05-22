@@ -46,7 +46,7 @@ devices: {}
 }
 
 #[test]
-fn preflight_fails_when_readconfig_path_is_missing() {
+fn preflight_allows_missing_ezkvm_q35_template_for_portable_synthesis() {
     let config = VmConfig::from_str(
         r#"
 name: preflight-missing-readconfig
@@ -66,6 +66,37 @@ devices: {}
     )
     .expect("vm config should parse");
 
+    let result = run_runtime_preflight(
+        &config,
+        &CentralConfig::default(),
+        &RuntimeCliOverrides::default(),
+        "/bin/sh",
+    );
+
+    assert!(result.is_ok());
+}
+
+#[test]
+fn preflight_fails_when_parity_readconfig_path_is_missing() {
+    let config = VmConfig::from_str(
+        r#"
+name: preflight-missing-parity-readconfig
+backend: qemu
+system:
+    architecture: x86_64
+    machine: q35
+    readconfig:
+        - /definitely/missing/pve-q35-4.0.cfg
+    memory:
+        size: 1024
+    cpu:
+        model: host
+        vcpus: 2
+devices: {}
+"#,
+    )
+    .expect("vm config should parse");
+
     let err = run_runtime_preflight(
         &config,
         &CentralConfig::default(),
@@ -75,7 +106,7 @@ devices: {}
     .expect_err("preflight should fail");
 
     assert!(err.to_string().contains(
-        "system.readconfig path '/definitely/missing/ezkvm-q35.cfg' does not exist on this host"
+        "system.readconfig path '/definitely/missing/pve-q35-4.0.cfg' does not exist on this host"
     ));
 }
 

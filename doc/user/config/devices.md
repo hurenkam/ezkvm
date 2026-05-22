@@ -101,6 +101,9 @@ Common fields:
 ### controllers.scsi
 
 - entries match SCSI controller schema: `id`, `type`, optional `iothread`, `max_targets`, `bus`, `addr`
+- with Q35 bridge topology (loaded readconfig or portable synthesized mode),
+  `type: pvscsi` defaults to `bus=pci.0` and sequential addresses starting at
+  `addr=0x5` when `bus`/`addr` are omitted
 - generated import YAML no longer uses top-level `controllers.scsi[].drives[]` by default; it emits `devices.controllers.scsi[].drives[]` instead
 
 ### controllers.sata

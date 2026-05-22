@@ -17,12 +17,8 @@ struct TopologyNode {
     explicit_id: bool,
 }
 
-pub fn render_machine_layout(
-    machine: &str,
-    args: &QemuArgs,
-    readconfig_paths: &[String],
-) -> String {
-    let mut nodes = readconfig_paths
+pub fn render_machine_layout(machine: &str, args: &QemuArgs) -> String {
+    let mut nodes = readconfig_paths_from_args(args)
         .iter()
         .flat_map(|path| parse_readconfig_devices(path))
         .collect::<Vec<_>>();
@@ -95,6 +91,25 @@ pub fn render_machine_layout(
     }
 
     lines.join("\n")
+}
+
+fn readconfig_paths_from_args(args: &QemuArgs) -> Vec<String> {
+    let mut paths = Vec::new();
+    let mut idx = 0usize;
+
+    while idx < args.len() {
+        if args[idx] == "-readconfig"
+            && let Some(path) = args.get(idx + 1)
+        {
+            paths.push(path.clone());
+            idx += 2;
+            continue;
+        }
+
+        idx += 1;
+    }
+
+    paths
 }
 
 #[derive(Debug, Clone)]
@@ -436,7 +451,7 @@ addr = "1c.0"
             "vfio-pci,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0.0".to_string(),
         ]);
 
-        let tree = render_machine_layout("q35", &args, &[]);
+        let tree = render_machine_layout("q35", &args);
         assert!(tree.contains("machine q35"));
         assert!(tree.contains("bus pcie.0"));
         assert!(tree.contains("ich9-pcie-port-1 (pcie-root-port @1c.0)"));
@@ -456,7 +471,7 @@ addr = "1c.0"
             "scsi-hd,id=scsi0,bus=scsihw0.0,scsi-id=0".to_string(),
         ]);
 
-        let tree = render_machine_layout("q35", &args, &[]);
+        let tree = render_machine_layout("q35", &args);
         assert!(tree.contains("xhci (qemu-xhci)"));
         assert!(tree.contains("usb0 (usb-host)"));
         assert!(tree.contains("scsihw0 (pvscsi)"));
@@ -513,11 +528,7 @@ addr = "1c.0"
             RuntimeCliOverrides::default(),
         );
         let command = manager.build_command().expect("qemu command should build");
-        let tree = render_machine_layout(
-            &manager.config.system.machine,
-            &command,
-            &manager.config.system.readconfig,
-        );
+        let tree = render_machine_layout(&manager.config.system.machine, &command);
 
         assert!(tree.contains("ich9-pcie-port-1 (pcie-root-port @1c.0 readconfig)"));
         assert!(tree.contains("hostpci0 (vfio-pci)"));

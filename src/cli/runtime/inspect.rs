@@ -518,11 +518,7 @@ pub(crate) async fn handle_validate(
             crate::config::RuntimeCliOverrides::default(),
         );
         let args = manager.build_command()?;
-        let layout = crate::qemu::topology::render_machine_layout(
-            &config.system.machine,
-            &args,
-            &config.system.readconfig,
-        );
+        let layout = crate::qemu::topology::render_machine_layout(&config.system.machine, &args);
         println!("\nMachine layout:");
         println!("{}", layout);
     }

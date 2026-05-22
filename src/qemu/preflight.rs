@@ -33,6 +33,23 @@ fn referenced_root_port_buses(config: &VmConfig) -> HashSet<String> {
         .collect()
 }
 
+fn uses_synthesized_portable_q35_topology(config: &VmConfig) -> bool {
+    let mode = crate::state::detect_runtime_capability_mode(config);
+    if mode != crate::state::RuntimeCapabilityMode::PortableLinux {
+        return false;
+    }
+
+    if !config.system.machine.to_lowercase().contains("q35") {
+        return false;
+    }
+
+    config
+        .system
+        .readconfig
+        .iter()
+        .any(|path| path.contains("ezkvm-q35.cfg"))
+}
+
 /// Check that every `ich9-pcie-port-*` bus name referenced by hostpci entries
 /// is actually defined in one of the loaded readconfig files.
 ///
@@ -43,6 +60,10 @@ fn referenced_root_port_buses(config: &VmConfig) -> HashSet<String> {
 /// Returns a sorted list of human-readable warning strings. An empty vec means
 /// all references are satisfied (or no check was possible).
 pub(super) fn check_hostpci_bus_references(config: &VmConfig) -> Vec<String> {
+    if uses_synthesized_portable_q35_topology(config) {
+        return vec![];
+    }
+
     let referenced = referenced_root_port_buses(config);
     if referenced.is_empty() {
         return vec![];
@@ -94,6 +115,10 @@ pub(super) fn check_hostpci_bus_references(config: &VmConfig) -> Vec<String> {
 pub(super) fn check_legacy_pci_bus_references(config: &VmConfig) -> Vec<String> {
     let machine_lower = config.system.machine.to_lowercase();
     if !machine_lower.contains("q35") {
+        return vec![];
+    }
+
+    if uses_synthesized_portable_q35_topology(config) {
         return vec![];
     }
 
@@ -234,6 +259,32 @@ host:
     - device: "0000:03:00.0"
       id: hostpci0
       pcie: true
+"#;
+        let config = VmConfig::from_str(yaml).expect("parse config");
+        assert!(check_hostpci_bus_references(&config).is_empty());
+    }
+
+    #[test]
+    fn no_readconfig_bus_warnings_when_portable_q35_synthesis_is_active() {
+        let yaml = r#"
+name: test-vm
+backend: qemu
+system:
+  architecture: x86_64
+  machine: q35
+  readconfig:
+    - /usr/share/ezkvm/ezkvm-q35.cfg
+  memory:
+    size: 4096
+  cpu:
+    vcpus: 2
+    model: host
+host:
+  pci:
+    - device: "0000:03:00.0"
+      id: hostpci0
+      pcie: true
+      bus: ich9-pcie-port-5
 "#;
         let config = VmConfig::from_str(yaml).expect("parse config");
         assert!(check_hostpci_bus_references(&config).is_empty());

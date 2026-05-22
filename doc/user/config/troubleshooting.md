@@ -17,7 +17,18 @@ Common issues and quick checks for VM configuration and startup.
 - A configured parity/readconfig topology file is missing on this host (for example
    `/usr/share/qemu-server/pve-q35-4.0.cfg`), which can lead to startup errors
    like `Bus 'pci.1' not found` when static Q35 bridge buses are expected.
-   Portable Q35 mode synthesizes these bridge devices at runtime.
+   Portable Q35 mode synthesizes these bridge devices at runtime and does not
+   require `ezkvm-q35.cfg` to exist on host.
+
+Portable Q35 synthesis is active when:
+- runtime target resolves to portable-linux
+- machine is Q35
+- config includes `ezkvm-q35.cfg` as a portable topology marker
+
+When synthesis is active:
+- effective topology is emitted as explicit `-device` args
+- missing `ezkvm-q35.cfg` is not a preflight blocker
+- parity/static readconfig paths (for example `pve-q35-*`) are still validated
 
 ### Checks
 
@@ -46,7 +57,12 @@ Common issues and quick checks for VM configuration and startup.
 5. Verify configured readconfig paths exist when using parity/static templates:
    ```bash
    yq '.system.readconfig[]' vm.yaml
-   ls -la /usr/share/ezkvm/ezkvm-q35.cfg
+   ls -la /usr/share/qemu-server/pve-q35-4.0.cfg
+   ```
+
+6. Confirm synthesized portable topology in dry-run output when portable mode is used:
+   ```bash
+   ezkvm start vm.yaml --dry-run | grep -E 'pcie-root-port|i82801b11-bridge|pci-bridge'
    ```
 
 ### Notes

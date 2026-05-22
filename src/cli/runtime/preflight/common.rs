@@ -4,6 +4,10 @@ use std::process::Command;
 
 pub(super) fn ensure_readconfig_files_present(config: &crate::config::VmConfig) -> Result<()> {
     for path in &config.system.readconfig {
+        if should_skip_missing_readconfig_path(config, path) {
+            continue;
+        }
+
         if Path::new(path).exists() {
             continue;
         }
@@ -15,6 +19,19 @@ pub(super) fn ensure_readconfig_files_present(config: &crate::config::VmConfig) 
     }
 
     Ok(())
+}
+
+fn should_skip_missing_readconfig_path(config: &crate::config::VmConfig, path: &str) -> bool {
+    let mode = crate::state::detect_runtime_capability_mode(config);
+    if mode != crate::state::RuntimeCapabilityMode::PortableLinux {
+        return false;
+    }
+
+    if !config.system.machine.to_lowercase().contains("q35") {
+        return false;
+    }
+
+    path.contains("ezkvm-q35.cfg")
 }
 
 pub(super) fn ensure_program_available(label: &str, program: &str) -> Result<()> {

@@ -861,6 +861,12 @@ Acceptance Criteria:
 - Preflight warnings/errors reference synthesized buses and ports correctly.
 Estimate: 2 days
 
+Completion Notes (2026-05-22):
+- Updated machine-layout rendering to consume effective `-readconfig` arguments from generated QEMU command output, so portable Q35 layout reflects synthesized topology directly.
+- Updated portable runtime preflight to allow missing `ezkvm-q35.cfg` when portable Q35 synthesis is active, while preserving strict missing-readconfig failures for parity/static templates.
+- Updated QEMU preflight warning checks to treat synthesized portable Q35 as the effective topology source instead of requiring static readconfig-backed bus definitions.
+- Added/updated preflight and topology tests to verify synthesized portable behavior and parity/static guard behavior.
+
 ### Q-04 Add tests, snapshots, and docs for dynamic topology behavior
 Scope:
 - Add unit/integration coverage for on-demand generation of `ich9-pcie-port-*`, `pci.N`, and `uhci-*`.
