@@ -14,9 +14,10 @@ Common issues and quick checks for VM configuration and startup.
 - Required binary is missing (`qemu-system-*`, `swtpm`, or configured bridge helper path).
 - UEFI/OVMF firmware is requested but no compatible firmware file is available.
 - Runtime/socket parent directory is not writable by the current user.
-- A configured `system.readconfig` file is missing on this host (for example
-   `/usr/share/ezkvm/ezkvm-q35.cfg`), which can lead to startup errors like
-   `Bus 'pci.1' not found` when Q35 bridge buses are expected.
+- A configured parity/readconfig topology file is missing on this host (for example
+   `/usr/share/qemu-server/pve-q35-4.0.cfg`), which can lead to startup errors
+   like `Bus 'pci.1' not found` when static Q35 bridge buses are expected.
+   Portable Q35 mode synthesizes these bridge devices at runtime.
 
 ### Checks
 
@@ -42,7 +43,7 @@ Common issues and quick checks for VM configuration and startup.
    ezkvm start vm.yaml --run-dir /tmp/ezkvm --swtpm-binary /usr/bin/swtpm --ovmf-dir /usr/share/OVMF
    ```
 
-5. Verify every configured readconfig path exists:
+5. Verify configured readconfig paths exist when using parity/static templates:
    ```bash
    yq '.system.readconfig[]' vm.yaml
    ls -la /usr/share/ezkvm/ezkvm-q35.cfg
@@ -300,6 +301,8 @@ can sometimes clear it without a reboot for RDNA1 but has limited support for RD
 - For Proxmox-style Q35 topologies (for example with `system.readconfig` set to
    `/usr/share/ezkvm/ezkvm-q35.cfg` or `pve-q35-*`), these warnings can appear even
    when topology and placement are correct.
+- In portable Q35 mode, equivalent topology is synthesized at runtime and can still
+   produce the same non-fatal EHCI guest warnings.
 - In most cases this is non-fatal noise, not a startup failure.
 
 ### Why it is visible
@@ -316,7 +319,9 @@ can sometimes clear it without a reboot for RDNA1 but has limited support for RD
     ps -ef | grep '[q]emu-system'
     ```
 
-2. Confirm the Q35 readconfig path exists on this host:
+2. Confirm Q35 topology source is available for your mode:
+   - parity/static mode: readconfig file exists on host
+   - portable mode: synthesized topology is emitted in dry-run output
     ```bash
     yq '.system.readconfig[]' <vm.yaml>
     ls -la /usr/share/ezkvm/ezkvm-q35.cfg

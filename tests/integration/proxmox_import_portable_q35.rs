@@ -66,17 +66,17 @@ fn run_portable_fixture(conf: &str) -> (String, Vec<String>) {
 }
 
 #[test]
-fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
+fn portable_q35_planner_allocates_root_ports_and_synthesizes_required_topology() {
     let _guard = env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let (yaml, args) = run_portable_fixture("proxmox_import/12-portable-q35-hostpci.conf");
 
-    // The planner must inject the portable Q35 readconfig, not the Proxmox one.
+    // Portable Q35 synthesizer must not pass through the static ezkvm template.
     assert!(
-        args.contains(&"/usr/share/ezkvm/ezkvm-q35.cfg".to_string()),
-        "expected ezkvm-q35.cfg in args; args:\n{}",
+        !args.contains(&"/usr/share/ezkvm/ezkvm-q35.cfg".to_string()),
+        "did not expect ezkvm-q35.cfg in args when topology is synthesized; args:\n{}",
         args.join("\n")
     );
     assert!(
@@ -125,6 +125,12 @@ fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
         hostpci0_arg.contains("bus=ich9-pcie-port-1"),
         "hostpci0 must be placed on ich9-pcie-port-1; got: {hostpci0_arg}"
     );
+    assert!(
+        args.iter()
+            .any(|arg| arg.contains("pcie-root-port,id=ich9-pcie-port-1")),
+        "missing synthesized root port device ich9-pcie-port-1; args:\n{}",
+        args.join("\n")
+    );
 
     let hostpci1_arg = device_args
         .iter()
@@ -134,9 +140,14 @@ fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
         hostpci1_arg.contains("bus=ich9-pcie-port-2"),
         "hostpci1 must be placed on ich9-pcie-port-2; got: {hostpci1_arg}"
     );
+    assert!(
+        args.iter()
+            .any(|arg| arg.contains("pcie-root-port,id=ich9-pcie-port-2")),
+        "missing synthesized root port device ich9-pcie-port-2; args:\n{}",
+        args.join("\n")
+    );
 
-    // Legacy pci.N bus references are expected when portable Q35 readconfig
-    // defines bridge-backed pci.0..pci.3 buses.
+    // Legacy pci.N bus references require synthesized pcidmi and bridge islands.
     let raw_pci_bus_args: Vec<&str> = args
         .iter()
         .filter(|a| {
@@ -148,7 +159,13 @@ fn portable_q35_planner_allocates_root_ports_and_uses_ezkvm_readconfig() {
         .collect();
     assert!(
         !raw_pci_bus_args.is_empty(),
-        "expected portable Q35 args to include legacy pci.N bus references when ezkvm-q35.cfg is loaded; full args:\n{}",
+        "expected portable Q35 args to include legacy pci.N bus references; full args:\n{}",
+        args.join("\n")
+    );
+    assert!(
+        args.iter()
+            .any(|arg| arg == "i82801b11-bridge,id=pcidmi,bus=pcie.0,addr=1e.0"),
+        "expected synthesized pcidmi bridge; full args:\n{}",
         args.join("\n")
     );
 

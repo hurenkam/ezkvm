@@ -1,9 +1,9 @@
 use crate::config::QmpSocketType;
 use crate::qemu::{QemuManager, types::QemuArgs};
 use anyhow::{Result, anyhow};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
-// Must stay aligned with the number of ich9-pcie-port-* entries in ezkvm-q35.cfg.
+// Maximum number of runtime-synthesized ich9-pcie-port-* buses.
 const MAX_RUNTIME_Q35_ROOT_PORTS: u8 = 8;
 
 impl QemuManager {
@@ -11,9 +11,18 @@ impl QemuManager {
         args.add_name(&self.config.name);
         args.extend(QemuArgs::from(self.config.system.clone()));
 
+        let synthesize_q35_topology = self.should_synthesize_portable_q35_topology();
+
         for path in &self.config.system.readconfig {
+            if synthesize_q35_topology && path.contains("ezkvm-q35.cfg") {
+                continue;
+            }
             args.push_str("-readconfig");
             args.push(path.clone());
+        }
+
+        if synthesize_q35_topology {
+            self.add_dynamic_q35_topology(args);
         }
 
         // Determine if this is a Q35 machine with the q35 bridge template.
@@ -57,6 +66,286 @@ impl QemuManager {
                 sata_controller.addr.as_deref(),
             );
         }
+    }
+
+    fn should_synthesize_portable_q35_topology(&self) -> bool {
+        let mode = crate::state::detect_runtime_capability_mode(&self.config);
+        if mode != crate::state::RuntimeCapabilityMode::PortableLinux {
+            return false;
+        }
+
+        if !self.config.system.machine.to_lowercase().contains("q35") {
+            return false;
+        }
+
+        self.config
+            .system
+            .readconfig
+            .iter()
+            .any(|path| path.contains("ezkvm-q35.cfg"))
+    }
+
+    fn add_dynamic_q35_topology(&self, args: &mut QemuArgs) {
+        for port in self.dynamic_q35_required_root_ports() {
+            let slot = port.saturating_sub(1);
+            let spec = format!(
+                "pcie-root-port,id=ich9-pcie-port-{port},x-speed=16,x-width=32,multifunction=on,bus=pcie.0,addr=1c.{slot:x},port={port},chassis={port}"
+            );
+            args.push_str("-device");
+            args.push(spec);
+        }
+
+        let active_ehci = self.dynamic_q35_active_ehci_complexes();
+        if active_ehci.contains("ehci.0") {
+            args.push_str("-device");
+            args.push("ich9-usb-ehci1,id=ehci,multifunction=on,bus=pcie.0,addr=1d.7".to_string());
+            args.push_str("-device");
+            args.push(
+                "ich9-usb-uhci1,id=uhci1,multifunction=on,bus=pcie.0,addr=1d.0,masterbus=ehci.0,firstport=0"
+                    .to_string(),
+            );
+            args.push_str("-device");
+            args.push(
+                "ich9-usb-uhci2,id=uhci2,multifunction=on,bus=pcie.0,addr=1d.1,masterbus=ehci.0,firstport=2"
+                    .to_string(),
+            );
+            args.push_str("-device");
+            args.push(
+                "ich9-usb-uhci3,id=uhci3,multifunction=on,bus=pcie.0,addr=1d.2,masterbus=ehci.0,firstport=4"
+                    .to_string(),
+            );
+        }
+        if active_ehci.contains("ehci-2.0") {
+            args.push_str("-device");
+            args.push("ich9-usb-ehci2,id=ehci-2,multifunction=on,bus=pcie.0,addr=1a.7".to_string());
+            args.push_str("-device");
+            args.push(
+                "ich9-usb-uhci4,id=uhci-4,multifunction=on,bus=pcie.0,addr=1a.0,masterbus=ehci-2.0,firstport=0"
+                    .to_string(),
+            );
+            args.push_str("-device");
+            args.push(
+                "ich9-usb-uhci5,id=uhci-5,multifunction=on,bus=pcie.0,addr=1a.1,masterbus=ehci-2.0,firstport=2"
+                    .to_string(),
+            );
+            args.push_str("-device");
+            args.push(
+                "ich9-usb-uhci6,id=uhci-6,multifunction=on,bus=pcie.0,addr=1a.2,masterbus=ehci-2.0,firstport=4"
+                    .to_string(),
+            );
+        }
+
+        let legacy_buses = self.dynamic_q35_required_legacy_pci_buses();
+        if !legacy_buses.is_empty() {
+            args.push_str("-device");
+            args.push("i82801b11-bridge,id=pcidmi,bus=pcie.0,addr=1e.0".to_string());
+
+            for bus in legacy_buses {
+                let bridge_addr = bus + 1;
+                args.push_str("-device");
+                args.push(format!(
+                    "pci-bridge,id=pci.{bus},bus=pcidmi,addr={bridge_addr}.0,chassis_nr={bridge_addr}"
+                ));
+            }
+        }
+    }
+
+    fn dynamic_q35_required_root_ports(&self) -> BTreeSet<u8> {
+        let mut required_ports = BTreeSet::new();
+
+        let mut function_count_by_base: HashMap<String, usize> = HashMap::new();
+        let mut multifunction_hint_by_base: HashMap<String, bool> = HashMap::new();
+        let mut root_port_required_by_base: HashMap<String, bool> = HashMap::new();
+        for hostpci in self.config.host_pci() {
+            if let Some((base, _)) = parse_pci_device_function(&hostpci.device) {
+                *function_count_by_base.entry(base.clone()).or_insert(0) += 1;
+                if hostpci.multifunction || hostpci.x_vga {
+                    multifunction_hint_by_base.insert(base.clone(), true);
+                }
+                if hostpci.pcie || hostpci.multifunction || hostpci.x_vga {
+                    root_port_required_by_base.insert(base, true);
+                }
+            }
+        }
+
+        let mut used_root_ports: HashSet<u8> = self
+            .config
+            .host_pci()
+            .iter()
+            .filter_map(|h| h.bus.as_deref())
+            .filter_map(parse_ich9_root_port)
+            .collect();
+        required_ports.extend(used_root_ports.iter().copied());
+        let mut next_root_port = 1u8;
+
+        let mut port_by_base_device: HashMap<String, u8> = HashMap::new();
+        for hostpci in self.config.host_pci() {
+            if let Some(port) = hostpci.bus.as_deref().and_then(parse_ich9_root_port) {
+                if let Some((base, function)) = parse_pci_device_function(&hostpci.device)
+                    && function == 0
+                {
+                    port_by_base_device.insert(base, port);
+                }
+                continue;
+            }
+
+            let Some((base, function)) = parse_pci_device_function(&hostpci.device) else {
+                if hostpci.pcie {
+                    while next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS
+                        && used_root_ports.contains(&next_root_port)
+                    {
+                        next_root_port += 1;
+                    }
+                    if next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS {
+                        used_root_ports.insert(next_root_port);
+                        required_ports.insert(next_root_port);
+                        next_root_port += 1;
+                    }
+                }
+                continue;
+            };
+
+            let should_assign_root_port = root_port_required_by_base
+                .get(&base)
+                .copied()
+                .unwrap_or(hostpci.pcie);
+            if !should_assign_root_port {
+                continue;
+            }
+
+            let _assign_function_addrs = function_count_by_base.get(&base).copied().unwrap_or(0)
+                > 1
+                || multifunction_hint_by_base
+                    .get(&base)
+                    .copied()
+                    .unwrap_or(false);
+
+            if function > 0
+                && let Some(port) = port_by_base_device.get(&base)
+            {
+                required_ports.insert(*port);
+                continue;
+            }
+
+            while next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS
+                && used_root_ports.contains(&next_root_port)
+            {
+                next_root_port += 1;
+            }
+
+            if next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS {
+                used_root_ports.insert(next_root_port);
+                required_ports.insert(next_root_port);
+                if function == 0 {
+                    port_by_base_device.insert(base, next_root_port);
+                }
+                next_root_port += 1;
+            }
+        }
+
+        required_ports
+    }
+
+    fn dynamic_q35_required_legacy_pci_buses(&self) -> BTreeSet<u8> {
+        let mut buses = BTreeSet::new();
+
+        for network in &self.config.devices.networks {
+            collect_legacy_pci_bus_number(network.bus.as_deref(), &mut buses);
+        }
+
+        let mut scsi_index = 0u8;
+        for controller in self.config.controllers_scsi() {
+            if let Some(bus) = controller.bus.as_deref() {
+                collect_legacy_pci_bus_number(Some(bus), &mut buses);
+                continue;
+            }
+
+            if controller.r#type == "pvscsi" && controller.addr.is_none() {
+                let _ = scsi_index;
+                buses.insert(0);
+                scsi_index = scsi_index.saturating_add(1);
+            }
+        }
+
+        for controller in self.config.controllers_xhci() {
+            if let Some(bus) = controller.bus.as_deref() {
+                collect_legacy_pci_bus_number(Some(bus), &mut buses);
+            } else {
+                buses.insert(1);
+            }
+        }
+        if self.config.controllers_xhci().is_empty() && !self.config.host_usb().is_empty() {
+            buses.insert(1);
+        }
+
+        for hostpci in self.config.host_pci() {
+            collect_legacy_pci_bus_number(hostpci.bus.as_deref(), &mut buses);
+        }
+
+        for audio in self.config.devices_audio() {
+            collect_legacy_pci_bus_number(audio.bus.as_deref(), &mut buses);
+        }
+
+        if self
+            .config
+            .devices_input()
+            .iter()
+            .any(|input| input.r#type != "usb-tablet")
+        {
+            buses.insert(0);
+        }
+
+        if let Some(ballooning) = self.config.system_memory_ballooning() {
+            collect_legacy_pci_bus_number(ballooning.bus.as_deref(), &mut buses);
+        }
+
+        if let Some(guest_agent) = self.config.options_guest_agent()
+            && guest_agent.enabled
+        {
+            if guest_agent.bus.is_none() && guest_agent.addr.is_none() {
+                buses.insert(0);
+            }
+            collect_legacy_pci_bus_number(guest_agent.bus.as_deref(), &mut buses);
+        }
+
+        if let Some(spice) = &self.config.spice
+            && spice.enabled
+            && spice.vdagent
+        {
+            buses.insert(0);
+        }
+
+        if let Some(ivshmem) = self.config.system_memory_ivshmem() {
+            collect_legacy_pci_bus_number(ivshmem.bus.as_deref(), &mut buses);
+        }
+
+        buses
+    }
+
+    fn dynamic_q35_active_ehci_complexes(&self) -> BTreeSet<&'static str> {
+        let mut active = BTreeSet::new();
+
+        for usb in self.config.host_usb() {
+            if let Some(bus) = usb.bus.as_deref() {
+                if bus.starts_with("ehci.0") {
+                    active.insert("ehci.0");
+                }
+                if bus.starts_with("ehci-2.0") {
+                    active.insert("ehci-2.0");
+                }
+            }
+        }
+
+        if self
+            .config
+            .devices_input()
+            .iter()
+            .any(|input| input.r#type == "usb-tablet")
+        {
+            active.insert("ehci.0");
+        }
+
+        active
     }
 
     pub(crate) fn add_devices_and_boot_args(&self, args: &mut QemuArgs) -> Result<()> {
@@ -535,6 +824,19 @@ fn parse_pci_device_function(device: &str) -> Option<(String, u8)> {
 fn address_for_function(base_addr: &str, function: u8) -> Option<String> {
     let (slot, _) = base_addr.rsplit_once('.')?;
     Some(format!("{}.{}", slot, function))
+}
+
+fn collect_legacy_pci_bus_number(bus: Option<&str>, out: &mut BTreeSet<u8>) {
+    let Some(bus) = bus else {
+        return;
+    };
+    let Some(index) = bus.strip_prefix("pci.") else {
+        return;
+    };
+    let Ok(parsed) = index.parse::<u8>() else {
+        return;
+    };
+    out.insert(parsed);
 }
 
 fn infer_ide_attachment_from_drive_id(id: &str) -> Option<(String, u32)> {

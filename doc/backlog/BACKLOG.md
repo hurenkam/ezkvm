@@ -841,6 +841,14 @@ Acceptance Criteria:
 - Existing explicit bus/address assignments remain authoritative.
 Estimate: 3 days
 
+Completion Notes (2026-05-22):
+- Added portable Q35 runtime synthesis in `src/qemu/command_builder/composition.rs` to emit required topology devices directly as `-device` args.
+- Implemented deterministic on-demand `ich9-pcie-port-*` root-port emission from resolved host PCI endpoint demand, preserving explicit bus assignments.
+- Implemented on-demand legacy PCI island synthesis through `i82801b11-bridge` plus only referenced `pci.N` `pci-bridge` devices.
+- Implemented on-demand EHCI/UHCI companion synthesis so `uhci-*` devices are emitted only for active EHCI complexes.
+- Kept Proxmox parity behavior unchanged while portable Q35 skips static `ezkvm-q35.cfg` runtime loading in favor of synthesized topology args.
+- Added/updated unit and integration coverage for deterministic synthesis and portable Q35 hostpci/root-port behavior.
+
 ### Q-03 Integrate synthesized topology into portable command-builder path
 Scope:
 - Route portable Q35 topology resolution through synthesized hierarchy output.
