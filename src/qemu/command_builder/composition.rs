@@ -11,6 +11,12 @@ impl QemuManager {
         args.add_name(&self.config.name);
         args.extend(QemuArgs::from(self.config.system.clone()));
 
+        for path in &self.config.system.readconfig {
+            args.push_str("-readconfig");
+            args.push(path.clone());
+        }
+
+        // Determine if this is a Q35 machine with the q35 bridge template.
         let has_q35_bridge_readconfig = self
             .config
             .system
@@ -18,35 +24,29 @@ impl QemuManager {
             .iter()
             .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
 
-        for path in &self.config.system.readconfig {
-            args.push_str("-readconfig");
-            args.push(path.clone());
-        }
-
+        let mut scsi_addr_counter = 0x5u8;
         for scsi_controller in self.config.controllers_scsi() {
-            let bus = if scsi_controller.bus.is_none()
-                && has_q35_bridge_readconfig
+            let mut bus = scsi_controller.bus.clone();
+            let mut addr = scsi_controller.addr.clone();
+
+            // Apply Q35 defaults per ADR-0005: pvscsi at pci.0, addr=0x5+
+            if has_q35_bridge_readconfig
+                && bus.is_none()
+                && addr.is_none()
                 && scsi_controller.r#type == "pvscsi"
             {
-                Some("pci.0")
-            } else {
-                scsi_controller.bus.as_deref()
-            };
-            let addr = if scsi_controller.addr.is_none()
-                && has_q35_bridge_readconfig
-                && scsi_controller.r#type == "pvscsi"
-            {
-                Some("0x5")
-            } else {
-                scsi_controller.addr.as_deref()
-            };
+                bus = Some("pci.0".to_string());
+                addr = Some(format!("0x{:x}", scsi_addr_counter));
+                scsi_addr_counter += 1;
+            }
+
             args.add_scsi_controller(
                 &scsi_controller.id,
                 &scsi_controller.r#type,
                 scsi_controller.iothread.as_deref(),
                 scsi_controller.max_targets,
-                bus,
-                addr,
+                bus.as_deref(),
+                addr.as_deref(),
             );
         }
 
@@ -120,17 +120,6 @@ impl QemuManager {
                     }
                 }
             }
-
-            for drive in &mut devices.drives {
-                if drive.interface == "ide" {
-                    if drive.bus.is_none() {
-                        drive.bus = Some("ide.1".to_string());
-                    }
-                    if drive.unit.is_none() {
-                        drive.unit = Some(0);
-                    }
-                }
-            }
         }
 
         args.extend(QemuArgs::from(devices));
@@ -171,45 +160,26 @@ impl QemuManager {
         if let Some(guest_agent) = self.config.options_guest_agent()
             && guest_agent.enabled
         {
-            let is_portable_mode = crate::state::detect_runtime_capability_mode(&self.config)
-                == crate::state::RuntimeCapabilityMode::PortableLinux;
-            let guest_agent_socket_path = match guest_agent.socket_path.as_deref() {
-                Some(path)
-                    if {
-                        let is_proxmox_qga_path = path.starts_with("/var/run/qemu-server/");
-                        let is_generic_proxmox_qga = path == "/var/run/qemu-server/qga.sock";
-                        let proxmox_runtime_available =
-                            std::path::Path::new("/var/run/qemu-server").exists();
-                        !(is_generic_proxmox_qga
-                            || (is_proxmox_qga_path
-                                && (is_portable_mode || !proxmox_runtime_available)))
-                    } =>
-                {
-                    path.to_string()
-                }
-                _ => self.resolve_guest_agent_socket_path(),
-            };
-            let has_q35_bridge_readconfig = self
-                .config
-                .system
-                .readconfig
-                .iter()
-                .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
-            let bus = if guest_agent.bus.is_none() && has_q35_bridge_readconfig {
-                Some(std::borrow::Cow::Borrowed("pci.0"))
-            } else {
-                self.normalize_legacy_root_bus(guest_agent.bus.as_deref())
-            };
-            let addr = if guest_agent.addr.is_none() && has_q35_bridge_readconfig {
-                Some("0x8")
-            } else {
-                guest_agent.addr.as_deref()
-            };
+            let socket_path = guest_agent
+                .socket_path
+                .as_deref()
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| self.resolve_guest_agent_socket_path());
+            let mut bus = self.normalize_legacy_root_bus(guest_agent.bus.as_deref());
+            let mut addr = guest_agent.addr.clone();
+
+            // Default to Proxmox standard placement when not explicitly specified.
+            // This maintains compatibility with imported Proxmox VMs.
+            if bus.is_none() && addr.is_none() {
+                bus = Some(std::borrow::Cow::Borrowed("pci.0"));
+                addr = Some("0x8".to_string());
+            }
+
             args.add_guest_agent(
-                Some(guest_agent_socket_path.as_str()),
+                Some(&socket_path),
                 guest_agent.freeze_cpu,
                 bus.as_deref(),
-                addr,
+                addr.as_deref(),
             );
         }
     }
@@ -282,55 +252,63 @@ impl QemuManager {
                 .map(|b| b.into_owned());
             let mut addr = hostpci.addr.clone();
             let parsed_function = parse_pci_device_function(&hostpci.device);
-            let has_multifunction_sibling = parsed_function
-                .as_ref()
-                .is_some_and(|(_, function)| *function > 0);
 
-            if has_q35_bridge_readconfig
-                && bus.is_none()
-                && (hostpci.pcie || has_multifunction_sibling)
-            {
+            if has_q35_bridge_readconfig && bus.is_none() {
                 if let Some((base, function)) = &parsed_function {
-                    if *function > 0
-                        && let Some((base_bus, base_addr)) = slot_by_base_device.get(base)
-                    {
-                        bus = Some(base_bus.clone());
-                        if addr.is_none() {
-                            addr = address_for_function(base_addr, *function);
-                        }
-                    }
+                    let should_assign_root_port = root_port_required_by_base
+                        .get(base)
+                        .copied()
+                        .unwrap_or(hostpci.pcie);
+                    if should_assign_root_port {
+                        let assign_function_addrs =
+                            function_count_by_base.get(base).copied().unwrap_or(0) > 1
+                                || multifunction_hint_by_base
+                                    .get(base)
+                                    .copied()
+                                    .unwrap_or(false);
 
-                    if bus.is_none() {
-                        while next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS
-                            && used_root_ports.contains(&next_root_port)
+                        if *function > 0
+                            && let Some((base_bus, base_addr)) = slot_by_base_device.get(base)
                         {
-                            next_root_port += 1;
+                            bus = Some(base_bus.clone());
+                            if assign_function_addrs && addr.is_none() {
+                                addr = address_for_function(base_addr, *function);
+                            }
                         }
 
-                        if next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS {
-                            let allocated_bus = format!("ich9-pcie-port-{}", next_root_port);
-                            used_root_ports.insert(next_root_port);
-                            next_root_port += 1;
-                            bus = Some(allocated_bus.clone());
-
-                            if addr.is_none() {
-                                addr = Some(format!("0x0.{}", function));
-                            }
-
-                            if *function == 0
-                                && let Some(assigned_addr) = addr.clone()
+                        if bus.is_none() {
+                            while next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS
+                                && used_root_ports.contains(&next_root_port)
                             {
-                                slot_by_base_device
-                                    .insert(base.clone(), (allocated_bus, assigned_addr));
+                                next_root_port += 1;
                             }
-                        } else {
-                            bus = Some("pcie.0".to_string());
-                            if addr.is_none() {
-                                addr = Some(format!("0x0.{}", function));
+
+                            if next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS {
+                                let allocated_bus = format!("ich9-pcie-port-{}", next_root_port);
+                                used_root_ports.insert(next_root_port);
+                                next_root_port += 1;
+                                bus = Some(allocated_bus.clone());
+
+                                if assign_function_addrs && addr.is_none() {
+                                    addr = Some(format!("0x0.{}", function));
+                                }
+
+                                if assign_function_addrs
+                                    && *function == 0
+                                    && let Some(assigned_addr) = addr.clone()
+                                {
+                                    slot_by_base_device
+                                        .insert(base.clone(), (allocated_bus, assigned_addr));
+                                }
+                            } else {
+                                bus = Some("pcie.0".to_string());
+                                if assign_function_addrs && addr.is_none() {
+                                    addr = Some(format!("0x0.{}", function));
+                                }
                             }
                         }
                     }
-                } else {
+                } else if hostpci.pcie {
                     while next_root_port <= MAX_RUNTIME_Q35_ROOT_PORTS
                         && used_root_ports.contains(&next_root_port)
                     {
@@ -388,15 +366,17 @@ impl QemuManager {
             .readconfig
             .iter()
             .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
+        let has_q35_bridge_readconfig = self
+            .config
+            .system
+            .readconfig
+            .iter()
+            .any(|p| p.contains("pve-q35") || p.contains("ezkvm-q35"));
         for input_device in self.config.devices_input() {
             if input_device.r#type == "usb-tablet" && has_q35_usb {
                 args.add_usb_tablet("ehci.0", 1);
-            } else if has_q35_usb
-                && matches!(
-                    input_device.r#type.as_str(),
-                    "virtio-mouse" | "virtio-keyboard"
-                )
-            {
+            } else if has_q35_bridge_readconfig {
+                // Apply Q35 defaults for virtio input devices: pci.0
                 args.add_input_device_with_bus(&input_device.r#type, Some("pci.0"));
             } else {
                 args.add_input_device(&input_device.r#type);
