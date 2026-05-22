@@ -25,15 +25,24 @@ use std::time::Duration;
 pub fn spawn_shutdown_monitor(
     socket_path: String,
     marker_path: PathBuf,
+    guest_agent_socket: Option<String>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
-        log_run_monitor_result(run_monitor(&socket_path, &marker_path));
+        log_run_monitor_result(run_monitor(
+            &socket_path,
+            guest_agent_socket.as_deref(),
+            &marker_path,
+        ));
     })
 }
 
 /// Run the shutdown monitor synchronously until completion.
-pub fn run_shutdown_monitor(socket_path: &str, marker_path: &std::path::Path) {
-    log_run_monitor_result(run_monitor(socket_path, marker_path));
+pub fn run_shutdown_monitor(
+    socket_path: &str,
+    guest_agent_socket: Option<&str>,
+    marker_path: &std::path::Path,
+) {
+    log_run_monitor_result(run_monitor(socket_path, guest_agent_socket, marker_path));
 }
 
 fn log_run_monitor_result(result: Result<(), MonitorError>) {
@@ -45,8 +54,19 @@ fn log_run_monitor_result(result: Result<(), MonitorError>) {
     }
 }
 
-fn run_monitor(socket_path: &str, marker_path: &std::path::Path) -> Result<(), MonitorError> {
+fn run_monitor(
+    socket_path: &str,
+    guest_agent_socket: Option<&str>,
+    marker_path: &std::path::Path,
+) -> Result<(), MonitorError> {
     wait_for_socket(socket_path, 60)?;
+    if let Some(guest_agent_socket) = guest_agent_socket {
+        tracing::debug!(
+            target: "ezkvm::shutdown_monitor",
+            guest_agent_socket,
+            "guest-agent socket available for shutdown monitoring"
+        );
+    }
     let stream = connect_with_retry(socket_path, 20)?;
     let reader_stream = stream.try_clone().map_err(MonitorError::Io)?;
     reader_stream

@@ -73,11 +73,16 @@ fn test_qmp_uses_listening_unix_socket() {
     args.add_qmp(Some(&qmp_sock_str), "unix");
 
     let built = args.build();
-    assert_eq!(built[0], "-qmp");
-    assert!(built[1].starts_with("unix:"));
-    assert!(built[1].contains("ezkvm-test-qmp.sock"));
-    assert!(built[1].contains("server=on"));
-    assert!(built[1].contains("wait=off"));
+    assert_eq!(built[0], "-chardev");
+    assert_eq!(built[1], format!("socket,id=qmp,path={},server=on,wait=off", qmp_sock_str));
+    assert_eq!(built[2], "-mon");
+    assert_eq!(built[3], "chardev=qmp,mode=control");
+    assert_eq!(built[4], "-chardev");
+    assert!(built[5].starts_with("socket,id=qmp-event,path="));
+    assert!(built[5].contains("server=on"));
+    assert!(built[5].contains("wait=off"));
+    assert_eq!(built[6], "-mon");
+    assert_eq!(built[7], "chardev=qmp-event,mode=control");
 }
 
 #[test]
