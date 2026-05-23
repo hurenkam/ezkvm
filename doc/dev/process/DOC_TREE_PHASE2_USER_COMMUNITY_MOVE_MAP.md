@@ -102,3 +102,32 @@ Transition actions applied:
 - forwarding stub added at old path `doc/dev/CONTRIBUTING.md`
 - `doc/community/README.md` updated to point to new canonical contribution guide path
 - `doc/README.md` updated with direct contribution-guide entrypoint
+
+### Batch 3 (2026-05-23)
+
+Moved documents:
+- `doc/user/config/README.md` -> `doc/user/reference/config/README.md`
+- `doc/user/config/central-config.md` -> `doc/user/reference/config/central-config.md`
+- `doc/user/config/code-backed-shapes.md` -> `doc/user/reference/config/code-backed-shapes.md`
+- `doc/user/config/devices.md` -> `doc/user/reference/config/devices.md`
+- `doc/user/config/field-reference.md` -> `doc/user/reference/config/field-reference.md`
+- `doc/user/config/platform-features.md` -> `doc/user/reference/config/platform-features.md`
+- `doc/user/config/profiles-and-merge.md` -> `doc/user/reference/config/profiles-and-merge.md`
+- `doc/user/config/system-and-boot.md` -> `doc/user/reference/config/system-and-boot.md`
+- `doc/user/config/vm-structure.md` -> `doc/user/reference/config/vm-structure.md`
+- `doc/user/config/troubleshooting.md` -> `doc/user/troubleshooting/config.md`
+
+Transition actions applied:
+- forwarding stubs added at all moved old paths
+- moved document relative links updated for `how-to`, `reference`, and `troubleshooting` targets
+- reference index links updated to current canonical paths
+
+### Batch 4 (2026-05-23)
+
+Moved document:
+- `doc/user/UBUNTU_NETPLAN_BRIDGE.md` -> `doc/user/how-to/networking/ubuntu-netplan-bridge.md`
+
+Transition actions applied:
+- forwarding stub added at old path `doc/user/UBUNTU_NETPLAN_BRIDGE.md`
+- user landing pages added and validated (`doc/user/README.md`, `doc/user/how-to/README.md`)
+- navigation validation completed for `doc/README.md`, `doc/user/`, and `doc/community/`

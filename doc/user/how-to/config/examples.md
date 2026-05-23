@@ -258,4 +258,4 @@ options:
 - [System and Boot](../../config/system-and-boot.md)
 - [Devices, Controllers, and Host Passthrough](../../config/devices.md)
 - [Platform Features and Options](../../config/platform-features.md)
-- [Code-Backed Schema Examples](code-backed-shapes.md)
+- [Code-Backed Schema Examples](../../reference/config/code-backed-shapes.md)

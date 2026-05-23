@@ -392,6 +392,6 @@ For field-level mapping reference:
 
 ## See Also
 
-- [central-config.md](central-config.md)
-- [troubleshooting.md](troubleshooting.md)
-- [vm-structure.md](vm-structure.md)
+- [central-config.md](../../reference/config/central-config.md)
+- [troubleshooting.md](../../troubleshooting/config.md)
+- [vm-structure.md](../../reference/config/vm-structure.md)

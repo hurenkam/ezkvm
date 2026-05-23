@@ -1,56 +1,7 @@
-# Profiles and Merge
+# Moved: Profiles and Merge
 
-## profiles
+This document moved to:
 
-`profiles` is an ordered list. Merge order is:
+- [doc/user/reference/config/profiles-and-merge.md](../reference/config/profiles-and-merge.md)
 
-1. empty base
-2. profiles in declared order
-3. VM file values
-
-## policies
-
-`policies` applies defaults after merge and before validation.
-
-Supported policy families:
-
-- `policies.drives`
-- `policies.networks`
-- `policies.displays`
-- `policies.serials`
-- `policies.hostpci`
-- `policies.usb_devices`
-- `policies.xhci_controllers`
-- `policies.audio_devices`
-- `policies.scsi_controllers`
-- `policies.iscsi_disks`
-
-Each entry supports:
-
-- `match`
-- `defaults`
-- optional `placement` (`drives.scsi_id`, `networks.addr`)
-
-## Merge Semantics
-
-- Scalars: replace (last writer wins)
-- Maps: deep merge
-- Lists: path-aware strategy
-
-Path-aware list behavior:
-
-- id-merge lists: `host.pci`, `host.usb`, `controllers.scsi`, `controllers.xhci`, `devices.audio`
-- append-all lists: `devices.drives`, `devices.networks`, and `policies.*` families
-- append-unique lists: `system.cpu.features`, `system.machine_options`, `options.global_options`
-- all others: replace
-
-## Notes
-
-- Configure networks with `devices.networks[].backend`.
-
-## See also
-
-- [VM structure](vm-structure.md)
-- [Devices, controllers, and host passthrough](devices.md)
-- [Platform features and options](platform-features.md)
-- [Examples](examples.md)
+This forwarding stub is temporary during the documentation migration.

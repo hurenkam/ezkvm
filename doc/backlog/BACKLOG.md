@@ -1515,6 +1515,12 @@ Execution Notes (2026-05-23):
 - Batch 1: moved user docs for examples and import guides to `doc/user/how-to/**`, added forwarding stubs at old paths, and updated links in `doc/user/config/README.md`.
 - Batch 2: moved contributing guide to `doc/community/contribution-guide/README.md`, added forwarding stub at `doc/dev/CONTRIBUTING.md`, and updated hub/community references.
 
+Completion Notes (2026-05-23):
+- Batch 3: moved remaining config reference docs to `doc/user/reference/config/**` and troubleshooting to `doc/user/troubleshooting/config.md`, with forwarding stubs and link rewrites.
+- Batch 4: moved Ubuntu bridge guide to `doc/user/how-to/networking/ubuntu-netplan-bridge.md` and added forwarding stub at old path.
+- Navigation validation completed across `doc/README.md`, `doc/user/`, and `doc/community/`.
+- L-03 acceptance criteria satisfied.
+
 ### L-04 Migrate development docs to architecture/workflow/domain/analysis model
 Scope:
 - Reorganize dev docs into architecture, workflow, domain-knowledge, and analysis areas.

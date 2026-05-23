@@ -20,10 +20,10 @@ Use this checklist to track migration from the current `doc/` structure to the t
 - [x] Inventory user/operator documents under `doc/user/`
 - [x] Identify participation docs to move to `doc/community/`
 - [x] Create move map for each source document
-- [ ] Move documents in small batches
-- [ ] Leave forwarding stubs at old paths
-- [ ] Update all internal links for moved docs
-- [ ] Validate navigation from `doc/README.md`, `doc/user/`, and `doc/community/`
+- [x] Move documents in small batches
+- [x] Leave forwarding stubs at old paths
+- [x] Update all internal links for moved docs
+- [x] Validate navigation from `doc/README.md`, `doc/user/`, and `doc/community/`
 
 Execution artifact:
 - `doc/dev/process/DOC_TREE_PHASE2_USER_COMMUNITY_MOVE_MAP.md`
@@ -31,6 +31,8 @@ Execution artifact:
 Progress note:
 - Batch 1 completed on 2026-05-23 (examples/import docs moved with stubs and link updates).
 - Batch 2 completed on 2026-05-23 (contribution guide moved to community with stub and hub link updates).
+- Batch 3 completed on 2026-05-23 (reference and troubleshooting config docs moved with stubs and relative-link rewrites).
+- Batch 4 completed on 2026-05-23 (Ubuntu networking guide moved with stub and navigation validation).
 
 ## Phase 3: Development Docs Normalization
 
@@ -68,7 +70,7 @@ Progress note:
 
 ## Validation Checklist (run after each phase)
 
-- [ ] No critical broken links in edited area
-- [ ] Root hub links remain valid
-- [ ] Canonical-path rules still hold
-- [ ] Backlog/tracking docs remain synchronized when planning docs are edited
+- [x] No critical broken links in edited area
+- [x] Root hub links remain valid
+- [x] Canonical-path rules still hold
+- [x] Backlog/tracking docs remain synchronized when planning docs are edited
