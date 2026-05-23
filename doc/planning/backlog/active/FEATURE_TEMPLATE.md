@@ -1,7 +1,7 @@
 # Feature Backlog Template
 
 Date: YYYY-MM-DD
-Source of truth during transition: `doc/backlog/BACKLOG.md`, `doc/backlog/TRACKING_BOARD.md`
+Source of truth: `doc/planning/backlog/active/<EPIC>.md`
 
 ## Scope
 
@@ -14,11 +14,31 @@ Only include tickets in one of these states:
 - `In Progress`
 - `In Review`
 
-| ID | Title | Status | Depends On | Notes |
-|---|---|---|---|---|
-| X-01 | Example ticket | Todo | None | Replace with real entry |
+| ID | Title | Status | Depends On |
+|---|---|---|---|
+| X-01 | Example ticket | Todo | None |
 
-## Transition Notes
+## Ticket Definitions
+
+### X-01 Example ticket
+Status: Todo
+Milestone: Phase-X
+Labels: epic:example, phase:x
+Assignee: unassigned
+Dependencies: None
+
+Scope:
+- Replace with ticket scope bullets.
+
+Acceptance Criteria:
+- Replace with measurable completion outcomes.
+
+Estimate: N days
+
+Planning Notes:
+- Optional current context, sequencing notes, or blockers.
+
+## Completion Rules
 
 - Completed tickets move to `doc/planning/backlog/done/YYYY/<EPIC>.md`.
 - Uncommitted future work moves to `doc/planning/backlog/future/` buckets.
