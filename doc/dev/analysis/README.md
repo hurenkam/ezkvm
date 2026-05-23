@@ -8,4 +8,5 @@ Guidelines:
 - promote stable rules to architecture/workflow docs when needed
 
 Transition references:
-- existing analysis documents currently in `doc/preparation/`
+- `doc/dev/analysis/codebase-analysis.md`
+- `doc/dev/analysis/ezkvm-comparison.md`

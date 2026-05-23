@@ -9,4 +9,9 @@ Example domains:
 - generic virtualization networking and storage behavior
 
 Transition reference:
-- existing notes currently in `doc/dev/notes/`
+- `doc/dev/domain-knowledge/qemu-bus-and-addr-assignment.md`
+
+Maintenance guidance:
+- Include metadata headers in each note: date, scope, and purpose.
+- Add a short validation section that lists how findings were verified (for example: source files, command traces, or reproducible test steps).
+- Keep normative rules in architecture/workflow docs; keep domain notes factual and reference-driven.

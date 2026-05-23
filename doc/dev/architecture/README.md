@@ -6,7 +6,7 @@ This area contains architecture-level documentation:
 - architecture decisions and rationale
 
 Transition references:
-- `doc/dev/ARCHITECTURE_GUIDELINES.md`
-- `doc/dev/MODULE_OWNERSHIP.md`
-- `doc/dev/EXTENSIBILITY_SEAMS.md`
-- `doc/dev/adr/`
+- `doc/dev/architecture/architecture-guidelines.md`
+- `doc/dev/architecture/module-ownership.md`
+- `doc/dev/architecture/extensibility-seams.md`
+- `doc/dev/architecture/decisions/`

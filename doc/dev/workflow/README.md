@@ -6,5 +6,5 @@ This area contains engineering process documentation:
 - documentation synchronization rules
 
 Transition references:
-- `doc/dev/CODING_GUIDELINES.md`
-- `doc/dev/process/`
+- `doc/dev/workflow/coding-guidelines.md`
+- `doc/dev/workflow/process/`

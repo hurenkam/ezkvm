@@ -4,11 +4,11 @@ This document defines the minimum workflow for architecture-safe contributions.
 
 ## Required Reading
 
-1. `doc/dev/CODING_GUIDELINES.md`
-2. `doc/dev/ARCHITECTURE_GUIDELINES.md`
-3. `doc/dev/MODULE_OWNERSHIP.md`
-4. Relevant ADRs in `doc/dev/adr/`
-5. `doc/dev/EXTENSIBILITY_SEAMS.md` when touching import or runtime extension boundaries
+1. `doc/dev/workflow/coding-guidelines.md`
+2. `doc/dev/architecture/architecture-guidelines.md`
+3. `doc/dev/architecture/module-ownership.md`
+4. Relevant ADRs in `doc/dev/architecture/decisions/`
+5. `doc/dev/architecture/extensibility-seams.md` when touching import or runtime extension boundaries
 
 ## Standard Workflow
 
@@ -81,6 +81,6 @@ See `pkg/arch/PKGBUILD` for the full package definition.
 
 ## Documentation Expectations
 
-1. Link new architecture decisions in `doc/dev/adr/`.
-2. Update `doc/dev/MODULE_OWNERSHIP.md` if ownership boundaries change.
+1. Link new architecture decisions in `doc/dev/architecture/decisions/`.
+2. Update `doc/dev/architecture/module-ownership.md` if ownership boundaries change.
 3. Update user docs if commands/behavior change.

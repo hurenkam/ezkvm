@@ -19,12 +19,12 @@ Quick entrypoint:
 - Workflow and process: `doc/dev/workflow/`
 - Domain knowledge: `doc/dev/domain-knowledge/`
 - Analysis reports: `doc/dev/analysis/`
-- ADRs (existing location during transition): `doc/dev/adr/`
-- Existing development guidelines (transition paths):
-  - `doc/dev/ARCHITECTURE_GUIDELINES.md`
-  - `doc/dev/CODING_GUIDELINES.md`
-  - `doc/dev/MODULE_OWNERSHIP.md`
-  - `doc/dev/EXTENSIBILITY_SEAMS.md`
+- ADRs: `doc/dev/architecture/decisions/`
+- Key development documents (canonical paths):
+  - `doc/dev/architecture/architecture-guidelines.md`
+  - `doc/dev/workflow/coding-guidelines.md`
+  - `doc/dev/architecture/module-ownership.md`
+  - `doc/dev/architecture/extensibility-seams.md`
 
 ## Planning and Execution Navigation
 
@@ -43,8 +43,8 @@ The documentation tree is migrating to an audience-based structure under backlog
 
 Reference documents:
 - Taxonomy and migration policy:
-  - `doc/dev/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`
+  - `doc/dev/workflow/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`
 - Migration checklist:
-  - `doc/dev/process/DOC_TREE_MIGRATION_CHECKLIST.md`
+  - `doc/dev/workflow/process/DOC_TREE_MIGRATION_CHECKLIST.md`
 - Feature story:
   - `doc/backlog/in_progress_features/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`

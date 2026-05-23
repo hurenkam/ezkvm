@@ -1479,7 +1479,7 @@ Acceptance Criteria:
 Estimate: 1 day
 
 Completion Notes (2026-05-23):
-- Published taxonomy and migration policy at `doc/dev/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`.
+- Published taxonomy and migration policy at `doc/dev/workflow/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`.
 - Added canonical-path rules, ownership model, phased migration policy, and current-to-target mapping table.
 
 ### L-02 Add new doc-tree skeleton and navigation hubs
@@ -1532,6 +1532,20 @@ Acceptance Criteria:
 - Domain-knowledge notes include metadata and validation guidance.
 - Analysis reports are separated from normative architecture/process docs.
 Estimate: 3 days
+
+Execution Notes (2026-05-23):
+- Started implementation; tracking status set to In Progress.
+- Batch 1 completed: moved core architecture/workflow docs, one domain-knowledge note, and two preparation analysis reports to canonical dev taxonomy paths.
+- Added forwarding stubs at all moved old paths and updated section indexes plus affected cross-links.
+- Batch 2 completed: moved ADRs to `doc/dev/architecture/decisions/**` and process docs to `doc/dev/workflow/process/**`, with forwarding stubs and canonical-link updates.
+- Added metadata/validation maintenance guidance in `doc/dev/domain-knowledge/README.md` for domain-note consistency.
+- Migration artifact created: `doc/dev/workflow/process/DOC_TREE_PHASE3_DEV_MOVE_MAP.md`.
+
+Completion Notes (2026-05-23):
+- Development docs are now split by intent across architecture, workflow, domain-knowledge, and analysis sections.
+- Domain-knowledge maintenance guidance (metadata + validation expectations) is documented in `doc/dev/domain-knowledge/README.md`.
+- Analysis reports are separated from normative architecture/process docs under `doc/dev/analysis/**`.
+- L-04 acceptance criteria satisfied.
 
 ### L-05 Migrate backlog representation to feature-centric active/done/future model
 Scope:
