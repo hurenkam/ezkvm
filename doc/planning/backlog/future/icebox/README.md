@@ -8,4 +8,7 @@ Required fields for each parked item:
 - last reviewed date
 - review cadence
 
+Template:
+- `TEMPLATE.md`
+
 Do not place committed active work here.

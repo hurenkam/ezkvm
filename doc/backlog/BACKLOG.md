@@ -1560,6 +1560,27 @@ Acceptance Criteria:
 - Icebox entries require rationale, re-entry trigger, and review cadence.
 Estimate: 4 days
 
+Execution Notes (2026-05-23):
+- Started implementation; tracking status set to In Progress.
+- Batch 1 completed: introduced feature-centric planning files for Epic L:
+  - active: `doc/planning/backlog/active/L.md`
+  - done archive: `doc/planning/backlog/done/2026/L.md`
+- Updated planning backlog readmes to expose initial feature files and archive location.
+- Batch 2 completed: defined reusable templates for:
+  - active feature files: `doc/planning/backlog/active/FEATURE_TEMPLATE.md`
+  - future candidates: `doc/planning/backlog/future/candidates/TEMPLATE.md`
+  - future research-needed: `doc/planning/backlog/future/research-needed/TEMPLATE.md`
+  - future icebox: `doc/planning/backlog/future/icebox/TEMPLATE.md`
+- Updated future bucket readmes to point to templates and enforce required item fields.
+- Batch 3 completed: expanded active feature-centric files to cover currently open epics (`B.md`, `C.md`, `D.md`, `E.md`, `K.md`, `L.md`).
+- Batch 4 completed: archived completed feature-centric files for epics with finished work under `doc/planning/backlog/done/2026/`.
+
+Completion Notes (2026-05-23):
+- Active planning now has feature-centric files for open epics under `doc/planning/backlog/active/`.
+- Completed work is archived under `doc/planning/backlog/done/2026/`.
+- Future backlog buckets have explicit templates, including required icebox metadata fields.
+- L-05 acceptance criteria satisfied.
+
 ### L-06 Create issues landing, intake guides, and triage flow docs
 Scope:
 - Add issue landing docs for problems and feature requests.

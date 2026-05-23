@@ -6,3 +6,6 @@ Expected content:
 - short problem statement
 - expected value
 - dependencies and rough priority
+
+Template:
+- `TEMPLATE.md`

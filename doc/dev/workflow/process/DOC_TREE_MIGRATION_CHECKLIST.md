@@ -54,12 +54,18 @@ Progress note:
 
 ## Phase 4: Planning and Backlog Migration
 
-- [ ] Define feature-centric file format for active backlog (`A.md`, `B.md`, ...)
-- [ ] Build `doc/planning/backlog/active/` feature files
-- [ ] Build archive strategy under `doc/planning/backlog/done/`
-- [ ] Partition future work into `candidates`, `research-needed`, `icebox`
-- [ ] Add required icebox metadata fields to templates
-- [ ] Keep `BACKLOG.md` and `TRACKING_BOARD.md` synchronized during transition
+- [x] Define feature-centric file format for active backlog (`A.md`, `B.md`, ...)
+- [x] Build `doc/planning/backlog/active/` feature files
+- [x] Build archive strategy under `doc/planning/backlog/done/`
+- [x] Partition future work into `candidates`, `research-needed`, `icebox`
+- [x] Add required icebox metadata fields to templates
+- [x] Keep `BACKLOG.md` and `TRACKING_BOARD.md` synchronized during transition
+
+Progress note:
+- Batch 1 completed on 2026-05-23 (introduced first active/done feature-centric files for Epic L).
+- Batch 2 completed on 2026-05-23 (added active/future templates, including required icebox fields).
+- Batch 3 completed on 2026-05-23 (expanded active feature files for currently open epics B/C/D/E/K/L and documented archive strategy under `done/2026/`).
+- Batch 4 completed on 2026-05-23 (archived completed epics A/B/D/K/L/M/N/Q under `doc/planning/backlog/done/2026/`).
 
 ## Phase 5: Issues Landing and Triage
 

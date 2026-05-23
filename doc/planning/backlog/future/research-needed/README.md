@@ -6,3 +6,6 @@ Expected content:
 - research question
 - unknowns and assumptions
 - exit criteria to promote to candidates or active
+
+Template:
+- `TEMPLATE.md`
