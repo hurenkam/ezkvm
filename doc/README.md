@@ -39,7 +39,7 @@ Quick entrypoint:
 
 ## Migration Context
 
-The documentation tree is migrating to an audience-based structure under backlog epic `L`.
+The documentation tree was reorganized to an audience-based structure under backlog epic `L`.
 
 Reference documents:
 - Taxonomy and migration policy:
@@ -47,4 +47,4 @@ Reference documents:
 - Migration checklist:
   - `doc/dev/workflow/process/DOC_TREE_MIGRATION_CHECKLIST.md`
 - Feature story:
-  - `doc/backlog/in_progress_features/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`
+  - `doc/backlog/implemented_features/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`

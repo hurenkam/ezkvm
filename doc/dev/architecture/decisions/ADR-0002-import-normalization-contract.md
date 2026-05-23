@@ -169,6 +169,6 @@ devices:
 
 ## References
 
-- Current canonical schema: `doc/user/config/vm-structure.md`
+- Current canonical schema: `doc/user/reference/config/vm-structure.md`
 - v1 Proxmox parser: `/home/hurenkam/Workspace/ezkvm_v1/src/import/proxmox_parser.rs`
 - Backlog task: `doc/backlog/BACKLOG.md` - B-01, B-02

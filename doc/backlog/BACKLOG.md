@@ -362,7 +362,7 @@ Scope:
 Dependencies: B-23
 Acceptance Criteria:
 - At least 5 new profile inference rules added and tested.
-- Inference decision tree documented in `doc/user/config/profiles-and-merge.md`.
+- Inference decision tree documented in `doc/user/reference/config/profiles-and-merge.md`.
 - Representative fixtures validate correct inference across rule set with snapshot tests in compact and canonical/debug-canonical export paths.
 - No breaking changes to existing profile stack behavior or explicit output-mode semantics.
 Estimate: 2.5 days
@@ -1014,7 +1014,7 @@ Completion Notes (2026-05-21):
 
 ### M-08 Publish standalone qemu-cmd import documentation
 Scope:
-- Add dedicated user guide for qemu-cmd import under `doc/user/config/`.
+- Add dedicated user guide for qemu-cmd import under `doc/user/how-to/import/`.
 - Update docs index so qemu-cmd and Proxmox import are separate entries.
 - Document separation contract and limitations for first release scope.
 Dependencies: M-06
@@ -1025,8 +1025,8 @@ Acceptance Criteria:
 Estimate: 1 day
 
 Completion Notes (2026-05-21):
-- Added standalone user guide at `doc/user/config/import-qemu-cmd.md` covering scope, separation contract, first-release limitations, CLI examples, warning model, and post-import validation checklist.
-- Updated config docs index at `doc/user/config/README.md` to include `import-qemu-cmd.md` as a separate special-topic entry alongside Proxmox import.
+- Added standalone user guide at `doc/user/how-to/import/qemu-cmd.md` covering scope, separation contract, first-release limitations, CLI examples, warning model, and post-import validation checklist.
+- Updated config docs index at `doc/user/reference/config/README.md` to include the qemu-cmd import guide as a separate special-topic entry alongside Proxmox import.
 - Added quick-link and table cross-references so users can discover qemu-cmd import flow without relying on Proxmox documentation.
 
 ### M-09 Harden qemu-cmd profile inference and parity assertions
@@ -1593,6 +1593,12 @@ Acceptance Criteria:
 - Known issues and resolution status are discoverable.
 Estimate: 2 days
 
+Completion Notes (2026-05-23):
+- Expanded `doc/issues/README.md` into a usable entrypoint with links for problem reports, feature requests, triage, and known issues.
+- Added `doc/issues/report-a-problem.md`, `doc/issues/request-a-feature.md`, `doc/issues/triage.md`, and `doc/issues/known-issues.md`.
+- Documented severity/priority guidance, ownership areas, backlog linkage, and known-issues maintenance rules.
+- L-06 acceptance criteria satisfied.
+
 ### L-07 Update Copilot helpers and run consistency/link validation
 Scope:
 - Update instructions/skills/agents to reference new doc paths and domain note locations.
@@ -1604,6 +1610,13 @@ Acceptance Criteria:
 - Link and reference checks pass for migrated docs.
 - Deprecation cleanup plan executed or explicitly deferred with rationale.
 Estimate: 2 days
+
+Completion Notes (2026-05-23):
+- Updated Copilot/customization references to canonical workflow, architecture, analysis, and issue-document paths.
+- Updated lingering documentation references outside migration artifacts so active helper/docs links resolve to current canonical locations.
+- Ran a consistency sweep for old helper/doc path references; remaining hits are limited to intentional migration-history and mapping documents.
+- Removed deprecated forwarding stubs after canonical references were updated and consistency verification passed.
+- L-07 acceptance criteria satisfied.
 
 ---
 

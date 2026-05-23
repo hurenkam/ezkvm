@@ -224,5 +224,5 @@ After making changes to mapper, profile, or args generation:
 - **Network args**: `src/qemu/args/network.rs`
 - **Guest-agent args**: `src/qemu/args/guest_agent.rs`
 - **Device groups**: `src/qemu/command_builder/device_groups.rs`
-- **Architecture guidelines**: `doc/dev/ARCHITECTURE_GUIDELINES.md`
-- **Coding guidelines**: `doc/dev/CODING_GUIDELINES.md`
+- **Architecture guidelines**: `doc/dev/architecture/architecture-guidelines.md`
+- **Coding guidelines**: `doc/dev/workflow/coding-guidelines.md`

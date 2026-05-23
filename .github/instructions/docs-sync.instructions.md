@@ -21,10 +21,10 @@ Before finalizing code changes:
 
 Check and update relevant docs from this list:
 
-- `doc/user/config/*.md` for end-user configuration behavior
-- `doc/user/config/troubleshooting.md` and distro/operator guides (for example `doc/user/UBUNTU_NETPLAN_BRIDGE.md`) for verified field fixes
+- `doc/user/reference/config/*.md` for end-user configuration behavior
+- `doc/user/troubleshooting/*.md` and distro/operator guides (for example `doc/user/how-to/networking/ubuntu-netplan-bridge.md`) for verified field fixes
 - `README.md` for CLI usage, commands, and examples
-- `doc/preparation/*.md` or `doc/backlog/*.md` when architecture/backlog intent changes are part of the request
+- `doc/dev/analysis/*.md` or `doc/backlog/*.md` when architecture/backlog intent changes are part of the request
 
 ## Execution Rule
 

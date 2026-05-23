@@ -1,12 +1,12 @@
 ---
-description: "Use when editing Rust code, tests, config parsing, or refactors to enforce doc/dev/CODING_GUIDELINES.md thresholds and review checklist."
+description: "Use when editing Rust code, tests, config parsing, or refactors to enforce doc/dev/workflow/coding-guidelines.md thresholds and review checklist."
 name: "Rust Guideline Enforcement"
 applyTo: "src/**/*.rs, tests/**/*.rs"
 ---
 
 # Rust Guideline Enforcement
 
-Always validate changed Rust files against doc/dev/CODING_GUIDELINES.md.
+Always validate changed Rust files against doc/dev/workflow/coding-guidelines.md.
 
 ## Mandatory Checks On Relevant Changes
 

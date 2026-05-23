@@ -538,14 +538,14 @@ doc/
 - Separate architecture and schema documentation
 - Modular by feature
 
-**User Documentation (`doc/user/config/`):**
+**User Documentation:**
 ```
-doc/user/config/
-├── README.md - Overview
-├── vm-structure.md - Complete VM config reference
-├── central-config.md - Tool paths and locations
-├── profiles-and-merge.md - Profile system detailed guide
-├── system-and-boot.md - CPU, memory, boot configuration
+doc/user/
+├── reference/config/README.md - Overview
+├── reference/config/vm-structure.md - Complete VM config reference
+├── reference/config/central-config.md - Tool paths and locations
+├── reference/config/profiles-and-merge.md - Profile system detailed guide
+├── reference/config/system-and-boot.md - CPU, memory, boot configuration
 ├── devices.md - Storage, network, display devices
 ├── platform-features.md - Advanced: TPM, SPICE, audio, GPU, ivshmem
 └── examples.md - Annotated YAML examples

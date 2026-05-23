@@ -1,6 +1,6 @@
 # Project Copilot Instructions
 
-Authoritative standard: follow doc/dev/CODING_GUIDELINES.md for all implementation and review work.
+Authoritative standard: follow doc/dev/workflow/coding-guidelines.md for all implementation and review work.
 
 ## Feature Document Lifecycle
 
@@ -13,7 +13,7 @@ Feature design documents live under `doc/backlog/` and follow a status-based dir
 | `doc/backlog/implemented_features/` | Fully implemented; kept for reference |
 | `doc/backlog/postponed_features/` | Deferred; not to be picked up in the near future |
 
-Reference and strategy documents (codebase analysis, phase roadmaps, historical comparisons) that are not feature specs stay in `doc/preparation/`.
+Reference and strategy documents (codebase analysis, phase roadmaps, historical comparisons) that are not feature specs stay in `doc/dev/analysis/`.
 
 When creating a new feature design document, place it directly in the appropriate directory. When status changes:
 - Move to `in_progress_features/` when implementation begins.
@@ -22,7 +22,7 @@ When creating a new feature design document, place it directly in the appropriat
 
 ## Required Workflow For Code Changes
 
-1. Before editing, consult the relevant sections of doc/dev/CODING_GUIDELINES.md.
+1. Before editing, consult the relevant sections of doc/dev/workflow/coding-guidelines.md.
 2. Keep changes minimal and focused to the requested behavior.
 3. Before changing any implicit/default behavior (including config defaults, topology placement defaults, fallback paths, or auto-assigned bus/addr/unit values), ask the user for explicit approval in the current conversation.
 4. If a task is urgent and a default-behavior change appears necessary, pause and present the exact proposed default change plus expected runtime impact before editing.
@@ -92,7 +92,7 @@ For review-style requests, present:
 ## Scope Notes
 
 - Prefer explicit error handling; avoid unwrap/expect in production paths.
-- Keep modules and functions small per thresholds in doc/dev/CODING_GUIDELINES.md.
+- Keep modules and functions small per thresholds in doc/dev/workflow/coding-guidelines.md.
 - Keep mod.rs files as module wiring only (no struct/fn/impl bodies).
 - For config serialization, follow compact-by-default output: omit fields at semantic defaults unless explicit values are needed for merge/override behavior.
 

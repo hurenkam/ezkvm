@@ -69,18 +69,25 @@ Progress note:
 
 ## Phase 5: Issues Landing and Triage
 
-- [ ] Create issue reporting guide for problems
-- [ ] Create feature request guide
-- [ ] Document triage flow and severity levels
-- [ ] Create known issues index and maintenance policy
-- [ ] Link issues flow to planning/backlog tracking
+- [x] Create issue reporting guide for problems
+- [x] Create feature request guide
+- [x] Document triage flow and severity levels
+- [x] Create known issues index and maintenance policy
+- [x] Link issues flow to planning/backlog tracking
+
+Progress note:
+- Phase 5 completed on 2026-05-23.
 
 ## Phase 6: Helper and Link Consistency
 
-- [ ] Update Copilot instructions for new paths
-- [ ] Update skills/agents with new documentation locations
-- [ ] Run link/reference verification
-- [ ] Remove obsolete stubs after stabilization-window criteria are met
+- [x] Update Copilot instructions for new paths
+- [x] Update skills/agents with new documentation locations
+- [x] Run link/reference verification
+- [x] Remove obsolete stubs after stabilization-window criteria are met
+
+Progress note:
+- Phase 6 helper/link consistency completed on 2026-05-23.
+- Post-migration cleanup removed obsolete forwarding stubs on 2026-05-23 after canonical-reference verification.
 
 ## Validation Checklist (run after each phase)
 

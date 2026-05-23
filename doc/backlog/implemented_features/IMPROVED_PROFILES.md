@@ -291,7 +291,7 @@ Files likely affected:
 - `src/config/vm_schema/network.rs`
 - `src/config/validation/devices/network.rs`
 - QEMU network argument generation code
-- `doc/user/config/README.md`
+- `doc/user/reference/config/README.md`
 
 Tasks:
 

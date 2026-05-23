@@ -430,7 +430,7 @@ This section captures the implementation artifacts required by `M-08`.
 ### 1. Added standalone user documentation page
 
 Introduced dedicated qemu-cmd import guide:
-- `doc/user/config/import-qemu-cmd.md`
+- `doc/user/how-to/import/qemu-cmd.md`
 
 Guide content includes:
 - workflow separation from Proxmox import,
@@ -443,7 +443,7 @@ Guide content includes:
 ### 2. Updated user docs index and cross-links
 
 Updated:
-- `doc/user/config/README.md`
+- `doc/user/reference/config/README.md`
 
 Changes include:
 - separate special-topic entry for `import-qemu-cmd.md`,
@@ -539,7 +539,7 @@ Extended `tests/integration/qemu_cmd_import_output_modes.rs` to assert:
 - `src/cli/execute.rs`
 - `src/cli/commands/mod.rs`
 - `tests/integration_tests.rs`
-- `doc/user/config/README.md`
+- `doc/user/reference/config/README.md`
 - `doc/backlog/BACKLOG.md`
 - `doc/backlog/TRACKING_BOARD.md`
 
@@ -560,7 +560,7 @@ Extended `tests/integration/qemu_cmd_import_output_modes.rs` to assert:
 - `tests/integration/qemu_cmd_import_output_modes.rs`
 - `tests/integration/qemu_cmd_import_profiles.rs`
 - `tests/fixtures/qemu_cmd_import/`
-- `doc/user/config/import-qemu-cmd.md`
+- `doc/user/how-to/import/qemu-cmd.md`
 
 ## Verification
 

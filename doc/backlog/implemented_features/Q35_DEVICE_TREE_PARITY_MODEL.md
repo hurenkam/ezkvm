@@ -216,7 +216,7 @@ This section captures the implementation artifacts completed for `N-03`.
 
 #### 4. Documentation updates
 
-- Updated `doc/user/config/import-qemu-cmd.md` with runtime-target flag semantics, examples, and expected output differences.
+- Updated `doc/user/how-to/import/qemu-cmd.md` with runtime-target flag semantics, examples, and expected output differences.
 
 ### N-04 Deliverables
 
@@ -365,7 +365,7 @@ This section captures the implementation artifacts completed for `N-06`.
 
 Update in same task as behavior changes:
 
-- doc/dev/adr/ADR-0005-q35-topology-contract.md
+- doc/dev/architecture/decisions/ADR-0005-q35-topology-contract.md
 - user docs for import behavior, placement precedence, and compact semantics
 - importer command docs reflecting runtime-target and placement behavior
 

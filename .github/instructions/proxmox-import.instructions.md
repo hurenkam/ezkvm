@@ -91,8 +91,8 @@ ezkvm run 108.yaml --dry-run > ezkvm.cmd
 ## Related Documentation
 
 - **Full workflow**: See `/proxmox-import` skill for complete procedures
-- **Runtime parity invariants**: `doc/dev/ARCHITECTURE_GUIDELINES.md` → "Proxmox Runtime Parity Invariants" section
-- **Import compactness rules**: `doc/dev/CODING_GUIDELINES.md` → "Import output compactness rule" section
+- **Runtime parity invariants**: `doc/dev/architecture/architecture-guidelines.md` → "Proxmox Runtime Parity Invariants" section
+- **Import compactness rules**: `doc/dev/workflow/coding-guidelines.md` → "Import output compactness rule" section
 - **Mapper implementation**: `src/import/proxmox/mapper/system.rs`
 - **Device groups orchestration**: `src/qemu/command_builder/device_groups.rs`
 - **Profile bases**: `etc/profiles.d/proxmox-*.yaml`

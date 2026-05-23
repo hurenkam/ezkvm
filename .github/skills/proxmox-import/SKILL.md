@@ -173,8 +173,8 @@ Before committing import-related changes:
 
 ## Links to Related Documentation
 
-- **Architecture Guidelines** (`doc/dev/ARCHITECTURE_GUIDELINES.md`): Proxmox Runtime Parity Invariants section
-- **Coding Guidelines** (`doc/dev/CODING_GUIDELINES.md`): Import output compactness rules
+- **Architecture Guidelines** (`doc/dev/architecture/architecture-guidelines.md`): Proxmox Runtime Parity Invariants section
+- **Coding Guidelines** (`doc/dev/workflow/coding-guidelines.md`): Import output compactness rules
 - **Mapper implementation** (`src/import/proxmox/mapper/system.rs`): Where runtime paths are derived
 - **QEMU args generation** (`src/qemu/args/`): Device topology and serial controller logic
 - **Integration tests** (`tests/integration/proxmox_import.rs`): Import validation workflow

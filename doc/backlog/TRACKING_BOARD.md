@@ -151,8 +151,8 @@ Source: doc/backlog/BACKLOG.md
 | L-03 | Migrate user and community-facing docs to target structure | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Done |
 | L-04 | Migrate development docs to architecture/workflow/domain/analysis model | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Done |
 | L-05 | Migrate backlog representation to feature-centric active/done/future model | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-01, L-02 | unassigned | Done |
-| L-06 | Create issues landing, intake guides, and triage flow docs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |
-| L-07 | Update Copilot helpers and run consistency/link validation | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-03, L-04, L-05, L-06 | unassigned | Todo |
+| L-06 | Create issues landing, intake guides, and triage flow docs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Done |
+| L-07 | Update Copilot helpers and run consistency/link validation | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-03, L-04, L-05, L-06 | unassigned | Done |
 
 ## Dependency Graph
 

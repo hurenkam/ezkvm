@@ -754,7 +754,7 @@ fn validate_config(config: &VmConfig) -> Result<()> {
 ### State & Metadata
 
 - [src/state/](../../../src/state/) - PID files, logs, config cache, path conventions
-- [doc/user/config/](../../user/config/) - User-facing YAML config documentation
+- [doc/user/reference/config/](../../user/reference/config/) - User-facing YAML config documentation
 
 ---
 
@@ -830,14 +830,14 @@ fn validate_config(config: &VmConfig) -> Result<()> {
 
 ## 11. Documentation Structure
 
-### User-Facing Docs (`doc/user/config/`)
-- [vm-structure.md](../../user/config/vm-structure.md) - Overall YAML schema
-- [central-config.md](../../user/config/central-config.md) - Tool paths, locations
-- [profiles-and-merge.md](../../user/config/profiles-and-merge.md) - Profile system
-- [system-and-boot.md](../../user/config/system-and-boot.md) - CPU, mem, boot config
-- [devices.md](../../user/config/devices.md) - Drives, networks, displays
-- [platform-features.md](../../user/config/platform-features.md) - TPM, SPICE, audio, GPU
-- [examples.md](../../user/config/examples.md) - Configuration examples
+### User-Facing Docs
+- [vm-structure.md](../../user/reference/config/vm-structure.md) - Overall YAML schema
+- [central-config.md](../../user/reference/config/central-config.md) - Tool paths, locations
+- [profiles-and-merge.md](../../user/reference/config/profiles-and-merge.md) - Profile system
+- [system-and-boot.md](../../user/reference/config/system-and-boot.md) - CPU, mem, boot config
+- [devices.md](../../user/reference/config/devices.md) - Drives, networks, displays
+- [platform-features.md](../../user/reference/config/platform-features.md) - TPM, SPICE, audio, GPU
+- [examples.md](../../user/how-to/config/examples.md) - Configuration examples
 
 ### Developer Docs (`doc/dev/`)
 - [ARCHITECTURE_GUIDELINES.md](../ARCHITECTURE_GUIDELINES.md) - Modular design, layering

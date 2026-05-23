@@ -4,9 +4,9 @@
 **Updated:** 2026-04-17  
 **Scope:** Current architecture, coding, and module ownership compliance review of `src/import/proxmox/`  
 **References:**
-- `doc/dev/ARCHITECTURE_GUIDELINES.md`
-- `doc/dev/CODING_GUIDELINES.md`
-- `doc/dev/MODULE_OWNERSHIP.md`
+- `doc/dev/architecture/architecture-guidelines.md`
+- `doc/dev/workflow/coding-guidelines.md`
+- `doc/dev/architecture/module-ownership.md`
 
 ---
 

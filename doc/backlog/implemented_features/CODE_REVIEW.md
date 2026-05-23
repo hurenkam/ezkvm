@@ -659,6 +659,6 @@ No obvious performance bottlenecks.
 
 ## References
 
-- [CODING_GUIDELINES.md](doc/dev/CODING_GUIDELINES.md) — Active guidelines
-- [ADR-0004: Trait Seam Policy](doc/dev/adr/ADR-0004-trait-seam-policy.md) — Design principles
-- [EXTENSIBILITY_SEAMS.md](doc/dev/EXTENSIBILITY_SEAMS.md) — Trait boundary rules
+- [coding-guidelines.md](doc/dev/workflow/coding-guidelines.md) — Active guidelines
+- [ADR-0004: Trait Seam Policy](doc/dev/architecture/decisions/ADR-0004-trait-seam-policy.md) — Design principles
+- [extensibility-seams.md](doc/dev/architecture/extensibility-seams.md) — Trait boundary rules
