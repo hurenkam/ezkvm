@@ -77,6 +77,17 @@ Updating a Proxmox runtime default means updating the relevant profile file, not
 
 Drive and network IDs **must** be set from the Proxmox source key (e.g. `disk.key` → `"scsi0"`, `network.key` → `"net0"`). This is required so that boot-order lookup (`"scsi0" → boot_index`) functions correctly at import time.
 
+### Placement Preservation and Precedence
+
+For topology-sensitive PCI devices, import normalization must preserve whether placement was explicit or implicit in source input. This is required for deterministic replay and parity with QEMU runtime behavior.
+
+Placement precedence for normalized output and command-build behavior:
+
+- Explicit `bus`/`addr` in effective config
+- Imported explicit `bus`/`addr` from source command/config
+- ezkvm placement policy defaults
+- QEMU implicit defaults (runtime fallback)
+
 ### Import Output Compactness
 
 Mapper output may omit fields that equal the assigned profile defaults — but only because the compaction pass (`compact_profile_owned_fields`) will verify that the profile restores them at runtime. A field must never be silently dropped without a profile guarantee.
@@ -154,6 +165,7 @@ devices:
 ## Related ADRs
 - [ADR-0001: Base Selection](ADR-0001-base-selection.md)
 - [ADR-0004: Trait Seam Policy](ADR-0004-trait-seam-policy.md) (for extension mappers)
+- [ADR-0005: Q35 Topology Contract](ADR-0005-q35-topology-contract.md) (for placement semantics and precedence)
 
 ## References
 

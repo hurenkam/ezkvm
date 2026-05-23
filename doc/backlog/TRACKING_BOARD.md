@@ -1,7 +1,7 @@
 # Convergence Tracking Board
 
-Date: 2026-05-22  
-Scope: Epics A-E, K, M, N, Q (Phase 0 to Phase 3)  
+Date: 2026-05-23  
+Scope: Epics A-E, K, L, M, N, Q (Phase 0 to Phase 3)  
 Source: doc/backlog/BACKLOG.md
 
 ## Board Columns
@@ -19,6 +19,7 @@ Source: doc/backlog/BACKLOG.md
 - epic:extensibility
 - epic:hardening
 - epic:packaging
+- epic:docs-ia
 - epic:q35-topology
 - epic:q35-parity
 - epic:qemu-cmd-import
@@ -145,6 +146,13 @@ Source: doc/backlog/BACKLOG.md
 | K-04 | Execute dual-distro package validation matrix | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
 | K-05 | Add packaging CI and release gate enforcement | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-04 | unassigned | Todo |
 | K-06 | Package non-root runtime group and directory ownership policy | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
+| L-01 | Define target documentation taxonomy and migration policy | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | None | unassigned | Todo |
+| L-02 | Add new doc-tree skeleton and navigation hubs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-01 | unassigned | Todo |
+| L-03 | Migrate user and community-facing docs to target structure | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |
+| L-04 | Migrate development docs to architecture/workflow/domain/analysis model | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |
+| L-05 | Migrate backlog representation to feature-centric active/done/future model | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-01, L-02 | unassigned | Todo |
+| L-06 | Create issues landing, intake guides, and triage flow docs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |
+| L-07 | Update Copilot helpers and run consistency/link validation | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-03, L-04, L-05, L-06 | unassigned | Todo |
 
 ## Dependency Graph
 
@@ -212,6 +220,12 @@ Source: doc/backlog/BACKLOG.md
 - E-04 -> E-05 -> E-06
 - B-54 -> K-01 -> K-02 -> K-03 -> K-04 -> K-05
 - K-03 -> K-06
+- L-01 -> L-02
+- L-02 -> L-03
+- L-02 -> L-04
+- (L-01 and L-02) -> L-05
+- L-02 -> L-06
+- (L-03 and L-04 and L-05 and L-06) -> L-07
 
 ## Usage Notes
 

@@ -1464,6 +1464,93 @@ Acceptance Criteria:
 - Optional udev automation is either implemented and documented, or explicitly deferred with rationale.
 Estimate: 2 days
 
+## Epic L: Documentation Information Architecture Restructure
+
+### L-01 Define target documentation taxonomy and migration policy
+Scope:
+- Define approved target documentation taxonomy for user/community/dev/planning/issues audiences.
+- Define naming, ownership, and canonical-path rules.
+- Publish migration mapping from current paths to target paths.
+Dependencies: None
+Acceptance Criteria:
+- Approved taxonomy and migration policy committed in developer docs.
+- Mapping table covers all current top-level doc areas.
+- Policy includes deprecation and redirect/stub strategy.
+Estimate: 1 day
+
+### L-02 Add new doc-tree skeleton and navigation hubs
+Scope:
+- Create top-level target directories and landing pages.
+- Add audience-based navigation and ownership hints.
+- Add canonical entrypoint from `doc/README.md`.
+Dependencies: L-01
+Acceptance Criteria:
+- Target top-level directories exist with minimal index docs.
+- `doc/README.md` links to all audience landing pages.
+- Navigation supports old and new readers during transition.
+Estimate: 1 day
+
+### L-03 Migrate user and community-facing docs to target structure
+Scope:
+- Move user/operator docs into target `user` structure.
+- Separate contribution/participation guidance into `community` docs.
+- Add temporary compatibility stubs for moved pages.
+Dependencies: L-02
+Acceptance Criteria:
+- User/operator content is discoverable from user landing page.
+- Contribution docs are discoverable from community landing page.
+- Moved docs have redirects/stubs and no critical orphaned links.
+Estimate: 3 days
+
+### L-04 Migrate development docs to architecture/workflow/domain/analysis model
+Scope:
+- Reorganize dev docs into architecture, workflow, domain-knowledge, and analysis areas.
+- Migrate existing domain notes and analysis reports into dedicated locations.
+- Document maintenance workflow for domain-knowledge notes.
+Dependencies: L-02
+Acceptance Criteria:
+- Dev docs are split by intent with clear landing pages.
+- Domain-knowledge notes include metadata and validation guidance.
+- Analysis reports are separated from normative architecture/process docs.
+Estimate: 3 days
+
+### L-05 Migrate backlog representation to feature-centric active/done/future model
+Scope:
+- Introduce feature-level backlog files (`A.md`, `B.md`, etc.) for active planning.
+- Keep active backlog focused on todo/in-progress/in-review.
+- Move completed work to done archives and future/uncommitted work to future buckets.
+- Define semantics for `future/candidates`, `future/research-needed`, and `future/icebox`.
+Dependencies: L-01, L-02
+Acceptance Criteria:
+- Active backlog no longer depends on a monolithic ticket-only view.
+- Completed and future work are clearly separated from active planning.
+- Icebox entries require rationale, re-entry trigger, and review cadence.
+Estimate: 4 days
+
+### L-06 Create issues landing, intake guides, and triage flow docs
+Scope:
+- Add issue landing docs for problems and feature requests.
+- Define triage model, severity/priority conventions, and known-issues handling.
+- Cross-link issue flow with planning tickets.
+Dependencies: L-02
+Acceptance Criteria:
+- Users and developers have a clear issue/reporting entrypoint.
+- Triage workflow and ownership are documented.
+- Known issues and resolution status are discoverable.
+Estimate: 2 days
+
+### L-07 Update Copilot helpers and run consistency/link validation
+Scope:
+- Update instructions/skills/agents to reference new doc paths and domain note locations.
+- Run documentation consistency checks and fix broken references.
+- Remove deprecated stubs after transition stabilization criteria are met.
+Dependencies: L-03, L-04, L-05, L-06
+Acceptance Criteria:
+- Copilot helper applyTo and references match new doc layout.
+- Link and reference checks pass for migrated docs.
+- Deprecation cleanup plan executed or explicitly deferred with rationale.
+Estimate: 2 days
+
 ---
 
 # Suggested Sprint Sequence

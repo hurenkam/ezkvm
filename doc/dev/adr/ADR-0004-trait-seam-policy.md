@@ -52,6 +52,8 @@ impl ImporterRegistry {
 - All importers output canonical schema (no version negotiation)
 - Importers are registered at compile time (no dynamic loading)
 - Trait impl lives in `src/import/{format}/mod.rs`
+- Importers must preserve explicit-vs-implicit PCI placement semantics from source input when normalizing topology-sensitive devices
+- Importers must apply placement precedence consistently with ADR-0002 and ADR-0005
 
 ### 2. **Runtime Extension Points** (TBD - reserved for future)
 
@@ -172,6 +174,7 @@ Traits must not violate unidirectional dependencies:
 - [ADR-0001: Base Selection](ADR-0001-base-selection.md)
 - [ADR-0002: Import Contract](ADR-0002-import-normalization-contract.md)
 - [ADR-0003: Hooks Policy](ADR-0003-hooks-policy.md)
+- [ADR-0005: Q35 Topology Contract](ADR-0005-q35-topology-contract.md)
 
 ## References
 
