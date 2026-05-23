@@ -29,20 +29,22 @@ Keep the codebase discoverable, modular, and testable by using a predictable fil
 ├── examples/                   # runnable and documented sample configs
 ├── etc/                        # environment-specific config artifacts
 ├── input/                      # fixtures and external reference inputs
-├── notes/                      # design notes and planning docs
 ├── README.md                   # project overview and usage
 ├── doc/
-│   ├── user/CONFIG.md          # user-facing config contract
+│   ├── user/                   # user-facing guides and reference docs
+│   ├── planning/               # roadmap, backlog, and project planning
 │   └── dev/
-│       ├── CODING_GUIDELINES.md
-│       └── ARCHITECTURE_GUIDELINES.md
+│       ├── architecture/       # normative architecture guidance
+│       ├── workflow/           # coding and process guidance
+│       ├── domain-knowledge/   # reusable technical reference notes
+│       └── analysis/           # time-bound investigations and reports
 ```
 
 ### Placement Rules
 - Put production Rust code under `src/` only.
 - Keep module entrypoints (`mod.rs` where used) as wiring-only files.
 - Place integration tests in `tests/` with one entrypoint per test family and module files in subdirectories.
-- Keep long-term reference docs in root or `notes/`; keep generated, obsolete, or temporary artifacts out of primary docs paths.
+- Keep long-term reference docs under `doc/`; use `doc/dev/domain-knowledge/`, `doc/dev/analysis/`, or `doc/planning/` as appropriate, and keep generated, obsolete, or temporary artifacts out of primary docs paths.
 - Place user-consumable examples in `examples/`; place external comparison fixtures under `input/`.
 
 ### Naming and File Granularity

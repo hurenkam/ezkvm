@@ -840,9 +840,9 @@ fn validate_config(config: &VmConfig) -> Result<()> {
 - [examples.md](../../user/how-to/config/examples.md) - Configuration examples
 
 ### Developer Docs (`doc/dev/`)
-- [ARCHITECTURE_GUIDELINES.md](../ARCHITECTURE_GUIDELINES.md) - Modular design, layering
-- [CODING_GUIDELINES.md](../CODING_GUIDELINES.md) - Rust style, error handling
-- [IMPROVED_PROFILES.md](./IMPROVED_PROFILES.md) - Profile system design notes
+- [architecture-guidelines.md](../architecture/architecture-guidelines.md) - Modular design, layering
+- [coding-guidelines.md](../workflow/coding-guidelines.md) - Rust style, error handling
+- [profile-system-proposal.md](./profile-system-proposal.md) - Profile system design notes
 - [IMPROVED_TARGET_SCHEMA.md](./IMPROVED_TARGET_SCHEMA.md) - Schema evolution notes
 - [TODO.md](../../backlog/TODO.md) - Known limitations and roadmap
 

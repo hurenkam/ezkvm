@@ -382,4 +382,4 @@ MIT License
 
 ## Contributing
 
-Contributions welcome! Please see the project plan in `ProjectPlan.md` for roadmap and development guidelines.
+Contributions welcome! Please see the project plan in `doc/planning/project-plan.md` for roadmap and development guidelines.

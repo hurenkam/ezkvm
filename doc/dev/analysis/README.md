@@ -10,3 +10,5 @@ Guidelines:
 Transition references:
 - `doc/dev/analysis/codebase-analysis.md`
 - `doc/dev/analysis/ezkvm-comparison.md`
+- `doc/dev/analysis/wakiza-boot-resolution.md`
+- `doc/dev/analysis/profile-system-proposal.md`

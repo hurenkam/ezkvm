@@ -554,9 +554,9 @@ doc/user/
 **Developer Documentation (`doc/dev/`):**
 ```
 doc/dev/
-├── ARCHITECTURE_GUIDELINES.md - Layered design, module pattern
-├── CODING_GUIDELINES.md - Rust style, error handling
-├── IMPROVED_PROFILES.md - Profile system design rationale
+├── architecture/architecture-guidelines.md - Layered design, module pattern
+├── workflow/coding-guidelines.md - Rust style, error handling
+├── analysis/profile-system-proposal.md - Profile system design rationale
 ├── IMPROVED_TARGET_SCHEMA.md - Schema evolution decisions
 └── TODO.md - Known limitations and roadmap
 ```
