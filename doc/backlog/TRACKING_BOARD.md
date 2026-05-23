@@ -146,9 +146,9 @@ Source: doc/backlog/BACKLOG.md
 | K-04 | Execute dual-distro package validation matrix | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
 | K-05 | Add packaging CI and release gate enforcement | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-04 | unassigned | Todo |
 | K-06 | Package non-root runtime group and directory ownership policy | K | Phase-3-Packaging | epic:packaging, phase:2-hardening | K-03 | unassigned | Todo |
-| L-01 | Define target documentation taxonomy and migration policy | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | None | unassigned | Todo |
-| L-02 | Add new doc-tree skeleton and navigation hubs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-01 | unassigned | Todo |
-| L-03 | Migrate user and community-facing docs to target structure | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |
+| L-01 | Define target documentation taxonomy and migration policy | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | None | unassigned | Done |
+| L-02 | Add new doc-tree skeleton and navigation hubs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-01 | unassigned | Done |
+| L-03 | Migrate user and community-facing docs to target structure | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | In Progress |
 | L-04 | Migrate development docs to architecture/workflow/domain/analysis model | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |
 | L-05 | Migrate backlog representation to feature-centric active/done/future model | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-01, L-02 | unassigned | Todo |
 | L-06 | Create issues landing, intake guides, and triage flow docs | L | Phase-2-Hardening | epic:docs-ia, phase:2-hardening | L-02 | unassigned | Todo |

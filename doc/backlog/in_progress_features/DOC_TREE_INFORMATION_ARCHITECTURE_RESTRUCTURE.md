@@ -61,6 +61,12 @@ Design intent:
 
 ## Transition Plan
 
+L-01 execution artifact:
+- `doc/dev/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`
+
+L-02 execution artifact:
+- `doc/dev/process/DOC_TREE_MIGRATION_CHECKLIST.md`
+
 ### Phase 1: Alignment and scaffolding
 
 1. Freeze target taxonomy and naming conventions.

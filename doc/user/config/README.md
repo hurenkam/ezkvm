@@ -15,13 +15,13 @@ This directory contains the user-facing configuration reference for ezkvm.
 6. [platform-features.md](platform-features.md) — Platform options, hyperv, and special features
 
 **Reference and Examples:**
-7. [examples.md](examples.md) — Practical end-to-end configuration examples
+7. [../how-to/config/examples.md](../how-to/config/examples.md) — Practical end-to-end configuration examples
 8. [code-backed-shapes.md](code-backed-shapes.md) — Minimal schema patterns from implementation
 9. [field-reference.md](field-reference.md) — Complete field tables (legacy schema reference)
 
 **Special Topics:**
-10. [import-proxmox.md](import-proxmox.md) — Proxmox import plus portable runtime operator guidance
-11. [import-qemu-cmd.md](import-qemu-cmd.md) — QEMU command import workflow, warnings, and validation
+10. [../how-to/import/proxmox.md](../how-to/import/proxmox.md) — Proxmox import plus portable runtime operator guidance
+11. [../how-to/import/qemu-cmd.md](../how-to/import/qemu-cmd.md) — QEMU command import workflow, warnings, and validation
 12. [troubleshooting.md](troubleshooting.md) — Common issues and diagnostic checks
 
 ## Canonical First
@@ -49,11 +49,11 @@ Do not use legacy top-level sections (`general`, `gpu`, `display`, `storage`, `n
 ## Quick Links
 
 - **Getting Started**: Start with [vm-structure.md](vm-structure.md)
-- **Practical Examples**: See [examples.md](examples.md)
+- **Practical Examples**: See [../how-to/config/examples.md](../how-to/config/examples.md)
 - **Profiles**: Learn about layering in [profiles-and-merge.md](profiles-and-merge.md)
 - **Hardware Passthrough**: See [devices.md](devices.md)
-- **Migrating from Proxmox**: Check [import-proxmox.md](import-proxmox.md)
-- **Importing Captured QEMU Commands**: Check [import-qemu-cmd.md](import-qemu-cmd.md)
+- **Migrating from Proxmox**: Check [../how-to/import/proxmox.md](../how-to/import/proxmox.md)
+- **Importing Captured QEMU Commands**: Check [../how-to/import/qemu-cmd.md](../how-to/import/qemu-cmd.md)
 - **Debugging Issues**: Use [troubleshooting.md](troubleshooting.md)
 - **Field Reference**: See [field-reference.md](field-reference.md) for complete tables
 
@@ -69,9 +69,9 @@ Each document focuses on a specific area:
 | [system-and-boot.md](system-and-boot.md) | CPU, memory, boot, TPM, NUMA |
 | [devices.md](devices.md) | Drives, networks, controllers, passthrough |
 | [platform-features.md](platform-features.md) | Hyper-V, IOMMU, options, QMP, guest agent |
-| [examples.md](examples.md) | Real-world scenarios (desktop, headless, GPU, NUMA) |
+| [../how-to/config/examples.md](../how-to/config/examples.md) | Real-world scenarios (desktop, headless, GPU, NUMA) |
 | [code-backed-shapes.md](code-backed-shapes.md) | Schema examples from serde implementation |
 | [field-reference.md](field-reference.md) | Legacy field tables and auto-ID rules |
-| [import-proxmox.md](import-proxmox.md) | Proxmox config mapping and checklist |
-| [import-qemu-cmd.md](import-qemu-cmd.md) | QEMU command import workflow and warning model |
+| [../how-to/import/proxmox.md](../how-to/import/proxmox.md) | Proxmox config mapping and checklist |
+| [../how-to/import/qemu-cmd.md](../how-to/import/qemu-cmd.md) | QEMU command import workflow and warning model |
 | [troubleshooting.md](troubleshooting.md) | Memory, display, boot, PCI, USB issues |

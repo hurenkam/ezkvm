@@ -1,14 +1,50 @@
-# Documentation structure
+# Documentation Hub
 
-- `<workspace>/doc/`: Top level of the documentation tree
-  - `backlog/`: Contains documents that keep track of ongoing work and their progress.
-    - `dev/`: Top level of developer documentation
-        - `adr/`: Directory contains Architectural Design Rulings; design choices affecting major features
-        - `ARCHITECTURAL_GUIDELINES.md`: architectural guidelines, to be used by developers or ai instructions/agents/skills to make architectural choices
-        - `CODING_GUIDELINES.md`: coding guidelines, to be used by developers or ai instructions/agents/skills to keep the codebase clean
-        - `CONTRIBUTING.md`: info for potential contributers on how they can help improve ezkvm
-        - `MODULE_OWNERSHIP.md`:
-    - `preparation/`: This is where feature preparation documents are stored.
-    - `user/`: Top level of user level documentation
-        - `config/`: Describe the configuration files: central config, profiles and vm config.
-        - `cli.md`: Describe the command line commands and arguments
+This document is the top-level navigation hub for the `doc/` tree.
+
+## Audience Navigation
+
+- User and operator documentation: `doc/user/`
+- Participation and contribution guidance: `doc/community/`
+- Development documentation: `doc/dev/`
+- Planning and backlog lifecycle: `doc/planning/`
+- Issue intake and triage: `doc/issues/`
+
+Quick entrypoint:
+- Contribution guide: `doc/community/contribution-guide/README.md`
+
+## Development Documentation Navigation
+
+- Architecture: `doc/dev/architecture/`
+- Workflow and process: `doc/dev/workflow/`
+- Domain knowledge: `doc/dev/domain-knowledge/`
+- Analysis reports: `doc/dev/analysis/`
+- ADRs (existing location during transition): `doc/dev/adr/`
+- Existing development guidelines (transition paths):
+  - `doc/dev/ARCHITECTURE_GUIDELINES.md`
+  - `doc/dev/CODING_GUIDELINES.md`
+  - `doc/dev/MODULE_OWNERSHIP.md`
+  - `doc/dev/EXTENSIBILITY_SEAMS.md`
+
+## Planning and Execution Navigation
+
+- Current planning docs (existing paths):
+  - `doc/backlog/BACKLOG.md`
+  - `doc/backlog/TRACKING_BOARD.md`
+- Target planning structure (in rollout):
+  - `doc/planning/backlog/active/`
+  - `doc/planning/backlog/done/`
+  - `doc/planning/backlog/future/`
+  - `doc/planning/epics/`
+
+## Migration Context
+
+The documentation tree is migrating to an audience-based structure under backlog epic `L`.
+
+Reference documents:
+- Taxonomy and migration policy:
+  - `doc/dev/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`
+- Migration checklist:
+  - `doc/dev/process/DOC_TREE_MIGRATION_CHECKLIST.md`
+- Feature story:
+  - `doc/backlog/in_progress_features/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`

@@ -1478,6 +1478,10 @@ Acceptance Criteria:
 - Policy includes deprecation and redirect/stub strategy.
 Estimate: 1 day
 
+Completion Notes (2026-05-23):
+- Published taxonomy and migration policy at `doc/dev/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`.
+- Added canonical-path rules, ownership model, phased migration policy, and current-to-target mapping table.
+
 ### L-02 Add new doc-tree skeleton and navigation hubs
 Scope:
 - Create top-level target directories and landing pages.
@@ -1490,6 +1494,11 @@ Acceptance Criteria:
 - Navigation supports old and new readers during transition.
 Estimate: 1 day
 
+Completion Notes (2026-05-23):
+- Started implementation; feature document moved to `doc/backlog/in_progress_features/`.
+- Created target skeleton directories for `community`, `dev/{architecture,workflow,domain-knowledge,analysis}`, `planning/backlog/{active,done,future}`, `planning/epics`, and `issues`.
+- Added landing hub README files for each target section and updated `doc/README.md` navigation.
+
 ### L-03 Migrate user and community-facing docs to target structure
 Scope:
 - Move user/operator docs into target `user` structure.
@@ -1501,6 +1510,10 @@ Acceptance Criteria:
 - Contribution docs are discoverable from community landing page.
 - Moved docs have redirects/stubs and no critical orphaned links.
 Estimate: 3 days
+
+Execution Notes (2026-05-23):
+- Batch 1: moved user docs for examples and import guides to `doc/user/how-to/**`, added forwarding stubs at old paths, and updated links in `doc/user/config/README.md`.
+- Batch 2: moved contributing guide to `doc/community/contribution-guide/README.md`, added forwarding stub at `doc/dev/CONTRIBUTING.md`, and updated hub/community references.
 
 ### L-04 Migrate development docs to architecture/workflow/domain/analysis model
 Scope:
