@@ -1,6 +1,6 @@
 ---
 name: Convergence Task
-about: Track a convergence backlog item from doc/backlog/BACKLOG.md
+about: Track a convergence backlog item from doc/planning/backlog/
 labels: ready
 ---
 
@@ -10,7 +10,7 @@ labels: ready
 
 ## Title
 
-<!-- Use title from BACKLOG.md -->
+<!-- Use title from owning planning backlog file -->
 
 ## Epic
 
@@ -47,7 +47,7 @@ labels: ready
 
 ## Scope
 
-<!-- Copy scope from BACKLOG.md -->
+<!-- Copy scope from owning planning backlog file -->
 
 ## Acceptance Criteria
 

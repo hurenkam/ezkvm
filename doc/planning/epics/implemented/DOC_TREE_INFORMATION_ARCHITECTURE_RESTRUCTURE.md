@@ -123,4 +123,4 @@ L-02 execution artifact:
 
 ## Backlog Mapping
 
-This improvement story is implemented by tickets `L-01` through `L-07` in `doc/backlog/BACKLOG.md` and tracked in `doc/backlog/TRACKING_BOARD.md`.
+This improvement story is implemented by tickets `L-01` through `L-07` in `doc/planning/backlog/done/2026/L.md`.

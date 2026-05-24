@@ -8,5 +8,6 @@ Primary sections:
 - `doc/planning/project-plan.md`
 
 Transition references:
-- `doc/backlog/BACKLOG.md`
-- `doc/backlog/TRACKING_BOARD.md`
+- `doc/planning/backlog/active/`
+- `doc/planning/backlog/done/`
+- `doc/planning/backlog/future/`

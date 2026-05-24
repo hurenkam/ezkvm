@@ -11,5 +11,5 @@ Canonical source of truth:
 - Future, uncommitted work lives in `doc/planning/backlog/future/` buckets.
 
 Legacy reference policy:
-- `doc/backlog/` is retained as a historical reference set and should not receive new planning updates.
-- When discrepancies exist, treat `doc/planning/backlog/` as authoritative.
+- `doc/backlog/` legacy planning files have been retired.
+- `doc/planning/backlog/` is authoritative for backlog state and ticket lifecycle.

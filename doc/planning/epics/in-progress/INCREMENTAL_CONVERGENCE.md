@@ -65,4 +65,4 @@ Goal: validation, env substitution, management subcommands, resource pooling, an
 
 ## 5. Backlog Location
 
-The complete implementation backlog is now maintained in `BACKLOG.md`.
+The complete implementation backlog is maintained in `doc/planning/backlog/active/`, `doc/planning/backlog/done/`, and `doc/planning/backlog/future/`.

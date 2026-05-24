@@ -45,6 +45,6 @@ Define how reported problems and feature requests are classified, prioritized, a
 
 ## Backlog Linkage
 
-- Confirmed implementation work should map to a backlog ticket in `doc/backlog/BACKLOG.md` and `doc/backlog/TRACKING_BOARD.md` during transition.
+- Confirmed implementation work should map to a backlog ticket in the owning file under `doc/planning/backlog/active/` or `doc/planning/backlog/done/YYYY/`.
 - Future/uncommitted requests should be routed to the appropriate `doc/planning/backlog/future/` bucket.
 - Known recurring issues should also be listed in `doc/issues/known-issues.md`.

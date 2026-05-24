@@ -374,8 +374,8 @@ Update in same task as behavior changes:
 When this feature is picked up:
 
 - Ensure related backlog tickets and tracking-board registry/dependency/status are synced in the same task.
-- Keep this feature doc in `in_progress_features` while linked tickets are active.
-- Move to implemented_features when all linked tickets are complete.
+- Keep this feature doc in `doc/planning/epics/in-progress/` while linked tickets are active.
+- Move to `doc/planning/epics/implemented/` when all linked tickets are complete.
 
 ## Risks and Mitigations
 

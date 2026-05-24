@@ -178,7 +178,7 @@ Traits must not violate unidirectional dependencies:
 
 ## References
 
-- Backlog task: `doc/backlog/BACKLOG.md` - D-01 through D-04
+- Backlog task: `doc/planning/backlog/active/D.md` - D-01 through D-04
 - Current architecture: `doc/dev/architecture/architecture-guidelines.md`
 - Concrete seam map: `doc/dev/architecture/extensibility-seams.md`
 - v1 Trait System: `/home/hurenkam/Workspace/ezkvm_v1/src/vm/mod.rs` (QemuDevice trait)

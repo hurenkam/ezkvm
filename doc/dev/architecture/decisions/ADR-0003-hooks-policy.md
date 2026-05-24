@@ -143,6 +143,6 @@ options:
 
 ## References
 
-- Backlog task: `doc/backlog/BACKLOG.md` - C-01 through C-05
+- Backlog task: `doc/planning/backlog/active/C.md` - C-01 through C-05
 - v1 Lifecycle Hooks: `/home/hurenkam/Workspace/ezkvm_v1/src/vm/virtual_machine.rs` (trait methods)
 - Current layers: `doc/dev/architecture/architecture-guidelines.md`

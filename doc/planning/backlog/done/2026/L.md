@@ -60,7 +60,7 @@ Acceptance Criteria:
 Estimate: 1 day
 
 Completion Notes (2026-05-23):
-- Started implementation; feature document moved to `doc/backlog/in_progress_features/`.
+- Started implementation; feature document moved to `doc/planning/epics/in-progress/`.
 - Created target skeleton directories for `community`, `dev/{architecture,workflow,domain-knowledge,analysis}`, `planning/backlog/{active,done,future}`, `planning/epics`, and `issues`.
 - Added landing hub README files for each target section and updated `doc/README.md` navigation.
 

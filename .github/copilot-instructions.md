@@ -4,21 +4,21 @@ Authoritative standard: follow doc/dev/workflow/coding-guidelines.md for all imp
 
 ## Feature Document Lifecycle
 
-Feature design documents live under `doc/backlog/` and follow a status-based directory convention:
+Feature design documents live under `doc/planning/epics/` and follow a status-based directory convention:
 
 | Directory | Meaning |
 |---|---|
-| `doc/backlog/prepared_features/` | Design complete; ready to be picked up for implementation |
-| `doc/backlog/in_progress_features/` | Actively being implemented |
-| `doc/backlog/implemented_features/` | Fully implemented; kept for reference |
-| `doc/backlog/postponed_features/` | Deferred; not to be picked up in the near future |
+| `doc/planning/epics/prepared/` | Design complete; ready to be picked up for implementation |
+| `doc/planning/epics/in-progress/` | Actively being implemented |
+| `doc/planning/epics/implemented/` | Fully implemented; kept for reference |
+| `doc/planning/epics/postponed/` | Deferred; not to be picked up in the near future |
 
 Reference and strategy documents (codebase analysis, phase roadmaps, historical comparisons) that are not feature specs stay in `doc/dev/analysis/`.
 
 When creating a new feature design document, place it directly in the appropriate directory. When status changes:
-- Move to `in_progress_features/` when implementation begins.
-- Move to `implemented_features/` in the same task as marking the related backlog ticket(s) Done.
-- Move to `postponed_features/` when deferring; include a brief note explaining the reason.
+- Move to `doc/planning/epics/in-progress/` when implementation begins.
+- Move to `doc/planning/epics/implemented/` in the same task as marking the related backlog ticket(s) Done.
+- Move to `doc/planning/epics/postponed/` when deferring; include a brief note explaining the reason.
 
 ## Required Workflow For Code Changes
 
@@ -28,10 +28,10 @@ When creating a new feature design document, place it directly in the appropriat
 4. If a task is urgent and a default-behavior change appears necessary, pause and present the exact proposed default change plus expected runtime impact before editing.
 5. After edits, perform documentation impact analysis and update user-facing docs in the same task when behavior/schema/defaults changed.
 6. For refactors and code-change tasks with multi-file impact, run the `Docs Sync` agent as a final docs pass before final response.
-7. When implementing or completing any backlog ticket (for example `A-01`, `B-38`, `D-02`), update `doc/backlog/TRACKING_BOARD.md` status in the same task even if no backlog document was explicitly requested.
-8. When implementing or completing any backlog ticket that has a feature document in `in_progress_features/`, move that document to `implemented_features/` in the same task.
-9. When editing `doc/backlog/BACKLOG.md` or `doc/backlog/TRACKING_BOARD.md`, perform a backlog/tracking sync pass in the same task.
-10. For backlog-ticket completion or backlog/tracking-board edits with dependency/status/registry impact, run the `Backlog Sync` agent before final response.
+7. When implementing or completing any backlog ticket (for example `A-01`, `B-38`, `D-02`), update the owning file under `doc/planning/backlog/active/` or `doc/planning/backlog/done/YYYY/` in the same task.
+8. When implementing or completing any backlog ticket that has a feature document in `doc/planning/epics/in-progress/`, move that document to `doc/planning/epics/implemented/` in the same task.
+9. When editing planning backlog lifecycle files (`doc/planning/backlog/active/**`, `doc/planning/backlog/done/**`, `doc/planning/backlog/future/**`), perform a backlog sync pass in the same task.
+10. For backlog-ticket completion or planning-backlog edits with dependency/status impact, run the `Backlog Sync` agent before final response.
 11. After edits, perform a guideline audit of changed files and report pass/fail findings.
 12. If a guideline is intentionally not met, document a short justification in code comments or review notes.
 
@@ -80,7 +80,7 @@ When deferral is approved, include in the response:
 - suspected first bad commit (if known)
 - short rationale for unrelated classification
 - user-approved deferral note
-- tracking reference (for example `doc/backlog/TRACKING_BOARD.md` row or ticket)
+- tracking reference (for example the owning row/definition in `doc/planning/backlog/active/*.md` or `doc/planning/backlog/done/YYYY/*.md`)
 
 ## Review Output Contract
 

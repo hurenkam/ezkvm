@@ -60,4 +60,4 @@ Which codebase (current, v1, or from-scratch) should serve as the foundation for
 
 - Comparison document: `EZKVM_COMPARISON.md`
 - Convergence plan: `INCREMENTAL_CONVERGENCE.md`
-- Backlog: `doc/backlog/BACKLOG.md`
+- Backlog: `doc/planning/backlog/done/2026/A.md`

@@ -540,8 +540,8 @@ Extended `tests/integration/qemu_cmd_import_output_modes.rs` to assert:
 - `src/cli/commands/mod.rs`
 - `tests/integration_tests.rs`
 - `doc/user/reference/config/README.md`
-- `doc/backlog/BACKLOG.md`
-- `doc/backlog/TRACKING_BOARD.md`
+- `doc/planning/backlog/active/`
+- `doc/planning/backlog/done/`
 
 ### New files/directories to create
 

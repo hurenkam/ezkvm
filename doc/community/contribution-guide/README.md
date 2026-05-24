@@ -57,7 +57,7 @@ The `debian/` directory uses `dh-cargo` and produces a cross-distro `.deb`.
    ```
 
 The package is validated against both Debian Trixie and Ubuntu 26.04.
-See `debian/control` for the runtime dependency policy and `doc/backlog/implemented_features/DEBIAN_PACKAGE.md` for the full packaging contract.
+See `debian/control` for the runtime dependency policy and `doc/planning/epics/implemented/DEBIAN_PACKAGE.md` for the full packaging contract.
 
 ### Arch Linux Package
 

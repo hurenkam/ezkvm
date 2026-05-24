@@ -39,7 +39,7 @@ Acceptance Criteria:
 Estimate: 1 day
 
 Completion Notes (2026-05-20):
-- Feature document moved to in-progress: `doc/backlog/in_progress_features/QEMU_CMD_IMPORT.md`.
+- Feature document moved to in-progress: `doc/planning/epics/in-progress/QEMU_CMD_IMPORT.md`.
 - Added explicit importer boundary contract, qemu-cmd public API contract, and importer-common extraction checklist.
 - M-02 and M-03 can proceed using the documented contracts.
 

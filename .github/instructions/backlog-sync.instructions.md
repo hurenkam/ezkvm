@@ -1,36 +1,36 @@
 ---
-name: "Backlog And Tracking Sync"
-description: "Use when editing doc/backlog/BACKLOG.md or doc/backlog/TRACKING_BOARD.md, or when completing a backlog ticket (for example A-01/B-38), to require same-task synchronization of ticket registry, dependency graph, and status between the planning documents."
-applyTo: "doc/backlog/BACKLOG.md, doc/backlog/TRACKING_BOARD.md, doc/backlog/prepared_features/**, doc/backlog/in_progress_features/**, doc/backlog/implemented_features/**, doc/backlog/postponed_features/**"
+name: "Backlog And Planning Sync"
+description: "Use when editing planning backlog lifecycle files or epic feature docs, or when completing a backlog ticket (for example A-01/B-38), to require same-task synchronization of ticket status and dependencies in planning documents."
+applyTo: "doc/planning/backlog/active/**, doc/planning/backlog/done/**, doc/planning/backlog/future/**, doc/planning/epics/prepared/**, doc/planning/epics/in-progress/**, doc/planning/epics/implemented/**, doc/planning/epics/postponed/**"
 ---
 
 # Backlog And Tracking Sync
 
-When either backlog planning document is edited, or when implementation work completes a backlog ticket, synchronization is mandatory in the same task.
+When planning backlog files are edited, or when implementation work completes a backlog ticket, synchronization is mandatory in the same task.
 
 ## Required Sync Check
 
 Before finalizing changes:
 
-1. Compare `doc/backlog/BACKLOG.md` and `doc/backlog/TRACKING_BOARD.md` for affected ticket IDs.
-2. Ensure ticket presence, title, dependencies, and coarse status are aligned.
-3. Update the tracking board registry and dependency graph when backlog items are added, removed, renamed, completed, or re-sequenced.
-4. If only one file needed changes, explicitly state why the counterpart file required no update.
+1. Identify affected ticket IDs and owning epic files under `doc/planning/backlog/active/` or `doc/planning/backlog/done/YYYY/`.
+2. Ensure ticket title, dependencies, and status are aligned between the summary table and ticket definitions in the owning file.
+3. Update future buckets when uncommitted tickets are added, removed, renamed, or re-scoped.
+4. If only one planning file needed changes, explicitly state why no companion file required update.
 
 ## Completion Trigger Rule
 
 When a task implements or completes a backlog ticket ID:
 
-1. Mark the corresponding row in `doc/backlog/TRACKING_BOARD.md` as `Done` (or the requested status) in the same task.
-2. Update the board date when status changed.
+1. Update the corresponding ticket status in its owning planning backlog file in the same task.
+2. Move ticket definitions between `active/` and `done/YYYY/` when status crosses completion boundaries.
 3. Run a backlog-sync pass even if only code files were edited.
 
 ## Minimum Alignment Rules
 
-- Every active backlog ticket should appear in the tracking board registry.
-- Tracking board dependency edges must match backlog dependency declarations for affected tickets.
-- Completed implementation work should update tracking status in the same task when the task maps to a backlog item.
-- Registry headings and scope notes must not claim outdated ticket ranges.
+- Every active backlog ticket should appear in `doc/planning/backlog/active/` under its owning epic file.
+- Completed tickets should appear in `doc/planning/backlog/done/YYYY/` under the owning epic file.
+- Dependencies and status must be consistent between summary tables and ticket definitions for affected tickets.
+- `future/` buckets should not contain committed active or completed work.
 
 ## Execution Rule
 
@@ -41,21 +41,21 @@ For edits affecting either file, run a final backlog-sync pass before the final 
 - reconcile dependency graph edges
 - report a concise backlog-sync delta summary
 
-Use the `Backlog Sync` custom agent when the change touches multiple tickets or when backlog and tracking board differ.
+Use the `Backlog Sync` custom agent when the change touches multiple tickets or when planning backlog files differ.
 
 ## Feature Document Sync
 
-Feature design documents in `doc/backlog/` subdirectories must stay aligned with ticket status:
+Feature design documents in `doc/planning/epics/` subdirectories must stay aligned with ticket status:
 
 | Directory | Expected ticket status |
 |---|---|
-| `doc/backlog/prepared_features/` | Todo or Ready (not yet started) |
-| `doc/backlog/in_progress_features/` | In Progress |
-| `doc/backlog/implemented_features/` | Done |
-| `doc/backlog/postponed_features/` | Blocked or Postponed |
+| `doc/planning/epics/prepared/` | Todo or Ready (not yet started) |
+| `doc/planning/epics/in-progress/` | In Progress |
+| `doc/planning/epics/implemented/` | Done |
+| `doc/planning/epics/postponed/` | Blocked or Postponed |
 
-When completing a backlog ticket that has a feature document in `in_progress_features/`, move that document to `implemented_features/` in the same task.
+When completing a backlog ticket that has a feature document in `doc/planning/epics/in-progress/`, move that document to `doc/planning/epics/implemented/` in the same task.
 
-When starting work on a ticket that has a feature document in `prepared_features/`, move that document to `in_progress_features/` in the same task.
+When starting work on a ticket that has a feature document in `doc/planning/epics/prepared/`, move that document to `doc/planning/epics/in-progress/` in the same task.
 
-When deferring a ticket, move its feature document to `postponed_features/` and add a brief deferral note to the document.
+When deferring a ticket, move its feature document to `doc/planning/epics/postponed/` and add a brief deferral note to the document.

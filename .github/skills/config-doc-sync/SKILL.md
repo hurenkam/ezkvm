@@ -25,7 +25,7 @@ user-invocable: true
    - `README.md` when onboarding or CLI-facing behavior changed
 2. Update field descriptions, defaults, constraints, and examples in relevant docs.
 3. Update command usage docs when CLI flags or semantics changed.
-4. If docs must be deferred, create/update backlog tracking in `doc/backlog/BACKLOG.md` and keep `doc/backlog/TRACKING_BOARD.md` synchronized.
+4. If docs must be deferred, create/update tracking in the owning planning backlog files under `doc/planning/backlog/active/` or `doc/planning/backlog/future/`.
 5. Report documentation impact as one of: `updated`, `not needed`, or `deferred`.
 
 ## Drift Checklist

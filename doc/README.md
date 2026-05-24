@@ -28,10 +28,7 @@ Quick entrypoint:
 
 ## Planning and Execution Navigation
 
-- Current planning docs (existing paths):
-  - `doc/backlog/BACKLOG.md`
-  - `doc/backlog/TRACKING_BOARD.md`
-- Target planning structure (in rollout):
+- Current planning structure:
   - `doc/planning/backlog/active/`
   - `doc/planning/backlog/done/`
   - `doc/planning/backlog/future/`
@@ -45,4 +42,4 @@ Reference documents:
 - Taxonomy and migration policy:
   - `doc/dev/workflow/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`
 - Feature story:
-  - `doc/backlog/implemented_features/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`
+  - `doc/planning/epics/implemented/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`

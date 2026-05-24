@@ -3,7 +3,7 @@
 Date: 2026-04-19  
 Status: Active  
 Implements: D-01  
-Related: `doc/dev/architecture/decisions/ADR-0004-trait-seam-policy.md`, `doc/dev/architecture/module-ownership.md`, `doc/backlog/implemented_features/PROXMOX_PORTABILITY.md`
+Related: `doc/dev/architecture/decisions/ADR-0004-trait-seam-policy.md`, `doc/dev/architecture/module-ownership.md`, `doc/planning/epics/implemented/PROXMOX_PORTABILITY.md`
 
 ## Purpose
 
@@ -116,7 +116,7 @@ Runtime-oriented orchestration, using validated host facts from `config/`.
 
 Resolve host-specific runtime details without pushing those details into guest-semantic config or importer logic.
 
-This seam is the extensibility boundary that matches the portability design in `doc/backlog/implemented_features/PROXMOX_PORTABILITY.md`.
+This seam is the extensibility boundary that matches the portability design in `doc/planning/epics/implemented/PROXMOX_PORTABILITY.md`.
 
 ### Why this seam exists
 
@@ -259,5 +259,5 @@ As of D-01:
 
 - `doc/dev/architecture/decisions/ADR-0004-trait-seam-policy.md`
 - `doc/dev/architecture/module-ownership.md`
-- `doc/backlog/implemented_features/PROXMOX_PORTABILITY.md`
-- `doc/backlog/BACKLOG.md`
+- `doc/planning/epics/implemented/PROXMOX_PORTABILITY.md`
+- `doc/planning/backlog/active/D.md`

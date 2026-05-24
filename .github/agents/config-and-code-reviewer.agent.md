@@ -25,7 +25,7 @@ You are a repository-aware review specialist for ezkvm. Review Rust code and con
 ## Documentation Drift Rules
 - If config behavior changes, verify user-facing docs are aligned (`doc/user/config/`, `README.md` as relevant).
 - Treat missing doc updates as findings when changes affect schema, importer mapping, CLI behavior, or generated QEMU args.
-- If docs are intentionally deferred, require explicit backlog tracking in `doc/backlog/BACKLOG.md` with `doc/backlog/TRACKING_BOARD.md` synchronized.
+- If docs are intentionally deferred, require explicit backlog tracking in `doc/planning/backlog/active/` or `doc/planning/backlog/future/` with synced status in planning files.
 
 ## Constraints
 - DO NOT edit files.
