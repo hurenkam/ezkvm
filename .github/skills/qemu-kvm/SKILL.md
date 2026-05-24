@@ -27,7 +27,7 @@ This skill captures the recurring `ezkvm` development workflow for QEMU/KVM inte
    - `src/cli.rs` defines CLI commands and dispatches handlers
    - `src/qemu/` generates QEMU execution logic and process management
    - `src/state.rs` tracks VM status and PID/state artifacts
-   - `README.md` and `ProjectPlan.md` document the project scope and user-facing guidance
+   - `README.md` and `doc/planning/project-plan.md` document the project scope and user-facing guidance
 
 2. **Review relevant areas first**
    - config parsing/validation for required fields and defaults
@@ -50,7 +50,7 @@ This skill captures the recurring `ezkvm` development workflow for QEMU/KVM inte
 
 5. **Document and finalize**
    - update `README.md` to include new commands and examples
-   - keep `ProjectPlan.md` aligned with current phase and implementation status
+   - keep `doc/planning/project-plan.md` aligned with current phase and implementation status
    - capture feature coverage and test results in the README or progress notes
 
 ## Field Debug Playbook (Portable Linux)

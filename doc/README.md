@@ -44,7 +44,5 @@ The documentation tree was reorganized to an audience-based structure under back
 Reference documents:
 - Taxonomy and migration policy:
   - `doc/dev/workflow/process/DOC_TREE_TAXONOMY_AND_MIGRATION_POLICY.md`
-- Migration checklist:
-  - `doc/dev/workflow/process/DOC_TREE_MIGRATION_CHECKLIST.md`
 - Feature story:
   - `doc/backlog/implemented_features/DOC_TREE_INFORMATION_ARCHITECTURE_RESTRUCTURE.md`

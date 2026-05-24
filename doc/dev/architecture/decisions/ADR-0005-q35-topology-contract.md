@@ -75,5 +75,5 @@ Negative:
 
 - QEMU Q35 implementation notes and PCIe guidelines (`docs/pcie.txt`, `hw/i386/pc_q35.c`, `hw/pci-host/q35.c` in upstream QEMU)
 - Proxmox Q35 templates (`/usr/share/qemu-server/pve-q35.cfg`, `/usr/share/qemu-server/pve-q35-4.0.cfg`)
-- QEMU bus/address assignment analysis (`doc/dev/domain-knowledge/qemu-bus-and-addr-assignment.md`)
+- QEMU bus/address assignment analysis (`doc/dev/domain-knowledge/qemu-chipset-behavior.md`)
 - Local Q35 overview reference (`/home/hurenkam/Downloads/Q35.pdf`)

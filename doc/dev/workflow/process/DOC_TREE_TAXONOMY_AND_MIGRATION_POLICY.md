@@ -120,4 +120,4 @@ Changes to this policy require:
 3. explicit note in migration log describing impact on existing links
 
 Execution tracking checklist:
-- `doc/dev/workflow/process/DOC_TREE_MIGRATION_CHECKLIST.md`
+- migration checklist artifacts were retired after migration completion; ongoing rules are captured in this policy.
