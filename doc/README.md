@@ -1,6 +1,9 @@
 This directory contains documentation for the ezkvm project:
 
 - dev: Information intended for development
+   - architecture: Architecture contracts and implementation design notes
+      - design: Current implementation design breakdown and module notes
+         - current implementation architecture index: doc/dev/architecture/design/current-implementation-architecture.md
    - requirements: Requirements and specifications for the ezkvm tool
    - domain-knowledge: Collected information about relevant technologies and tools
        - proxmox: Contains expert information about the inner workings of proxmox, typically extracted from the public repo's.
