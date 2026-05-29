@@ -8,6 +8,8 @@ applyTo: "src/**/*.rs,tests/**/*.rs,Cargo.toml"
 
 Use this guidance for Rust implementation and review tasks.
 
+If the task involves module naming, file boundaries, or helper abstractions, consult [coding-guidelines.md](../../doc/dev/architecture/coding-guidelines.md) first.
+
 ## Baseline Quality Expectations
 
 - Prefer explicit error handling over panics in production paths.

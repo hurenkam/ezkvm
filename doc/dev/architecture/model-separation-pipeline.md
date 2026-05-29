@@ -38,6 +38,7 @@ Define the normative boundary between import-host data, canonical virtual_machin
 ## Stage Abstractions (Current)
 
 - Import stage now exposes a trait boundary (`ImportStage`) with a minimal request contract (`ImportRequest`) and current implementations for canonical YAML (`CanonicalYamlImportStage`) plus a Proxmox `.conf` scaffold (`ProxmoxConfImportStage`).
+- Import stage now exposes a trait boundary (`ImportStage`) with a minimal request contract (`ImportRequest`) and current implementations for canonical YAML (`CanonicalYamlImportStage`) plus a minimal Proxmox `.conf` adapter (`ProxmoxConfImportStage`) that maps name, machine, cpu, memory, and stable slot IDs into the canonical model.
 - Render stage now exposes a trait boundary (`RenderStage`) with a minimal request contract (`RenderRequest`) and default implementation (`DeterministicRenderStage`).
 - Runtime resolution currently publishes a minimal `EffectiveRuntimeModel` placeholder consumed by render.
 

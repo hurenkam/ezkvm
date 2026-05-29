@@ -45,8 +45,19 @@ Define the contract for source-specific import adapters that transform external 
 
 ## Current Scaffold
 
-- `CanonicalYamlImportStage` validates canonical YAML input against the current schema.
-- `ProxmoxConfImportStage` reserves the Proxmox `.conf` adapter slot behind the same `ImportStage` trait boundary.
+`CanonicalYamlImportStage` validates canonical YAML input against the current schema.
+`ProxmoxConfImportStage` now performs a minimal, deterministic Proxmox `.conf` to canonical mapping behind the same `ImportStage` trait.
+
+## Current Proxmox Mapping
+
+- `name` -> `metadata.vm_name`
+- `machine` -> `virtual_machine.system.machine.family` + `virtual_machine.system.machine.chipset`
+- `cpu` -> `virtual_machine.system.cpu.model`
+- `memory` -> `virtual_machine.system.memory.min`
+- `scsi*` -> `virtual_machine.storage[].id`
+- `net*` -> `virtual_machine.network[].id`
+- `hostpci*`, `usb*` -> `virtual_machine.resources[].id`
+- Unsupported source names remain typed failures; the adapter does not attempt general Proxmox syntax coverage yet
 
 ## Minimal Example
 

@@ -14,3 +14,6 @@
 - 2026-05-29: Reviewed expanded input/ Proxmox and QEMU corpus against canonical schema contract; aligned on schema expansion for topology/identity/intent/passthrough and runtime-resolution of host-specific paths.
 - 2026-05-29: Renamed Rust module directory from `src/canonical` to `src/vm_spec` to reflect typed VM intent schema plus validation responsibilities; kept type/function names stable and validated with fmt, clippy, and tests.
 - 2026-05-29: Added a Proxmox `.conf` import-stage skeleton (`ProxmoxConfImportStage`) beside canonical YAML import to prove the `ImportStage` trait boundary can host multiple adapters.
+- 2026-05-29: Implemented a minimal Proxmox `.conf` adapter that maps `name`, `machine`, `cpu`, `memory`, `scsi*`, `net*`, `hostpci*`, and `usb*` into `CanonicalDocument`; kept slot IDs deterministic and avoided host literals.
+- 2026-05-29: Learned that Proxmox `scsihw` must not be matched as a storage slot; numeric slot suffix checks are required for `scsi*` and `net*` fields.
+- 2026-05-29: Recorded the team decision that Proxmox `name` feeds `metadata.vm_name`, even though the canonical YAML schema contract still ties `vm_name` to the file stem for canonical YAML serialization.

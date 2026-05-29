@@ -8,6 +8,8 @@ When working with project documentation, treat [doc/README.md](../doc/README.md)
 
 ## Helper Registry
 
+- `Coding Guidelines`: `doc/dev/architecture/coding-guidelines.md`
+	- Use when shaping Rust modules, adding new helper abstractions, or checking file/module scope.
 - `Documentation Workflow Guardrails`: `.github/instructions/documentation.instructions.md`
 	- Use when reviewing, importing, or creating documentation.
 - `Docs Sync Enforcement`: `.github/instructions/docs-sync.instructions.md`
@@ -30,3 +32,16 @@ When working with project documentation, treat [doc/README.md](../doc/README.md)
 
 - `Sync Summary`: `.github/prompts/sync-summary.prompt.md`
 	- Use to run docs/planning sync pass(es) and return a consistent final summary format.
+- `Module Design`: `.github/prompts/module-design.prompt.md`
+	- Use when shaping a new module or stage boundary before implementation.
+
+## Skill Registry
+
+- `Design Patterns`: `.copilot/skills/design-patterns/SKILL.md`
+	- Use when designing new stage modules, adapter scaffolds, or deterministic render paths.
+
+## Code Quality Expectations
+
+- Prefer small, single-responsibility modules.
+- Keep stage boundaries explicit in names and file layout.
+- Consult `doc/dev/architecture/coding-guidelines.md` when introducing new Rust modules or abstractions.
