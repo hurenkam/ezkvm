@@ -69,6 +69,10 @@ qemu:
     firmware:
       normal: "OVMF_CODE_4M.fd"
       secure: "OVMF_CODE_4M.secboot.fd"
+resources:
+  - { id: "gpu0", type: "pcie", host: ["0000:03:00"]}
+  - { id: "usb0", type: "usb", host: { bus: 1, port: "2.2" }}
+
 ```
 
 ## Typical Virtual Machine config file
@@ -95,7 +99,10 @@ virtual_machine:
   storage:
     - controller: "pvscsi"
       drives:
-        - { interface: "scsi", type: "disk", path: "/dev/vm1/vm-108-boot" }
+        - { type: "disk", path: "/dev/vm1/vm-108-boot" }
+  resources: 
+    - id: "gpu0"
+    - id: "usb0"
 ```
 
 ## Notes
