@@ -1,5 +1,8 @@
 use serde::Deserialize;
 
+/// Schema version for canonical VM specification.
+pub const CANONICAL_SCHEMA_VERSION: &str = "1.0.0";
+
 #[derive(Debug, Deserialize)]
 pub struct CanonicalDocument {
     pub metadata: Metadata,
@@ -59,4 +62,23 @@ pub struct NetworkEntry {
 #[derive(Debug, Deserialize)]
 pub struct ResourceRef {
     pub id: String,
+}
+
+// Conversion implementations for YAML parsing
+impl From<String> for StorageEntry {
+    fn from(id: String) -> Self {
+        Self { id }
+    }
+}
+
+impl From<String> for NetworkEntry {
+    fn from(id: String) -> Self {
+        Self { id }
+    }
+}
+
+impl From<String> for ResourceRef {
+    fn from(id: String) -> Self {
+        Self { id }
+    }
 }
