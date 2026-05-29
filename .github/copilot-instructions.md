@@ -14,6 +14,8 @@ When working with project documentation, treat [doc/README.md](../doc/README.md)
 	- Use when implementation or configuration changes may require documentation updates.
 - `Planning And Backlog Sync`: `.github/instructions/planning-sync.instructions.md`
 	- Use when editing planning backlog or feature lifecycle files.
+- `Rust Guideline Enforcement`: `.github/instructions/rust-guidelines.instructions.md`
+	- Use when editing Rust source/tests to enforce baseline safety, validation, and reporting expectations.
 
 ## Agent Registry
 
@@ -21,6 +23,8 @@ When working with project documentation, treat [doc/README.md](../doc/README.md)
 	- Use for a final pass that maps changed behavior to documentation updates and reports a concise delta.
 - `Planning Sync`: `.github/agents/planning-sync.agent.md`
 	- Use for a final pass that reconciles planning status, dependencies, and lifecycle placement.
+- `Rust Guidelines Monitor`: `.github/agents/rust-guidelines-monitor.agent.md`
+	- Use for a findings-first audit of Rust code quality, regressions, and validation hygiene.
 
 ## Prompt Registry
 
