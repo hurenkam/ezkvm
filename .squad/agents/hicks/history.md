@@ -12,3 +12,4 @@
 - Deterministic command generation and preflight validation are baseline constraints.
 - 2026-05-29: Participated in corpus-vs-schema review with Bishop, Hudson, and Vasquez; confirmed `input/` artifact mix (222 files, mostly `.conf`/`.qemu.cmd`/`.qemu.cmd.split`) and captured likely canonical schema updates for topology, machine identity, storage/network intent, firmware/TPM identity, and passthrough limits.
 - 2026-05-29: Reviewed expanded input/ Proxmox and QEMU corpus against canonical schema contract; aligned on schema expansion for topology/identity/intent/passthrough and runtime-resolution of host-specific paths.
+- 2026-05-29: Implemented first Rust conformance slice with typed canonical YAML parsing and deterministic validation for core required fields, vm_name filename matching, pc chipset consistency, and scoped ID uniqueness; field-path diagnostics are emitted through structured validation issues.

@@ -28,12 +28,33 @@ Define the normative boundary between import-host data, canonical virtual_machin
    - Input: effective runtime model
    - Output: ordered QEMU argument vector
 
+## Implementation Naming (Current Scaffold)
+
+- `src/import_stage/`: import stage orchestration boundary
+- `src/vm_spec/`: canonical VM specification schema and validation boundary
+- `src/runtime_resolution/`: runtime resolution stage boundary
+- `src/render_stage/`: deterministic render stage boundary
+
+## Stage Abstractions (Current)
+
+- Import stage now exposes a trait boundary (`ImportStage`) with a minimal request contract (`ImportRequest`) and current implementations for canonical YAML (`CanonicalYamlImportStage`) plus a Proxmox `.conf` scaffold (`ProxmoxConfImportStage`).
+- Render stage now exposes a trait boundary (`RenderStage`) with a minimal request contract (`RenderRequest`) and default implementation (`DeterministicRenderStage`).
+- Runtime resolution currently publishes a minimal `EffectiveRuntimeModel` placeholder consumed by render.
+
+Trait boundaries are synchronous and object-safe by default (no generic method parameters, no `async fn`, no `Self` in return positions).
+
 ## Stage Contracts
 
 1. Import stage must not access runtime-host probes or runtime-only path resolution.
 2. Runtime resolution must not reinterpret source-specific syntax.
 3. Render stage must be side-effect free and deterministic.
 4. Validation must run at each boundary and must fail fast when contract violations are detected.
+
+## Trait Constraints
+
+- Sync vs async: keep sync now; no current stage performs I/O that requires async in the contract.
+- Object safety: required so stage implementations can be selected behind trait objects later.
+- Error typing: each trait uses an associated `Error` type so implementations can remain specific without forcing a global error enum too early.
 
 ## Data Ownership Rules
 
