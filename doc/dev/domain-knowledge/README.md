@@ -14,6 +14,9 @@ This area stores reusable, non-project-specific technical knowledge relevant to 
 - `q35/q35-chipset-domain.md`
 - `i440fx/i440fx-chipset-domain.md`
 - `qemu/qemu-chipset-behavior.md`
+- `windows/windows-11-guest-baseline.md`
+- `gpu/gpu-passthrough-host-readiness.md`
+- `looking-glass/looking-glass-integration.md`
 
 ## Scope Rules
 

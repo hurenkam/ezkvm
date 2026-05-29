@@ -64,6 +64,13 @@ Re-implement ezkvm from scratch to preserve design freedom while still learning 
 - Risk: Documentation drift.
   - Mitigation: Update docs as part of definition-of-done for each change.
 
+## Requirement Traceability Policy
+
+- Backlog and feature planning entries must link to one or more requirement IDs from `doc/dev/requirements/product-requirements.md` (for example: FR-001, NFR-003).
+- Traceability records must be maintained in `doc/planning/backlog/requirements-traceability-matrix.md` as items are added or status changes.
+- If an item is operational or maintenance work with no direct requirement mapping, mark Requirement ID as `N/A` and add a short rationale in the evidence field.
+- A planning item is not ready for implementation unless requirement linkage and evidence placeholders are present.
+
 ## Immediate Next Steps
 
 1. Create a comparison checklist against `~/Workspace/ezkvm`.
