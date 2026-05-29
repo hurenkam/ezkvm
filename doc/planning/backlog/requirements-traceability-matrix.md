@@ -24,3 +24,5 @@ Purpose: keep requirement-to-planning linkage explicit and lightweight for day-t
 | FR-004 | [example-runtime-pipeline](../features/prepared/example-runtime-pipeline.md) | prepared | unassigned | pending |
 | NFR-003 | [example-validation-improvements](../backlog/example-validation-improvements.md) | backlog | unassigned | pending |
 | N/A (maintenance) | [example-refactor-task](../backlog/example-refactor-task.md) | backlog | unassigned | rationale: internal cleanup |
+| FR-003, FR-004, FR-005, FR-006 | [canonical-schema-conformance-matrix](../features/prepared/canonical-schema-conformance-matrix.md) | prepared | unassigned | [canonical-yaml-schema-contract](../../dev/requirements/canonical-yaml-schema-contract.md), [input/felucia/108.conf](../../../input/felucia/108.conf) |
+| FR-003, FR-004, FR-005, FR-006 | [schema-host-resource-boundary-slice](../features/prepared/schema-host-resource-boundary-slice.md) | prepared | unassigned | [input/felucia/108.conf](../../../input/felucia/108.conf), [input/coruscant/3101.conf](../../../input/coruscant/3101.conf) |
