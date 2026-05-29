@@ -12,3 +12,4 @@
 - Docs must stay synchronized when behavior, defaults, or runtime workflow changes.
 - 2026-05-28: Assigned documentation readiness audit for doc structure and coverage checks.
 - 2026-05-28: Core dev contracts are clearer when split into adapter boundary, pipeline boundary, schema shape, and determinism guarantees with FR/NFR traceability.
+- 2026-05-28: Team converged to prioritize execution baseline and traceability activation before additional architecture writing, with a proposed prepared contract-first validation baseline for FR-003/004/005/006/007.

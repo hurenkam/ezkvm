@@ -5,7 +5,7 @@ Date: 2026-05-28
 
 ## Purpose
 
-Define the contract for source-specific import adapters that transform external VM definitions into the fixed machine layout consumed by runtime generation.
+Define the contract for source-specific import adapters that transform external VM definitions into the canonical virtual_machine model consumed by runtime generation.
 
 ## Requirement Traceability
 
@@ -22,7 +22,7 @@ Define the contract for source-specific import adapters that transform external 
    - Source payload (for example Proxmox config, raw QEMU CLI capture, or libvirt XML)
    - Import-host context (facts known at import time)
 3. An adapter must produce:
-   - Canonical fixed machine layout data only
+   - Canonical virtual_machine model data only
    - Structured diagnostics (errors/warnings) with source locations when available
 4. An adapter must not perform runtime-host resolution (paths, binaries, host device probing).
 5. Adapter output must be normalized enough for deterministic downstream rendering.
@@ -47,10 +47,13 @@ Define the contract for source-specific import adapters that transform external 
 ```text
 Adapter: proxmox
 Input:  machine: q35, cpu: host, memory: 8192
-Output: fixed_machine_layout
-  chipset: q35
-  cpu_model: host
-  memory_mib: 8192
+Output: virtual_machine
+   system:
+      chipset: q35
+      cpu:
+         model: host
+      memory:
+         min: 8192
 Diagnostics: []
 ```
 

@@ -28,7 +28,7 @@ Define deterministic behavior requirements for effective model resolution and QE
 
 Two inputs are equivalent when:
 
-- Canonical fixed machine layout is semantically equal after normalization.
+- Canonical virtual_machine model is semantically equal after normalization.
 - Runtime-host resolved capabilities and selected defaults are equal.
 - Explicit overrides and profile layering results are equal.
 

@@ -12,7 +12,7 @@ ezkvm is an easy-to-use drop-in replacement for running Proxmox-origin virtual m
 - Run Proxmox-origin virtual machines on non-Proxmox Linux hosts with minimal migration friction.
 - Keep the architecture import-source-agnostic so additional sources can be added without redesigning the core model.
 - Use a simple YAML-based core configuration schema that stays close in size and readability to the originating VM configuration.
-- Separate concerns between import-host assumptions, fixed guest machine model, and runtime-host assumptions.
+- Separate concerns between import-host assumptions, canonical virtual_machine model intent, and runtime-host assumptions.
 
 ## 3. Functional Requirements
 
@@ -45,20 +45,20 @@ The schema must be:
 The system must enforce a three-part model:
 
 1. Import-host-specific data
-2. Fixed machine layout (canonical machine model)
+2. Canonical virtual_machine model (source-agnostic machine intent)
 3. Runtime-host-specific data
 
 Import stage requirement:
 
-- Import-host data + source VM definition -> fixed machine layout
+- Import-host data + source VM definition -> canonical virtual_machine model
 
 Runtime stage requirement:
 
-- Fixed machine layout + runtime-host data -> generated QEMU command line
+- Canonical virtual_machine model + runtime-host data -> generated QEMU command line
 
 ### FR-005 Deterministic Command Generation
 
-Given the same fixed machine layout and runtime-host data, generated QEMU arguments must be deterministic.
+Given the same canonical virtual_machine model and runtime-host data, generated QEMU arguments must be deterministic.
 
 ### FR-006 Validation Before Execution
 

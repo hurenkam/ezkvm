@@ -5,7 +5,7 @@ Date: 2026-05-28
 
 ## Purpose
 
-Define the normative boundary between import-host data, fixed machine layout, and runtime-host data, including deterministic handoff expectations.
+Define the normative boundary between import-host data, canonical virtual_machine model data, and runtime-host data, including deterministic handoff expectations.
 
 ## Requirement Traceability
 
@@ -20,9 +20,9 @@ Define the normative boundary between import-host data, fixed machine layout, an
 
 1. Import Stage
    - Inputs: source VM definition + import-host context
-   - Output: fixed machine layout
+    - Output: canonical virtual_machine model
 2. Runtime Resolution Stage
-   - Inputs: fixed machine layout + runtime-host context
+    - Inputs: canonical virtual_machine model + runtime-host context
    - Output: effective runtime model
 3. Render Stage
    - Input: effective runtime model
@@ -38,7 +38,7 @@ Define the normative boundary between import-host data, fixed machine layout, an
 ## Data Ownership Rules
 
 - Import-host data should capture source assumptions that are needed to normalize machine intent.
-- Fixed machine layout must represent source-agnostic guest intent.
+- Canonical virtual_machine model must represent source-agnostic guest intent.
 - Runtime-host data must capture executable environment facts only.
 
 ## Allowed Transformations
@@ -57,13 +57,13 @@ Define the normative boundary between import-host data, fixed machine layout, an
 
 ```text
 import(source=proxmox.conf, import_host=H1)
-  -> fixed_machine_layout=F
+  -> canonical_vm=C
 
-resolve_runtime(fixed=F, runtime_host=H2)
+resolve_runtime(canonical_vm=C, runtime_host=H2)
   -> effective_runtime=R
 
 render_qemu_args(runtime=R)
   -> ["-machine", "q35", "-m", "8192", ...]
 ```
 
-If H1 and H2 are unchanged and F is unchanged, rendering must produce the same argument vector order.
+If H1 and H2 are unchanged and C is unchanged, rendering must produce the same argument vector order.
