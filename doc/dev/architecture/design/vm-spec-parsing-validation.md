@@ -20,51 +20,51 @@ Top-level schema expects `metadata` and `virtual_machine`. `storage`, `network`,
 @startuml
 skinparam classAttributeIconSize 0
 
-class CanonicalDocument {
+class CanonicalDocument << (S,#98FB98) >> {
   +metadata: Metadata
   +virtual_machine: VirtualMachine
 }
 
-class Metadata {
+class Metadata << (S,#98FB98) >> {
   +schema_version: String
   +vm_name: String
 }
 
-class VirtualMachine {
+class VirtualMachine << (S,#98FB98) >> {
   +system: System
   +storage: Vec<StorageEntry>
   +network: Vec<NetworkEntry>
   +resources: Vec<ResourceRef>
 }
 
-class System {
+class System << (S,#98FB98) >> {
   +machine: Machine
   +cpu: Cpu
   +memory: Memory
 }
 
-class Machine {
+class Machine << (S,#98FB98) >> {
   +family: String
   +chipset: String
 }
 
-class Cpu {
+class Cpu << (S,#98FB98) >> {
   +model: String
 }
 
-class Memory {
+class Memory << (S,#98FB98) >> {
   +min: i64
 }
 
-class StorageEntry {
+class StorageEntry << (S,#98FB98) >> {
   +id: String
 }
 
-class NetworkEntry {
+class NetworkEntry << (S,#98FB98) >> {
   +id: String
 }
 
-class ResourceRef {
+class ResourceRef << (S,#98FB98) >> {
   +id: String
 }
 
@@ -88,13 +88,13 @@ System *-- Memory
 @startuml
 skinparam classAttributeIconSize 0
 
-enum Severity {
+enum Severity << (S,#98FB98) >> {
   Error
   Warning
   Info
 }
 
-class ValidationIssue {
+class ValidationIssue << (S,#98FB98) >> {
   +path: String
   +reason: String
   +severity: Severity
@@ -103,14 +103,14 @@ class ValidationIssue {
   +remediation: Option<String>
 }
 
-class ParseError {
+class ParseError << (S,#98FB98) >> {
 }
 
-class CanonicalDocument
+class CanonicalDocument << (S,#98FB98) >>
 
-class "parse_canonical_document_from_yaml()" as ParseYaml
-class "parse_canonical_document()" as ParseValue
-class "enrich_validation_issues()" as Enrich
+class "parse_canonical_document_from_yaml()" as ParseYaml << (F,#DDA0DD) >>
+class "parse_canonical_document()" as ParseValue << (F,#DDA0DD) >>
+class "enrich_validation_issues()" as Enrich << (F,#DDA0DD) >>
 
 ParseYaml ..> ParseValue
 ParseValue ..> CanonicalDocument
@@ -137,7 +137,7 @@ ValidationIssue --> Severity
 @startuml
 skinparam classAttributeIconSize 0
 
-class ValidationSummary {
+class ValidationSummary << (S,#98FB98) >> {
   +total_issues: usize
   +errors: usize
   +warnings: usize
@@ -145,31 +145,31 @@ class ValidationSummary {
   +from_issues(issues)
 }
 
-class ValidationReport {
+class ValidationReport << (S,#98FB98) >> {
   +summary: ValidationSummary
   +issues: Vec<ValidationIssue>
   +from_issues(issues)
   +render_with(formatter, format)
 }
 
-interface ReportFormatter {
+interface ReportFormatter << (T,#FFB347) >> {
   +format_human(issues) -> String
   +format_json(issues) -> String
 }
 
-class DefaultReportFormatter {
+class DefaultReportFormatter << (S,#98FB98) >> {
   +new() -> Self
   +format_human(issues) -> String
   +format_json(issues) -> String
 }
 
-class ConformanceError {
+class ConformanceError << (S,#98FB98) >> {
   +issues() -> &[ValidationIssue]
   +report() -> Option<ValidationReport>
 }
 
-class ValidationIssue
-class ParseError
+class ValidationIssue << (S,#98FB98) >>
+class ParseError << (S,#98FB98) >>
 
 ReportFormatter <|.. DefaultReportFormatter
 ConformanceError --> ParseError : wraps

@@ -18,37 +18,41 @@ The import stage takes source text plus source name and returns a canonical `Can
 @startuml
 skinparam classAttributeIconSize 0
 
-class ImportRequest {
+class ImportRequest << (S,#98FB98) >> {
   +source_text: &str
   +source_name: &Path
 }
 
-interface ImportStage {
+interface ImportStage << (T,#FFB347) >> {
   +import(request: ImportRequest) -> Result<CanonicalDocument, Error>
 }
 
-class ImportStageError {
+class ImportStageError << (S,#98FB98) >> {
 }
 
-class CanonicalYamlImportStage {
+class CanonicalYamlImportStage << (S,#98FB98) >> {
   +import(request) -> Result<CanonicalDocument, ImportStageError>
 }
 
-class ProxmoxConfImportStage {
+class ProxmoxConfImportStage << (S,#98FB98) >> {
   +parse(request) -> Result<CanonicalDocument, ProxmoxConfImportError>
 }
 
-class ProxmoxConfImportError {
+class ProxmoxConfImportError << (S,#98FB98) >> {
 }
 
-class CanonicalDocument
+class CanonicalDocument << (S,#98FB98) >>
+class Path << (S,#98FB98) >>
+class ConformanceError << (S,#98FB98) >>
+class "validate_canonical_yaml()" as ValidateCanonicalYaml << (F,#DDA0DD) >>
+class "parse_machine_value()" as ParseMachineValue << (F,#DDA0DD) >>
 
 ImportStage <|.. CanonicalYamlImportStage
 ImportStage <|.. ProxmoxConfImportStage
 ImportStageError --> ProxmoxConfImportError : wraps
 ImportStageError --> ConformanceError : wraps
-CanonicalYamlImportStage ..> validate_canonical_yaml
-ProxmoxConfImportStage ..> parse_machine_value
+CanonicalYamlImportStage ..> ValidateCanonicalYaml
+ProxmoxConfImportStage ..> ParseMachineValue
 ProxmoxConfImportStage ..> CanonicalDocument
 ImportRequest --> Path
 @enduml

@@ -17,11 +17,11 @@ This note covers crate entry wiring in:
 @startuml
 skinparam classAttributeIconSize 0
 
-class "src/main.rs" as Main {
+class "src/main.rs" as Main << (M,#87CEEB) >> {
   +main()
 }
 
-class "src/lib.rs" as Lib {
+class "src/lib.rs" as Lib << (M,#87CEEB) >> {
   +app_name() -> &'static str
 }
 

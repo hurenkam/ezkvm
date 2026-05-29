@@ -18,21 +18,21 @@ This note covers stage boundaries in:
 @startuml
 skinparam classAttributeIconSize 0
 
-class RuntimeResolutionStage
+class RuntimeResolutionStage << (S,#98FB98) >>
 
-class EffectiveRuntimeModel {
+class EffectiveRuntimeModel << (S,#98FB98) >> {
   +qemu_args: Vec<String>
 }
 
-class RenderRequest {
+class RenderRequest << (S,#98FB98) >> {
   +effective_runtime: &EffectiveRuntimeModel
 }
 
-interface RenderStage {
+interface RenderStage << (T,#FFB347) >> {
   +render(request: RenderRequest) -> Result<Vec<String>, Error>
 }
 
-class DeterministicRenderStage {
+class DeterministicRenderStage << (S,#98FB98) >> {
   +render(request) -> Result<Vec<String>, Infallible>
 }
 
