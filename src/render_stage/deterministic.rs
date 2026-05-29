@@ -4,8 +4,6 @@
 
 use std::convert::Infallible;
 
-use crate::runtime_resolution::EffectiveRuntimeModel;
-
 use super::{RenderRequest, RenderStage};
 
 #[derive(Debug, Default)]

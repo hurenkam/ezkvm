@@ -40,21 +40,10 @@ pub enum ProxmoxConfImportError {
 pub struct ProxmoxConfImportStage;
 
 impl ProxmoxConfImportStage {
-    pub fn new() -> Self {
-        Self
-    }
-
-    fn is_proxmox_conf_source(source_name: &Path) -> bool {
-        matches!(
-            source_name.extension().and_then(OsStr::to_str),
-            Some("conf")
-        )
-    }
-
     pub fn parse(request: ImportRequest<'_>) -> Result<CanonicalDocument, ProxmoxConfImportError> {
         let source_name = request.source_name.to_string_lossy().into_owned();
 
-        validate_source_name(request.source_name, &source_name)?;
+        validate_source_name(request.source_name)?;
 
         let mut vm_name: Option<String> = None;
         let mut machine: Option<Machine> = None;
@@ -136,19 +125,25 @@ impl ProxmoxConfImportStage {
     }
 }
 
-fn validate_source_name(
-    source_name: &Path,
-    source_name_text: &str,
-) -> Result<(), ProxmoxConfImportError> {
+fn is_proxmox_conf_source(source_name: &Path) -> bool {
+    matches!(
+        source_name.extension().and_then(OsStr::to_str),
+        Some("conf")
+    )
+}
+
+fn validate_source_name(source_name: &Path) -> Result<(), ProxmoxConfImportError> {
+    let source_name_text = source_name.to_string_lossy().into_owned();
+
     let Some(file_name) = source_name.file_name().and_then(OsStr::to_str) else {
         return Err(ProxmoxConfImportError::InvalidSourceName {
-            source_name: source_name_text.to_owned(),
+            source_name: source_name_text,
         });
     };
 
-    if !ProxmoxConfImportStage::is_proxmox_conf_source(source_name) || file_name.is_empty() {
+    if !is_proxmox_conf_source(source_name) || file_name.is_empty() {
         return Err(ProxmoxConfImportError::InvalidSourceName {
-            source_name: source_name_text.to_owned(),
+            source_name: source_name_text,
         });
     }
 
