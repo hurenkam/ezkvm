@@ -15,3 +15,4 @@
 - 2026-05-28: Team converged to prioritize execution baseline and traceability activation before additional architecture writing, with a proposed prepared contract-first validation baseline for FR-003/004/005/006/007.
 - 2026-05-29: Reusable helper skills live under `.copilot/skills/` in this repo; prompt helpers live under `.github/prompts/`.
 - 2026-05-29: Module/stage design guidance should center on trait-based stage boundaries, source-specific adapter scaffolds, deterministic rendering, and validation before execution.
+- 2026-05-29: Validation docs drifted most around parse-vs-conformance boundaries, formatter baseline status, and planned corpus coverage being written as if already active.

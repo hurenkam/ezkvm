@@ -59,6 +59,27 @@ Define the contract for source-specific import adapters that transform external 
 - `hostpci*`, `usb*` -> `virtual_machine.resources[].id`
 - Unsupported source names remain typed failures; the adapter does not attempt general Proxmox syntax coverage yet
 
+## Corpus-Backed Evidence
+
+The current Proxmox adapter baseline is exercised against representative corpus samples from three hosts:
+
+- `input/felucia/108.conf` -> `wakiza`, `q35`, storage `scsi0`/`scsi1`, network `net0`, resources `hostpci0`/`usb0`
+- `input/coruscant/3101.conf` -> `gyndine`, `q35`, storage `scsi0`, no network entries, resources `hostpci0` through `hostpci11`
+- `input/zbp-server-mh2/103.conf` -> `desktop-markh-3`, `q35`, storage `scsi0`/`scsi1`, network `net0`, no passthrough resources
+
+Each imported document is validated with `validate_canonical_document` against the canonical output filename derived from `metadata.vm_name`.
+
+## Known Validation Limit
+
+Many Proxmox corpus files use numeric source filenames such as `108.conf` or `3101.conf` while the canonical document uses the guest name (`wakiza`, `gyndine`) as `metadata.vm_name`.
+
+This means:
+
+- validating the imported document against the original `.conf` source path is expected to fail the filename-stem rule
+- validating the imported document against the emitted canonical YAML path (for example `wakiza.yaml`) is expected to pass when the mapped document is otherwise conformant
+
+This is a boundary between source import fidelity and canonical file naming, not a parser defect.
+
 ## Minimal Example
 
 ```text

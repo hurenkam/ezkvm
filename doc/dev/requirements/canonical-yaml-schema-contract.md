@@ -121,7 +121,80 @@ VM config references host catalog resources:
 - Conflicting immutable fields in composed profiles must fail validation.
 - Layering must not alter resource-ID binding semantics (only values, never host-literal ownership rules).
 
-## Conformance Test Matrix
+## Validation Conformance Terms (CT-001 through CT-005)
+
+The validation framework enforces five core contract terms, each with dedicated test coverage in `src/vm_spec/validation.rs`:
+
+### CT-001: Valid Canonical Document Structure
+
+**Definition:** A canonical YAML document is valid when all required fields are present, correctly typed, and consistent with validation rules.
+
+**Test:** `passing_canonical_example` — validates happy path with metadata, system config, and resource entries
+
+**Edge Cases Covered:**
+- `optional_sections_omitted_is_valid` — Confirms storage, network, and resources sections are optional and document is valid without them
+- `same_id_across_scopes_is_allowed` — Validates that identical IDs across different scopes (storage, network, resources) do not cause errors
+
+### CT-002: Required Field Presence and Type Validation
+
+**Definition:** All required fields (metadata, system, machine, cpu, memory) must be present and correctly typed; violations report field path and constraint.
+
+**Tests:**
+- `missing_required_field` — rejects empty cpu.model, reports precise field path
+- `invalid_type_reports_field_path` — rejects memory.min as string, reports type constraint
+- `collection_type_mismatch_reports_field_path` — rejects `virtual_machine.storage` when provided as a mapping instead of a list
+
+**Edge Cases Covered:**
+- `malformed_yaml_is_rejected_before_validation` — Syntax-invalid YAML is rejected at the parse boundary before conformance validation runs
+- `multiple_missing_required_fields` — Multiple missing required fields (cpu.model and machine.chipset) reported simultaneously with precise paths
+- `empty_vm_name` — Boundary test: empty string vm_name is properly rejected as required field
+- `empty_schema_version` — Boundary test: empty string schema_version is properly rejected as required field
+- `memory_minimum_zero_is_valid` — Edge boundary: memory.min = 0 is valid (constraint is >= 0, not > 0)
+
+### CT-003: Resource ID Uniqueness Within Scope
+
+**Definition:** IDs must be unique within storage, network, and resources scopes respectively; same ID allowed across different scopes (cross-scope reuse permitted).
+
+**Tests:**
+- `duplicate_ids` — detects duplicates in all three scopes simultaneously
+- `empty_ids_report_precise_field_paths` — rejects empty IDs with indexed paths
+- `duplicate_storage_id_reports_offending_entry_index` — targets duplicate (not first) occurrence
+- `same_id_across_scopes_is_allowed` — confirms cross-scope ID reuse is valid
+
+**Edge Cases Covered:**
+- `multiple_duplicates_in_storage_scope` — Multiple instances (3+) of the same ID within a single scope; all duplicates after first are reported with correct indices
+
+### CT-004: Machine Consistency and vm_name Enforcement
+
+**Definition:** Machine family and chipset must be consistent (family "pc" requires chipset in [q35, i440fx]); vm_name must match filename stem.
+
+**Tests:**
+- `invalid_chipset_family_combination` — rejects arm-virt for family pc
+- `vm_name_mismatch` — rejects vm_name that differs from filename stem
+
+**Edge Cases Covered:**
+- `unknown_machine_family` — Machine families outside the validated set (not "pc") are accepted as-is; chipset validation only applies when family is "pc"
+
+### CT-005: Precise Field Path Error Reporting
+
+**Definition:** All validation errors must include full field path (with array indices) and specific constraint violated, enabling deterministic error routing.
+
+**Tests:**
+- `invalid_type_reports_field_path` — includes full nesting: `virtual_machine.system.memory.min`
+- `collection_type_mismatch_reports_field_path` — reports the collection path itself: `virtual_machine.storage`
+- `empty_ids_report_precise_field_paths` — includes array indices: `storage[0].id`, `network[0].id`, `resources[0].id`
+- `duplicate_storage_id_reports_offending_entry_index` — reports duplicate at [2], not [0]
+
+**Edge Cases Covered:**
+- `empty_schema_version` — Precise path reporting for empty required field: `metadata.schema_version`
+- `empty_vm_name` — Precise path reporting for empty required field: `metadata.vm_name`
+- `multiple_missing_required_fields` — Multiple field paths reported (e.g., `virtual_machine.system.cpu.model` and `virtual_machine.system.machine.chipset`)
+
+---
+
+## Planned Corpus-Based Conformance Matrix
+
+This matrix documents the intended corpus-backed coverage target for Item 4. The current validation suite is still synthetic and does not yet execute these corpus cases directly.
 
 | Test ID | Corpus Input | Focus | Expected Result |
 |---------|--------------|-------|-----------------|
@@ -213,3 +286,25 @@ virtual_machine:
 
 - This contract defines shape and semantics, not every optional field.
 - Additional field catalogs should remain compatible with this contract.
+
+## Edge Cases: Deferred / Out of Scope
+
+The following edge cases identified during Item 2 are documented as out-of-scope for contract v1.0:
+
+### Oversized Value Validation
+
+**Rationale:** Numeric limits (e.g., maximum CPU count, memory ceiling) are host-dependent and require performance/resource profile validation beyond YAML schema scope. These belong in host-config validation or runtime resolution stages.
+
+**Related fields:** `virtual_machine.system.cpu.cores`, `virtual_machine.system.memory.max`
+
+### Resource Catalog Cross-Reference Validation
+
+**Rationale:** Validating that VM `resources[].id` references match host catalog entries requires access to host configuration context, which is not available during canonical VM document validation. This validation is deferred to runtime resolution stage.
+
+**Related contract term:** "VM resource references must fail validation if no matching host catalog ID exists" — validation deferred to runtime resolution.
+
+### Full Machine Family Enumeration
+
+**Rationale:** Only "pc" family is validation-enforced; other families (e.g., "arm-virt", "virt") are accepted as custom/future extensions. Full enumeration deferred until additional architectures are formally normalized into the schema.
+
+**Current behavior:** Family "pc" → chipset [q35, i440fx] enforced; other families → no chipset constraint.

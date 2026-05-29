@@ -23,6 +23,46 @@ These are repo-level boundaries for writing and reviewing Rust code.
 - `src/runtime_resolution/` owns host-bound resolution of canonical intent.
 - `src/render_stage/` owns deterministic command rendering.
 
+## Validation Layer Implementation
+
+The `src/vm_spec/` module implements a two-layer validation pattern that separates concerns between parsing and semantic validation:
+
+**Layer 1: Parsing** (`src/vm_spec/parsing.rs`)
+- Converts raw YAML text to a structured model
+- Performs structural validation (required fields, type correctness, field path availability)
+- Produces `CanonicalDocument` on success or `ParseError` on failure
+- Returns `ParseError::Yaml` immediately for syntax-invalid YAML before structural validation runs
+- Collects all parsing issues in one pass (does not short-circuit on first error)
+- Uses `ValidationIssue` type with precise field paths (e.g., `virtual_machine.storage[1].id`)
+
+**Layer 2: Validation** (`src/vm_spec/validation.rs`)
+- Accepts a parsed `CanonicalDocument` and performs semantic validation
+- Enforces business rules: uniqueness constraints, consistency policies, filename matching
+- Produces `ConformanceError` that wraps validation issues or parse errors
+- Uses the same `ValidationIssue` type for consistency with parsing layer
+- Reports field paths including array indices for duplicate detection
+- Owns report formatting via `ReportFormatter` and `DefaultReportFormatter`
+
+**Key Types:**
+
+- `ValidationIssue`: Contains `path`, `reason`, `severity`, and optional `line_number`, `source_snippet`, and `remediation`
+- `ParseError`: Wraps either a raw YAML syntax error or a counted list of `ValidationIssue`
+- `ConformanceError`: Wraps either `ParseError` or a count + list of `ValidationIssue`
+
+**Testing Pattern:**
+
+Tests live in the implementation module (`validation.rs`) and cover:
+- Valid documents (happy path)
+- YAML syntax rejection at the parse boundary
+- Missing required fields
+- Type mismatches
+- ID uniqueness violations within each scope
+- Filename/vm_name matching
+- Chipset consistency with machine family
+- Human-readable and JSON report formatter output
+
+See [validation rules reference](../requirements/validation-rules.md) for detailed rule documentation and [validation examples](./validation-examples.md) for common failure scenarios.
+
 ## Stage Module Organization
 
 Stage modules (import_stage, render_stage, etc.) follow a consistent internal structure:

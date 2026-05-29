@@ -39,4 +39,3 @@ impl ImportStage for ProxmoxConfImportStage {
         ProxmoxConfImportStage::parse(request).map_err(Into::into)
     }
 }
-

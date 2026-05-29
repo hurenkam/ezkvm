@@ -3,7 +3,9 @@ pub mod parsing;
 pub mod validation;
 
 pub use model::CanonicalDocument;
-pub use parsing::{ParseError, ValidationIssue};
+pub use parsing::{ParseError, Severity, ValidationIssue};
 pub use validation::{
-    ConformanceError, validate_canonical_document, validate_canonical_yaml,
+    ConformanceError, DefaultReportFormatter, ReportFormatter, ValidationReport,
+    ValidationReportFormat, ValidationSummary, validate_canonical_document,
+    validate_canonical_yaml,
 };

@@ -32,7 +32,7 @@ Implement the first host/VM boundary slice for generic pass-through modeling so 
 ## Dependencies
 
 - [canonical-yaml-schema-contract](../../../dev/requirements/canonical-yaml-schema-contract.md)
-- [canonical-schema-conformance-matrix](canonical-schema-conformance-matrix.md)
+- [canonical-yaml-validation](../done/canonical-yaml-validation.md)
 - [input/felucia/108.conf](../../../../input/felucia/108.conf)
 - [input/coruscant/3101.conf](../../../../input/coruscant/3101.conf)
 - [input/coruscant/3101.qemu.cmd.split](../../../../input/coruscant/3101.qemu.cmd.split)

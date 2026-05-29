@@ -17,3 +17,4 @@
 - 2026-05-29: Implemented a minimal Proxmox `.conf` adapter that maps `name`, `machine`, `cpu`, `memory`, `scsi*`, `net*`, `hostpci*`, and `usb*` into `CanonicalDocument`; kept slot IDs deterministic and avoided host literals.
 - 2026-05-29: Learned that Proxmox `scsihw` must not be matched as a storage slot; numeric slot suffix checks are required for `scsi*` and `net*` fields.
 - 2026-05-29: Recorded the team decision that Proxmox `name` feeds `metadata.vm_name`, even though the canonical YAML schema contract still ties `vm_name` to the file stem for canonical YAML serialization.
+- 2026-05-29: Added table-driven corpus validation coverage for `felucia/108.conf`, `coruscant/3101.conf`, and `zbp-server-mh2/103.conf`; confirmed imported documents conform when validated against canonical output filenames, and documented numeric `.conf` source-name mismatch as an expected validation boundary rather than an adapter failure.

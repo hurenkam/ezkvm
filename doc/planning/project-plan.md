@@ -73,6 +73,6 @@ Re-implement ezkvm from scratch to preserve design freedom while still learning 
 
 ## Immediate Next Steps
 
-1. Implement [canonical-schema-conformance-matrix](features/prepared/canonical-schema-conformance-matrix.md) as the contract-validation gate for CT-001 through CT-005.
-2. Implement [schema-host-resource-boundary-slice](features/prepared/schema-host-resource-boundary-slice.md) as the first host/VM separation slice.
-3. Set up initial development standards and coding conventions.
+1. Advance [schema-host-resource-boundary-slice](features/prepared/schema-host-resource-boundary-slice.md) as the next host/VM separation slice now that [canonical-yaml-validation](features/done/canonical-yaml-validation.md) is complete.
+2. Expand corpus-backed validation baselines as adapter coverage grows.
+3. Keep development standards and validation/reporting guidance synchronized with implementation changes.
