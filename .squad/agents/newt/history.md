@@ -8,5 +8,5 @@
 ## Learnings
 
 - Day 1 context: product intent is drop-in Proxmox-origin VM execution on non-Proxmox Linux hosts.
-- Requirements baseline is maintained under doc/dev/requirements and should anchor future decision entries.
-- Scribe tracks decision and session continuity as team memory source of truth.
+- Requirement IDs in product requirements should anchor planning and implementation docs.
+- Docs must stay synchronized when behavior, defaults, or runtime workflow changes.

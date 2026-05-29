@@ -6,13 +6,19 @@ How to decide who handles what.
 
 | Work Type | Route To | Examples |
 |-----------|----------|----------|
-| {domain 1} | {Name} | {example tasks} |
-| {domain 2} | {Name} | {example tasks} |
-| {domain 3} | {Name} | {example tasks} |
-| Code review | {Name} | Review PRs, check quality, suggest improvements |
-| Testing | {Name} | Write tests, find edge cases, verify fixes |
-| Scope & priorities | {Name} | What to build next, trade-offs, decisions |
+| Scope, architecture, and sequencing | Ripley | Feature decomposition, design trade-offs, reviewer gates |
+| Rust runtime implementation | Hicks | Command generation, preflight validation, dry-run execution path |
+| Import source adapters | Bishop | Proxmox parser, raw QEMU CLI import, Libvirt mapping |
+| Test strategy and review | Vasquez | Requirement-linked tests, edge-case coverage, regression checks |
+| Documentation and requirements traceability | Newt | Doc sync, requirement ID cross-reference, operator troubleshooting |
+| Autonomous coding issue pickup | @copilot | Assigned issues, implementation, tests, and draft PR delivery |
+| Chipset and machine model consultation | Hudson | Q35 and i440fx behavior, topology constraints, compatibility risks |
+| Windows 11 and passthrough consultation | Apone | GPU passthrough assumptions, Looking Glass host path guidance |
+| Code review | Ripley | Review PRs, check quality, suggest improvements |
+| Testing | Vasquez | Write tests, find edge cases, verify fixes |
+| Scope & priorities | Ripley | What to build next, trade-offs, decisions |
 | Session logging | Scribe | Automatic — never needs routing |
+| Work queue monitoring | Ralph | Backlog scans, issue triage loop, keep-working orchestration |
 
 ## Issue Routing
 

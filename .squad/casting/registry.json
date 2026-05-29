@@ -1,3 +1,67 @@
 {
-  "agents": {}
+  "agents": {
+    "ripley": {
+      "persistent_name": "Ripley",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "hicks": {
+      "persistent_name": "Hicks",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "bishop": {
+      "persistent_name": "Bishop",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "vasquez": {
+      "persistent_name": "Vasquez",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "newt": {
+      "persistent_name": "Newt",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "hudson": {
+      "persistent_name": "Hudson",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "apone": {
+      "persistent_name": "Apone",
+      "universe": "Alien",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "scribe": {
+      "persistent_name": "Scribe",
+      "universe": "system",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "ralph": {
+      "persistent_name": "Ralph",
+      "universe": "system",
+      "created_at": "2026-05-28",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
 }
