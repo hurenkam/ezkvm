@@ -49,6 +49,8 @@ Define the contract for source-specific import adapters that transform external 
 `ProxmoxConfigImporter` now performs a minimal, deterministic Proxmox `.conf` to canonical mapping behind the same `ConfigImporter` trait.
 
 `EzkvmConfigImporter` currently accepts exactly one `ConfigArgs` entry (the YAML config path). Any extra args are rejected with a typed `ConfigImportError::UnexpectedArgs` to keep adapter boundaries explicit.
+`ProxmoxConfigImporter` currently accepts exactly one `ConfigArgs` entry (the `.conf` path). Any extra args are rejected with `ConfigImportError::UnexpectedArgs`.
+`QemuConfigImporter` and `LibvirtConfigImporter` stubs also enforce the same strict one-arg contract before returning `UnsupportedImporter`.
 
 ## Current Proxmox Mapping
 
