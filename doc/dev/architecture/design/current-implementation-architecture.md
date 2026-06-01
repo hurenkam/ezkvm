@@ -7,7 +7,7 @@ This page is the index for implementation design notes that describe the current
 The current implementation is split into these module areas:
 
 - entrypoint and crate wiring in `src/main.rs` and `src/lib.rs`
-- source import adapters in `src/import_stage/`
+- source import adapters in `src/config_importer/`
 - canonical VM model parsing and validation in `src/vm_spec/`
 - runtime-boundary scaffold plus deterministic rendering in `src/runtime_resolution/` and `src/render_stage/`
 
@@ -31,9 +31,11 @@ The binary entrypoint is still minimal and does not execute the full stage pipel
 | --- | --- | --- |
 | `src/lib.rs` | Crate wiring | `app_name()` |
 | `src/main.rs` | CLI entrypoint | `main()` |
-| `src/import_stage/mod.rs` | Import stage boundary | `ImportRequest`, `ImportStage`, `ImportStageError` |
-| `src/import_stage/canonical_yaml.rs` | Canonical YAML adapter | `CanonicalYamlImportStage` |
-| `src/import_stage/proxmox_conf.rs` | Proxmox `.conf` adapter | `ProxmoxConfImportStage`, `ProxmoxConfImportError`, `parse_machine_value()` |
+| `src/config_importer/mod.rs` | Config importer stage boundary | `ConfigArgs`, `ConfigImporter`, `ConfigImportError` |
+| `src/config_importer/ezkvm/mod.rs` | ezkvm YAML adapter | `EzkvmConfigImporter` |
+| `src/config_importer/proxmox/mod.rs` | Proxmox `.conf` adapter | `ProxmoxConfigImporter`, `ProxmoxImportError`, `parse_machine_value()` |
+| `src/config_importer/qemu/mod.rs` | QEMU command line adapter stub | `QemuConfigImporter` |
+| `src/config_importer/libvirt/mod.rs` | Libvirt XML adapter stub | `LibvirtConfigImporter` |
 | `src/vm_spec/mod.rs` | Canonical schema exports | `CanonicalDocument`, `ParseError`, `ValidationIssue`, `ConformanceError`, `validate_canonical_yaml()`, `validate_canonical_document()` |
 | `src/vm_spec/model.rs` | Canonical data model | `Metadata`, `VirtualMachine`, `System`, `Machine`, `Cpu`, `Memory`, `StorageEntry`, `NetworkEntry`, `ResourceRef` |
 | `src/vm_spec/parsing.rs` | YAML parsing and structural validation | `Severity`, `ValidationIssue`, `ParseError`, `parse_canonical_document_from_yaml()`, `parse_canonical_document()`, `enrich_validation_issues()` |

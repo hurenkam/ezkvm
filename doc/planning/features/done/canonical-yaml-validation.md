@@ -70,7 +70,7 @@ Establish comprehensive validation for the canonical YAML contract with an execu
 **Assigned To:** Bishop (Systems Adapter Dev)
 
 **Completion Summary:**
-- Added table-driven corpus coverage in `src/import_stage/proxmox_conf.rs` for `felucia/108.conf`, `coruscant/3101.conf`, and `zbp-server-mh2/103.conf`
+- Added table-driven corpus coverage in `src/config_importer/proxmox/mod.rs` for `felucia/108.conf`, `coruscant/3101.conf`, and `zbp-server-mh2/103.conf`
 - Verified each imported document conforms when validated against its canonical output filename (`wakiza.yaml`, `gyndine.yaml`, `desktop-markh-3.yaml`)
 - Added an explicit regression proving the current numeric-source-name mismatch is expected when validation runs against original `.conf` source paths
 
@@ -111,7 +111,7 @@ Establish comprehensive validation for the canonical YAML contract with an execu
 - Edge case: Optional sections omitted
 - Edge case: Container type mismatch path reporting
 - Edge case: Malformed YAML rejection
-- Corpus baseline preservation and canonical-path conformance in `src/import_stage/proxmox_conf.rs`
+- Corpus baseline preservation and canonical-path conformance in `src/config_importer/proxmox/mod.rs`
 
 ## Outcome
 

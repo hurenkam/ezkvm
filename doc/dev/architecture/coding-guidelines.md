@@ -18,7 +18,7 @@ These are repo-level boundaries for writing and reviewing Rust code.
 
 ## Pipeline Structure
 
-- `src/import_stage/` owns source-specific import adapters.
+- `src/config_importer/` owns source-specific import adapters.
 - `src/vm_spec/` owns the canonical VM specification model and validation.
 - `src/runtime_resolution/` owns host-bound resolution of canonical intent.
 - `src/render_stage/` owns deterministic command rendering.
@@ -28,18 +28,17 @@ These are repo-level boundaries for writing and reviewing Rust code.
 The `src/vm_spec/` module implements a two-layer validation pattern that separates concerns between parsing and semantic validation:
 
 **Layer 1: Parsing** (`src/vm_spec/parsing.rs`)
-- Converts raw YAML text to a structured model
-- Performs structural validation (required fields, type correctness, field path availability)
-- Produces `CanonicalDocument` on success or `ParseError` on failure
-- Returns `ParseError::Yaml` immediately for syntax-invalid YAML before structural validation runs
-- Collects all parsing issues in one pass (does not short-circuit on first error)
-- Uses `ValidationIssue` type with precise field paths (e.g., `virtual_machine.storage[1].id`)
+- Converts raw YAML text to `RuntimeConfig` via serde deserialization
+- Structural constraints (required fields and scalar/collection types) are enforced by serde during decode
+- Produces `RuntimeConfig` on success or `ParseError` on failure
+- Returns `ParseError::Yaml` for syntax errors and serde structural/type decode errors
+- Parse-layer failures short-circuit on the first decode error reported by serde
 
 **Layer 2: Validation** (`src/vm_spec/validation.rs`)
-- Accepts a parsed `CanonicalDocument` and performs semantic validation
+- Accepts a parsed `RuntimeConfig` and performs semantic validation
 - Enforces business rules: uniqueness constraints, consistency policies, filename matching
 - Produces `ConformanceError` that wraps validation issues or parse errors
-- Uses the same `ValidationIssue` type for consistency with parsing layer
+- Uses `ValidationIssue` for semantic diagnostics and reporting
 - Reports field paths including array indices for duplicate detection
 - Owns report formatting via `ReportFormatter` and `DefaultReportFormatter`
 
@@ -65,22 +64,22 @@ See [validation rules reference](../requirements/validation-rules.md) for detail
 
 ## Stage Module Organization
 
-Stage modules (import_stage, render_stage, etc.) follow a consistent internal structure:
+Stage modules (config_importer, render_stage, etc.) follow a consistent internal structure:
 
 **Type definitions and traits live in `mod.rs`:**
-- Request and response types (e.g., `ImportRequest`, `RenderRequest`)
-- Trait definitions that define the stage interface (e.g., `ImportStage`, `RenderStage`)
+- Request and response types (e.g., `ConfigArgs`, `RenderRequest`)
+- Trait definitions that define the stage interface (e.g., `ConfigImporter`, `RenderStage`)
 - Error types specific to the stage
 
 **Concrete implementations live in separate files:**
-- Each adapter or renderer gets its own module file (e.g., `canonical_yaml.rs`, `proxmox_conf.rs`, `deterministic.rs`)
+- Each adapter or renderer gets its own module boundary (e.g., `ezkvm/mod.rs`, `proxmox/mod.rs`, `deterministic.rs`)
 - Module files contain the struct definition and `impl StageTrait` blocks
 - Tests for the implementation live in its own module
 
 **Re-export pattern in `mod.rs`:**
 ```rust
-pub mod canonical_yaml;
-pub use canonical_yaml::CanonicalYamlImportStage;
+pub mod ezkvm;
+pub use ezkvm::EzkvmConfigImporter;
 ```
 
 **Rationale:**

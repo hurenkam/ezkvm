@@ -1,9 +1,9 @@
 ---
-updated_at: 2026-05-28T14:35:00.000Z
-focus_area: Documentation readiness audit and gap analysis
+updated_at: 2026-06-01T00:00:00.000Z
+focus_area: Ezkvm YAML parser complexity review and simplification opportunities
 active_issues: []
 ---
 
 # What We're Focused On
 
-Auditing existing documentation for readiness, identifying missing pieces, and proposing concrete closure steps.
+Reviewing the ezkvm YAML parser for unnecessary complexity and identifying safe simplifications.

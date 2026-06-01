@@ -4,11 +4,8 @@ use std::path::Path;
 use serde_json::json;
 use thiserror::Error;
 
-use super::model::{CanonicalDocument, NetworkEntry, ResourceRef, StorageEntry};
-use super::parsing::{
-    ParseError, Severity, ValidationIssue, enrich_validation_issues,
-    parse_canonical_document_from_yaml,
-};
+use super::model::{NetworkEntry, ResourceRef, RuntimeConfig, StorageEntry};
+use super::parsing::{ParseError, Severity, ValidationIssue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationReportFormat {
@@ -209,7 +206,7 @@ impl ReportFormatter for DefaultReportFormatter {
 
 #[derive(Debug, Error)]
 pub enum ConformanceError {
-    #[error("invalid canonical yaml: {0}")]
+    #[error("invalid ezkvm config yaml: {0}")]
     Parse(#[from] ParseError),
     #[error("validation failed with {0} issue(s)")]
     Validation(usize, Vec<ValidationIssue>),
@@ -233,24 +230,8 @@ impl ConformanceError {
     }
 }
 
-pub fn validate_canonical_yaml(
-    yaml: &str,
-    filename: &Path,
-) -> Result<CanonicalDocument, ConformanceError> {
-    let doc = parse_canonical_document_from_yaml(yaml)?;
-    match validate_canonical_document(&doc, filename) {
-        Ok(()) => {}
-        Err(ConformanceError::Validation(_, issues)) => {
-            let issues = enrich_validation_issues(yaml, issues);
-            return Err(ConformanceError::Validation(issues.len(), issues));
-        }
-        Err(other) => return Err(other),
-    }
-    Ok(doc)
-}
-
-pub fn validate_canonical_document(
-    doc: &CanonicalDocument,
+pub fn validate_runtime_config(
+    doc: &RuntimeConfig,
     filename: &Path,
 ) -> Result<(), ConformanceError> {
     let mut issues = Vec::new();
@@ -446,10 +427,12 @@ mod tests {
 
     use serde_json::Value;
 
+    use crate::config_importer::ezkvm::validate_ezkvm_config;
+
     use super::super::parsing::{ParseError, Severity, ValidationIssue};
     use super::{
         ConformanceError, DefaultReportFormatter, ReportFormatter, ValidationReport,
-        ValidationReportFormat, validate_canonical_yaml,
+        ValidationReportFormat,
     };
 
     fn valid_yaml() -> &'static str {
@@ -487,11 +470,18 @@ virtual_machine:
         }
     }
 
-    // CT-001: Valid canonical document with all required fields and valid machine model
+    fn expect_yaml_parse_error(err: ConformanceError) -> String {
+        match err {
+            ConformanceError::Parse(ParseError::Yaml(parse_error)) => parse_error.to_string(),
+            other => panic!("expected YAML parse error, got {other:?}"),
+        }
+    }
+
+    // CT-001: Valid runtime config with all required fields and valid machine model
     #[test]
-    fn passing_canonical_example() {
+    fn passing_runtime_config_example() {
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_canonical_yaml(valid_yaml(), filename);
+        let result = validate_ezkvm_config(valid_yaml(), filename);
         assert!(result.is_ok());
     }
 
@@ -519,14 +509,10 @@ virtual_machine:
       min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(
-            issues
-                .iter()
-                .any(|(path, reason)| path == "virtual_machine.system.cpu.model"
-                    && reason == "is required")
-        );
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
+        let message = expect_yaml_parse_error(err);
+        assert!(message.contains("virtual_machine.system.cpu"));
+        assert!(message.contains("missing field `model`"));
     }
     // CT-004: vm_name must match filename stem
 
@@ -534,7 +520,7 @@ virtual_machine:
     fn vm_name_mismatch() {
         let filename = Path::new("/tmp/another-name.yaml");
         let err =
-            validate_canonical_yaml(valid_yaml(), filename).expect_err("should fail validation");
+            validate_ezkvm_config(valid_yaml(), filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "metadata.vm_name" && reason.contains("filename stem 'another-name'")
@@ -568,7 +554,7 @@ virtual_machine:
     - id: "gpu0"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(
             issues
@@ -608,7 +594,7 @@ virtual_machine:
       min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "virtual_machine.system.machine.chipset" && reason.contains("[q35, i440fx]")
@@ -633,14 +619,10 @@ virtual_machine:
             min: "8192"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(
-            issues
-                .iter()
-                .any(|(path, reason)| path == "virtual_machine.system.memory.min"
-                    && reason == "must be an integer")
-        );
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
+        let message = expect_yaml_parse_error(err);
+        assert!(message.contains("virtual_machine.system.memory.min"));
+        assert!(message.contains("expected i64"));
     }
 
     // CT-002-01: Collection field type mismatch reports the container path precisely
@@ -663,12 +645,10 @@ virtual_machine:
         id: "disk0"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.storage" && reason == "must be a list"
-        }));
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
+        let message = expect_yaml_parse_error(err);
+        assert!(message.contains("virtual_machine.storage"));
+        assert!(message.contains("expected a sequence"));
     }
 
     // CT-002-02: Malformed YAML is rejected before structural/conformance validation runs
@@ -689,7 +669,7 @@ virtual_machine:
             min: [8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail parsing");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
 
         match err {
             ConformanceError::Parse(ParseError::Yaml(_)) => {}
@@ -721,7 +701,7 @@ virtual_machine:
         - id: ""
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
 
         assert!(issues.iter().any(|(path, reason)| {
@@ -760,7 +740,7 @@ virtual_machine:
         - id: "disk0"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
 
         assert!(issues.iter().any(|(path, reason)| {
@@ -797,7 +777,7 @@ virtual_machine:
         - id: "shared0"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_canonical_yaml(yaml, filename);
+        let result = validate_ezkvm_config(yaml, filename);
         assert!(result.is_ok());
     }
 
@@ -819,7 +799,7 @@ virtual_machine:
             min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_canonical_yaml(yaml, filename);
+        let result = validate_ezkvm_config(yaml, filename);
         assert!(result.is_ok());
     }
 
@@ -839,16 +819,10 @@ virtual_machine:
             min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        // Should report both missing cpu.model and missing machine.chipset
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.system.cpu.model" && reason == "is required"
-        }));
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.system.machine.chipset" && reason == "is required"
-        }));
-        assert!(issues.len() >= 2);
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
+        let message = expect_yaml_parse_error(err);
+        assert!(message.contains("virtual_machine.system.machine"));
+        assert!(message.contains("missing field `chipset`"));
     }
 
     // CT-002-04: Empty vm_name (boundary of required string field)
@@ -869,7 +843,7 @@ virtual_machine:
             min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "metadata.vm_name" && reason == "is required and must be a non-empty string"
@@ -894,7 +868,7 @@ virtual_machine:
             min: 0
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_canonical_yaml(yaml, filename);
+        let result = validate_ezkvm_config(yaml, filename);
         assert!(result.is_ok());
     }
 
@@ -920,7 +894,7 @@ virtual_machine:
         - id: "disk0"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         // Should report duplicates at indices 1 and 2
         assert!(issues.iter().any(|(path, reason)| {
@@ -949,7 +923,7 @@ virtual_machine:
             min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "metadata.schema_version"
@@ -975,7 +949,7 @@ virtual_machine:
             min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_canonical_yaml(yaml, filename);
+        let result = validate_ezkvm_config(yaml, filename);
         // Unknown family should pass (not "pc", so chipset constraint doesn't apply)
         assert!(result.is_ok());
     }
@@ -1069,16 +1043,11 @@ virtual_machine:
             min: 8192
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
-        let issue = expect_issue(&err, "virtual_machine.system.cpu.model");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
+        let message = expect_yaml_parse_error(err);
 
-        assert_eq!(
-            issue.remediation.as_deref(),
-            Some("Add the required string field at virtual_machine.system.cpu.model")
-        );
-        assert!(issue.line_number.is_some());
-        let snippet = issue.source_snippet.as_deref().unwrap_or("");
-        assert!(snippet.contains("cpu: {}"));
+        assert!(message.contains("virtual_machine.system.cpu"));
+        assert!(message.contains("missing field `model`"));
     }
 
     #[test]
@@ -1101,7 +1070,7 @@ virtual_machine:
         - id: "disk0"
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_canonical_yaml(yaml, filename).expect_err("should fail validation");
+        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
         let issue = expect_issue(&err, "virtual_machine.storage[1].id");
 
         assert!(issue.line_number.is_some());

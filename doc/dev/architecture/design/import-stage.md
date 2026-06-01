@@ -1,4 +1,4 @@
-# Import Stage
+# Config Importer Stage
 
 Back to index: [Current Implementation Architecture](./current-implementation-architecture.md)
 
@@ -6,11 +6,11 @@ Back to index: [Current Implementation Architecture](./current-implementation-ar
 
 This note covers source import adapters in:
 
-- `src/import_stage/mod.rs`
-- `src/import_stage/canonical_yaml.rs`
-- `src/import_stage/proxmox_conf.rs`
+- `src/config_importer/mod.rs`
+- `src/config_importer/ezkvm/mod.rs`
+- `src/config_importer/proxmox/mod.rs`
 
-The import stage takes source text plus source name and returns a canonical `CanonicalDocument` or a typed adapter error.
+The config importer stage takes importer-specific configuration in `ConfigArgs` and returns a canonical `CanonicalDocument` or a typed adapter error.
 
 ## Stage Structure
 
@@ -18,51 +18,62 @@ The import stage takes source text plus source name and returns a canonical `Can
 @startuml
 skinparam classAttributeIconSize 0
 
-class ImportRequest << (S,#98FB98) >> {
-  +source_text: &str
-  +source_name: &Path
+class ConfigArgs << (S,#98FB98) >> {
+  +payload: Vec<u8>
+  +source_hint: Option<PathBuf>
+  +args: Vec<String>
 }
 
-interface ImportStage << (T,#FFB347) >> {
-  +import(request: ImportRequest) -> Result<CanonicalDocument, Error>
+interface ConfigImporter << (T,#FFB347) >> {
+  +import_config(config_args: ConfigArgs) -> Result<CanonicalDocument, ConfigError>
 }
 
-class ImportStageError << (S,#98FB98) >> {
+class ConfigImportError << (S,#98FB98) >> {
 }
 
-class CanonicalYamlImportStage << (S,#98FB98) >> {
-  +import(request) -> Result<CanonicalDocument, ImportStageError>
+class EzkvmConfigImporter << (S,#98FB98) >> {
+  +import_config(config_args) -> Result<CanonicalDocument, ConfigImportError>
 }
 
-class ProxmoxConfImportStage << (S,#98FB98) >> {
-  +parse(request) -> Result<CanonicalDocument, ProxmoxConfImportError>
+class ProxmoxConfigImporter << (S,#98FB98) >> {
+  +parse(config_args) -> Result<CanonicalDocument, ProxmoxImportError>
 }
 
-class ProxmoxConfImportError << (S,#98FB98) >> {
+class QemuConfigImporter << (S,#98FB98) >> {
+  +import_config(config_args) -> Result<CanonicalDocument, ConfigImportError>
+}
+
+class LibvirtConfigImporter << (S,#98FB98) >> {
+  +import_config(config_args) -> Result<CanonicalDocument, ConfigImportError>
+}
+
+class ProxmoxImportError << (S,#98FB98) >> {
 }
 
 class CanonicalDocument << (S,#98FB98) >>
-class Path << (S,#98FB98) >>
+class PathBuf << (S,#98FB98) >>
 class ConformanceError << (S,#98FB98) >>
 class "validate_canonical_yaml()" as ValidateCanonicalYaml << (F,#DDA0DD) >>
 class "parse_machine_value()" as ParseMachineValue << (F,#DDA0DD) >>
 
-ImportStage <|.. CanonicalYamlImportStage
-ImportStage <|.. ProxmoxConfImportStage
-ImportStageError --> ProxmoxConfImportError : wraps
-ImportStageError --> ConformanceError : wraps
-CanonicalYamlImportStage ..> ValidateCanonicalYaml
-ProxmoxConfImportStage ..> ParseMachineValue
-ProxmoxConfImportStage ..> CanonicalDocument
-ImportRequest --> Path
+ConfigImporter <|.. EzkvmConfigImporter
+ConfigImporter <|.. ProxmoxConfigImporter
+ConfigImporter <|.. QemuConfigImporter
+ConfigImporter <|.. LibvirtConfigImporter
+ConfigImportError --> ProxmoxImportError : wraps
+ConfigImportError --> ConformanceError : wraps
+EzkvmConfigImporter ..> ValidateCanonicalYaml
+ProxmoxConfigImporter ..> ParseMachineValue
+ProxmoxConfigImporter ..> CanonicalDocument
+ConfigArgs --> PathBuf
 @enduml
 ```
 
 ## Current Adapter Coverage
 
-`CanonicalYamlImportStage` delegates to `validate_canonical_yaml()`.
+`EzkvmConfigImporter` delegates to `validate_canonical_yaml()`.
 
-`ProxmoxConfImportStage` currently maps these keys:
+`ProxmoxConfigImporter` currently maps these keys:
 
 - `name` -> canonical VM name
 - `machine` -> machine family and chipset
@@ -77,10 +88,10 @@ Malformed lines, unsupported machine values, missing required fields, and invali
 ```plantuml
 @startuml
 actor Caller
-participant "ProxmoxConfImportStage" as Stage
+participant "ProxmoxConfigImporter" as Stage
 participant "parse_machine_value()" as MachineParser
 
-Caller -> Stage : parse(ImportRequest)
+Caller -> Stage : parse(ConfigArgs)
 loop each non-empty non-comment line
   Stage -> Stage : split key:value
   alt key = machine
@@ -94,7 +105,7 @@ loop each non-empty non-comment line
     Stage -> Stage : ignore
   end
 end
-Stage --> Caller : CanonicalDocument or ProxmoxConfImportError
+Stage --> Caller : CanonicalDocument or ProxmoxImportError
 @enduml
 ```
 

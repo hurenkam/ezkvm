@@ -1,10 +1,10 @@
 use serde::Deserialize;
 
-/// Schema version for canonical VM specification.
-pub const CANONICAL_SCHEMA_VERSION: &str = "1.0.0";
+/// Schema version for ezkvm runtime config specification.
+pub const EZKVM_CONFIG_SCHEMA_VERSION: &str = "1.0.0";
 
 #[derive(Debug, Deserialize)]
-pub struct CanonicalDocument {
+pub struct RuntimeConfig {
     pub metadata: Metadata,
     pub virtual_machine: VirtualMachine,
 }

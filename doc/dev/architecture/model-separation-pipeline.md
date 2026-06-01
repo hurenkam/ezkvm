@@ -18,7 +18,7 @@ Define the normative boundary between import-host data, canonical virtual_machin
 
 ## Pipeline Stages
 
-1. Import Stage
+1. Config Importer Stage
    - Inputs: source VM definition + import-host context
     - Output: canonical virtual_machine model
 2. Runtime Resolution Stage
@@ -30,15 +30,15 @@ Define the normative boundary between import-host data, canonical virtual_machin
 
 ## Implementation Naming (Current Scaffold)
 
-- `src/import_stage/`: import stage orchestration boundary
+- `src/config_importer/`: config importer stage orchestration boundary
 - `src/vm_spec/`: canonical VM specification schema and validation boundary
 - `src/runtime_resolution/`: runtime resolution stage boundary
 - `src/render_stage/`: deterministic render stage boundary
 
 ## Stage Abstractions (Current)
 
-- Import stage now exposes a trait boundary (`ImportStage`) with a minimal request contract (`ImportRequest`) and current implementations for canonical YAML (`CanonicalYamlImportStage`) plus a Proxmox `.conf` scaffold (`ProxmoxConfImportStage`).
-- Import stage now exposes a trait boundary (`ImportStage`) with a minimal request contract (`ImportRequest`) and current implementations for canonical YAML (`CanonicalYamlImportStage`) plus a minimal Proxmox `.conf` adapter (`ProxmoxConfImportStage`) that maps name, machine, cpu, memory, and stable slot IDs into the canonical model.
+- Config importer stage now exposes a trait boundary (`ConfigImporter`) with a generic config contract (`ConfigArgs`) and current implementations for ezkvm YAML (`EzkvmConfigImporter`) plus a Proxmox `.conf` scaffold (`ProxmoxConfigImporter`).
+- Config importer stage now exposes a trait boundary (`ConfigImporter`) with a generic config contract (`ConfigArgs`) and current implementations for ezkvm YAML (`EzkvmConfigImporter`) plus a minimal Proxmox `.conf` adapter (`ProxmoxConfigImporter`) that maps name, machine, cpu, memory, and stable slot IDs into the canonical model.
 - Render stage now exposes a trait boundary (`RenderStage`) with a minimal request contract (`RenderRequest`) and default implementation (`DeterministicRenderStage`).
 - Runtime resolution currently publishes a minimal `EffectiveRuntimeModel` placeholder consumed by render.
 

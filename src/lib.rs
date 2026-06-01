@@ -1,4 +1,4 @@
-pub mod import_stage;
+pub mod config_importer;
 pub mod render_stage;
 pub mod runtime_resolution;
 pub mod vm_spec;

@@ -18,7 +18,7 @@ Define the contract for source-specific import adapters that transform external 
 ## Contract
 
 1. Each import source must be implemented as a dedicated adapter module.
-   - Rust scaffold location: `src/import_stage/`
+   - Rust scaffold location: `src/config_importer/`
 2. An adapter must accept:
    - Source payload (for example Proxmox config, raw QEMU CLI capture, or libvirt XML)
    - Import-host context (facts known at import time)
@@ -45,8 +45,10 @@ Define the contract for source-specific import adapters that transform external 
 
 ## Current Scaffold
 
-`CanonicalYamlImportStage` validates canonical YAML input against the current schema.
-`ProxmoxConfImportStage` now performs a minimal, deterministic Proxmox `.conf` to canonical mapping behind the same `ImportStage` trait.
+`EzkvmConfigImporter` validates canonical YAML input against the current schema.
+`ProxmoxConfigImporter` now performs a minimal, deterministic Proxmox `.conf` to canonical mapping behind the same `ConfigImporter` trait.
+
+`EzkvmConfigImporter` currently accepts exactly one `ConfigArgs` entry (the YAML config path). Any extra args are rejected with a typed `ConfigImportError::UnexpectedArgs` to keep adapter boundaries explicit.
 
 ## Current Proxmox Mapping
 

@@ -1,20 +1,19 @@
 //! Proxmox .conf file import adapter.
 //!
-//! Owns Proxmox-specific parsing and adaptation to canonical VM specification.
+//! Owns Proxmox-specific parsing and adaptation to runtime config specification.
 
 use std::ffi::OsStr;
 use std::path::Path;
 
-use crate::vm_spec::CanonicalDocument;
-use crate::vm_spec::model::{CANONICAL_SCHEMA_VERSION, VirtualMachine};
 use crate::vm_spec::model::{
     Cpu, Machine, Memory, Metadata, NetworkEntry, ResourceRef, StorageEntry, System,
 };
+use crate::vm_spec::model::{EZKVM_CONFIG_SCHEMA_VERSION, VirtualMachine};
 
-use super::ImportRequest;
+use super::{ConfigArgs, ConfigImportError, ConfigImporter, RuntimeConfig, read_config_text};
 
 #[derive(Debug, thiserror::Error)]
-pub enum ProxmoxConfImportError {
+enum ProxmoxImportError {
     #[error("expected a Proxmox .conf source name, got {source_name}")]
     InvalidSourceName { source_name: String },
     #[error("unsupported Proxmox machine value '{value}' in {source_name}")]
@@ -39,13 +38,16 @@ pub enum ProxmoxConfImportError {
 }
 
 #[derive(Debug, Default)]
-pub struct ProxmoxConfImportStage;
+pub struct ProxmoxConfigImporter;
 
-impl ProxmoxConfImportStage {
-    pub fn parse(request: ImportRequest<'_>) -> Result<CanonicalDocument, ProxmoxConfImportError> {
-        let source_name = request.source_name.to_string_lossy().into_owned();
+impl ProxmoxConfigImporter {
+    fn parse_source(
+        source_text: &str,
+        source_name_path: &Path,
+    ) -> Result<RuntimeConfig, ProxmoxImportError> {
+        let source_name = source_name_path.to_string_lossy().into_owned();
 
-        validate_source_name(request.source_name)?;
+        validate_source_name(source_name_path)?;
 
         let mut vm_name: Option<String> = None;
         let mut machine: Option<Machine> = None;
@@ -55,7 +57,7 @@ impl ProxmoxConfImportStage {
         let mut network: Vec<NetworkEntry> = Vec::new();
         let mut resources: Vec<ResourceRef> = Vec::new();
 
-        for (index, raw_line) in request.source_text.lines().enumerate() {
+        for (index, raw_line) in source_text.lines().enumerate() {
             let line_number = index + 1;
             let line = raw_line.trim();
 
@@ -68,7 +70,7 @@ impl ProxmoxConfImportStage {
             }
 
             let Some((key, value)) = line.split_once(':') else {
-                return Err(ProxmoxConfImportError::MalformedLine {
+                return Err(ProxmoxImportError::MalformedLine {
                     source_name: source_name.clone(),
                     line: line_number,
                     content: line.to_owned(),
@@ -79,7 +81,7 @@ impl ProxmoxConfImportStage {
             let value = value.trim();
 
             if value.is_empty() {
-                return Err(ProxmoxConfImportError::InvalidFieldValue {
+                return Err(ProxmoxImportError::InvalidFieldValue {
                     source_name: source_name.clone(),
                     field: "source line value",
                     value: line.to_owned(),
@@ -104,9 +106,9 @@ impl ProxmoxConfImportStage {
             }
         }
 
-        Ok(CanonicalDocument {
+        Ok(RuntimeConfig {
             metadata: Metadata {
-                schema_version: CANONICAL_SCHEMA_VERSION.to_owned(),
+                schema_version: EZKVM_CONFIG_SCHEMA_VERSION.to_owned(),
                 vm_name: required_string(vm_name, &source_name, "name")?,
             },
             virtual_machine: VirtualMachine {
@@ -127,6 +129,28 @@ impl ProxmoxConfImportStage {
     }
 }
 
+impl ConfigImporter for ProxmoxConfigImporter {
+    type ConfigError = ConfigImportError;
+
+    fn import_config(&self, config_args: ConfigArgs) -> Result<RuntimeConfig, Self::ConfigError> {
+        let config_path_arg =
+            config_args
+                .args
+                .first()
+                .ok_or(ConfigImportError::MissingConfigPath {
+                    importer: "proxmox",
+                })?;
+        let config_path = Path::new(config_path_arg);
+        let source_text = read_config_text(config_path, "proxmox")?;
+        let _extra_options = &config_args.args[1..];
+
+        Self::parse_source(&source_text, config_path).map_err(|error| ConfigImportError::Importer {
+            importer: "proxmox",
+            reason: error.to_string(),
+        })
+    }
+}
+
 fn is_proxmox_conf_source(source_name: &Path) -> bool {
     matches!(
         source_name.extension().and_then(OsStr::to_str),
@@ -134,17 +158,17 @@ fn is_proxmox_conf_source(source_name: &Path) -> bool {
     )
 }
 
-fn validate_source_name(source_name: &Path) -> Result<(), ProxmoxConfImportError> {
+fn validate_source_name(source_name: &Path) -> Result<(), ProxmoxImportError> {
     let source_name_text = source_name.to_string_lossy().into_owned();
 
     let Some(file_name) = source_name.file_name().and_then(OsStr::to_str) else {
-        return Err(ProxmoxConfImportError::InvalidSourceName {
+        return Err(ProxmoxImportError::InvalidSourceName {
             source_name: source_name_text,
         });
     };
 
     if !is_proxmox_conf_source(source_name) || file_name.is_empty() {
-        return Err(ProxmoxConfImportError::InvalidSourceName {
+        return Err(ProxmoxImportError::InvalidSourceName {
             source_name: source_name_text,
         });
     }
@@ -156,8 +180,8 @@ fn required_string(
     value: Option<String>,
     source_name: &str,
     field: &'static str,
-) -> Result<String, ProxmoxConfImportError> {
-    value.ok_or(ProxmoxConfImportError::MissingRequiredField {
+) -> Result<String, ProxmoxImportError> {
+    value.ok_or(ProxmoxImportError::MissingRequiredField {
         source_name: source_name.to_owned(),
         field,
     })
@@ -166,24 +190,21 @@ fn required_string(
 fn required_machine(
     value: Option<Machine>,
     source_name: &str,
-) -> Result<Machine, ProxmoxConfImportError> {
-    value.ok_or(ProxmoxConfImportError::MissingRequiredField {
+) -> Result<Machine, ProxmoxImportError> {
+    value.ok_or(ProxmoxImportError::MissingRequiredField {
         source_name: source_name.to_owned(),
         field: "machine",
     })
 }
 
-fn required_memory(value: Option<i64>, source_name: &str) -> Result<i64, ProxmoxConfImportError> {
-    value.ok_or(ProxmoxConfImportError::MissingRequiredField {
+fn required_memory(value: Option<i64>, source_name: &str) -> Result<i64, ProxmoxImportError> {
+    value.ok_or(ProxmoxImportError::MissingRequiredField {
         source_name: source_name.to_owned(),
         field: "memory",
     })
 }
 
-pub fn parse_machine_value(
-    value: &str,
-    source_name: &str,
-) -> Result<Machine, ProxmoxConfImportError> {
+fn parse_machine_value(value: &str, source_name: &str) -> Result<Machine, ProxmoxImportError> {
     let machine_token = value.split(',').next().unwrap_or(value).trim();
 
     let chipset = if machine_token == "q35"
@@ -201,7 +222,7 @@ pub fn parse_machine_value(
     };
 
     let Some(chipset) = chipset else {
-        return Err(ProxmoxConfImportError::UnsupportedMachineValue {
+        return Err(ProxmoxImportError::UnsupportedMachineValue {
             source_name: source_name.to_owned(),
             value: machine_token.to_owned(),
         });
@@ -213,17 +234,17 @@ pub fn parse_machine_value(
     })
 }
 
-fn parse_memory_value(value: &str, source_name: &str) -> Result<i64, ProxmoxConfImportError> {
+fn parse_memory_value(value: &str, source_name: &str) -> Result<i64, ProxmoxImportError> {
     let memory = value
         .parse::<i64>()
-        .map_err(|_| ProxmoxConfImportError::InvalidFieldValue {
+        .map_err(|_| ProxmoxImportError::InvalidFieldValue {
             source_name: source_name.to_owned(),
             field: "memory",
             value: value.to_owned(),
         })?;
 
     if memory < 0 {
-        return Err(ProxmoxConfImportError::InvalidFieldValue {
+        return Err(ProxmoxImportError::InvalidFieldValue {
             source_name: source_name.to_owned(),
             field: "memory",
             value: value.to_owned(),
@@ -241,11 +262,13 @@ fn is_numeric_slot_key(key: &str, prefix: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use super::{ProxmoxConfImportError, ProxmoxConfImportStage};
-    use crate::import_stage::ImportRequest;
-    use crate::vm_spec::{ConformanceError, validate_canonical_document};
+    use super::ProxmoxConfigImporter;
+    use crate::config_importer::{ConfigArgs, ConfigImportError, ConfigImporter};
+    use crate::vm_spec::{ConformanceError, validate_runtime_config};
 
     struct CorpusExpectation {
         fixture_label: &'static str,
@@ -260,11 +283,55 @@ mod tests {
         expected_resource_ids: &'static [&'static str],
     }
 
+    const FELUCIA_108_CONF: &str = r#"
+name: wakiza
+machine: q35
+cpu: host
+memory: 16384
+scsi0: local-lvm:vm-108-disk-0
+scsi1: local-lvm:vm-108-disk-1
+net0: virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0
+hostpci0: 0000:65:00
+usb0: host=046d:c52b
+"#;
+
+    const CORUSCANT_3101_CONF: &str = r#"
+name: gyndine
+machine: q35
+cpu: host
+memory: 65536
+scsi0: local-zfs:vm-3101-disk-0
+hostpci0: 0000:01:00
+hostpci1: 0000:02:00
+hostpci2: 0000:03:00
+hostpci3: 0000:04:00
+hostpci4: 0000:05:00
+hostpci5: 0000:06:00
+hostpci6: 0000:07:00
+hostpci7: 0000:08:00
+hostpci8: 0000:09:00
+hostpci9: 0000:0a:00
+hostpci10: 0000:0b:00
+hostpci11: 0000:0c:00
+"#;
+
+    const ZBP_SERVER_MH2_103_CONF: &str = r#"
+name: desktop-markh-3
+machine: q35
+cpu: x86-64-v2-AES
+memory: 24576
+scsi0: local-zfs:vm-103-disk-0
+scsi1: local-zfs:vm-103-disk-1
+net0: virtio=11:22:33:44:55:66,bridge=vmbr0
+"#;
+
+    static NEXT_CASE_ID: AtomicUsize = AtomicUsize::new(0);
+
     fn corpus_expectations() -> &'static [CorpusExpectation] {
         &[
             CorpusExpectation {
                 fixture_label: "felucia/108.conf",
-                source_text: include_str!("../../input/felucia/108.conf"),
+                source_text: FELUCIA_108_CONF,
                 source_name: "/tmp/108.conf",
                 expected_vm_name: "wakiza",
                 expected_chipset: "q35",
@@ -276,7 +343,7 @@ mod tests {
             },
             CorpusExpectation {
                 fixture_label: "coruscant/3101.conf",
-                source_text: include_str!("../../input/coruscant/3101.conf"),
+                source_text: CORUSCANT_3101_CONF,
                 source_name: "/tmp/3101.conf",
                 expected_vm_name: "gyndine",
                 expected_chipset: "q35",
@@ -301,7 +368,7 @@ mod tests {
             },
             CorpusExpectation {
                 fixture_label: "zbp-server-mh2/103.conf",
-                source_text: include_str!("../../input/zbp-server-mh2/103.conf"),
+                source_text: ZBP_SERVER_MH2_103_CONF,
                 source_name: "/tmp/103.conf",
                 expected_vm_name: "desktop-markh-3",
                 expected_chipset: "q35",
@@ -314,15 +381,20 @@ mod tests {
         ]
     }
 
-    fn import_corpus_case(case: &CorpusExpectation) -> crate::vm_spec::CanonicalDocument {
-        ProxmoxConfImportStage::parse(ImportRequest {
-            source_text: case.source_text,
-            source_name: Path::new(case.source_name),
-        })
-        .unwrap_or_else(|err| panic!("{} should parse: {err}", case.fixture_label))
+    fn import_corpus_case(case: &CorpusExpectation) -> crate::vm_spec::RuntimeConfig {
+        let case_id = NEXT_CASE_ID.fetch_add(1, Ordering::Relaxed);
+        let source_path = PathBuf::from(format!(
+            "/tmp/ezkvm-proxmox-{case_id}-{}.conf",
+            case.expected_vm_name
+        ));
+        fs::write(&source_path, case.source_text).expect("fixture write should succeed");
+        let config_args = ConfigArgs::new(vec![source_path.to_string_lossy().into_owned()]);
+        ProxmoxConfigImporter
+            .import_config(config_args)
+            .unwrap_or_else(|err| panic!("{} should parse: {err}", case.fixture_label))
     }
 
-    fn canonical_output_path(vm_name: &str) -> PathBuf {
+    fn runtime_output_path(vm_name: &str) -> PathBuf {
         PathBuf::from(format!("/tmp/{vm_name}.yaml"))
     }
 
@@ -363,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn proxmox_conf_import_stage_preserves_corpus_expectations() {
+    fn proxmox_importer_preserves_corpus_expectations() {
         for case in corpus_expectations() {
             let document = import_corpus_case(case);
 
@@ -414,19 +486,19 @@ mod tests {
                 case.fixture_label,
             );
 
-            let canonical_path = canonical_output_path(case.expected_vm_name);
-            validate_canonical_document(&document, &canonical_path).unwrap_or_else(|err| {
+            let runtime_path = runtime_output_path(case.expected_vm_name);
+            validate_runtime_config(&document, &runtime_path).unwrap_or_else(|err| {
                 panic!(
                     "{} should conform when validated as {}: {err}",
                     case.fixture_label,
-                    canonical_path.display()
+                    runtime_path.display()
                 )
             });
         }
     }
 
     #[test]
-    fn proxmox_conf_imported_corpus_documents_report_source_filename_mismatch() {
+    fn proxmox_imported_corpus_documents_report_source_filename_mismatch() {
         for case in corpus_expectations() {
             let document = import_corpus_case(case);
             let source_name = Path::new(case.source_name);
@@ -435,7 +507,7 @@ mod tests {
                 .and_then(|stem| stem.to_str())
                 .expect("fixture source name should have a stem");
 
-            let err = validate_canonical_document(&document, source_name).unwrap_err();
+            let err = validate_runtime_config(&document, source_name).unwrap_err();
 
             match err {
                 ConformanceError::Validation(_, issues) => {
@@ -455,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    fn proxmox_conf_machine_parser_handles_pc_q35_shape() {
+    fn proxmox_machine_parser_handles_pc_q35_shape() {
         let machine = super::parse_machine_value("pc-q35-8.1", "/tmp/108.conf")
             .expect("machine parser should accept pc-q35 shapes");
 
@@ -464,18 +536,29 @@ mod tests {
     }
 
     #[test]
-    fn proxmox_conf_import_stage_rejects_malformed_source_name() {
-        let request = ImportRequest {
-            source_text: "name: wakiza\nmachine: pc-q35-8.1\ncpu: host\nmemory: 8192\n",
-            source_name: Path::new("/tmp/wakiza.yaml"),
-        };
+    fn proxmox_importer_rejects_malformed_source_name() {
+        let source_path = PathBuf::from("/tmp/wakiza.yaml");
+        fs::write(
+            &source_path,
+            "name: wakiza\nmachine: pc-q35-8.1\ncpu: host\nmemory: 8192\n",
+        )
+        .expect("fixture write should succeed");
+        let config_args = ConfigArgs::new(vec![source_path.to_string_lossy().into_owned()]);
 
-        let err = ProxmoxConfImportStage::parse(request)
+        let err = ProxmoxConfigImporter
+            .import_config(config_args)
             .expect_err("non-.conf source names should be rejected");
 
         assert!(matches!(
             err,
-            ProxmoxConfImportError::InvalidSourceName { .. }
+            ConfigImportError::Importer {
+                importer: "proxmox",
+                ..
+            }
         ));
+        assert!(
+            err.to_string()
+                .contains("expected a Proxmox .conf source name")
+        );
     }
 }

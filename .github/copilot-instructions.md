@@ -39,9 +39,12 @@ When working with project documentation, treat [doc/README.md](../doc/README.md)
 
 - `Design Patterns`: `.copilot/skills/design-patterns/SKILL.md`
 	- Use when designing new stage modules, adapter scaffolds, or deterministic render paths.
+- `Coding Guideline Conformance`: `.copilot/skills/coding-guideline-conformance/SKILL.md`
+	- Use when Rust files are added or modified to run a focused conformance check against coding guidelines before finalizing.
 
 ## Code Quality Expectations
 
 - Prefer small, single-responsibility modules.
 - Keep stage boundaries explicit in names and file layout.
 - Consult `doc/dev/architecture/coding-guidelines.md` when introducing new Rust modules or abstractions.
+- Before finalizing Rust changes, run a coding-guideline conformance pass on all touched Rust files and report the status.

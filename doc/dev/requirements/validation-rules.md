@@ -6,19 +6,19 @@ This document describes the validation rules enforced on canonical YAML VM confi
 
 Validation is performed in two layers:
 
-1. **Parsing** validates structural correctness and required fields
+1. **Parsing** deserializes YAML into `RuntimeConfig` and enforces structural correctness via serde
 2. **Conformance** validates semantic rules and business logic
 
-Structural and semantic validation issues are collected within their respective layer, allowing tools to batch-fix multiple problems at once. Syntax-invalid YAML is rejected immediately as a parse error before field-level issue aggregation begins.
+Conformance validation issues are collected in one pass to support bulk remediation. Parse-layer failures are returned as serde/YAML decode errors and short-circuit at the first structural/type mismatch encountered.
 
-Collected issues now include severity, remediation guidance, and best-effort YAML source context for both parse-layer and conformance-layer failures.
+Collected `ValidationIssue` diagnostics include severity, remediation guidance, and best-effort YAML source context for conformance-layer failures.
 
 ## Validation Rule Reference
 
 | CT | Scope | Implemented checks | Primary evidence |
 |---|---|---|---|
 | `CT-001` | Required canonical shape | Required sections and fields, optional section omission accepted | `passing_canonical_example`, `optional_sections_omitted_is_valid` |
-| `CT-002` | Parse-layer correctness | Missing fields, mapping/list/string/integer enforcement, malformed YAML rejection | `missing_required_field`, `invalid_type_reports_field_path`, `collection_type_mismatch_reports_field_path`, `malformed_yaml_is_rejected_before_validation` |
+| `CT-002` | Parse-layer correctness | serde decode enforcement for missing fields and type mismatches, plus malformed YAML rejection | `missing_required_field`, `invalid_type_reports_field_path`, `collection_type_mismatch_reports_field_path`, `malformed_yaml_is_rejected_before_validation` |
 | `CT-003` | Scope-local ID rules | Non-empty IDs, duplicate detection per storage/network/resources scope, cross-scope reuse allowed | `duplicate_ids`, `empty_ids_report_precise_field_paths`, `duplicate_storage_id_reports_offending_entry_index`, `same_id_across_scopes_is_allowed` |
 | `CT-004` | Semantic policy | `vm_name` filename match, `pc` chipset restriction to `q35` or `i440fx` | `vm_name_mismatch`, `invalid_chipset_family_combination`, `unknown_machine_family` |
 | `CT-005` | Diagnostics precision | Full field paths, indexed collection paths, formatter coverage for human and JSON output | `invalid_type_reports_field_path`, `duplicate_storage_id_reports_offending_entry_index`, `human_readable_report_formatting`, `json_report_formatting` |
@@ -69,7 +69,7 @@ virtual_machine:
 
 ## CT-002: Required Field Validation and Type Correctness
 
-**Requirement:** Validation rejects configurations with missing required fields or type mismatches.
+**Requirement:** Parsing rejects configurations with missing required fields or type mismatches.
 
 **Validation Rules:**
 
@@ -84,23 +84,13 @@ virtual_machine:
 - `virtual_machine.system.machine.chipset`
 - `virtual_machine.system.cpu.model`
 
-**Error message:**
+**Parse diagnostic (serde):**
 
 ```
-path: "metadata.schema_version"
-reason: "is required"
-remediation: "Add the required string field at metadata.schema_version"
+metadata: missing field `schema_version`
 ```
 
-OR
-
-```
-path: "metadata.schema_version"
-reason: "is required and must be a non-empty string"
-remediation: "Provide a non-empty string value for metadata.schema_version"
-```
-
-The shorter `is required` form comes from parse-layer absence checks. The longer form comes from conformance checks when the field exists but trims to empty.
+Empty/whitespace-only values still fail in conformance with `ValidationIssue` output (for example `is required and must be a non-empty string`).
 
 **When Violated:**
 
@@ -137,15 +127,13 @@ metadata:
 
 **Description:** The `virtual_machine.system.memory.min` field must be an integer >= 0.
 
-**Error messages:**
+**Parse diagnostic (serde) for type mismatch:**
 
 ```
-path: "virtual_machine.system.memory.min"
-reason: "must be an integer"
-remediation: "Change virtual_machine.system.memory.min to an integer value"
+virtual_machine.system.memory.min: invalid type: string "8192", expected i64
 ```
 
-OR
+Negative numeric values are parsed successfully but fail conformance with:
 
 ```
 path: "virtual_machine.system.memory.min"

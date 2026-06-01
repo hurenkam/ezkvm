@@ -14,6 +14,9 @@ ezkvm_v3 is organized as a staged pipeline:
 
 Use this skill when designing a new module, trait boundary, or source adapter inside that pipeline.
 
+For config importer stage contracts and naming, consult `src/config_importer/README.md` before proposing API changes.
+Treat `src/config_importer/README.md` as manually authored design documentation: do not modify it unless the user explicitly asks for that file to be changed and confirms the change.
+
 ## Patterns
 
 ### Trait-Based Stage Boundary
@@ -27,7 +30,7 @@ Use a small object-safe trait when a stage needs to be selected behind an interf
 
 ### Adapter Scaffold
 
-Give each import source its own module under `src/import_stage/`.
+Give each import source its own module under `src/config_importer/`.
 
 - parse source payload plus import-host context
 - map source terms into canonical model fields
@@ -47,7 +50,7 @@ The render stage must be pure and repeatable.
 
 Validate early, then fail fast on contract violations.
 
-- import stage validates source syntax and source-local semantics
+- config importer validates source syntax and source-local semantics
 - runtime resolution validates host-bound assumptions
 - render stage assumes it receives a valid, effective runtime model
 - warnings are acceptable for ignorable source fields; silent drops are not

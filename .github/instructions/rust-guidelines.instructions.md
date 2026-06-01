@@ -17,6 +17,22 @@ If the task involves module naming, file boundaries, or helper abstractions, con
 - Add or update tests when behavior changes.
 - Keep examples and documentation aligned with behavior changes.
 
+## Coding Guideline Conformance Gate
+
+For any task that creates or modifies Rust files, run a coding-guideline conformance check against `doc/dev/architecture/coding-guidelines.md` before finalizing.
+
+Minimum required checks on changed Rust files:
+
+- module/file responsibility still matches a single stage concern
+- interfaces remain narrow and explicit
+- stage `mod.rs` files keep boundary types/traits/errors and avoid accumulating implementation helpers
+- module boundary changes include corresponding test updates
+
+If a mismatch is found:
+
+- either fix it in the same task, or
+- explicitly report the remaining mismatch and why it was deferred.
+
 ## Validation Expectations
 
 For Rust code changes, run and report these commands when feasible:
@@ -33,7 +49,8 @@ When summarizing Rust changes, include:
 
 1. What changed and why.
 2. Validation performed and results.
-3. Documentation impact statement (`updated` or `no user-facing doc impact` with reason).
+3. Coding-guideline conformance status (`pass` or findings with file references).
+4. Documentation impact statement (`updated` or `no user-facing doc impact` with reason).
 
 ## Scope Note
 
