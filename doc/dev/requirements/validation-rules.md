@@ -367,4 +367,4 @@ When implementing tools that process these errors:
 
 See [Validation Examples](../architecture/validation-examples.md) for runnable code examples and [Coding Guidelines](../architecture/coding-guidelines.md#validation-layer-implementation) for implementation patterns.
 
-**Test Coverage:** All rules are validated by the test suite in [src/vm_spec/validation.rs](../../../src/vm_spec/validation.rs).
+**Test Coverage:** All rules are validated by the test suite in [src/runtime_config/validation.rs](../../../src/runtime_config/validation.rs).

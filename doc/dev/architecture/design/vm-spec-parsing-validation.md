@@ -6,10 +6,10 @@ Back to index: [Current Implementation Architecture](./current-implementation-ar
 
 This note covers canonical model shape plus parse and validation logic in:
 
-- `src/vm_spec/model.rs`
-- `src/vm_spec/parsing.rs`
-- `src/vm_spec/validation.rs`
-- `src/vm_spec/mod.rs`
+- `src/runtime_config/model.rs`
+- `src/runtime_config/parsing.rs`
+- `src/runtime_config/validation.rs`
+- `src/runtime_config/mod.rs`
 
 ## Canonical Model
 

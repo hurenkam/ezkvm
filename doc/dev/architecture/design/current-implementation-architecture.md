@@ -8,7 +8,7 @@ The current implementation is split into these module areas:
 
 - entrypoint and crate wiring in `src/main.rs` and `src/lib.rs`
 - source import adapters in `src/config_importer/`
-- canonical VM model parsing and validation in `src/vm_spec/`
+- canonical VM model parsing and validation in `src/runtime_config/`
 - runtime-boundary scaffold plus deterministic rendering in `src/runtime_resolution/` and `src/render_stage/`
 
 The binary entrypoint is still minimal and does not execute the full stage pipeline. Current stage flow remains:
@@ -36,10 +36,10 @@ The binary entrypoint is still minimal and does not execute the full stage pipel
 | `src/config_importer/proxmox/mod.rs` | Proxmox `.conf` adapter | `ProxmoxConfigImporter`, `ProxmoxImportError`, `parse_machine_value()` |
 | `src/config_importer/qemu/mod.rs` | QEMU command line adapter stub | `QemuConfigImporter` |
 | `src/config_importer/libvirt/mod.rs` | Libvirt XML adapter stub | `LibvirtConfigImporter` |
-| `src/vm_spec/mod.rs` | Canonical schema exports | `CanonicalDocument`, `ParseError`, `ValidationIssue`, `ConformanceError`, `validate_canonical_yaml()`, `validate_canonical_document()` |
-| `src/vm_spec/model.rs` | Canonical data model | `Metadata`, `VirtualMachine`, `System`, `Machine`, `Cpu`, `Memory`, `StorageEntry`, `NetworkEntry`, `ResourceRef` |
-| `src/vm_spec/parsing.rs` | YAML parsing and structural validation | `Severity`, `ValidationIssue`, `ParseError`, `parse_canonical_document_from_yaml()`, `parse_canonical_document()`, `enrich_validation_issues()` |
-| `src/vm_spec/validation.rs` | Semantic validation and report formatting | `ValidationSummary`, `ValidationReport`, `ReportFormatter`, `DefaultReportFormatter`, `ConformanceError` |
+| `src/runtime_config/mod.rs` | Canonical schema exports | `CanonicalDocument`, `ParseError`, `ValidationIssue`, `ConformanceError`, `validate_canonical_yaml()`, `validate_canonical_document()` |
+| `src/runtime_config/model.rs` | Canonical data model | `Metadata`, `VirtualMachine`, `System`, `Machine`, `Cpu`, `Memory`, `StorageEntry`, `NetworkEntry`, `ResourceRef` |
+| `src/runtime_config/parsing.rs` | YAML parsing and structural validation | `Severity`, `ValidationIssue`, `ParseError`, `parse_canonical_document_from_yaml()`, `parse_canonical_document()`, `enrich_validation_issues()` |
+| `src/runtime_config/validation.rs` | Semantic validation and report formatting | `ValidationSummary`, `ValidationReport`, `ReportFormatter`, `DefaultReportFormatter`, `ConformanceError` |
 | `src/runtime_resolution/mod.rs` | Runtime boundary scaffold | `RuntimeResolutionStage`, `EffectiveRuntimeModel` |
 | `src/render_stage/mod.rs` | Render stage boundary | `RenderRequest`, `RenderStage` |
 | `src/render_stage/deterministic.rs` | Deterministic renderer | `DeterministicRenderStage` |

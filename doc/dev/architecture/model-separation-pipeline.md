@@ -31,7 +31,7 @@ Define the normative boundary between import-host data, canonical virtual_machin
 ## Implementation Naming (Current Scaffold)
 
 - `src/config_importer/`: config importer stage orchestration boundary
-- `src/vm_spec/`: canonical VM specification schema and validation boundary
+- `src/runtime_config/`: canonical VM specification schema and validation boundary
 - `src/runtime_resolution/`: runtime resolution stage boundary
 - `src/render_stage/`: deterministic render stage boundary
 

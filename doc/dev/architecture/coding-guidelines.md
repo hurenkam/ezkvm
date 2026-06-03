@@ -19,22 +19,22 @@ These are repo-level boundaries for writing and reviewing Rust code.
 ## Pipeline Structure
 
 - `src/config_importer/` owns source-specific import adapters.
-- `src/vm_spec/` owns the canonical VM specification model and validation.
+- `src/runtime_config/` owns the canonical VM specification model and validation.
 - `src/runtime_resolution/` owns host-bound resolution of canonical intent.
 - `src/render_stage/` owns deterministic command rendering.
 
 ## Validation Layer Implementation
 
-The `src/vm_spec/` module implements a two-layer validation pattern that separates concerns between parsing and semantic validation:
+The `src/runtime_config/` module implements a two-layer validation pattern that separates concerns between parsing and semantic validation:
 
-**Layer 1: Parsing** (`src/vm_spec/parsing.rs`)
+**Layer 1: Parsing** (`src/runtime_config/parsing.rs`)
 - Converts raw YAML text to `RuntimeConfig` via serde deserialization
 - Structural constraints (required fields and scalar/collection types) are enforced by serde during decode
 - Produces `RuntimeConfig` on success or `ParseError` on failure
 - Returns `ParseError::Yaml` for syntax errors and serde structural/type decode errors
 - Parse-layer failures short-circuit on the first decode error reported by serde
 
-**Layer 2: Validation** (`src/vm_spec/validation.rs`)
+**Layer 2: Validation** (`src/runtime_config/validation.rs`)
 - Accepts a parsed `RuntimeConfig` and performs semantic validation
 - Enforces business rules: uniqueness constraints, consistency policies, filename matching
 - Produces `ConformanceError` that wraps validation issues or parse errors

@@ -2,7 +2,7 @@
 
 **Status:** Active | **Owner:** Hicks (Backend Dev) | **Date:** 2026-05-29
 
-This document describes the validation reporting baseline currently implemented in `src/vm_spec/validation.rs`, including severity classification, remediation guidance, and machine-readable output formats.
+This document describes the validation reporting baseline currently implemented in `src/runtime_config/validation.rs`, including severity classification, remediation guidance, and machine-readable output formats.
 
 ## Overview
 

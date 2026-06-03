@@ -6,6 +6,12 @@ When working with project documentation, treat [doc/README.md](../doc/README.md)
 - Keep documentation organized according to the `dev`, `user`, and `planning` structure described there.
 - If a requested document does not clearly fit, propose or document placement rationale relative to `doc/README.md`.
 
+When working in `src/**`, treat `README.md` files in the `src` directory tree as canonical design and requirement inputs for the directory subtree in which they are found.
+
+- Read the nearest in-scope `README.md` under `src/**` before designing or changing implementation within that subtree.
+- Treat `src/**/README.md` files as manually authored and read-only by default.
+- Edit a `src/**/README.md` only when the user explicitly instructs that edit and confirms it.
+
 ## Helper Registry
 
 - `Coding Guidelines`: `doc/dev/architecture/coding-guidelines.md`

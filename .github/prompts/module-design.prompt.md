@@ -15,9 +15,9 @@ Design the module or stage before writing code.
 
 ## Workflow
 
-1. Read `.squad/decisions.md`, the agent history, `doc/dev/architecture/coding-guidelines.md`, `doc/README.md`, and the relevant architecture docs. For config importer boundaries, also read `src/config_importer/README.md`.
-	- `src/config_importer/README.md` is manually authored design documentation. Do not edit it unless the user explicitly requests edits to that file and confirms.
-2. Place the work in the existing pipeline: `config_importer`, `vm_spec`, `runtime_resolution`, or `render_stage`.
+1. Read `.squad/decisions.md`, the agent history, `doc/dev/architecture/coding-guidelines.md`, `doc/README.md`, and the relevant architecture docs. Also read the nearest `README.md` in the `src` subtree for the module or stage path being designed.
+	- Any `src/**/README.md` is manually authored design and requirement documentation for its subtree. Do not edit it unless the user explicitly requests edits to that file and confirms.
+2. Place the work in the existing pipeline: `config_importer`, `runtime_config`, `runtime_model`, or `config_exporter`.
 3. Define the smallest responsible unit: one module, one trait boundary, or one adapter family.
 4. Specify the public contract: request shape, output shape, error shape, validation boundary, and whether the boundary must stay synchronous or object-safe.
 5. Call out what must stay deterministic, what may vary by host or source, and what must be rejected early.

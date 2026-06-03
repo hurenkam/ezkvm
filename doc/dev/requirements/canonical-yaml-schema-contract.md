@@ -123,7 +123,7 @@ VM config references host catalog resources:
 
 ## Validation Conformance Terms (CT-001 through CT-005)
 
-The validation framework enforces five core contract terms, each with dedicated test coverage in `src/vm_spec/validation.rs`:
+The validation framework enforces five core contract terms, each with dedicated test coverage in `src/runtime_config/validation.rs`:
 
 ### CT-001: Valid Canonical Document Structure
 

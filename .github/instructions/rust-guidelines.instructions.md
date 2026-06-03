@@ -10,6 +10,11 @@ Use this guidance for Rust implementation and review tasks.
 
 If the task involves module naming, file boundaries, or helper abstractions, consult [coding-guidelines.md](../../doc/dev/architecture/coding-guidelines.md) first.
 
+When changing code in `src/**`, read the nearest in-scope `README.md` under `src/**` as design and requirements input for that subtree.
+
+- Treat `src/**/README.md` files as manually authored and read-only by default.
+- Edit a `src/**/README.md` only when the user explicitly requests edits to that file and confirms.
+
 ## Baseline Quality Expectations
 
 - Prefer explicit error handling over panics in production paths.

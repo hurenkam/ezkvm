@@ -45,7 +45,7 @@ Establish comprehensive validation for the canonical YAML contract with an execu
 **Assigned To:** Vasquez (Tester)
 
 **Completion Summary:**
-- Added CT requirement comments to all 9 tests in `src/vm_spec/validation.rs`
+- Added CT requirement comments to all 9 tests in `src/runtime_config/validation.rs`
 - Created contract specification document: `doc/dev/requirements/canonical-yaml-schema-contract.md`
 - Established test-to-requirement mapping for CT-001 through CT-005
 

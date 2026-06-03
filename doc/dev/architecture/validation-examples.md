@@ -496,7 +496,7 @@ virtual_machine:
 
 For actual validation, use the ezkvm test suite:
 ```bash
-cargo test --lib vm_spec::validation -- --nocapture
+cargo test --lib runtime_config::validation -- --nocapture
 ```
 
 ---
