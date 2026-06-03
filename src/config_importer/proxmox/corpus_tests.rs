@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::config_importer::{ConfigArgs, ConfigImporter};
-use crate::vm_spec::{ConformanceError, validate_runtime_config};
+use crate::runtime_config::{ConformanceError, validate_runtime_config};
 
 use super::ProxmoxConfigImporter;
 
@@ -118,7 +118,7 @@ fn corpus_expectations() -> &'static [CorpusExpectation] {
     ]
 }
 
-fn import_corpus_case(case: &CorpusExpectation) -> crate::vm_spec::RuntimeConfig {
+fn import_corpus_case(case: &CorpusExpectation) -> crate::runtime_config::RuntimeConfig {
     let case_id = NEXT_CASE_ID.fetch_add(1, Ordering::Relaxed);
     let source_path = PathBuf::from(format!(
         "/tmp/ezkvm-proxmox-{case_id}-{}.conf",
@@ -136,7 +136,7 @@ fn runtime_output_path(vm_name: &str) -> PathBuf {
 }
 
 fn assert_storage_ids(
-    entries: &[crate::vm_spec::model::StorageEntry],
+    entries: &[crate::runtime_config::model::StorageEntry],
     expected_ids: &[&str],
     fixture_label: &str,
 ) {
@@ -148,7 +148,7 @@ fn assert_storage_ids(
 }
 
 fn assert_network_ids(
-    entries: &[crate::vm_spec::model::NetworkEntry],
+    entries: &[crate::runtime_config::model::NetworkEntry],
     expected_ids: &[&str],
     fixture_label: &str,
 ) {
@@ -160,7 +160,7 @@ fn assert_network_ids(
 }
 
 fn assert_resource_ids(
-    entries: &[crate::vm_spec::model::ResourceRef],
+    entries: &[crate::runtime_config::model::ResourceRef],
     expected_ids: &[&str],
     fixture_label: &str,
 ) {

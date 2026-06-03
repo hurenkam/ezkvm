@@ -1,4 +1,6 @@
-# Config Importer Stage
+src/config_importer/README.md
+
+# Config Importer
 
 ## Requirements
 This document describes how the config importer stage is modeled.
@@ -10,19 +12,17 @@ First some requirements:
 	3. qemu command line
 	4. libvirt config files
  2. Each importer should return a generic ezkvm machine runtime model
- 3. Each importer is passed relevant command line args (any argument passed following a --<importer_type> argument, where <importer_type> is a unique identifier for the importer, for the above mentioned importers, this could be --ezkvm, --proxmox, --qemu, --libvirt). These arguments will be passed to the importer through ConfigArgs. It is not the task of the importer to do this itself, but rather by the caller of the importer to make sure ConfigArgs already contains only relevant args for the importer.
+ 3. Each importer is passed relevant command line args (any argument passed using the ```--import:type=<importer>[,<args>]``` flag. Where ```<args>``` is a comma seperated list of arguments to be passed to the importer.
  4. The importers shall each implement the generic ConfigImporter trait, that defines how arguments are passed to the importer, and how the resulting runtime is returned. This trait shall be generic so that it does not depend on the actual implementation of the importer, this to allow easy extensibility.
  5. Each implementation shall be in a separate subdirectory, the current directory shall only be used for generic types and traits that are shared by more than one implementation.
 
 ## Command line arguments
 
-Import command line will typically look like this:
+Import command line arguments will typically look like this:
 
 ```
-ezkvm import --ezkvm <filename> --profiles=/etc/ezkvm/profiles.d
-ezkvm import --proxmox <filename> --storage=/etc/pve/storage.cfg
-ezkvm import --qemu <filename>
-ezkvm import --libvirt <filename>
+--input:type=proxmox,config=<name>.conf,storage=/etc/pve/storage.cfg
+--input:type=ezkvm,config=<name>.yaml,host=/etc/ezkvm/host.yaml,profiles=/etc/ezkvm/profiles.d
 ```
 
 ## Design

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::vm_spec::{ConformanceError, validate_runtime_config};
+use crate::runtime_config::{ConformanceError, validate_runtime_config};
 
 use super::RuntimeConfig;
 use super::diagnostics::enrich_validation_issues;

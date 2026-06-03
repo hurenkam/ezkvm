@@ -1,4 +1,4 @@
-use crate::vm_spec::ValidationIssue;
+use crate::runtime_config::ValidationIssue;
 
 pub(super) fn enrich_validation_issues(
     yaml: &str,

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{ConfigArgs, ConfigImportError, ConfigImporter, RuntimeConfig};
+use super::{ConfigArgs, ConfigImportError, ConfigImporter, RuntimeConfig, extract_config_path};
 
 #[derive(Debug, Default)]
 pub struct QemuConfigImporter;
@@ -14,20 +14,17 @@ struct QemuImportOptions {
 
 impl QemuImportOptions {
     fn parse(config_args: ConfigArgs) -> Result<Self, ConfigImportError> {
-        let (config_path_arg, extra_args) = config_args
-            .args
-            .split_first()
-            .ok_or(ConfigImportError::MissingConfigPath { importer: "qemu" })?;
+        let (config_path, leftovers) = extract_config_path("qemu", config_args)?;
 
-        if !extra_args.is_empty() {
+        if !leftovers.is_empty() {
             return Err(ConfigImportError::UnexpectedArgs {
                 importer: "qemu",
-                args: extra_args.to_vec(),
+                args: leftovers,
             });
         }
 
         Ok(Self {
-            _config_path: PathBuf::from(config_path_arg),
+            _config_path: config_path,
         })
     }
 }
@@ -60,8 +57,8 @@ mod tests {
     #[test]
     fn parse_options_rejects_extra_args() {
         let error = super::QemuImportOptions::parse(ConfigArgs::new(vec![
-            "capture.txt".to_string(),
-            "--unexpected".to_string(),
+            "config=capture.txt".to_string(),
+            "machine=q35".to_string(),
         ]))
         .expect_err("extra args must fail");
 

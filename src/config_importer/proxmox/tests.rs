@@ -19,12 +19,23 @@ fn parse_options_requires_config_path() {
 }
 
 #[test]
-fn parse_options_rejects_extra_args() {
-    let error = ProxmoxImportOptions::parse(ConfigArgs::new(vec![
-        "/tmp/108.conf".to_string(),
-        "--unexpected".to_string(),
+fn parse_options_accepts_named_config_and_extra_import_args() {
+    let options = ProxmoxImportOptions::parse(ConfigArgs::new(vec![
+        "config=/tmp/108.conf".to_string(),
+        "storage=/etc/pve/storage.cfg".to_string(),
     ]))
-    .expect_err("extra args must fail");
+    .expect("named args should parse");
+
+    assert_eq!(options.config_path, PathBuf::from("/tmp/108.conf"));
+}
+
+#[test]
+fn parse_options_rejects_unknown_named_args() {
+    let error = ProxmoxImportOptions::parse(ConfigArgs::new(vec![
+        "config=/tmp/108.conf".to_string(),
+        "host=/etc/ezkvm/host.yaml".to_string(),
+    ]))
+    .expect_err("unknown args must fail");
 
     assert!(matches!(
         error,

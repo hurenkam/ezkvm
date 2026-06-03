@@ -1,10 +1,10 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use crate::vm_spec::model::{
+use crate::runtime_config::model::{
     Cpu, Machine, Memory, Metadata, NetworkEntry, ResourceRef, StorageEntry, System,
 };
-use crate::vm_spec::model::{EZKVM_CONFIG_SCHEMA_VERSION, VirtualMachine};
+use crate::runtime_config::model::{EZKVM_CONFIG_SCHEMA_VERSION, VirtualMachine};
 
 use super::RuntimeConfig;
 

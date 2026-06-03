@@ -1,15 +1,17 @@
 //! Config importer stage module scaffold.
 //!
-//! Owns source-adapter orchestration and source -> vm_spec mapping boundaries.
+//! Owns source-adapter orchestration and source -> runtime_config mapping boundaries.
 
 use std::path::{Path, PathBuf};
 
-use crate::vm_spec::{ConformanceError, RuntimeConfig as VmRuntimeConfig};
+use crate::runtime_config::{ConformanceError, RuntimeConfig as VmRuntimeConfig};
+mod arg_parsing;
 pub mod ezkvm;
 pub mod libvirt;
 pub mod proxmox;
 pub mod qemu;
 
+pub(crate) use arg_parsing::extract_config_path;
 pub use ezkvm::EzkvmConfigImporter;
 pub use libvirt::LibvirtConfigImporter;
 pub use proxmox::ProxmoxConfigImporter;

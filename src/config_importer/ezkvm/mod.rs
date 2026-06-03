@@ -56,7 +56,7 @@ virtual_machine:
     fn import_via_trait_object(
         stage: &dyn ConfigImporter<ConfigError = ConfigImportError>,
         config_args: ConfigArgs,
-    ) -> Result<crate::vm_spec::RuntimeConfig, ConfigImportError> {
+    ) -> Result<crate::runtime_config::RuntimeConfig, ConfigImportError> {
         stage.import_config(config_args)
     }
 
@@ -83,12 +83,24 @@ virtual_machine:
     }
 
     #[test]
-    fn parse_options_rejects_extra_args() {
-        let error = EzkvmImportOptions::parse(ConfigArgs::new(vec![
-            "vm.yaml".to_string(),
-            "--unexpected".to_string(),
+    fn parse_options_accepts_named_config_and_extra_import_args() {
+        let options = EzkvmImportOptions::parse(ConfigArgs::new(vec![
+            "config=vm.yaml".to_string(),
+            "host=/etc/ezkvm/host.yaml".to_string(),
+            "profiles=/etc/ezkvm/profiles.d".to_string(),
         ]))
-        .expect_err("extra args must fail");
+        .expect("named args should parse");
+
+        assert_eq!(options.config_path, PathBuf::from("vm.yaml"));
+    }
+
+    #[test]
+    fn parse_options_rejects_unknown_named_args() {
+        let error = EzkvmImportOptions::parse(ConfigArgs::new(vec![
+            "config=vm.yaml".to_string(),
+            "storage=/etc/pve/storage.cfg".to_string(),
+        ]))
+        .expect_err("unknown args must fail");
 
         assert!(matches!(
             error,
