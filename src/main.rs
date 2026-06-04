@@ -1,14 +1,6 @@
-use std::path::{Path, PathBuf};
-
 mod cli;
 
 use cli::{CliCommand, parse_cli_options, print_help};
-use ezkvm::config_format::{
-    ExportOptions, Exporter, EzkvmExporter, EzkvmImporter, ImportOptions, Importer,
-    LibvirtExporter, LibvirtImporter, ProxmoxExporter, ProxmoxImporter, QemuExporter, QemuImporter,
-    RuntimeConfig,
-};
-use ezkvm::runtime_config::validate_runtime_config;
 
 fn main() {
     if let Err(error) = run() {
@@ -33,13 +25,13 @@ fn run() -> Result<(), String> {
 
     match command {
         CliCommand::Import { input } => {
-            let runtime = import_runtime_config(&input)?;
-            validate_runtime(&runtime, None)?;
+            let runtime = input.import_runtime_config()?;
+            runtime.validate_runtime(None)?;
             println!("validation passed");
         }
         CliCommand::Convert { input, output } => {
-            let runtime = import_runtime_config(&input)?;
-            let path = export_runtime(&runtime, &output)?;
+            let runtime = input.import_runtime_config()?;
+            let path = output.export_runtime(&runtime)?;
             println!("exported output to {}", path.display());
         }
         CliCommand::Export { output } => {
@@ -81,40 +73,4 @@ fn run() -> Result<(), String> {
     }
 
     Ok(())
-}
-
-fn import_runtime_config(options: &ImportOptions) -> Result<RuntimeConfig, String> {
-    match options {
-        ImportOptions::Ezkvm { .. } => EzkvmImporter.import(options.clone()),
-        ImportOptions::Proxmox { .. } => ProxmoxImporter.import(options.clone()),
-        ImportOptions::Qemu { .. } => QemuImporter.import(options.clone()),
-        ImportOptions::Libvirt { .. } => LibvirtImporter.import(options.clone()),
-    }
-    .map_err(|error| format!("import failed: {error}"))
-}
-
-fn validate_runtime(runtime: &RuntimeConfig, source_path: Option<&Path>) -> Result<(), String> {
-    let fallback = PathBuf::from(format!("{}.yaml", runtime.metadata.vm_name));
-    let path = source_path.unwrap_or(&fallback);
-
-    validate_runtime_config(runtime, path).map_err(|error| match error.report() {
-        Some(report) => {
-            let formatter = ezkvm::runtime_config::DefaultReportFormatter::new();
-            report.render_with(
-                &formatter,
-                ezkvm::runtime_config::ValidationReportFormat::Human,
-            )
-        }
-        None => error.to_string(),
-    })
-}
-
-fn export_runtime(runtime: &RuntimeConfig, options: &ExportOptions) -> Result<PathBuf, String> {
-    match options {
-        ExportOptions::Ezkvm { .. } => EzkvmExporter.export(runtime, options.clone()),
-        ExportOptions::Proxmox { .. } => ProxmoxExporter.export(runtime, options.clone()),
-        ExportOptions::Qemu { .. } => QemuExporter.export(runtime, options.clone()),
-        ExportOptions::Libvirt { .. } => LibvirtExporter.export(runtime, options.clone()),
-    }
-    .map_err(|error| format!("export failed: {error}"))
 }

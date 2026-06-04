@@ -4,7 +4,7 @@ use std::path::Path;
 use serde_json::json;
 use thiserror::Error;
 
-use super::model::{NetworkEntry, ResourceRef, RuntimeConfig, StorageEntry};
+use super::model::{NetworkEntry, ResourceRef, StorageEntry};
 use super::parsing::{ParseError, Severity, ValidationIssue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -230,62 +230,7 @@ impl ConformanceError {
     }
 }
 
-pub fn validate_runtime_config(
-    doc: &RuntimeConfig,
-    filename: &Path,
-) -> Result<(), ConformanceError> {
-    let mut issues = Vec::new();
-
-    check_required_strings(
-        &mut issues,
-        "metadata.schema_version",
-        &doc.metadata.schema_version,
-    );
-    check_required_strings(&mut issues, "metadata.vm_name", &doc.metadata.vm_name);
-    check_required_strings(
-        &mut issues,
-        "virtual_machine.system.machine.family",
-        &doc.virtual_machine.system.machine.family,
-    );
-    check_required_strings(
-        &mut issues,
-        "virtual_machine.system.machine.chipset",
-        &doc.virtual_machine.system.machine.chipset,
-    );
-    check_required_strings(
-        &mut issues,
-        "virtual_machine.system.cpu.model",
-        &doc.virtual_machine.system.cpu.model,
-    );
-
-    if doc.virtual_machine.system.memory.min < 0 {
-        issues.push(
-            ValidationIssue::new(
-                "virtual_machine.system.memory.min",
-                "must be an integer >= 0",
-            )
-            .with_remediation("Change memory.min to a non-negative value"),
-        );
-    }
-
-    validate_vm_name_filename_match(&mut issues, &doc.metadata.vm_name, filename);
-    validate_machine_consistency(
-        &mut issues,
-        &doc.virtual_machine.system.machine.family,
-        &doc.virtual_machine.system.machine.chipset,
-    );
-    validate_unique_ids_storage(&mut issues, &doc.virtual_machine.storage);
-    validate_unique_ids_network(&mut issues, &doc.virtual_machine.network);
-    validate_unique_ids_resources(&mut issues, &doc.virtual_machine.resources);
-
-    if issues.is_empty() {
-        Ok(())
-    } else {
-        Err(ConformanceError::Validation(issues.len(), issues))
-    }
-}
-
-fn check_required_strings(issues: &mut Vec<ValidationIssue>, path: &str, value: &str) {
+pub fn check_required_strings(issues: &mut Vec<ValidationIssue>, path: &str, value: &str) {
     if value.trim().is_empty() {
         issues.push(
             ValidationIssue::new(path, "is required and must be a non-empty string")
@@ -294,7 +239,7 @@ fn check_required_strings(issues: &mut Vec<ValidationIssue>, path: &str, value: 
     }
 }
 
-fn validate_vm_name_filename_match(
+pub fn validate_vm_name_filename_match(
     issues: &mut Vec<ValidationIssue>,
     vm_name: &str,
     filename: &Path,
@@ -328,7 +273,7 @@ fn validate_vm_name_filename_match(
     }
 }
 
-fn validate_machine_consistency(issues: &mut Vec<ValidationIssue>, family: &str, chipset: &str) {
+pub fn validate_machine_consistency(issues: &mut Vec<ValidationIssue>, family: &str, chipset: &str) {
     if family == "pc" {
         let allowed = ["q35", "i440fx"];
         if !allowed.contains(&chipset) {
@@ -343,7 +288,7 @@ fn validate_machine_consistency(issues: &mut Vec<ValidationIssue>, family: &str,
     }
 }
 
-fn validate_unique_ids_storage(issues: &mut Vec<ValidationIssue>, entries: &[StorageEntry]) {
+pub fn validate_unique_ids_storage(issues: &mut Vec<ValidationIssue>, entries: &[StorageEntry]) {
     let mut seen = HashSet::new();
     for (idx, entry) in entries.iter().enumerate() {
         let path = format!("virtual_machine.storage[{idx}].id");
@@ -369,7 +314,7 @@ fn validate_unique_ids_storage(issues: &mut Vec<ValidationIssue>, entries: &[Sto
     }
 }
 
-fn validate_unique_ids_network(issues: &mut Vec<ValidationIssue>, entries: &[NetworkEntry]) {
+pub fn validate_unique_ids_network(issues: &mut Vec<ValidationIssue>, entries: &[NetworkEntry]) {
     let mut seen = HashSet::new();
     for (idx, entry) in entries.iter().enumerate() {
         let path = format!("virtual_machine.network[{idx}].id");
@@ -395,7 +340,7 @@ fn validate_unique_ids_network(issues: &mut Vec<ValidationIssue>, entries: &[Net
     }
 }
 
-fn validate_unique_ids_resources(issues: &mut Vec<ValidationIssue>, entries: &[ResourceRef]) {
+pub fn validate_unique_ids_resources(issues: &mut Vec<ValidationIssue>, entries: &[ResourceRef]) {
     let mut seen = HashSet::new();
     for (idx, entry) in entries.iter().enumerate() {
         let path = format!("virtual_machine.resources[{idx}].id");

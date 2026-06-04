@@ -2,7 +2,7 @@ use serde_yaml::from_str;
 use std::path::Path;
 
 use crate::config_format::{EzkvmImporter, ImportError, ImportOptions, Importer, RuntimeConfig};
-use crate::runtime_config::{ConformanceError, ParseError, validate_runtime_config};
+use crate::runtime_config::{ConformanceError, ParseError};
 
 use super::diagnostics::enrich_validation_issues;
 
@@ -20,7 +20,7 @@ pub(crate) fn validate_ezkvm_config(
     filename: &Path,
 ) -> Result<RuntimeConfig, ConformanceError> {
     let doc = from_str::<RuntimeConfig>(yaml).map_err(ParseError::from)?;
-    match validate_runtime_config(&doc, filename) {
+    match doc.validate_runtime_config(filename) {
         Ok(()) => {}
         Err(ConformanceError::Validation(_, issues)) => {
             let issues = enrich_validation_issues(yaml, issues);
