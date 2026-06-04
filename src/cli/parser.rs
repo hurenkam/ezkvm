@@ -1,142 +1,88 @@
-use std::path::PathBuf;
-use super::options::{CliOptions, OutputSpec, SourceSpec};
+use serde_json::{Map, Value};
 
-pub fn parse_cli_options(args: &[String]) -> Result<CliOptions, String> {
-    let mut source: Option<SourceSpec> = None;
-    let mut output: Option<OutputSpec> = None;
-    let mut validate = false;
-    let mut show_runtime = false;
-    let mut unknown_args: Vec<String> = Vec::new();
+use super::CliCommand;
 
-    for arg in args {
-        if let Some(parsed_source) = parse_source_flag(arg)? {
-            if source.replace(parsed_source).is_some() {
-                return Err("multiple import/input source flags were provided".to_string());
-            }
-            continue;
-        }
+pub fn parse_cli_options(args: &[String]) -> Result<CliCommand, String> {
+    let structured_json = args_to_structured_json(args)?;
+    let yaml_payload = serde_json::to_string(&structured_json)
+        .map_err(|error| format!("failed to encode CLI payload: {error}"))?;
 
-        if let Some(parsed_output) = parse_output_flag(arg)? {
-            if output.replace(parsed_output).is_some() {
-                return Err("multiple output flags were provided".to_string());
-            }
-            continue;
-        }
+    serde_yaml::from_str(&yaml_payload)
+        .map_err(|error| format!("failed to parse CLI payload: {error}"))
+}
 
-        match arg.as_str() {
-            "--validate" => validate = true,
-            "--show-runtime" => show_runtime = true,
-            _ => unknown_args.push(arg.clone()),
-        }
+fn args_to_structured_json(args: &[String]) -> Result<Value, String> {
+    if args.is_empty() {
+        return Err("missing subcommand".to_string());
     }
 
-    if !unknown_args.is_empty() {
+    let command = args[0].clone();
+    let options = parse_options_as_nested_json(&args[1..])?;
+
+    Ok(serde_json::json!({
+        "command": command,
+        "options": options,
+    }))
+}
+
+fn parse_options_as_nested_json(args: &[String]) -> Result<Map<String, Value>, String> {
+    let mut options = Map::new();
+    let mut index = 0;
+
+    while index < args.len() {
+        let arg = &args[index];
+        if !arg.starts_with("--") {
+            return Err(format!("unexpected positional argument '{}'", arg));
+        }
+
+        let key = arg.trim_start_matches("--");
+        if key.is_empty() {
+            return Err("empty flag name is not allowed".to_string());
+        }
+
+        if index + 1 < args.len() && !args[index + 1].starts_with("--") {
+            insert_dotted_key(&mut options, key, Value::String(args[index + 1].clone()))?;
+            index += 2;
+            continue;
+        }
+
+        insert_dotted_key(&mut options, key, Value::Bool(true))?;
+        index += 1;
+    }
+
+    Ok(options)
+}
+
+fn insert_dotted_key(map: &mut Map<String, Value>, key: &str, value: Value) -> Result<(), String> {
+    let segments: Vec<&str> = key.split('.').collect();
+    insert_segments(map, &segments, value)
+}
+
+fn insert_segments(
+    current: &mut Map<String, Value>,
+    segments: &[&str],
+    value: Value,
+) -> Result<(), String> {
+    if segments.is_empty() {
+        return Err("empty flag path is not allowed".to_string());
+    }
+
+    if segments.len() == 1 {
+        current.insert(segments[0].to_string(), value);
+        return Ok(());
+    }
+
+    let head = segments[0].to_string();
+    let entry = current
+        .entry(head)
+        .or_insert_with(|| Value::Object(Map::new()));
+
+    let Some(child) = entry.as_object_mut() else {
         return Err(format!(
-            "unrecognized arguments: {}",
-            unknown_args.join(", ")
+            "cannot nest property under non-object flag '--{}'",
+            segments[0]
         ));
-    }
-
-    let source = source.ok_or("missing source; use --input:type=... or --import:type=...")?;
-
-    if !validate && !show_runtime && output.is_none() {
-        return Err(
-            "no action requested; use --validate, --show-runtime, or --output:type=...".to_string(),
-        );
-    }
-
-    Ok(CliOptions {
-        source,
-        output,
-        validate,
-        show_runtime,
-    })
-}
-
-pub fn parse_source_flag(arg: &str) -> Result<Option<SourceSpec>, String> {
-    const INPUT_PREFIX: &str = "--input:type=";
-    const IMPORT_PREFIX: &str = "--import:type=";
-    const LEGACY_IMPORT_PREFIX: &str = "--import:";
-
-    let payload = if let Some(value) = arg.strip_prefix(INPUT_PREFIX) {
-        value
-    } else if let Some(value) = arg.strip_prefix(IMPORT_PREFIX) {
-        value
-    } else if let Some(value) = arg.strip_prefix(LEGACY_IMPORT_PREFIX) {
-        value
-    } else {
-        return Ok(None);
     };
 
-    let mut tokens = payload.split(',').filter(|s| !s.trim().is_empty());
-    let importer = tokens
-        .next()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or("source flag requires an importer type")?
-        .to_string();
-
-    let importer_args: Vec<String> = tokens.map(|token| token.trim().to_string()).collect();
-    let source_config_path = infer_config_path(&importer_args);
-
-    Ok(Some(SourceSpec {
-        importer,
-        importer_args,
-        source_config_path,
-    }))
-}
-
-pub fn parse_output_flag(arg: &str) -> Result<Option<OutputSpec>, String> {
-    const OUTPUT_PREFIX: &str = "--output:type=";
-
-    let Some(payload) = arg.strip_prefix(OUTPUT_PREFIX) else {
-        return Ok(None);
-    };
-
-    let mut tokens = payload.split(',').filter(|token| !token.trim().is_empty());
-    let output_type = tokens
-        .next()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or("output flag requires an output type")?
-        .to_string();
-
-    let mut output_path: Option<PathBuf> = None;
-    for token in tokens {
-        let Some((key, value)) = token.split_once('=') else {
-            return Err(format!(
-                "invalid output argument '{}'; expected key=value",
-                token
-            ));
-        };
-
-        if key != "path" || value.trim().is_empty() || output_path.is_some() {
-            return Err(format!("unsupported output argument '{}'", token));
-        }
-
-        output_path = Some(PathBuf::from(value.trim()));
-    }
-
-    Ok(Some(OutputSpec {
-        output_type,
-        output_path,
-    }))
-}
-
-fn infer_config_path(importer_args: &[String]) -> Option<PathBuf> {
-    for arg in importer_args {
-        if let Some(value) = arg.strip_prefix("config=")
-            && !value.trim().is_empty()
-        {
-            return Some(PathBuf::from(value.trim()));
-        }
-    }
-
-    importer_args.first().and_then(|value| {
-        if value.contains('=') {
-            None
-        } else {
-            Some(PathBuf::from(value))
-        }
-    })
+    insert_segments(child, &segments[1..], value)
 }

@@ -1,40 +1,38 @@
-use std::collections::HashSet;
-
 pub fn print_help() {
-    let mut importers = HashSet::new();
-    importers.insert("ezkvm");
-    importers.insert("proxmox");
-    importers.insert("qemu");
-    importers.insert("libvirt");
-
-    let mut importers_list: Vec<&str> = importers.into_iter().collect();
-    importers_list.sort_unstable();
-
     println!("ezkvm CLI syntax");
     println!();
     println!("Usage:");
+    println!("  ezkvm import --input.type <type> [input flags]");
+    println!("  ezkvm export --output.type <type> [output flags]");
     println!(
-        "  ezkvm --input:type=<importer>,config=<path>[,<importer-args>] [--validate] [--show-runtime] [--output:type=<type>[,path=<file>]]"
+        "  ezkvm convert --input.type <type> [input flags] --output.type <type> [output flags]"
     );
-    println!(
-        "  ezkvm --import:type=<importer>,config=<path>[,<importer-args>] [--validate] [--show-runtime] [--output:type=<type>[,path=<file>]]"
-    );
+    println!("  ezkvm show-runtime --name <name>");
+    println!("  ezkvm start --name <name>");
+    println!("  ezkvm stop --name <name>");
+    println!("  ezkvm reset --name <name>");
+    println!("  ezkvm shutdown --name <name>");
     println!();
-    println!("Importers: {}", importers_list.join(", "));
-    println!("Output types: qemu, ezkvm");
+    println!("Input types: ezkvm, proxmox, qemu, libvirt");
+    println!("Output types: qemu, ezkvm, proxmox, libvirt");
     println!();
     println!("Examples:");
     println!(
-        "  ezkvm --input:type=ezkvm,config=win11-dev.yaml,host=/etc/ezkvm/host.yaml,profiles=/etc/ezkvm/profiles.d --validate"
+        "  ezkvm import --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm win11-dev.yaml"
     );
     println!(
-        "  ezkvm --input:type=ezkvm,config=win11-dev.yaml,host=/etc/ezkvm/host.yaml,profiles=/etc/ezkvm/profiles.d --show-runtime"
+        "  ezkvm convert --input.type proxmox --input.storage /etc/pve/storage.cfg --input.vm 108.conf --output.type ezkvm --output.host /etc/ezkvm/host.yaml --output.vm 108.yaml"
     );
     println!(
-        "  ezkvm --import:type=proxmox,config=108.conf,storage=/etc/pve/storage.cfg --output:type=ezkvm"
+        "  ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm win11-dev.yaml --output.type qemu"
     );
+    println!(
+        "  ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm win11-dev.yaml --output.type libvirt --output.vm win11-dev.xml"
+    );
+    println!("  ezkvm show-runtime --name win11-dev");
     println!();
     println!("Notes:");
-    println!("  - Exporters are currently stubbed and write placeholder output files.");
+    println!("  - Exporters currently write the RuntimeConfig snapshot text to the output file.");
+    println!("  - 'export' without an import context is not implemented yet; use convert.");
     println!("  - Use --help to show this message.");
 }

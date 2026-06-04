@@ -2,12 +2,13 @@ use std::path::{Path, PathBuf};
 
 mod cli;
 
-use ezkvm::config_importer::{
-    ConfigArgs, ConfigImportError, ConfigImporter, EzkvmConfigImporter, LibvirtConfigImporter,
-    ProxmoxConfigImporter, QemuConfigImporter,
+use cli::{CliCommand, parse_cli_options, print_help};
+use ezkvm::config_format::{
+    ExportOptions, Exporter, EzkvmExporter, EzkvmImporter, ImportOptions, Importer,
+    LibvirtExporter, LibvirtImporter, ProxmoxExporter, ProxmoxImporter, QemuExporter, QemuImporter,
+    RuntimeConfig,
 };
-use ezkvm::runtime_config::{RuntimeConfig, validate_runtime_config};
-use cli::{parse_cli_options, print_help, OutputSpec, SourceSpec};
+use ezkvm::runtime_config::validate_runtime_config;
 
 fn main() {
     if let Err(error) = run() {
@@ -28,51 +29,68 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    let options = parse_cli_options(&args)?;
-    let runtime = import_runtime_config(&options.source)?;
+    let command = parse_cli_options(&args)?;
 
-    if options.validate {
-        validate_runtime(&runtime, options.source.source_config_path.as_deref())?;
-        println!("validation passed");
-    }
-
-    if options.show_runtime {
-        print_runtime_layout(&runtime);
-    }
-
-    if let Some(output) = &options.output {
-        let path = export_runtime_stub(&runtime, output)?;
-        println!(
-            "exported {} output to {}",
-            output.output_type,
-            path.display()
-        );
+    match command {
+        CliCommand::Import { input } => {
+            let runtime = import_runtime_config(&input)?;
+            validate_runtime(&runtime, None)?;
+            println!("validation passed");
+        }
+        CliCommand::Convert { input, output } => {
+            let runtime = import_runtime_config(&input)?;
+            let path = export_runtime(&runtime, &output)?;
+            println!("exported output to {}", path.display());
+        }
+        CliCommand::Export { output } => {
+            let _ = output;
+            return Err(
+                "export without an import context is not implemented yet; use convert".to_string(),
+            );
+        }
+        CliCommand::ShowRuntime { name } => {
+            println!(
+                "show-runtime requested for vm '{}'; use convert/import to materialize runtime context",
+                name
+            );
+        }
+        CliCommand::Start { name } => {
+            println!(
+                "lifecycle action 'start' requested for vm '{}'; execution is not implemented yet",
+                name
+            );
+        }
+        CliCommand::Stop { name } => {
+            println!(
+                "lifecycle action 'stop' requested for vm '{}'; execution is not implemented yet",
+                name
+            );
+        }
+        CliCommand::Reset { name } => {
+            println!(
+                "lifecycle action 'reset' requested for vm '{}'; execution is not implemented yet",
+                name
+            );
+        }
+        CliCommand::Shutdown { name } => {
+            println!(
+                "lifecycle action 'shutdown' requested for vm '{}'; execution is not implemented yet",
+                name
+            );
+        }
     }
 
     Ok(())
 }
 
-fn import_runtime_config(source: &SourceSpec) -> Result<RuntimeConfig, String> {
-    let config_args = ConfigArgs::new(source.importer_args.clone());
-    match source.importer.as_str() {
-        "ezkvm" => import_with(&EzkvmConfigImporter, config_args),
-        "proxmox" => import_with(&ProxmoxConfigImporter, config_args),
-        "qemu" => import_with(&QemuConfigImporter, config_args),
-        "libvirt" => import_with(&LibvirtConfigImporter, config_args),
-        other => Err(format!(
-            "unsupported importer '{}'; expected one of: ezkvm, proxmox, qemu, libvirt",
-            other
-        )),
+fn import_runtime_config(options: &ImportOptions) -> Result<RuntimeConfig, String> {
+    match options {
+        ImportOptions::Ezkvm { .. } => EzkvmImporter.import(options.clone()),
+        ImportOptions::Proxmox { .. } => ProxmoxImporter.import(options.clone()),
+        ImportOptions::Qemu { .. } => QemuImporter.import(options.clone()),
+        ImportOptions::Libvirt { .. } => LibvirtImporter.import(options.clone()),
     }
-}
-
-fn import_with(
-    importer: &dyn ConfigImporter<ConfigError = ConfigImportError>,
-    config_args: ConfigArgs,
-) -> Result<RuntimeConfig, String> {
-    importer
-        .import_config(config_args)
-        .map_err(|error| format!("import failed: {error}"))
+    .map_err(|error| format!("import failed: {error}"))
 }
 
 fn validate_runtime(runtime: &RuntimeConfig, source_path: Option<&Path>) -> Result<(), String> {
@@ -91,88 +109,12 @@ fn validate_runtime(runtime: &RuntimeConfig, source_path: Option<&Path>) -> Resu
     })
 }
 
-fn print_runtime_layout(runtime: &RuntimeConfig) {
-    println!("RuntimeConfig layout:");
-    println!("metadata:");
-    println!("  schema_version: {}", runtime.metadata.schema_version);
-    println!("  vm_name: {}", runtime.metadata.vm_name);
-    println!("virtual_machine.system:");
-    println!(
-        "  machine: family={}, chipset={}",
-        runtime.virtual_machine.system.machine.family,
-        runtime.virtual_machine.system.machine.chipset
-    );
-    println!("  cpu: model={}", runtime.virtual_machine.system.cpu.model);
-    println!(
-        "  memory: min={}",
-        runtime.virtual_machine.system.memory.min
-    );
-    print_collection_layout(
-        "virtual_machine.storage",
-        runtime
-            .virtual_machine
-            .storage
-            .iter()
-            .map(|entry| entry.id.as_str()),
-    );
-    print_collection_layout(
-        "virtual_machine.network",
-        runtime
-            .virtual_machine
-            .network
-            .iter()
-            .map(|entry| entry.id.as_str()),
-    );
-    print_collection_layout(
-        "virtual_machine.resources",
-        runtime
-            .virtual_machine
-            .resources
-            .iter()
-            .map(|entry| entry.id.as_str()),
-    );
-}
-
-fn print_collection_layout<'a>(name: &str, ids: impl Iterator<Item = &'a str>) {
-    let values: Vec<&str> = ids.collect();
-    println!("{} ({}):", name, values.len());
-    for id in values {
-        println!("  - id={}", id);
+fn export_runtime(runtime: &RuntimeConfig, options: &ExportOptions) -> Result<PathBuf, String> {
+    match options {
+        ExportOptions::Ezkvm { .. } => EzkvmExporter.export(runtime, options.clone()),
+        ExportOptions::Proxmox { .. } => ProxmoxExporter.export(runtime, options.clone()),
+        ExportOptions::Qemu { .. } => QemuExporter.export(runtime, options.clone()),
+        ExportOptions::Libvirt { .. } => LibvirtExporter.export(runtime, options.clone()),
     }
-}
-
-fn export_runtime_stub(runtime: &RuntimeConfig, output: &OutputSpec) -> Result<PathBuf, String> {
-    let path = output
-        .output_path
-        .clone()
-        .unwrap_or_else(|| default_output_path(&runtime.metadata.vm_name, &output.output_type));
-
-    let content = match output.output_type.as_str() {
-        "qemu" => format!(
-            "# stub exporter output\n# target=qemu\n# vm_name={}\n# TODO: connect runtime_resolution + render_stage\n",
-            runtime.metadata.vm_name
-        ),
-        "ezkvm" => format!(
-            "# stub exporter output\n# target=ezkvm\n# vm_name={}\n# TODO: emit canonical ezkvm yaml\n",
-            runtime.metadata.vm_name
-        ),
-        other => {
-            return Err(format!(
-                "unsupported output type '{}'; expected one of: qemu, ezkvm",
-                other
-            ));
-        }
-    };
-
-    std::fs::write(&path, content)
-        .map_err(|error| format!("failed to write output {}: {}", path.display(), error))?;
-    Ok(path)
-}
-
-fn default_output_path(vm_name: &str, output_type: &str) -> PathBuf {
-    match output_type {
-        "qemu" => PathBuf::from(format!("{}.qemu.cmd", vm_name)),
-        "ezkvm" => PathBuf::from(format!("{}.yaml", vm_name)),
-        other => PathBuf::from(format!("{}.{}.out", vm_name, other)),
-    }
+    .map_err(|error| format!("export failed: {error}"))
 }

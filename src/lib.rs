@@ -1,2 +1,2 @@
-pub mod config_importer;
+pub mod config_format;
 pub mod runtime_config;

@@ -427,7 +427,7 @@ mod tests {
 
     use serde_json::Value;
 
-    use crate::config_importer::ezkvm::validate_ezkvm_config;
+    use crate::config_format::validate_ezkvm_config;
 
     use super::super::parsing::{ParseError, Severity, ValidationIssue};
     use super::{

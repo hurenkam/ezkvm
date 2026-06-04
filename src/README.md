@@ -10,20 +10,27 @@ src/README.md
 
 ### Importing
 1. Import ezkvm config file and run validation:
-```ezkvm import --input-type ezkvm --input-host /etc/ezkvm/host.yaml --input-vm <name>.yaml --validate```
+```ezkvm import --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --validate```
 
 2. Import ezkvm config file and show runtime:
-```ezkvm import --input-type ezkvm --input-host /etc/ezkvm/host.yaml --input-vm <name>.yaml --show-runtime```
+```ezkvm import --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --show-runtime```
 
 3. Import ezkvm config file and export qemu commandline:
-```ezkvm convert --input-type ezkvm --input-host /etc/ezkvm/host.yaml --input-vm <name>.yaml --output-type qemu```
-This command shall import the given ezkvm config file using the ezkvm importer, and output the results through ezkvm config_exporter to ```<name>.qemu.cmd```.
-Note that the vm input path is provided with ```--input-vm```, and host settings are provided with ```--input-host```.
+```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type qemu```
+This command imports the given ezkvm config file through the `config_format/ezkvm` importer and exports via the `config_format/qemu_cmd` exporter to ```<name>.qemu.cmd```.
+Note that the vm input path is provided with ```--input.vm```, and host settings are provided with ```--input.host```.
 
 4. Import proxmox config file, and save as ezkvm yaml file:
-```ezkvm convert --input-type proxmox --input-storage /etc/pve/storage.cfg --input-vm <name>.conf --output-type ezkvm --output-host /etc/ezkvm/host.yaml --output-vm <name>.yaml```
-This command shall result import the given (```config=```) proxmox config file using the proxmox importer, and output the results through ezkvm config_exporter to ```<name>.yaml```.
-Note that ```--input-storage``` is used to locate the proxmox ```storage.cfg``` file which explains how to translate storage paths in the proxmox vm config file to actual device locations.
+```ezkvm convert --input.type proxmox --input.storage /etc/pve/storage.cfg --input.vm <name>.conf --output.type ezkvm --output.host /etc/ezkvm/host.yaml --output.vm <name>.yaml```
+This command imports the given proxmox config file through the `config_format/proxmox` importer and exports via the `config_format/ezkvm` exporter to ```<name>.yaml```.
+Note that ```--input.storage``` is used to locate the proxmox ```storage.cfg``` file which explains how to translate storage paths in the proxmox vm config file to actual device locations.
+
+5. Import ezkvm config and export as libvirt xml:
+```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type libvirt --output.vm <name>.xml```
+
+6. Standalone export subcommand:
+```ezkvm export --output.type proxmox --output.storage /etc/pve/storage.cfg --output.vm <name>.conf```
+This subcommand is currently a placeholder and returns an error. Use `convert` for import+export flow.
 
 ### Runtime operations
 1. Show runtime:

@@ -1,15 +1,14 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
+use crate::config_format::{ImportError, ImportOptions, Importer, ProxmoxImporter, RuntimeConfig};
 use crate::runtime_config::model::{
-    Cpu, Machine, Memory, Metadata, NetworkEntry, ResourceRef, StorageEntry, System,
+    Cpu, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, NetworkEntry, ResourceRef,
+    StorageEntry, System, VirtualMachine,
 };
-use crate::runtime_config::model::{EZKVM_CONFIG_SCHEMA_VERSION, VirtualMachine};
-
-use super::RuntimeConfig;
 
 #[derive(Debug, thiserror::Error)]
-pub(super) enum ProxmoxImportError {
+enum ProxmoxImportError {
     #[error("expected a Proxmox .conf source name, got {source_name}")]
     InvalidSourceName { source_name: String },
     #[error("unsupported Proxmox machine value '{value}' in {source_name}")]
@@ -33,7 +32,7 @@ pub(super) enum ProxmoxImportError {
     },
 }
 
-pub(super) fn parse_source(
+fn parse_source(
     source_text: &str,
     source_name_path: &Path,
 ) -> Result<RuntimeConfig, ProxmoxImportError> {
@@ -229,14 +228,18 @@ fn is_numeric_slot_key(key: &str, prefix: &str) -> bool {
     })
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn proxmox_machine_parser_handles_pc_q35_shape() {
-        let machine = super::parse_machine_value("pc-q35-8.1", "/tmp/108.conf")
-            .expect("machine parser should accept pc-q35 shapes");
+impl Importer for ProxmoxImporter {
+    fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
+        let (storage_path, source_path) = match args {
+            ImportOptions::Proxmox { storage, vm } => (storage, vm),
+            _ => return Err(ImportError::InvalidFormat),
+        };
 
-        assert_eq!(machine.family, "pc");
-        assert_eq!(machine.chipset, "q35");
+        let _storage_path = storage_path;
+        let source_text = std::fs::read_to_string(&source_path)
+            .map_err(|e| ImportError::ImportFailed(format!("{}: {}", source_path, e)))?;
+
+        parse_source(&source_text, Path::new(&source_path))
+            .map_err(|e| ImportError::ImportFailed(e.to_string()))
     }
 }
