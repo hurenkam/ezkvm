@@ -25,12 +25,12 @@ fn run() -> Result<(), String> {
 
     match command {
         CliCommand::Import { input } => {
-            let runtime = input.import_runtime_config()?;
+            let runtime = input.import_runtime()?;
             runtime.validate_runtime(None)?;
             println!("validation passed");
         }
         CliCommand::Convert { input, output } => {
-            let runtime = input.import_runtime_config()?;
+            let runtime = input.import_runtime()?;
             let path = output.export_runtime(&runtime)?;
             println!("exported output to {}", path.display());
         }

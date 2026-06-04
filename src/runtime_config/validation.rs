@@ -1,10 +1,12 @@
-use std::collections::HashSet;
-use std::path::Path;
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use serde_json::json;
 use thiserror::Error;
 
-use super::model::{NetworkEntry, ResourceRef, StorageEntry};
+use super::model::{NetworkEntry, ResourceRef, RuntimeConfig, StorageEntry};
 use super::parsing::{ParseError, Severity, ValidationIssue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +63,210 @@ impl ValidationReport {
         match format {
             ValidationReportFormat::Human => formatter.format_human(&self.issues),
             ValidationReportFormat::Json => formatter.format_json(&self.issues),
+        }
+    }
+}
+
+impl RuntimeConfig {
+    pub fn validate_runtime(&self, source_path: Option<&Path>) -> Result<(), String> {
+        let fallback = PathBuf::from(format!("{}.yaml", self.metadata.vm_name));
+        let path = source_path.unwrap_or(&fallback);
+
+        self.validate_runtime_config(path)
+            .map_err(|error| match error.report() {
+                Some(report) => {
+                    let formatter = DefaultReportFormatter::new();
+                    report.render_with(&formatter, ValidationReportFormat::Human)
+                }
+                None => error.to_string(),
+            })
+    }
+
+    pub fn validate_runtime_config(&self, filename: &Path) -> Result<(), ConformanceError> {
+        let mut issues = Vec::new();
+
+        check_required_strings(
+            &mut issues,
+            "metadata.schema_version",
+            &self.metadata.schema_version,
+        );
+        check_required_strings(&mut issues, "metadata.vm_name", &self.metadata.vm_name);
+        check_required_strings(
+            &mut issues,
+            "virtual_machine.system.machine.family",
+            &self.virtual_machine.system.machine.family,
+        );
+        check_required_strings(
+            &mut issues,
+            "virtual_machine.system.machine.chipset",
+            &self.virtual_machine.system.machine.chipset,
+        );
+        check_required_strings(
+            &mut issues,
+            "virtual_machine.system.cpu.model",
+            &self.virtual_machine.system.cpu.model,
+        );
+
+        if self.virtual_machine.system.memory.min < 0 {
+            issues.push(
+                ValidationIssue::new(
+                    "virtual_machine.system.memory.min",
+                    "must be an integer >= 0",
+                )
+                .with_remediation("Change memory.min to a non-negative value"),
+            );
+        }
+
+        validate_vm_name_filename_match(&mut issues, &self.metadata.vm_name, filename);
+        validate_machine_consistency(
+            &mut issues,
+            &self.virtual_machine.system.machine.family,
+            &self.virtual_machine.system.machine.chipset,
+        );
+        validate_unique_ids_storage(&mut issues, &self.virtual_machine.storage);
+        validate_unique_ids_network(&mut issues, &self.virtual_machine.network);
+        validate_unique_ids_resources(&mut issues, &self.virtual_machine.resources);
+
+        if issues.is_empty() {
+            Ok(())
+        } else {
+            Err(ConformanceError::Validation(issues.len(), issues))
+        }
+    }
+}
+
+fn check_required_strings(issues: &mut Vec<ValidationIssue>, path: &str, value: &str) {
+    if value.trim().is_empty() {
+        issues.push(
+            ValidationIssue::new(path, "is required and must be a non-empty string")
+                .with_remediation(format!("Provide a non-empty string value for {}", path)),
+        );
+    }
+}
+
+fn validate_vm_name_filename_match(
+    issues: &mut Vec<ValidationIssue>,
+    vm_name: &str,
+    filename: &Path,
+) {
+    let expected = filename.file_stem().and_then(|stem| stem.to_str());
+    match expected {
+        Some(stem) if !stem.is_empty() => {
+            if vm_name != stem {
+                issues.push(
+                    ValidationIssue::new(
+                        "metadata.vm_name",
+                        format!("must match filename stem '{stem}'"),
+                    )
+                    .with_remediation(format!(
+                        "Rename the file to {}.yaml or update vm_name to '{}'",
+                        vm_name, stem
+                    )),
+                );
+            }
+        }
+        _ => {
+            issues.push(
+                ValidationIssue::with_severity(
+                    "metadata.vm_name",
+                    "cannot validate vm_name because filename stem is unavailable",
+                    Severity::Warning,
+                )
+                .with_remediation("Ensure the YAML file has a valid filename stem"),
+            );
+        }
+    }
+}
+
+fn validate_machine_consistency(issues: &mut Vec<ValidationIssue>, family: &str, chipset: &str) {
+    if family == "pc" {
+        let allowed = ["q35", "i440fx"];
+        if !allowed.contains(&chipset) {
+            issues.push(
+                ValidationIssue::new(
+                    "virtual_machine.system.machine.chipset",
+                    "must be one of [q35, i440fx] when machine family is 'pc'",
+                )
+                .with_remediation("Change chipset to 'q35' or 'i440fx' for pc family machines"),
+            );
+        }
+    }
+}
+
+fn validate_unique_ids_storage(issues: &mut Vec<ValidationIssue>, entries: &[StorageEntry]) {
+    let mut seen = HashSet::new();
+    for (idx, entry) in entries.iter().enumerate() {
+        let path = format!("virtual_machine.storage[{idx}].id");
+        if entry.id.trim().is_empty() {
+            issues.push(
+                ValidationIssue::new(path, "is required and must be a non-empty string")
+                    .with_remediation(format!(
+                        "Provide a non-empty id string for storage entry at index {}",
+                        idx
+                    )),
+            );
+            continue;
+        }
+        if !seen.insert(entry.id.as_str()) {
+            issues.push(
+                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
+                    .with_remediation(format!(
+                        "Change the id to a unique value; '{}' is already used in storage",
+                        entry.id
+                    )),
+            );
+        }
+    }
+}
+
+fn validate_unique_ids_network(issues: &mut Vec<ValidationIssue>, entries: &[NetworkEntry]) {
+    let mut seen = HashSet::new();
+    for (idx, entry) in entries.iter().enumerate() {
+        let path = format!("virtual_machine.network[{idx}].id");
+        if entry.id.trim().is_empty() {
+            issues.push(
+                ValidationIssue::new(path, "is required and must be a non-empty string")
+                    .with_remediation(format!(
+                        "Provide a non-empty id string for network entry at index {}",
+                        idx
+                    )),
+            );
+            continue;
+        }
+        if !seen.insert(entry.id.as_str()) {
+            issues.push(
+                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
+                    .with_remediation(format!(
+                        "Change the id to a unique value; '{}' is already used in network",
+                        entry.id
+                    )),
+            );
+        }
+    }
+}
+
+fn validate_unique_ids_resources(issues: &mut Vec<ValidationIssue>, entries: &[ResourceRef]) {
+    let mut seen = HashSet::new();
+    for (idx, entry) in entries.iter().enumerate() {
+        let path = format!("virtual_machine.resources[{idx}].id");
+        if entry.id.trim().is_empty() {
+            issues.push(
+                ValidationIssue::new(path, "is required and must be a non-empty string")
+                    .with_remediation(format!(
+                        "Provide a non-empty id string for resource entry at index {}",
+                        idx
+                    )),
+            );
+            continue;
+        }
+        if !seen.insert(entry.id.as_str()) {
+            issues.push(
+                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
+                    .with_remediation(format!(
+                        "Change the id to a unique value; '{}' is already used in resources",
+                        entry.id
+                    )),
+            );
         }
     }
 }
@@ -230,674 +436,12 @@ impl ConformanceError {
     }
 }
 
-pub fn check_required_strings(issues: &mut Vec<ValidationIssue>, path: &str, value: &str) {
-    if value.trim().is_empty() {
-        issues.push(
-            ValidationIssue::new(path, "is required and must be a non-empty string")
-                .with_remediation(format!("Provide a non-empty string value for {}", path)),
-        );
-    }
-}
-
-pub fn validate_vm_name_filename_match(
-    issues: &mut Vec<ValidationIssue>,
-    vm_name: &str,
-    filename: &Path,
-) {
-    let expected = filename.file_stem().and_then(|stem| stem.to_str());
-    match expected {
-        Some(stem) if !stem.is_empty() => {
-            if vm_name != stem {
-                issues.push(
-                    ValidationIssue::new(
-                        "metadata.vm_name",
-                        format!("must match filename stem '{stem}'"),
-                    )
-                    .with_remediation(format!(
-                        "Rename the file to {}.yaml or update vm_name to '{}'",
-                        vm_name, stem
-                    )),
-                );
-            }
-        }
-        _ => {
-            issues.push(
-                ValidationIssue::with_severity(
-                    "metadata.vm_name",
-                    "cannot validate vm_name because filename stem is unavailable",
-                    Severity::Warning,
-                )
-                .with_remediation("Ensure the YAML file has a valid filename stem"),
-            );
-        }
-    }
-}
-
-pub fn validate_machine_consistency(issues: &mut Vec<ValidationIssue>, family: &str, chipset: &str) {
-    if family == "pc" {
-        let allowed = ["q35", "i440fx"];
-        if !allowed.contains(&chipset) {
-            issues.push(
-                ValidationIssue::new(
-                    "virtual_machine.system.machine.chipset",
-                    "must be one of [q35, i440fx] when machine family is 'pc'",
-                )
-                .with_remediation("Change chipset to 'q35' or 'i440fx' for pc family machines"),
-            );
-        }
-    }
-}
-
-pub fn validate_unique_ids_storage(issues: &mut Vec<ValidationIssue>, entries: &[StorageEntry]) {
-    let mut seen = HashSet::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let path = format!("virtual_machine.storage[{idx}].id");
-        if entry.id.trim().is_empty() {
-            issues.push(
-                ValidationIssue::new(path, "is required and must be a non-empty string")
-                    .with_remediation(format!(
-                        "Provide a non-empty id string for storage entry at index {}",
-                        idx
-                    )),
-            );
-            continue;
-        }
-        if !seen.insert(entry.id.as_str()) {
-            issues.push(
-                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
-                    .with_remediation(format!(
-                        "Change the id to a unique value; '{}' is already used in storage",
-                        entry.id
-                    )),
-            );
-        }
-    }
-}
-
-pub fn validate_unique_ids_network(issues: &mut Vec<ValidationIssue>, entries: &[NetworkEntry]) {
-    let mut seen = HashSet::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let path = format!("virtual_machine.network[{idx}].id");
-        if entry.id.trim().is_empty() {
-            issues.push(
-                ValidationIssue::new(path, "is required and must be a non-empty string")
-                    .with_remediation(format!(
-                        "Provide a non-empty id string for network entry at index {}",
-                        idx
-                    )),
-            );
-            continue;
-        }
-        if !seen.insert(entry.id.as_str()) {
-            issues.push(
-                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
-                    .with_remediation(format!(
-                        "Change the id to a unique value; '{}' is already used in network",
-                        entry.id
-                    )),
-            );
-        }
-    }
-}
-
-pub fn validate_unique_ids_resources(issues: &mut Vec<ValidationIssue>, entries: &[ResourceRef]) {
-    let mut seen = HashSet::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let path = format!("virtual_machine.resources[{idx}].id");
-        if entry.id.trim().is_empty() {
-            issues.push(
-                ValidationIssue::new(path, "is required and must be a non-empty string")
-                    .with_remediation(format!(
-                        "Provide a non-empty id string for resource entry at index {}",
-                        idx
-                    )),
-            );
-            continue;
-        }
-        if !seen.insert(entry.id.as_str()) {
-            issues.push(
-                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
-                    .with_remediation(format!(
-                        "Change the id to a unique value; '{}' is already used in resources",
-                        entry.id
-                    )),
-            );
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use serde_json::Value;
 
-    use crate::config_format::validate_ezkvm_config;
-
-    use super::super::parsing::{ParseError, Severity, ValidationIssue};
-    use super::{
-        ConformanceError, DefaultReportFormatter, ReportFormatter, ValidationReport,
-        ValidationReportFormat,
-    };
-
-    fn valid_yaml() -> &'static str {
-        r#"
-metadata:
-  schema_version: "1.0.0"
-  vm_name: "win11-dev"
-virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: 8192
-  storage:
-    - id: "disk0"
-  network:
-    - id: "net0"
-  resources:
-    - id: "gpu0"
-"#
-    }
-
-    fn expect_validation_issues(err: ConformanceError) -> Vec<(String, String)> {
-        match err {
-            ConformanceError::Validation(_, issues) => {
-                issues.into_iter().map(|i| (i.path, i.reason)).collect()
-            }
-            ConformanceError::Parse(ParseError::Validation(_, issues)) => {
-                issues.into_iter().map(|i| (i.path, i.reason)).collect()
-            }
-            other => panic!("expected validation error, got {other:?}"),
-        }
-    }
-
-    fn expect_yaml_parse_error(err: ConformanceError) -> String {
-        match err {
-            ConformanceError::Parse(ParseError::Yaml(parse_error)) => parse_error.to_string(),
-            other => panic!("expected YAML parse error, got {other:?}"),
-        }
-    }
-
-    // CT-001: Valid runtime config with all required fields and valid machine model
-    #[test]
-    fn passing_runtime_config_example() {
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_ezkvm_config(valid_yaml(), filename);
-        assert!(result.is_ok());
-    }
-
-    fn expect_issue<'a>(err: &'a ConformanceError, path: &str) -> &'a ValidationIssue {
-        err.issues()
-            .iter()
-            .find(|issue| issue.path == path)
-            .unwrap_or_else(|| panic!("expected issue for path {path}"))
-    }
-
-    // CT-002: Required field validation — rejects missing cpu.model
-    #[test]
-    fn missing_required_field() {
-        let yaml = r#"
-metadata:
-  schema_version: "1.0.0"
-  vm_name: "win11-dev"
-virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu: {}
-    memory:
-      min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
-        let message = expect_yaml_parse_error(err);
-        assert!(message.contains("virtual_machine.system.cpu"));
-        assert!(message.contains("missing field `model`"));
-    }
-    // CT-004: vm_name must match filename stem
-
-    #[test]
-    fn vm_name_mismatch() {
-        let filename = Path::new("/tmp/another-name.yaml");
-        let err =
-            validate_ezkvm_config(valid_yaml(), filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "metadata.vm_name" && reason.contains("filename stem 'another-name'")
-        }));
-    }
-    // CT-003: Resource ID uniqueness enforcement within each scope (storage, network, resources)
-
-    #[test]
-    fn duplicate_ids() {
-        let yaml = r#"
-metadata:
-  schema_version: "1.0.0"
-  vm_name: "win11-dev"
-virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: 8192
-  storage:
-    - id: "disk0"
-    - id: "disk0"
-  network:
-    - id: "net0"
-    - id: "net0"
-  resources:
-    - id: "gpu0"
-    - id: "gpu0"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(
-            issues
-                .iter()
-                .any(|(path, reason)| path == "virtual_machine.storage[1].id"
-                    && reason.contains("duplicate id"))
-        );
-        assert!(
-            issues
-                .iter()
-                .any(|(path, reason)| path == "virtual_machine.network[1].id"
-                    && reason.contains("duplicate id"))
-        );
-        assert!(
-            issues
-                .iter()
-                .any(|(path, reason)| path == "virtual_machine.resources[1].id"
-                    && reason.contains("duplicate id"))
-        );
-    }
-    // CT-004: Machine policy enforces chipset consistency with machine family (pc → [q35, i440fx])
-
-    #[test]
-    fn invalid_chipset_family_combination() {
-        let yaml = r#"
-metadata:
-  schema_version: "1.0.0"
-  vm_name: "win11-dev"
-virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "arm-virt"
-    cpu:
-      model: "host"
-    memory:
-      min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.system.machine.chipset" && reason.contains("[q35, i440fx]")
-        }));
-    }
-    // CT-002: Required field type validation; CT-005: Precise field path error reporting
-
-    #[test]
-    fn invalid_type_reports_field_path() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: "8192"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
-        let message = expect_yaml_parse_error(err);
-        assert!(message.contains("virtual_machine.system.memory.min"));
-        assert!(message.contains("expected i64"));
-    }
-
-    // CT-002-01: Collection field type mismatch reports the container path precisely
-    #[test]
-    fn collection_type_mismatch_reports_field_path() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-    storage:
-        id: "disk0"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
-        let message = expect_yaml_parse_error(err);
-        assert!(message.contains("virtual_machine.storage"));
-        assert!(message.contains("expected a sequence"));
-    }
-
-    // CT-002-02: Malformed YAML is rejected before structural/conformance validation runs
-    #[test]
-    fn malformed_yaml_is_rejected_before_validation() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: [8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
-
-        match err {
-            ConformanceError::Parse(ParseError::Yaml(_)) => {}
-            other => panic!("expected YAML parse error, got {other:?}"),
-        }
-    }
-    // CT-003: Required ID validation; CT-005: Precise field path error reporting with index
-
-    #[test]
-    fn empty_ids_report_precise_field_paths() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-    storage:
-        - id: ""
-    network:
-        - id: ""
-    resources:
-        - id: ""
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.storage[0].id"
-                && reason == "is required and must be a non-empty string"
-        }));
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.network[0].id"
-                && reason == "is required and must be a non-empty string"
-        }));
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.resources[0].id"
-                && reason == "is required and must be a non-empty string"
-        }));
-    }
-    // CT-003: Duplicate detection targets offending entry; CT-005: Precise index error reporting
-
-    #[test]
-    fn duplicate_storage_id_reports_offending_entry_index() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-    storage:
-        - id: "disk0"
-        - id: "disk1"
-        - id: "disk0"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.storage[2].id" && reason.contains("duplicate id 'disk0'")
-        }));
-        assert!(
-            !issues
-                .iter()
-                .any(|(path, _)| path == "virtual_machine.storage[1].id")
-        );
-    }
-    // CT-003: ID uniqueness scoped to resource type; same ID allowed across storage/network/resources
-
-    #[test]
-    fn same_id_across_scopes_is_allowed() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-    storage:
-        - id: "shared0"
-    network:
-        - id: "shared0"
-    resources:
-        - id: "shared0"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_ezkvm_config(yaml, filename);
-        assert!(result.is_ok());
-    }
-
-    // CT-001-01: Optional sections completely omitted (storage, network, resources are optional)
-    #[test]
-    fn optional_sections_omitted_is_valid() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_ezkvm_config(yaml, filename);
-        assert!(result.is_ok());
-    }
-
-    // CT-002-03: Multiple missing required fields reported with precise paths
-    #[test]
-    fn multiple_missing_required_fields() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-        cpu: {}
-        memory:
-            min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
-        let message = expect_yaml_parse_error(err);
-        assert!(message.contains("virtual_machine.system.machine"));
-        assert!(message.contains("missing field `chipset`"));
-    }
-
-    // CT-002-04: Empty vm_name (boundary of required string field)
-    #[test]
-    fn empty_vm_name() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: ""
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "metadata.vm_name" && reason == "is required and must be a non-empty string"
-        }));
-    }
-
-    // CT-002-05: Memory minimum boundary value = 0 (valid edge case)
-    #[test]
-    fn memory_minimum_zero_is_valid() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 0
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_ezkvm_config(yaml, filename);
-        assert!(result.is_ok());
-    }
-
-    // CT-003-01: Multiple duplicates within a single scope (3+ identical IDs)
-    #[test]
-    fn multiple_duplicates_in_storage_scope() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-    storage:
-        - id: "disk0"
-        - id: "disk0"
-        - id: "disk0"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        // Should report duplicates at indices 1 and 2
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.storage[1].id" && reason.contains("duplicate id")
-        }));
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "virtual_machine.storage[2].id" && reason.contains("duplicate id")
-        }));
-    }
-
-    // CT-005-01: Empty schema_version (boundary test of required string field)
-    #[test]
-    fn empty_schema_version() {
-        let yaml = r#"
-metadata:
-    schema_version: ""
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issues = expect_validation_issues(err);
-        assert!(issues.iter().any(|(path, reason)| {
-            path == "metadata.schema_version"
-                && reason == "is required and must be a non-empty string"
-        }));
-    }
-
-    // CT-004-01: Machine family outside known set (boundary of family enum)
-    #[test]
-    fn unknown_machine_family() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "unknown-family"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = validate_ezkvm_config(yaml, filename);
-        // Unknown family should pass (not "pc", so chipset constraint doesn't apply)
-        assert!(result.is_ok());
-    }
+    use super::super::parsing::{Severity, ValidationIssue};
+    use super::{DefaultReportFormatter, ReportFormatter, ValidationReport};
 
     // Reporter-001: Human-readable report formatting
     #[test]
@@ -970,70 +514,6 @@ virtual_machine:
         let json_report = formatter.format_json(&issues);
         let parsed: Value = serde_json::from_str(&json_report).expect("report must be valid json");
         assert_eq!(parsed["validation_report"]["summary"]["total_issues"], 0);
-    }
-
-    #[test]
-    fn parse_validation_issue_includes_context_and_remediation() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu: {}
-        memory:
-            min: 8192
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail parsing");
-        let message = expect_yaml_parse_error(err);
-
-        assert!(message.contains("virtual_machine.system.cpu"));
-        assert!(message.contains("missing field `model`"));
-    }
-
-    #[test]
-    fn conformance_validation_issue_includes_context_and_report_helpers() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "win11-dev"
-virtual_machine:
-    system:
-        machine:
-            family: "pc"
-            chipset: "q35"
-        cpu:
-            model: "host"
-        memory:
-            min: 8192
-    storage:
-        - id: "disk0"
-        - id: "disk0"
-"#;
-        let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = validate_ezkvm_config(yaml, filename).expect_err("should fail validation");
-        let issue = expect_issue(&err, "virtual_machine.storage[1].id");
-
-        assert!(issue.line_number.is_some());
-        let snippet = issue.source_snippet.as_deref().unwrap_or("");
-        assert!(snippet.contains("- id: \"disk0\""));
-
-        let report = err
-            .report()
-            .expect("validation issues should produce a report");
-        let formatter = DefaultReportFormatter::new();
-        let human = report.render_with(&formatter, ValidationReportFormat::Human);
-        let json = report.render_with(&formatter, ValidationReportFormat::Json);
-
-        assert!(human.contains("virtual_machine.storage[1].id"));
-        assert!(human.contains("Context:"));
-
-        let parsed: Value = serde_json::from_str(&json).expect("report must be valid json");
-        assert_eq!(parsed["validation_report"]["summary"]["errors"], 1);
     }
 
     #[test]
