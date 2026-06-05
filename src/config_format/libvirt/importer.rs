@@ -1,6 +1,13 @@
+//! libvirt XML importer placeholder.
+//!
+//! Related documentation:
+//! - src/README.md
+//! - doc/dev/domain-knowledge/linux/
+
 use crate::config_format::{ImportError, ImportOptions, Importer, LibvirtImporter, RuntimeConfig};
 
 impl Importer for LibvirtImporter {
+    /// Rejects libvirt XML imports until a real importer is implemented.
     fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
         let source_path = match args {
             ImportOptions::Libvirt { vm } => vm,

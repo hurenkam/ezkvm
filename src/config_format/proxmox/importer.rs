@@ -1,3 +1,9 @@
+//! Proxmox VM configuration importer for translating `.conf` files into the runtime model.
+//!
+//! Related documentation:
+//! - src/README.md
+//! - doc/dev/domain-knowledge/proxmox/
+
 use std::ffi::OsStr;
 use std::path::Path;
 
@@ -7,23 +13,29 @@ use crate::runtime_config::model::{
     StorageEntry, System, VirtualMachine,
 };
 
+/// Errors that can occur while parsing a Proxmox source file.
 #[derive(Debug, thiserror::Error)]
 enum ProxmoxImportError {
+    /// The source path does not look like a valid Proxmox `.conf` file.
     #[error("expected a Proxmox .conf source name, got {source_name}")]
     InvalidSourceName { source_name: String },
+    /// The machine value is not one of the supported chipset families.
     #[error("unsupported Proxmox machine value '{value}' in {source_name}")]
     UnsupportedMachineValue { source_name: String, value: String },
+    /// A field value could not be parsed into the expected representation.
     #[error("invalid Proxmox {field} value '{value}' in {source_name}")]
     InvalidFieldValue {
         source_name: String,
         field: &'static str,
         value: String,
     },
+    /// A required field was missing from the source file.
     #[error("missing required Proxmox field '{field}' in {source_name}")]
     MissingRequiredField {
         source_name: String,
         field: &'static str,
     },
+    /// A line could not be parsed as a valid Proxmox key/value entry.
     #[error("malformed Proxmox line {line} in {source_name}: {content}")]
     MalformedLine {
         source_name: String,
@@ -32,6 +44,16 @@ enum ProxmoxImportError {
     },
 }
 
+/// Parses Proxmox source text into the canonical runtime configuration.
+///
+/// # Arguments
+///
+/// * `source_text` - Raw Proxmox configuration text.
+/// * `source_name_path` - Path used to validate source naming conventions.
+///
+/// # Returns
+///
+/// A canonical runtime configuration or a Proxmox parsing error.
 fn parse_source(
     source_text: &str,
     source_name_path: &Path,
@@ -119,6 +141,7 @@ fn parse_source(
     })
 }
 
+/// Returns true when the source path has a `.conf` extension.
 fn is_proxmox_conf_source(source_name: &Path) -> bool {
     matches!(
         source_name.extension().and_then(OsStr::to_str),
@@ -126,6 +149,7 @@ fn is_proxmox_conf_source(source_name: &Path) -> bool {
     )
 }
 
+/// Validates that the source path is a Proxmox `.conf` file.
 fn validate_source_name(source_name: &Path) -> Result<(), ProxmoxImportError> {
     let source_name_text = source_name.to_string_lossy().into_owned();
 
@@ -144,6 +168,7 @@ fn validate_source_name(source_name: &Path) -> Result<(), ProxmoxImportError> {
     Ok(())
 }
 
+/// Returns a required string field or an error if it is missing.
 fn required_string(
     value: Option<String>,
     source_name: &str,
@@ -155,6 +180,7 @@ fn required_string(
     })
 }
 
+/// Returns a required machine definition or an error if it is missing.
 fn required_machine(
     value: Option<Machine>,
     source_name: &str,
@@ -165,6 +191,7 @@ fn required_machine(
     })
 }
 
+/// Returns a required memory value or an error if it is missing.
 fn required_memory(value: Option<i64>, source_name: &str) -> Result<i64, ProxmoxImportError> {
     value.ok_or(ProxmoxImportError::MissingRequiredField {
         source_name: source_name.to_owned(),
@@ -172,6 +199,7 @@ fn required_memory(value: Option<i64>, source_name: &str) -> Result<i64, Proxmox
     })
 }
 
+/// Parses a Proxmox machine token into the canonical machine model.
 fn parse_machine_value(value: &str, source_name: &str) -> Result<Machine, ProxmoxImportError> {
     let machine_token = value.split(',').next().unwrap_or(value).trim();
 
@@ -202,6 +230,7 @@ fn parse_machine_value(value: &str, source_name: &str) -> Result<Machine, Proxmo
     })
 }
 
+/// Parses a non-negative memory size from a Proxmox source value.
 fn parse_memory_value(value: &str, source_name: &str) -> Result<i64, ProxmoxImportError> {
     let memory = value
         .parse::<i64>()
@@ -222,6 +251,7 @@ fn parse_memory_value(value: &str, source_name: &str) -> Result<i64, ProxmoxImpo
     Ok(memory)
 }
 
+/// Returns true when a key matches a numeric Proxmox slot pattern.
 fn is_numeric_slot_key(key: &str, prefix: &str) -> bool {
     key.strip_prefix(prefix).is_some_and(|suffix| {
         !suffix.is_empty() && suffix.chars().all(|character| character.is_ascii_digit())
@@ -229,6 +259,7 @@ fn is_numeric_slot_key(key: &str, prefix: &str) -> bool {
 }
 
 impl Importer for ProxmoxImporter {
+    /// Imports a Proxmox VM configuration into the canonical runtime model.
     fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
         let (storage_path, source_path) = match args {
             ImportOptions::Proxmox { storage, vm } => (storage, vm),

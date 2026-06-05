@@ -47,6 +47,8 @@ When working in `src/**`, treat `README.md` files in the `src` directory tree as
 	- Use when designing new stage modules, adapter scaffolds, or deterministic render paths.
 - `Coding Guideline Conformance`: `.copilot/skills/coding-guideline-conformance/SKILL.md`
 	- Use when Rust files are added or modified to run a focused conformance check against coding guidelines before finalizing.
+- `Rustdoc Writing`: `.copilot/skills/rustdoc-writing/SKILL.md`
+	- Use when documenting Rust code with module headers, struct and enum docs, and function or method rustdoc comments.
 
 ## Code Quality Expectations
 

@@ -1,3 +1,13 @@
+//! CLI help text rendering for the ezkvm command-line interface.
+//!
+//! Related documentation:
+//! - src/README.md
+//! - src/cli/README.md
+
+/// Prints the ezkvm CLI usage, examples, and operational notes.
+///
+/// This keeps the user-facing help text centralized so command syntax stays
+/// consistent with the parser and module documentation.
 pub fn print_help() {
     println!("ezkvm CLI syntax");
     println!();

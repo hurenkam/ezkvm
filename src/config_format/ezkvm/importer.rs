@@ -1,3 +1,9 @@
+//! ezkvm YAML importer for loading and validating runtime configurations.
+//!
+//! Related documentation:
+//! - src/README.md
+//! - doc/dev/architecture/design/vm-spec-parsing-validation.md
+
 use serde_yaml::from_str;
 use std::path::Path;
 
@@ -6,15 +12,28 @@ use crate::runtime_config::{ConformanceError, ParseError};
 
 use super::diagnostics::enrich_validation_issues;
 
+/// Arguments required to import an ezkvm YAML configuration.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EzkvmInputArgs {
+    /// Path to the host configuration file used during import.
     #[serde(rename = "input.host")]
     pub input_host: String,
+    /// Path to the ezkvm VM configuration file.
     #[serde(rename = "input.vm")]
     pub input_vm: String,
 }
 
+/// Validates ezkvm YAML and returns a canonical runtime configuration.
+///
+/// # Arguments
+///
+/// * `yaml` - Source YAML text to parse and validate.
+/// * `filename` - Source filename used for validation context.
+///
+/// # Returns
+///
+/// A validated runtime configuration or a conformance error with context.
 fn validate_ezkvm_config(yaml: &str, filename: &Path) -> Result<RuntimeConfig, ConformanceError> {
     let doc = from_str::<RuntimeConfig>(yaml).map_err(ParseError::from)?;
     match doc.validate_runtime_config(filename) {
@@ -29,6 +48,7 @@ fn validate_ezkvm_config(yaml: &str, filename: &Path) -> Result<RuntimeConfig, C
 }
 
 impl Importer for EzkvmImporter {
+    /// Imports an ezkvm YAML configuration into the canonical runtime model.
     fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
         let (host_path, vm_path) = match args {
             ImportOptions::Ezkvm { host, vm } => (host, vm),
@@ -57,6 +77,7 @@ mod tests {
 
     use super::validate_ezkvm_config;
 
+    /// Returns a valid ezkvm YAML document used by multiple tests.
     fn valid_yaml() -> &'static str {
         r#"
 metadata:
@@ -80,6 +101,7 @@ virtual_machine:
 "#
     }
 
+    /// Collects validation issue paths and reasons from a failed validation result.
     fn expect_validation_issues(err: ConformanceError) -> Vec<(String, String)> {
         match err {
             ConformanceError::Validation(_, issues) => issues
@@ -94,6 +116,7 @@ virtual_machine:
         }
     }
 
+    /// Extracts the YAML parse error message from a conformance error.
     fn expect_yaml_parse_error(err: ConformanceError) -> String {
         match err {
             ConformanceError::Parse(ParseError::Yaml(parse_error)) => parse_error.to_string(),
@@ -101,6 +124,7 @@ virtual_machine:
         }
     }
 
+    /// Returns a single validation issue for the requested path.
     fn expect_issue<'a>(err: &'a ConformanceError, path: &str) -> &'a ValidationIssue {
         err.issues()
             .iter()
@@ -109,6 +133,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Accepts a valid ezkvm YAML document.
     fn passing_runtime_config_example() {
         let filename = Path::new("/tmp/win11-dev.yaml");
         let result = validate_ezkvm_config(valid_yaml(), filename);
@@ -116,6 +141,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Reports a missing nested field with the YAML path intact.
     fn missing_required_field() {
         let yaml = r#"
 metadata:
@@ -138,6 +164,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Flags a vm name mismatch against the source filename stem.
     fn vm_name_mismatch() {
         let filename = Path::new("/tmp/another-name.yaml");
         let err =
@@ -149,6 +176,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Detects duplicate identifiers in list-based sections.
     fn duplicate_ids() {
         let yaml = r#"
 metadata:
@@ -188,6 +216,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Rejects invalid machine and chipset combinations.
     fn invalid_chipset_family_combination() {
         let yaml = r#"
 metadata:
@@ -212,6 +241,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Reports numeric type mismatches with the exact field path.
     fn invalid_type_reports_field_path() {
         let yaml = r#"
 metadata:
@@ -235,6 +265,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Reports sequence type mismatches with the exact field path.
     fn collection_type_mismatch_reports_field_path() {
         let yaml = r#"
 metadata:
@@ -260,6 +291,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Rejects malformed YAML before validation runs.
     fn malformed_yaml_is_rejected_before_validation() {
         let yaml = r#"
 metadata:
@@ -285,6 +317,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Reports empty identifiers with precise list item paths.
     fn empty_ids_report_precise_field_paths() {
         let yaml = r#"
 metadata:
@@ -325,6 +358,7 @@ virtual_machine:
     }
 
     #[test]
+    /// Points duplicate storage ids at the second matching entry.
     fn duplicate_storage_id_reports_offending_entry_index() {
         let yaml = r#"
 metadata:
