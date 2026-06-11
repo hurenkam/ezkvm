@@ -1,12 +1,9 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use serde_json::json;
 use thiserror::Error;
 
-use super::model::{NetworkEntry, ResourceRef, RuntimeConfig, StorageEntry};
+use super::model::RuntimeConfig;
 use super::parsing::{ParseError, Severity, ValidationIssue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,39 +90,21 @@ impl RuntimeConfig {
         check_required_strings(&mut issues, "metadata.vm_name", &self.metadata.vm_name);
         check_required_strings(
             &mut issues,
-            "virtual_machine.system.machine.family",
-            &self.virtual_machine.system.machine.family,
+            "virtual_machine.machine.family",
+            &self.virtual_machine.machine.family,
         );
         check_required_strings(
             &mut issues,
-            "virtual_machine.system.machine.chipset",
-            &self.virtual_machine.system.machine.chipset,
+            "virtual_machine.machine.chipset",
+            &self.virtual_machine.machine.chipset,
         );
-        check_required_strings(
-            &mut issues,
-            "virtual_machine.system.cpu.model",
-            &self.virtual_machine.system.cpu.model,
-        );
-
-        if self.virtual_machine.system.memory.min < 0 {
-            issues.push(
-                ValidationIssue::new(
-                    "virtual_machine.system.memory.min",
-                    "must be an integer >= 0",
-                )
-                .with_remediation("Change memory.min to a non-negative value"),
-            );
-        }
 
         validate_vm_name_filename_match(&mut issues, &self.metadata.vm_name, filename);
         validate_machine_consistency(
             &mut issues,
-            &self.virtual_machine.system.machine.family,
-            &self.virtual_machine.system.machine.chipset,
+            &self.virtual_machine.machine.family,
+            &self.virtual_machine.machine.chipset,
         );
-        validate_unique_ids_storage(&mut issues, &self.virtual_machine.storage);
-        validate_unique_ids_network(&mut issues, &self.virtual_machine.network);
-        validate_unique_ids_resources(&mut issues, &self.virtual_machine.resources);
 
         if issues.is_empty() {
             Ok(())
@@ -184,88 +163,10 @@ fn validate_machine_consistency(issues: &mut Vec<ValidationIssue>, family: &str,
         if !allowed.contains(&chipset) {
             issues.push(
                 ValidationIssue::new(
-                    "virtual_machine.system.machine.chipset",
+                    "virtual_machine.machine.chipset",
                     "must be one of [q35, i440fx] when machine family is 'pc'",
                 )
                 .with_remediation("Change chipset to 'q35' or 'i440fx' for pc family machines"),
-            );
-        }
-    }
-}
-
-fn validate_unique_ids_storage(issues: &mut Vec<ValidationIssue>, entries: &[StorageEntry]) {
-    let mut seen = HashSet::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let path = format!("virtual_machine.storage[{idx}].id");
-        if entry.id.trim().is_empty() {
-            issues.push(
-                ValidationIssue::new(path, "is required and must be a non-empty string")
-                    .with_remediation(format!(
-                        "Provide a non-empty id string for storage entry at index {}",
-                        idx
-                    )),
-            );
-            continue;
-        }
-        if !seen.insert(entry.id.as_str()) {
-            issues.push(
-                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
-                    .with_remediation(format!(
-                        "Change the id to a unique value; '{}' is already used in storage",
-                        entry.id
-                    )),
-            );
-        }
-    }
-}
-
-fn validate_unique_ids_network(issues: &mut Vec<ValidationIssue>, entries: &[NetworkEntry]) {
-    let mut seen = HashSet::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let path = format!("virtual_machine.network[{idx}].id");
-        if entry.id.trim().is_empty() {
-            issues.push(
-                ValidationIssue::new(path, "is required and must be a non-empty string")
-                    .with_remediation(format!(
-                        "Provide a non-empty id string for network entry at index {}",
-                        idx
-                    )),
-            );
-            continue;
-        }
-        if !seen.insert(entry.id.as_str()) {
-            issues.push(
-                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
-                    .with_remediation(format!(
-                        "Change the id to a unique value; '{}' is already used in network",
-                        entry.id
-                    )),
-            );
-        }
-    }
-}
-
-fn validate_unique_ids_resources(issues: &mut Vec<ValidationIssue>, entries: &[ResourceRef]) {
-    let mut seen = HashSet::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let path = format!("virtual_machine.resources[{idx}].id");
-        if entry.id.trim().is_empty() {
-            issues.push(
-                ValidationIssue::new(path, "is required and must be a non-empty string")
-                    .with_remediation(format!(
-                        "Provide a non-empty id string for resource entry at index {}",
-                        idx
-                    )),
-            );
-            continue;
-        }
-        if !seen.insert(entry.id.as_str()) {
-            issues.push(
-                ValidationIssue::new(path, format!("duplicate id '{}'", entry.id))
-                    .with_remediation(format!(
-                        "Change the id to a unique value; '{}' is already used in resources",
-                        entry.id
-                    )),
             );
         }
     }
@@ -447,12 +348,9 @@ mod tests {
     #[test]
     fn human_readable_report_formatting() {
         let issues = vec![
-            ValidationIssue::new(
-                "virtual_machine.system.memory.min",
-                "must be an integer >= 0",
-            )
-            .with_source_snippet("   9 |     min: -1")
-            .with_remediation("Change memory.min to a non-negative value"),
+            ValidationIssue::new("virtual_machine.memory.size", "must be an integer >= 0")
+                .with_source_snippet("   9 |     size: -1")
+                .with_remediation("Change memory.size to a non-negative value"),
             ValidationIssue::with_severity(
                 "metadata.vm_name",
                 "must match filename stem",
@@ -467,8 +365,8 @@ mod tests {
         assert!(report.contains("Validation Report: 2 issue(s)"));
         assert!(report.contains("ERRORS (1)"));
         assert!(report.contains("WARNINGS (1)"));
-        assert!(report.contains("virtual_machine.system.memory.min"));
-        assert!(report.contains("Change memory.min to a non-negative value"));
+        assert!(report.contains("virtual_machine.memory.size"));
+        assert!(report.contains("Change memory.size to a non-negative value"));
         assert!(report.contains("Line: 5"));
         assert!(report.contains("Context:"));
     }

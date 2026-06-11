@@ -8,9 +8,8 @@ use std::ffi::OsStr;
 use std::path::Path;
 
 use crate::config_format::{ImportError, ImportOptions, Importer, ProxmoxImporter, RuntimeConfig};
-use crate::runtime_config::model::{
-    Cpu, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, NetworkEntry, ResourceRef,
-    StorageEntry, System, VirtualMachine,
+use crate::runtime_config::{
+    Cpu, CpuModel, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, VirtualMachine,
 };
 
 /// Errors that can occur while parsing a Proxmox source file.
@@ -66,9 +65,6 @@ fn parse_source(
     let mut machine: Option<Machine> = None;
     let mut cpu_model: Option<String> = None;
     let mut memory_min: Option<i64> = None;
-    let mut storage: Vec<StorageEntry> = Vec::new();
-    let mut network: Vec<NetworkEntry> = Vec::new();
-    let mut resources: Vec<ResourceRef> = Vec::new();
 
     for (index, raw_line) in source_text.lines().enumerate() {
         let line_number = index + 1;
@@ -106,15 +102,9 @@ fn parse_source(
             "machine" => machine = Some(parse_machine_value(value, &source_name)?),
             "cpu" => cpu_model = Some(value.to_owned()),
             "memory" => memory_min = Some(parse_memory_value(value, &source_name)?),
-            _ if is_numeric_slot_key(key, "scsi") => {
-                storage.push(StorageEntry { id: key.to_owned() })
-            }
-            _ if is_numeric_slot_key(key, "net") => {
-                network.push(NetworkEntry { id: key.to_owned() })
-            }
-            _ if is_numeric_slot_key(key, "hostpci") || is_numeric_slot_key(key, "usb") => {
-                resources.push(ResourceRef { id: key.to_owned() })
-            }
+            _ if is_numeric_slot_key(key, "scsi") => {}
+            _ if is_numeric_slot_key(key, "net") => {}
+            _ if is_numeric_slot_key(key, "hostpci") || is_numeric_slot_key(key, "usb") => {}
             _ => {}
         }
     }
@@ -125,19 +115,12 @@ fn parse_source(
             vm_name: required_string(vm_name, &source_name, "name")?,
         },
         virtual_machine: VirtualMachine {
-            system: System {
-                machine: required_machine(machine, &source_name)?,
-                cpu: Cpu {
-                    model: required_string(cpu_model, &source_name, "cpu")?,
-                },
-                memory: Memory {
-                    min: required_memory(memory_min, &source_name)?,
-                },
-            },
-            storage,
-            network,
-            resources,
+            machine: required_machine(machine, &source_name)?,
+            cpu: cpu_model.map(|_| Cpu::new(CpuModel::Host, 1, 1, 1)),
+            memory: Memory::megabytes(required_memory(memory_min, &source_name)?),
+            devices: Vec::new(),
         },
+        resources: Vec::new(),
     })
 }
 
@@ -192,11 +175,19 @@ fn required_machine(
 }
 
 /// Returns a required memory value or an error if it is missing.
-fn required_memory(value: Option<i64>, source_name: &str) -> Result<i64, ProxmoxImportError> {
-    value.ok_or(ProxmoxImportError::MissingRequiredField {
-        source_name: source_name.to_owned(),
-        field: "memory",
-    })
+fn required_memory(value: Option<i64>, source_name: &str) -> Result<usize, ProxmoxImportError> {
+    value
+        .ok_or(ProxmoxImportError::MissingRequiredField {
+            source_name: source_name.to_owned(),
+            field: "memory",
+        })
+        .and_then(|size| {
+            usize::try_from(size).map_err(|_| ProxmoxImportError::InvalidFieldValue {
+                source_name: source_name.to_owned(),
+                field: "memory",
+                value: size.to_string(),
+            })
+        })
 }
 
 /// Parses a Proxmox machine token into the canonical machine model.
@@ -227,6 +218,7 @@ fn parse_machine_value(value: &str, source_name: &str) -> Result<Machine, Proxmo
     Ok(Machine {
         family: "pc".to_owned(),
         chipset: chipset.to_owned(),
+        version: None,
     })
 }
 

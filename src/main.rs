@@ -1,6 +1,7 @@
 mod cli;
 
-use cli::{CliCommand, parse_cli_options, print_help};
+use cli::{CliArgs, CliCommand, print_help};
+use ezkvm::{config_format::ImportOptions, runtime_model::RuntimeModel};
 
 fn main() {
     if let Err(error) = run() {
@@ -10,8 +11,17 @@ fn main() {
     }
 }
 
+fn import_runtime(name: String) -> Result<RuntimeModel, String> {
+    let runtime_config = ImportOptions::Ezkvm {
+        host: "/etc/ezkvm/host.yaml".to_string(),
+        vm: name,
+    }
+    .import_runtime()?;
+    RuntimeModel::try_from(runtime_config)
+}
+
 fn run() -> Result<(), String> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: CliArgs = std::env::args().skip(1).collect();
     if args.is_empty() {
         return Err("missing arguments".to_string());
     }
@@ -21,17 +31,18 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    let command = parse_cli_options(&args)?;
+    let command = CliCommand::try_from(args)?;
 
     match command {
         CliCommand::Import { input } => {
-            let runtime = input.import_runtime()?;
-            runtime.validate_runtime(None)?;
+            let runtime_config = input.import_runtime()?;
+            runtime_config.validate_runtime(None)?;
             println!("validation passed");
         }
         CliCommand::Convert { input, output } => {
-            let runtime = input.import_runtime()?;
-            let path = output.export_runtime(&runtime)?;
+            let runtime_config = input.import_runtime()?;
+            runtime_config.validate_runtime(None)?;
+            let path = output.export_runtime(&runtime_config)?;
             println!("exported output to {}", path.display());
         }
         CliCommand::Export { output } => {
@@ -41,34 +52,19 @@ fn run() -> Result<(), String> {
             );
         }
         CliCommand::ShowRuntime { name } => {
-            println!(
-                "show-runtime requested for vm '{}'; use convert/import to materialize runtime context",
-                name
-            );
+            import_runtime(name)?.show()?;
         }
         CliCommand::Start { name } => {
-            println!(
-                "lifecycle action 'start' requested for vm '{}'; execution is not implemented yet",
-                name
-            );
+            import_runtime(name)?.start()?;
         }
         CliCommand::Stop { name } => {
-            println!(
-                "lifecycle action 'stop' requested for vm '{}'; execution is not implemented yet",
-                name
-            );
+            import_runtime(name)?.stop()?;
         }
         CliCommand::Reset { name } => {
-            println!(
-                "lifecycle action 'reset' requested for vm '{}'; execution is not implemented yet",
-                name
-            );
+            import_runtime(name)?.reset()?;
         }
         CliCommand::Shutdown { name } => {
-            println!(
-                "lifecycle action 'shutdown' requested for vm '{}'; execution is not implemented yet",
-                name
-            );
+            import_runtime(name)?.shutdown()?;
         }
     }
 

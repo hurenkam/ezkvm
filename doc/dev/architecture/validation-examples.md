@@ -13,18 +13,13 @@ metadata:
   # schema_version is missing
   vm_name: "win11-prod"
 virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: 8192
-  storage:
-    - id: "disk0"
-  network:
-    - id: "net0"
+  machine:
+    family: "pc"
+    chipset: "q35"
+  memory:
+    size: 8589934592
+  devices: []
+resources: []
 ```
 
 **Error Output:**
@@ -58,58 +53,12 @@ metadata:
 
 ## Duplicate Storage ID
 
-**Problem:** Two storage entries have the same ID, causing topology ambiguity.
-
-**Input YAML:**
-
-```yaml
-metadata:
-  schema_version: "1.0.0"
-  vm_name: "ubuntu-20"
-virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: 4096
-  storage:
-    - id: "system"
-    - id: "data"
-    - id: "system"  # Duplicate
-  network:
-    - id: "eth0"
-```
-
-**Error Output:**
-
-```
-Validation failed with 1 issue(s):
-  path: virtual_machine.storage[2].id
-  reason: duplicate id 'system'
-  line: 14
-  context:
-    13 |     - id: "data"
-    14 |     - id: "system"
-  remediation: Change the id to a unique value; 'system' is already used in storage
-```
-
-**How to Fix:**
-
-Rename the duplicate entry to have a unique ID:
-
-```yaml
-storage:
-  - id: "system"
-  - id: "data"
-  - id: "backup"  # Changed from 'system'
-```
-
-**Why This Matters:**
-
-Each storage device must have a unique identifier so rendering can create deterministic command-line arguments. Duplicates would create ambiguous references.
+> **Note:** The `resources` top-level list in the runtime config carries typed `Resource` variants
+> (Storage, Network, PciDevice, etc.) with full YAML-tagged keys. Duplicate-resource validation
+> is not yet implemented; this section describes intended future behaviour.
+>
+> Intended validation path (future): `resources[N]` — once implemented, duplicate resource
+> identifiers will be rejected with a `ConformanceError::Validation` issue.
 
 ---
 
@@ -124,30 +73,25 @@ metadata:
   schema_version: "1.0.0"
   vm_name: "test-vm"
 virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "virt"  # Invalid for pc family
-    cpu:
-      model: "qemu64"
-    memory:
-      min: 2048
-  storage:
-    - id: "disk0"
-  network:
-    - id: "net0"
+  machine:
+    family: "pc"
+    chipset: "virt"  # Invalid for pc family
+  memory:
+    size: 2147483648
+  devices: []
+resources: []
 ```
 
 **Error Output:**
 
 ```
 Validation failed with 1 issue(s):
-  path: virtual_machine.system.machine.chipset
+  path: virtual_machine.machine.chipset
   reason: must be one of [q35, i440fx] when machine family is 'pc'
-  line: 8
+  line: 7
   context:
-     7 |     family: "pc"
-     8 |     chipset: "virt"
+     6 |   family: "pc"
+     7 |   chipset: "virt"
   remediation: Change chipset to 'q35' or 'i440fx' for pc family machines
 ```
 
@@ -156,19 +100,17 @@ Validation failed with 1 issue(s):
 Choose a valid chipset for x86 PC machines:
 
 ```yaml
-system:
-  machine:
-    family: "pc"
-    chipset: "q35"  # Modern, UEFI-capable; recommended for Windows 11, modern Linux
+machine:
+  family: "pc"
+  chipset: "q35"  # Modern, UEFI-capable; recommended for Windows 11, modern Linux
 ```
 
 OR use the legacy option:
 
 ```yaml
-system:
-  machine:
-    family: "pc"
-    chipset: "i440fx"  # Legacy BIOS-only; for older systems
+machine:
+  family: "pc"
+  chipset: "i440fx"  # Legacy BIOS-only; for older systems
 ```
 
 **Decision Basis:**
@@ -190,18 +132,13 @@ metadata:
   schema_version: "1.0.0"
   vm_name: "staging-db"  # Does not match filename 'production-db'
 virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: 16384
-  storage:
-    - id: "disk0"
-  network:
-    - id: "eth0"
+  machine:
+    family: "pc"
+    chipset: "q35"
+  memory:
+    size: 17179869184
+  devices: []
+resources: []
 ```
 
 **Error Output:**
@@ -252,31 +189,26 @@ metadata:
   schema_version: "1.0.0"
   vm_name: "debian-11"
 virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: "4096"  # String (quoted) instead of integer
-  storage:
-    - id: "disk0"
-  network:
-    - id: "eth0"
+  machine:
+    family: "pc"
+    chipset: "q35"
+  memory:
+    size: "4294967296"  # String (quoted) instead of integer
+  devices: []
+resources: []
 ```
 
 **Error Output:**
 
 ```
 Validation failed with 1 issue(s):
-  path: virtual_machine.system.memory.min
-  reason: must be an integer
-  line: 11
+  path: virtual_machine.memory.size
+  reason: expected usize
+  line: 10
   context:
-    10 |     memory:
-    11 |       min: "4096"
-  remediation: Change virtual_machine.system.memory.min to an integer value
+    9  |   memory:
+    10 |     size: "4294967296"
+  remediation: Change virtual_machine.memory.size to an integer value (bytes)
 ```
 
 **How to Fix:**
@@ -285,17 +217,17 @@ Remove quotes from numeric values in YAML:
 
 ```yaml
 memory:
-  min: 4096  # No quotes; YAML interprets as integer
+  size: 4294967296  # No quotes; YAML interprets as integer (bytes)
 ```
 
 **Common YAML Gotchas:**
 
 | Input | YAML Type | Correct? |
 |---|---|---|
-| `4096` | integer | ✓ |
-| `"4096"` | string | ✗ |
+| `4294967296` | integer | ✓ |
+| `"4294967296"` | string | ✗ |
 | `4.5` | float | ✗ (must be integer) |
-| `0x1000` | integer | ✓ (hex notation) |
+| `0x100000000` | integer | ✓ (hex notation) |
 
 ---
 
@@ -310,9 +242,13 @@ metadata:
   schema_version: "1.0.0"
   vm_name: "broken-vm"
 virtual_machine:
-  system:
-    memory:
-      min: [8192
+  machine:
+    family: "pc"
+    chipset: "q35"
+  memory:
+    size: [8589934592
+  devices: []
+resources: []
 ```
 
 **Observed Result:**
@@ -367,19 +303,13 @@ metadata:
   schema_version: ""  # Empty string
   vm_name: "dev-app"
 virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "arm-virt"  # Invalid for pc
-    cpu:
-      model: "host"
-    memory:
-      min: "2048"  # String not integer
-  storage:
-    - id: "disk0"
-    - id: "disk0"  # Duplicate
-  network:
-    - id: "eth0"
+  machine:
+    family: "pc"
+    chipset: "arm-virt"  # Invalid for pc
+  memory:
+    size: "2147483648"  # String not integer
+  devices: []
+resources: []
 ```
 
 **File:** `/configs/test-vm.yaml` (filename doesn't match vm_name)
@@ -387,21 +317,15 @@ virtual_machine:
 **Error Output:**
 
 ```
-Validation failed with 4 issue(s):
+Validation failed with 3 issue(s):
   path: metadata.schema_version
   reason: is required and must be a non-empty string
   ---
   path: metadata.vm_name
   reason: must match filename stem 'test-vm'
   ---
-  path: virtual_machine.system.machine.chipset
+  path: virtual_machine.machine.chipset
   reason: must be one of [q35, i440fx] when machine family is 'pc'
-  ---
-  path: virtual_machine.system.memory.min
-  reason: must be an integer
-  ---
-  path: virtual_machine.storage[1].id
-  reason: duplicate id 'disk0'
 ```
 
 **How to Fix — Batch Remediation:**
@@ -419,20 +343,13 @@ Validation failed with 4 issue(s):
      chipset: "q35"
    ```
 
-3. **Fix memory type:**
+3. **Remove string-quoted memory size** (YAML type error, caught at parse time):
    ```yaml
    memory:
-     min: 2048
+     size: 2147483648  # integer bytes
    ```
 
-4. **Remove duplicate storage ID:**
-   ```yaml
-   storage:
-     - id: "disk0"
-     - id: "data"
-   ```
-
-5. **Rename file to match vm_name:**
+4. **Rename file to match vm_name:**
    ```bash
    mv /configs/test-vm.yaml /configs/dev-app.yaml
    ```
@@ -444,19 +361,13 @@ metadata:
   schema_version: "1.0.0"
   vm_name: "dev-app"
 virtual_machine:
-  system:
-    machine:
-      family: "pc"
-      chipset: "q35"
-    cpu:
-      model: "host"
-    memory:
-      min: 2048
-  storage:
-    - id: "disk0"
-    - id: "data"
-  network:
-    - id: "eth0"
+  machine:
+    family: "pc"
+    chipset: "q35"
+  memory:
+    size: 2147483648
+  devices: []
+resources: []
 ```
 
 ---
@@ -472,27 +383,20 @@ metadata:
   schema_version: 1.0      # Error: not a string
   vm_name: my-test-vm      # File: test-config.yaml
 virtual_machine:
-  system:
-    machine:
-      family: pc
-      chipset "q35"        # Error: missing ':'
-    cpu:
-      model: host
-    memory:
-      min: -512            # Error: negative
-  storage:
-    - id: "disk"
-    - id: "disk"           # Error: duplicate
-  network:
-    - id: "net0"
+  machine:
+    family: pc
+    chipset "q35"          # Error: missing ':'
+  memory:
+    size: "536870912"      # Error: string not integer
+  devices: []
+resources: []
 ```
 
-**Expected Issues (at least 5):**
+**Expected Issues (at least 3):**
 - VM name mismatch with file
-- Type error on schema_version
-- Negative memory value
-- Duplicate storage ID
-- YAML syntax error in chipset
+- Type error on schema_version (must be a string)
+- YAML parse error on chipset (missing `:`)
+- Type error on memory.size (string instead of integer)
 
 For actual validation, use the ezkvm test suite:
 ```bash

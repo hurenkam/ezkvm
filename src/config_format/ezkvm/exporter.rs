@@ -32,7 +32,9 @@ impl Exporter for EzkvmExporter {
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(format!("{}.yaml", runtime.metadata.vm_name)));
 
-        let content = runtime.to_string();
+        let content = serde_yaml::to_string(runtime).map_err(|e| {
+            ExportError::ExportFailed(format!("Failed to serialize runtime config: {}", e))
+        })?;
 
         std::fs::write(&path, content)
             .map_err(|e| ExportError::ExportFailed(format!("{}: {}", path.display(), e)))?;

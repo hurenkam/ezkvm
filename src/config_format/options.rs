@@ -15,13 +15,9 @@ use super::{
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ImportOptions {
-    /// Imports an ezkvm YAML configuration using host and VM paths.
     Ezkvm { host: String, vm: String },
-    /// Imports a Proxmox VM configuration together with the storage layout.
     Proxmox { storage: String, vm: String },
-    /// Imports a QEMU command file.
     Qemu { vm: String },
-    /// Imports a libvirt XML file.
     Libvirt { vm: String },
 }
 
@@ -46,18 +42,14 @@ impl ImportOptions {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ExportOptions {
-    /// Exports the runtime model as ezkvm YAML.
     Ezkvm { host: String, vm: Option<String> },
-    /// Exports the runtime model as a Proxmox VM configuration.
     Proxmox { storage: String, vm: String },
-    /// Exports the runtime model as a QEMU command file.
     Qemu { vm: Option<String> },
-    /// Exports the runtime model as libvirt XML.
     Libvirt { vm: String },
 }
 
 impl ExportOptions {
-    /// Dispatches the options to the matching exporter and writes the runtime model.
+    /// Dispatches the options to the matching exporter and writes the runtime config.
     ///
     /// # Returns
     ///

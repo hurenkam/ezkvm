@@ -8,13 +8,11 @@ mod diagnostics;
 mod exporter;
 mod importer;
 
-/// ezkvm exporter input arguments.
 pub use exporter::EzkvmOutputArgs;
-/// ezkvm importer input arguments.
 pub use importer::EzkvmInputArgs;
 
-/// Imports ezkvm YAML into the canonical runtime model.
+/// Imports ezkvm YAML into RuntimeConfig.
 pub struct EzkvmImporter;
 
-/// Exports the canonical runtime model back to ezkvm YAML.
+/// Exports RuntimeConfig back to ezkvm YAML.
 pub struct EzkvmExporter;

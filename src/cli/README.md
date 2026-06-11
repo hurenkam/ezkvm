@@ -55,7 +55,7 @@ Output flags:
 
 In the future, new subcommands and flags may be added while preserving this explicit named-flag style.
 
-## Examples
+### Examples
 
 Import an ezkvm input config:
 ```bash
@@ -223,4 +223,165 @@ let parsed_cli = CliCommand::Convert {
     vm: Some("/etc/ezkvm/vm/101.yaml".to_string()),
   },
 };
+```
+
+### Design
+
+#### Type Overview
+
+The CLI module defines the following key types, spread across three source files.
+
+| Symbol | Kind | File | Role |
+|---|---|---|---|
+| `CliArgs` | Struct (type alias) | `parser.rs` | Raw `Vec<String>` received from the OS |
+| `JsonPayloadBuilder` | Struct | `parser.rs` | Converts flat `--dot.path value` flags into nested JSON |
+| `TryFrom<CliArgs> for CliCommand` | Impl (Fn) | `parser.rs` | Entry point: wires args → builder → deserialization |
+| `CliCommand` | Enum | `mod.rs` | Discriminated union of all supported subcommands |
+| `ImportOptions` | Enum | `config_format` | Selects and configures an importer; dispatches `import_runtime()` |
+| `ExportOptions` | Enum | `config_format` | Selects and configures an exporter; dispatches `export_runtime()` |
+| `Importer` | Trait | `config_format` | Contract for any type that reads a source format into `RuntimeConfig` |
+| `Exporter` | Trait | `config_format` | Contract for any type that writes `RuntimeConfig` to an output format |
+| `print_help()` | Function | `help.rs` | Renders usage text to stdout |
+
+---
+
+#### Class Diagram
+
+```plantuml
+@startuml CLI Module – Class Diagram
+
+skinparam linetype ortho
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam roundcorner 0
+skinparam packageStyle rectangle
+
+package "cli" {
+  package "mod" {
+    class CliCommand << (E,#FFD700) Enum >> {
+      Import \{ input: ImportOptions \}
+      Export \{ output: ExportOptions \}
+      Convert \{ input: ImportOptions, output: ExportOptions \}
+      ShowRuntime \{ name: String \}
+      Start \{ name: String \}
+      Stop \{ name: String \}
+      Reset \{ name: String \}
+      Shutdown \{ name: String \}
+    }
+  }
+
+  package "parser" {
+    class CliArgs << (S,#ADD8E6) Struct >> {
+      Vec<String>
+    }
+    class JsonPayloadBuilder << (S,#ADD8E6) Struct >> {
+      - args: CliArgs
+      ..
+      + build() : Result<String, String>
+      - args_to_structured_json(args) : Result<Value, String>
+      - parse_options_as_nested_json(args) : Result<Map, String>
+      - insert_dotted_key(map, key, value) : Result<(), String>
+      - insert_segments(current, segments, value) : Result<(), String>
+    }
+    class "TryFrom<CliArgs> for CliCommand" as TryFrom << (F,#90EE90) Fn >> {
+      + try_from(args: CliArgs) : Result<CliCommand, String>
+    }
+  }
+
+  package "help" {
+    class "print_help()" as print_help << (F,#90EE90) Fn >>
+  }
+}
+
+package "config_format" {
+  enum ImportOptions << (E,#FFD700) >> {
+    Ezkvm { host, vm }
+    Proxmox { storage, vm }
+    Qemu { vm }
+    Libvirt { vm }
+    ..
+    + import_runtime() : Result<RuntimeConfig, String>
+  }
+  enum ExportOptions << (E,#FFD700) >> {
+    Ezkvm { host, vm }
+    Proxmox { storage, vm }
+    Qemu { vm }
+    Libvirt { vm }
+    ..
+    + export_runtime(runtime) : Result<PathBuf, String>
+  }
+  class Importer << (T,#FFA500) Trait >> {
+    + import(args: ImportOptions) : Result<RuntimeConfig, ImportError>
+  }
+  class Exporter << (T,#FFA500) Trait >> {
+    + export(runtime, args: ExportOptions) : Result<PathBuf, ExportError>
+  }
+}
+
+TryFrom --> CliArgs         : takes
+TryFrom --> JsonPayloadBuilder : creates
+TryFrom --> CliCommand      : produces
+
+CliCommand --> ImportOptions : contains
+CliCommand --> ExportOptions : contains
+
+ImportOptions ..> Importer  : dispatches to
+ExportOptions ..> Exporter  : dispatches to
+
+@enduml
+```
+
+---
+
+#### Parsing Sequence
+
+```plantuml
+@startuml CLI Module – Parsing Sequence
+
+skinparam shadowing false
+skinparam roundcorner 0
+skinparam sequenceArrowThickness 2
+skinparam sequenceMessageAlign left
+
+participant "main()" as main
+participant "TryFrom impl" as try_from
+participant "JsonPayloadBuilder" as builder
+participant "serde_json" as serde
+participant "ImportOptions" as import_opts
+participant "ExportOptions" as export_opts
+
+main        ->  try_from     : try_from(args: Vec<String>)
+try_from    ->  builder      : JsonPayloadBuilder::new(args)
+builder     ->  builder      : args_to_structured_json(args)
+note right
+  args[0]  → "command" key
+  args[1..] → parse_options_as_nested_json()
+  dot.path flags split into nested JSON objects via
+  insert_dotted_key / insert_segments
+end note
+builder     --> try_from     : json_payload: String
+try_from    ->  serde        : from_str::<CliCommand>(&json_payload)
+note right
+  serde tag = "command"
+  serde content = "options"
+  variant matched by kebab-case name
+end note
+serde       --> try_from     : Ok(CliCommand)
+try_from    --> main         : Ok(CliCommand)
+
+main        ->  main         : match command
+
+alt CliCommand::Import or Convert
+  main      ->  import_opts  : import_runtime()
+  note right: dispatches to\nmatching Importer impl
+  import_opts --> main       : Ok(RuntimeConfig)
+end
+
+alt CliCommand::Export or Convert
+  main      ->  export_opts  : export_runtime(&runtime)
+  note right: dispatches to\nmatching Exporter impl
+  export_opts --> main       : Ok(PathBuf)
+end
+
+@enduml
 ```
