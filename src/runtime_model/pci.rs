@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use derive_new::new;
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,11 @@ pub type PciBus = String;
 pub struct PciAddress {
     pub device: u8,
     pub function: u8,
+}
+impl Display for PciAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "dev {}, func {}", self.device, self.function)
+    }
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PciDevice {
@@ -26,14 +31,14 @@ impl From<PciDevice> for Arc<dyn PciDeviceApi> {
     }
 }
 
-pub trait PciDeviceApi {
+pub trait PciDeviceApi: Display {
     fn preferred_address(&self) -> Option<PciAddress> {
         None
     }
     fn qemu_args(&self, bus: &PciBus, address: PciAddress) -> Vec<String>;
 }
 
-pub trait PciControllerApi: ControllerApi {
+pub trait PciControllerApi: ControllerApi + Display {
     fn register_pci_device(
         &self,
         device: Arc<dyn PciDeviceApi>,

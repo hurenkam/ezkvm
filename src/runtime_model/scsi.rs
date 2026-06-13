@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{ControllerApi, PcieAddress, PcieBus, PcieDeviceApi};
+use super::{ControllerApi, PcieDeviceApi};
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
@@ -21,29 +21,6 @@ pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
         device: Arc<dyn ScsiDeviceApi>,
         preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String>;
-}
-
-#[derive(Default)]
-pub struct PvScsiController {}
-
-impl PcieDeviceApi for PvScsiController {
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        todo!()
-    }
-
-    fn preferred_address(&self) -> Option<PcieAddress> {
-        None
-    }
-}
-impl ControllerApi for PvScsiController {}
-impl ScsiControllerApi for PvScsiController {
-    fn register_scsi_device(
-        &self,
-        _device: Arc<dyn ScsiDeviceApi>,
-        _preferred_address: Option<ScsiAddress>,
-    ) -> Result<(), String> {
-        todo!()
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -81,7 +81,6 @@ impl RuntimeConfig {
 
     pub fn validate_runtime_config(&self, filename: &Path) -> Result<(), ConformanceError> {
         let mut issues = Vec::new();
-
         check_required_strings(
             &mut issues,
             "metadata.schema_version",
@@ -98,7 +97,6 @@ impl RuntimeConfig {
             "virtual_machine.machine.chipset",
             &self.virtual_machine.machine.chipset,
         );
-
         validate_vm_name_filename_match(&mut issues, &self.metadata.vm_name, filename);
         validate_machine_consistency(
             &mut issues,
@@ -109,6 +107,15 @@ impl RuntimeConfig {
         if issues.is_empty() {
             Ok(())
         } else {
+            print!("validation issues:\n");
+            for issue in &issues {
+                print!(
+                    "  - [{}] {}: {}\n",
+                    issue.severity.as_str(),
+                    issue.path,
+                    issue.reason
+                );
+            }
             Err(ConformanceError::Validation(issues.len(), issues))
         }
     }

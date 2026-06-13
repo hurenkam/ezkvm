@@ -12,40 +12,40 @@ use crate::runtime_model::{
 pub const EZKVM_CONFIG_SCHEMA_VERSION: &str = "1.0.0";
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum StorageResource {
-    File { path: String },
-    BlockDevice { path: String },
+    File { file: String },
+    BlockDevice { block_device: String },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum NetworkResource {
-    Tap { name: String },
+    Tap { name: String, tap: String },
     Bridge { name: String, bridge: String },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum PciDeviceResource {
     Address { bus: PciBus, address: PciAddress },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum PcieDeviceResource {
     Address { bus: PcieBus, address: PcieAddress },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum UsbDeviceResource {
     Id { vendor_id: u16, device_id: u16 },
     Address { bus: UsbBus, address: UsbAddress },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum Resource {
     Storage { storage: StorageResource },
     Network { network: NetworkResource },
@@ -77,46 +77,46 @@ pub struct VirtualMachine {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum Device {
     Pcie {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        bus: Option<PcieBus>,
+        pcie: Option<PcieBus>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         address: Option<PcieAddress>,
         device: PcieDevice,
     },
     Pci {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        bus: Option<PciBus>,
+        pci: Option<PciBus>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         address: Option<PciAddress>,
         device: PciDevice,
     },
     Usb {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        bus: Option<UsbBus>,
+        usb: Option<UsbBus>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         port: Option<UsbAddress>,
         device: UsbDevice,
     },
     Sata {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        bus: Option<SataBus>,
+        sata: Option<SataBus>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         address: Option<SataAddress>,
         device: SataDevice,
     },
     Ide {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        bus: Option<IdeBus>,
+        ide: Option<IdeBus>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         port: Option<IdeAddress>,
         device: IdeDevice,
     },
     Scsi {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        bus: Option<ScsiBus>,
+        scsi: Option<ScsiBus>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         address: Option<ScsiAddress>,
         device: ScsiDevice,
@@ -170,8 +170,8 @@ resources:
         assert!(config.virtual_machine.cpu.is_none());
         assert!(config.virtual_machine.machine.version.is_none());
         match &config.virtual_machine.devices[0] {
-            Device::Sata { bus, address, .. } => {
-                assert!(bus.is_none());
+            Device::Sata { sata, address, .. } => {
+                assert!(sata.is_none());
                 assert!(address.is_none());
             }
             other => panic!("expected sata device, got {other:?}"),
@@ -194,9 +194,9 @@ resources:
                 cpu: None,
                 memory: Memory::gigabytes(8),
                 devices: vec![Device::Sata {
-                    bus: None,
+                    sata: None,
                     address: None,
-                    device: SataDevice::SataDisk,
+                    device: SataDevice::Disk,
                 }],
             },
             resources: vec![Resource::Network {
@@ -211,7 +211,7 @@ resources:
 
         assert!(!yaml.contains("cpu: null"));
         assert!(!yaml.contains("version: null"));
-        assert!(!yaml.contains("bus: null"));
+        assert!(!yaml.contains("sata: null"));
         assert!(!yaml.contains("address: null"));
     }
 }

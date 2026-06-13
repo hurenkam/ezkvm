@@ -1,0 +1,22 @@
+metadata:
+  schema_version: 1.0.0
+  vm_name: wakiza
+
+resources:
+  - network: { name: "lan", bridge: "br0" }
+  - storage: { name: "sda", block_device: "/dev/vm0/vm-108-disk0" }
+
+virtual_machine:
+  machine:
+    family: pc
+    chipset: q35
+  cpu:
+    model: Host
+    cores: 8
+    threads: 2
+    sockets: 1
+  memory:
+    size: 16384
+  devices:
+    - { sata: sata.0, resource: "sda", device: { type: disk } }
+    - { pcie: pcie.0, resource: "lan", device: { type: virtio_net } }

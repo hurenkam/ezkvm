@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use derive_new::new;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,11 @@ pub type IdeBus = String;
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
 pub struct IdeAddress {
     pub address: u8,
+}
+impl Display for IdeAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "address {}", self.address)
+    }
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub enum IdeDevice {
@@ -28,12 +33,17 @@ impl IdeDeviceApi for IdeDisk {
         todo!()
     }
 }
+impl Display for IdeDisk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IDE Disk")
+    }
+}
 
-pub trait IdeDeviceApi {
+pub trait IdeDeviceApi: Display {
     fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String>;
 }
 
-pub trait IdeControllerApi: ControllerApi {
+pub trait IdeControllerApi: ControllerApi + Display {
     fn register_ide_device(
         &self,
         device: Arc<dyn IdeDeviceApi>,

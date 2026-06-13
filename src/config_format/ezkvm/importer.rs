@@ -56,10 +56,8 @@ impl Importer for EzkvmImporter {
             ImportOptions::Ezkvm { host, vm } => (host, vm),
             _ => return Err(ImportError::InvalidFormat),
         };
-
         let source_text = std::fs::read_to_string(&vm_path)
             .map_err(|e| ImportError::ImportFailed(format!("{}: {}", vm_path, e)))?;
-
         Self::validate(&source_text, Path::new(&vm_path))
             .map_err(|e| ImportError::ImportFailed(e.to_string()))
     }
