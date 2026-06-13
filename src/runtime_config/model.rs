@@ -3,8 +3,9 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime_model::{
-    Cpu, IdeAddress, IdeBus, Memory, PciAddress, PciBus, PcieAddress, PcieBus, SataAddress,
-    SataBus, ScsiAddress, ScsiBus, UsbAddress, UsbBus,
+    Cpu, IdeAddress, IdeBus, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress,
+    PcieBus, PcieDevice, SataAddress, SataBus, SataDevice, ScsiAddress, ScsiBus, ScsiDevice,
+    UsbAddress, UsbBus, UsbDevice,
 };
 
 /// Schema version for ezkvm runtime config specification.
@@ -123,19 +124,6 @@ pub enum Device {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PciDevice {}
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PcieDevice {}
-#[derive(Debug, Deserialize, Serialize)]
-pub struct UsbDevice {}
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SataDevice {}
-#[derive(Debug, Deserialize, Serialize)]
-pub struct IdeDevice {}
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ScsiDevice {}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct Machine {
     pub family: String,
     pub chipset: String,
@@ -208,7 +196,7 @@ resources:
                 devices: vec![Device::Sata {
                     bus: None,
                     address: None,
-                    device: SataDevice {},
+                    device: SataDevice::SataDisk,
                 }],
             },
             resources: vec![Resource::Network {

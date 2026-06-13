@@ -249,14 +249,11 @@ virtual_machine:
   memory:
     size: 17179869184
   devices:
-    - type: sata
-      device: {}
+    - { type: sata, driver: resource, name: "bootdisk" }
+    - { type: network, driver: resource, name: "lan" }
 resources:
-  - type: network
-    network:
-      type: bridge
-      name: "lan"
-      bridge: "br0"
+  - { type: network, name: "lan", driver: bridge, bridge: "br0" }
+  - { type: storage, name: "bootdisk", driver: raw, device: "/dev/vm0/vm-108-disk0" }
 ```
 
 Notes:

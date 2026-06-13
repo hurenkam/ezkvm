@@ -1,12 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::{
-    Cpu, I440fxChipset, IdeAddress, IdeControllerApi, IdeDeviceApi, PciAddress, PciControllerApi,
-    PciDeviceApi, PcieAddress, PcieControllerApi, PcieDeviceApi, Q35Chipset, SataAddress,
-    SataControllerApi, SataDeviceApi, ScsiAddress, ScsiControllerApi, ScsiDeviceApi, UsbAddress,
-    UsbControllerApi, UsbDeviceApi,
+    Cpu, I440fxChipset, IdeAddress, IdeControllerApi, IdeDeviceApi, Memory, PciAddress,
+    PciControllerApi, PciDeviceApi, PcieAddress, PcieControllerApi, PcieDeviceApi, Q35Chipset,
+    SataAddress, SataControllerApi, SataDeviceApi, ScsiAddress, ScsiControllerApi, ScsiDeviceApi,
+    UsbAddress, UsbControllerApi, UsbDeviceApi,
 };
-use crate::{config_format::RuntimeConfig, runtime_model::Memory};
+use crate::{config_format::RuntimeConfig, runtime_config::Device};
 
 pub trait ControllerApi {}
 
@@ -72,11 +72,53 @@ pub struct RuntimeModel {
     busses: BusRegister,
 }
 impl RuntimeModel {
+    pub fn get_pcie_bus(&self, id: String) -> Arc<dyn PcieControllerApi> {
+        self.busses
+            .pcie_buses
+            .get(&id)
+            .expect(&format!("PCIe bus with id {} does not exist", id))
+            .clone()
+    }
+    pub fn get_pci_bus(&self, id: String) -> Arc<dyn PciControllerApi> {
+        self.busses
+            .pci_buses
+            .get(&id)
+            .expect(&format!("PCI bus with id {} does not exist", id))
+            .clone()
+    }
+    pub fn get_usb_bus(&self, id: String) -> Arc<dyn UsbControllerApi> {
+        self.busses
+            .usb_buses
+            .get(&id)
+            .expect(&format!("USB bus with id {} does not exist", id))
+            .clone()
+    }
+    pub fn get_sata_bus(&self, id: String) -> Arc<dyn SataControllerApi> {
+        self.busses
+            .sata_buses
+            .get(&id)
+            .expect(&format!("SATA bus with id {} does not exist", id))
+            .clone()
+    }
+    pub fn get_ide_bus(&self, id: String) -> Arc<dyn IdeControllerApi> {
+        self.busses
+            .ide_buses
+            .get(&id)
+            .expect(&format!("IDE bus with id {} does not exist", id))
+            .clone()
+    }
+    pub fn get_scsi_bus(&self, id: String) -> Arc<dyn ScsiControllerApi> {
+        self.busses
+            .scsi_buses
+            .get(&id)
+            .expect(&format!("SCSI bus with id {} does not exist", id))
+            .clone()
+    }
     pub fn register_pcie_device(
         &self,
         bus_id: String,
         device: Arc<dyn PcieDeviceApi>,
-        preferred_address: PcieAddress,
+        preferred_address: Option<PcieAddress>,
     ) -> Result<(), String> {
         match self.busses.pcie_buses.get(&bus_id) {
             Some(controller) => {
@@ -90,7 +132,7 @@ impl RuntimeModel {
         &self,
         bus_id: String,
         device: Arc<dyn PciDeviceApi>,
-        preferred_address: PciAddress,
+        preferred_address: Option<PciAddress>,
     ) -> Result<(), String> {
         match self.busses.pci_buses.get(&bus_id) {
             Some(controller) => {
@@ -104,7 +146,7 @@ impl RuntimeModel {
         &self,
         bus_id: String,
         device: Arc<dyn UsbDeviceApi>,
-        preferred_address: UsbAddress,
+        preferred_address: Option<UsbAddress>,
     ) -> Result<(), String> {
         match self.busses.usb_buses.get(&bus_id) {
             Some(controller) => {
@@ -118,7 +160,7 @@ impl RuntimeModel {
         &self,
         bus_id: String,
         device: Arc<dyn SataDeviceApi>,
-        preferred_address: SataAddress,
+        preferred_address: Option<SataAddress>,
     ) -> Result<(), String> {
         match self.busses.sata_buses.get(&bus_id) {
             Some(controller) => {
@@ -132,7 +174,7 @@ impl RuntimeModel {
         &self,
         bus_id: String,
         device: Arc<dyn IdeDeviceApi>,
-        preferred_address: IdeAddress,
+        preferred_address: Option<IdeAddress>,
     ) -> Result<(), String> {
         match self.busses.ide_buses.get(&bus_id) {
             Some(controller) => {
@@ -146,7 +188,7 @@ impl RuntimeModel {
         &self,
         bus_id: String,
         device: Arc<dyn ScsiDeviceApi>,
-        preferred_address: ScsiAddress,
+        preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String> {
         match self.busses.scsi_buses.get(&bus_id) {
             Some(controller) => {
@@ -220,7 +262,66 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
         //   - audio
 
         for device in vm.devices {
-            println!("handling for device not implemented yet:\n'{:?}'", device);
+            match device {
+                Device::Pcie {
+                    bus,
+                    address,
+                    device,
+                } => {
+                    model.register_pcie_device(
+                        bus.unwrap_or("pcie.0".to_string()),
+                        device.into(),
+                        address,
+                    )?;
+                }
+                Device::Pci {
+                    bus,
+                    address,
+                    device,
+                } => {
+                    model.register_pci_device(
+                        bus.unwrap_or("pci.0".to_string()),
+                        device.into(),
+                        address,
+                    )?;
+                }
+                Device::Usb { bus, port, device } => {
+                    model.register_usb_device(
+                        bus.unwrap_or("usb.0".to_string()),
+                        device.into(),
+                        port,
+                    )?;
+                }
+                Device::Ide { bus, port, device } => {
+                    model.register_ide_device(
+                        bus.unwrap_or("ide.0".to_string()),
+                        device.into(),
+                        port,
+                    )?;
+                }
+                Device::Sata {
+                    bus,
+                    address,
+                    device,
+                } => {
+                    model.register_sata_device(
+                        bus.unwrap_or("sata.0".to_string()),
+                        device.into(),
+                        address,
+                    )?;
+                }
+                Device::Scsi {
+                    bus,
+                    address,
+                    device,
+                } => {
+                    model.register_scsi_device(
+                        bus.unwrap_or("scsi.0".to_string()),
+                        device.into(),
+                        address,
+                    )?;
+                }
+            }
         }
 
         Ok(model)

@@ -30,7 +30,7 @@ impl PcieControllerApi for Q35RootPortController {
     fn register_pcie_device(
         &self,
         _device: Arc<dyn PcieDeviceApi>,
-        _preferred_address: PcieAddress,
+        _preferred_address: Option<PcieAddress>,
     ) -> Result<(), String> {
         Err("Unable to register PCIe device: not implemented".to_string())
     }
@@ -42,7 +42,7 @@ impl SataControllerApi for Q35SataController {
     fn register_sata_device(
         &self,
         _device: Arc<dyn SataDeviceApi>,
-        _preferred_address: SataAddress,
+        _preferred_address: Option<SataAddress>,
     ) -> Result<(), String> {
         Err("Unable to register SATA device: not implemented".to_string())
     }
@@ -54,7 +54,7 @@ impl UsbControllerApi for Q35UsbController {
     fn register_usb_device(
         &self,
         _device: Arc<dyn UsbDeviceApi>,
-        _preferred_address: UsbAddress,
+        _preferred_address: Option<UsbAddress>,
     ) -> Result<(), String> {
         Err("Unable to register USB device: not implemented".to_string())
     }

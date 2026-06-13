@@ -4,7 +4,7 @@ use super::{ControllerApi, PcieAddress, PcieBus, PcieDeviceApi};
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-pub type ScsiBus = u8;
+pub type ScsiBus = String;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
 pub struct ScsiAddress {
@@ -19,7 +19,7 @@ pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
     fn register_scsi_device(
         &self,
         device: Arc<dyn ScsiDeviceApi>,
-        preferred_address: ScsiAddress,
+        preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String>;
 }
 
@@ -40,9 +40,21 @@ impl ScsiControllerApi for PvScsiController {
     fn register_scsi_device(
         &self,
         _device: Arc<dyn ScsiDeviceApi>,
-        _preferred_address: ScsiAddress,
+        _preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String> {
         todo!()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ScsiDevice {
+    ScsiDisk,
+}
+impl From<ScsiDevice> for Arc<dyn ScsiDeviceApi> {
+    fn from(device: ScsiDevice) -> Self {
+        match device {
+            ScsiDevice::ScsiDisk => Arc::new(ScsiDisk::default()),
+        }
     }
 }
 
