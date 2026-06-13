@@ -315,7 +315,7 @@ impl ReportFormatter for DefaultReportFormatter {
 pub enum ConformanceError {
     #[error("invalid ezkvm config yaml: {0}")]
     Parse(#[from] ParseError),
-    #[error("validation failed with {0} issue(s)")]
+    #[error("conformance failed with {0} issue(s)")]
     Validation(usize, Vec<ValidationIssue>),
 }
 

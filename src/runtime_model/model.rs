@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use super::{
     Cpu, I440fxChipset, IdeAddress, IdeControllerApi, IdeDeviceApi, Memory, PciAddress,
@@ -198,13 +198,6 @@ impl RuntimeModel {
             None => Err(format!("SCSI bus with id {} does not exist", bus_id)),
         }
     }
-    pub fn show(&self) -> Result<(), String> {
-        println!(
-            "lifecycle action 'show' requested for vm '{}'; execution is not implemented yet",
-            self.name
-        );
-        Ok(())
-    }
     pub fn start(&self) -> Result<(), String> {
         println!(
             "lifecycle action 'start' requested for vm '{}'; execution is not implemented yet",
@@ -257,9 +250,10 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
         // TODO:
         //   - uefi/bios
         //   - tpm
-        //   - spice/vnc
+        //   - spice/vnc/gpu
         //   - serial ports
         //   - audio
+        //   - qmp/guest agent
 
         for device in vm.devices {
             match device {
@@ -325,5 +319,29 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
         }
 
         Ok(model)
+    }
+}
+
+impl Display for RuntimeModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "RuntimeModel for VM '{}':", self.name)?;
+        writeln!(f, "  CPU: {:?}", self.cpu)?;
+        writeln!(f, "  Memory: {:?}", self.memory)?;
+        writeln!(
+            f,
+            "  Chipset: {}",
+            match &self.chipset {
+                Chipset::Q35(_) => "Q35",
+                Chipset::I440FX(_) => "I440FX",
+            }
+        )?;
+        writeln!(f, "  Busses:")?;
+        writeln!(f, "    PCIe Buses: {:?}", self.busses.pcie_buses.keys())?;
+        writeln!(f, "    PCI Buses: {:?}", self.busses.pci_buses.keys())?;
+        writeln!(f, "    USB Buses: {:?}", self.busses.usb_buses.keys())?;
+        writeln!(f, "    SATA Buses: {:?}", self.busses.sata_buses.keys())?;
+        writeln!(f, "    IDE Buses: {:?}", self.busses.ide_buses.keys())?;
+        writeln!(f, "    SCSI Buses: {:?}", self.busses.scsi_buses.keys())?;
+        Ok(())
     }
 }

@@ -13,7 +13,7 @@ fn main() {
 
 fn import_runtime(name: String) -> Result<RuntimeModel, String> {
     let runtime_config = ImportOptions::Ezkvm {
-        host: "/etc/ezkvm/host.yaml".to_string(),
+        host: "./dist/etc/ezkvm/host.yaml".to_string(),
         vm: name,
     }
     .import_runtime()?;
@@ -52,7 +52,8 @@ fn run() -> Result<(), String> {
             );
         }
         CliCommand::ShowRuntime { name } => {
-            import_runtime(name)?.show()?;
+            //import_runtime(name)?.show()?;
+            print!("{}", import_runtime(name)?);
         }
         CliCommand::Start { name } => {
             import_runtime(name)?.start()?;

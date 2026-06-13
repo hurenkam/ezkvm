@@ -85,7 +85,7 @@ impl ValidationIssue {
 pub enum ParseError {
     #[error("invalid YAML: {0}")]
     Yaml(#[from] serde_yaml::Error),
-    #[error("validation failed with {0} issue(s)")]
+    #[error("parsing failed with {0} issue(s)")]
     Validation(usize, Vec<ValidationIssue>),
 }
 

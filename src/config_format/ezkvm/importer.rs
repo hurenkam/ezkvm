@@ -52,12 +52,11 @@ impl EzkvmImporter {
 impl Importer for EzkvmImporter {
     /// Imports an ezkvm YAML configuration into the canonical runtime model.
     fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
-        let (host_path, vm_path) = match args {
+        let (_host_path, vm_path) = match args {
             ImportOptions::Ezkvm { host, vm } => (host, vm),
             _ => return Err(ImportError::InvalidFormat),
         };
 
-        let _host_path = host_path;
         let source_text = std::fs::read_to_string(&vm_path)
             .map_err(|e| ImportError::ImportFailed(format!("{}: {}", vm_path, e)))?;
 
