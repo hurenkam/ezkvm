@@ -1,11 +1,10 @@
-use std::{fmt::Display, sync::Arc};
-
+use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
+use std::{fmt::Display, sync::Arc};
 
 use super::ControllerApi;
-
-pub type PcieBus = String;
+pub type PcieBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Hash, Eq, PartialEq, new)]
 pub struct PcieAddress {
@@ -17,17 +16,28 @@ impl Display for PcieAddress {
         write!(f, "dev {}, func {}", self.device, self.function)
     }
 }
+#[derive(Debug, Deserialize, Serialize, Getters)]
+pub struct PcieDevice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bus: Option<PcieBus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    address: Option<PcieAddress>,
+    #[serde(flatten)]
+    device: PcieDeviceType,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum PcieDevice {
+pub enum PcieDeviceType {
     PvScsi,
     VirtioNet,
 }
-impl From<PcieDevice> for Arc<dyn PcieDeviceApi> {
-    fn from(device: PcieDevice) -> Self {
+impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
+    fn from(device: &PcieDeviceType) -> Self {
         match device {
-            PcieDevice::PvScsi => Arc::new(super::PvScsiController::default()),
-            PcieDevice::VirtioNet => Arc::new(super::VirtioNetController::default()),
+            PcieDeviceType::PvScsi => Arc::new(super::PvScsiController::default()),
+            PcieDeviceType::VirtioNet => Arc::new(super::VirtioNetController::default()),
         }
     }
 }

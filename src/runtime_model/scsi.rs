@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use super::{ControllerApi, PcieDeviceApi};
+use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-pub type ScsiBus = String;
+pub type ScsiBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
 pub struct ScsiAddress {
@@ -22,15 +23,22 @@ pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
         preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String>;
 }
-
+#[derive(Debug, Deserialize, Serialize, Getters, new)]
+pub struct ScsiDevice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bus: Option<ScsiBus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    address: Option<ScsiAddress>,
+    device: ScsiDeviceType,
+}
 #[derive(Debug, Deserialize, Serialize)]
-pub enum ScsiDevice {
+pub enum ScsiDeviceType {
     ScsiDisk,
 }
-impl From<ScsiDevice> for Arc<dyn ScsiDeviceApi> {
-    fn from(device: ScsiDevice) -> Self {
+impl From<&ScsiDeviceType> for Arc<dyn ScsiDeviceApi> {
+    fn from(device: &ScsiDeviceType) -> Self {
         match device {
-            ScsiDevice::ScsiDisk => Arc::new(ScsiDisk::default()),
+            ScsiDeviceType::ScsiDisk => Arc::new(ScsiDisk::default()),
         }
     }
 }

@@ -1,11 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
+use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 use super::ControllerApi;
 
-pub type PciBus = String;
+pub type PciBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
 pub struct PciAddress {
@@ -17,14 +18,22 @@ impl Display for PciAddress {
         write!(f, "dev {}, func {}", self.device, self.function)
     }
 }
+#[derive(Debug, Deserialize, Serialize, Getters, new)]
+pub struct PciDevice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bus: Option<PciBus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    address: Option<PciAddress>,
+    device: PciDeviceType,
+}
 #[derive(Debug, Deserialize, Serialize)]
-pub enum PciDevice {
+pub enum PciDeviceType {
     NetworkController,
 }
-impl From<PciDevice> for Arc<dyn PciDeviceApi> {
-    fn from(device: PciDevice) -> Self {
+impl From<&PciDeviceType> for Arc<dyn PciDeviceApi> {
+    fn from(device: &PciDeviceType) -> Self {
         match device {
-            PciDevice::NetworkController => {
+            PciDeviceType::NetworkController => {
                 todo!();
             }
         }

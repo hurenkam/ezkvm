@@ -3,9 +3,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime_model::{
-    Cpu, IdeAddress, IdeBus, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress,
-    PcieBus, PcieDevice, SataAddress, SataBus, SataDevice, ScsiAddress, ScsiBus, ScsiDevice,
-    UsbAddress, UsbBus, UsbDevice,
+    Cpu, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress, PcieBus, PcieDevice,
+    SataDevice, ScsiDevice, UsbAddress, UsbBus, UsbDevice,
 };
 
 /// Schema version for ezkvm runtime config specification.
@@ -79,48 +78,12 @@ pub struct VirtualMachine {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Device {
-    Pcie {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pcie: Option<PcieBus>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        address: Option<PcieAddress>,
-        device: PcieDevice,
-    },
-    Pci {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pci: Option<PciBus>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        address: Option<PciAddress>,
-        device: PciDevice,
-    },
-    Usb {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        usb: Option<UsbBus>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        port: Option<UsbAddress>,
-        device: UsbDevice,
-    },
-    Sata {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        sata: Option<SataBus>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        address: Option<SataAddress>,
-        device: SataDevice,
-    },
-    Ide {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        ide: Option<IdeBus>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        port: Option<IdeAddress>,
-        device: IdeDevice,
-    },
-    Scsi {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        scsi: Option<ScsiBus>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        address: Option<ScsiAddress>,
-        device: ScsiDevice,
-    },
+    Pcie { pcie: PcieDevice },
+    Pci { pci: PciDevice },
+    Usb { usb: UsbDevice },
+    Sata { sata: SataDevice },
+    Ide { ide: IdeDevice },
+    Scsi { scsi: ScsiDevice },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -141,6 +104,7 @@ impl fmt::Display for RuntimeConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime_model::SataDeviceType;
 
     #[test]
     fn omitted_optional_fields_deserialize_as_none() {
@@ -170,9 +134,8 @@ resources:
         assert!(config.virtual_machine.cpu.is_none());
         assert!(config.virtual_machine.machine.version.is_none());
         match &config.virtual_machine.devices[0] {
-            Device::Sata { sata, address, .. } => {
-                assert!(sata.is_none());
-                assert!(address.is_none());
+            Device::Sata { sata } => {
+                assert!(sata.address().is_none());
             }
             other => panic!("expected sata device, got {other:?}"),
         }
@@ -194,9 +157,7 @@ resources:
                 cpu: None,
                 memory: Memory::gigabytes(8),
                 devices: vec![Device::Sata {
-                    sata: None,
-                    address: None,
-                    device: SataDevice::Disk,
+                    sata: SataDevice::new(None, None, SataDeviceType::Ssd),
                 }],
             },
             resources: vec![Resource::Network {

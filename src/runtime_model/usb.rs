@@ -1,11 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
+use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 use super::ControllerApi;
 
-pub type UsbBus = String;
+pub type UsbBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Hash, Eq, PartialEq, new)]
 pub struct UsbAddress {
@@ -16,14 +17,22 @@ impl Display for UsbAddress {
         write!(f, "port {}", self.port)
     }
 }
+#[derive(Debug, Deserialize, Serialize, Getters, new)]
+pub struct UsbDevice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bus: Option<UsbBus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    address: Option<UsbAddress>,
+    device: UsbDeviceType,
+}
 #[derive(Debug, Deserialize, Serialize)]
-pub enum UsbDevice {
+pub enum UsbDeviceType {
     NetworkController,
 }
-impl From<UsbDevice> for Arc<dyn UsbDeviceApi> {
-    fn from(device: UsbDevice) -> Self {
+impl From<&UsbDeviceType> for Arc<dyn UsbDeviceApi> {
+    fn from(device: &UsbDeviceType) -> Self {
         match device {
-            UsbDevice::NetworkController => {
+            UsbDeviceType::NetworkController => {
                 todo!();
             }
         }

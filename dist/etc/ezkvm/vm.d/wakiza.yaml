@@ -4,7 +4,7 @@ metadata:
 
 resources:
   - network: { name: "lan", bridge: "br0" }
-  - storage: { name: "sda", block_device: "/dev/vm0/vm-108-disk0" }
+  - storage: { name: "sda", block_device: "/dev/vm0/vm-108-disk0", format: "raw" }
 
 virtual_machine:
   machine:
@@ -18,5 +18,8 @@ virtual_machine:
   memory:
     size: 16384
   devices:
-    - { sata: sata.0, resource: "sda", device: { type: disk } }
-    - { pcie: pcie.0, resource: "lan", device: { type: virtio_net } }
+    #- { sata: sata.0, resource: "sda", device: { type: disk } }
+    #- { pcie: pcie.0, resource: "lan", device: { type: virtio_net } }
+
+    - sata: { bus: 0, address: 0, type: ssd, resource: "sda" }
+    - pcie: { bus: 1, address: 7, type: virtio-net, resource: "lan" }

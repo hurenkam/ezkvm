@@ -1,11 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
+use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime_model::ControllerApi;
 
-pub type IdeBus = String;
+pub type IdeBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
 pub struct IdeAddress {
@@ -16,14 +17,22 @@ impl Display for IdeAddress {
         write!(f, "address {}", self.address)
     }
 }
+#[derive(Debug, Deserialize, Serialize, Getters, new)]
+pub struct IdeDevice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bus: Option<IdeBus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    address: Option<IdeAddress>,
+    device: IdeDeviceType,
+}
 #[derive(Debug, Deserialize, Serialize)]
-pub enum IdeDevice {
+pub enum IdeDeviceType {
     IdeDisk,
 }
-impl From<IdeDevice> for Arc<dyn IdeDeviceApi> {
-    fn from(device: IdeDevice) -> Self {
+impl From<&IdeDeviceType> for Arc<dyn IdeDeviceApi> {
+    fn from(device: &IdeDeviceType) -> Self {
         match device {
-            IdeDevice::IdeDisk => Arc::new(IdeDisk {}),
+            IdeDeviceType::IdeDisk => Arc::new(IdeDisk {}),
         }
     }
 }
