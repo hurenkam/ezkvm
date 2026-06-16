@@ -1,33 +1,62 @@
-use derive_getters::Getters;
-use derive_new::new;
-use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
-pub struct Boot {
-    #[serde(flatten)]
-    bios: Bios,
+use crate::runtime_config::{Bios, Boot, StorageResource};
+
+pub struct BootModelBuilder {}
+impl BootModelBuilder {
+    pub fn build(boot: &Boot, storage_resources: &std::collections::HashMap<String, StorageResource>) -> Result<BootModel, String> {
+        let bios = match boot.bios() {
+            Bios::SeaBios { seabios: _ } => BiosModel::SeaBios(SeaBiosModel {}),
+            Bios::Uefi { uefi } => {
+                let uefi_resource = storage_resources.get(uefi.resource()).ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by UEFI firmware",
+                        uefi.resource()
+                    )
+                })?;
+                BiosModel::Uefi(UefiModel { storage: uefi_resource.clone() })
+            },
+        };
+        Ok(BootModel {
+            bios,
+        })
+    }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum Bios {
-    SeaBios { seabios: SeaBios },
-    Uefi { uefi: Uefi },
+pub struct BootModel {
+    bios: BiosModel,
 }
-impl Default for Bios {
-    fn default() -> Self {
-        Bios::SeaBios {
-            seabios: SeaBios::default(),
+impl Display for BootModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.bios {
+            BiosModel::SeaBios(_) => write!(f, "SeaBios"),
+            BiosModel::Uefi(uefi) => {
+                write!(f, "Uefi: {:?}", uefi.storage)
+            },
         }
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
-pub struct SeaBios {
-    firmware: String,
+pub enum BiosModel {
+    SeaBios(SeaBiosModel),
+    Uefi(UefiModel),
 }
-
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
-pub struct Uefi {
-    resource: String,
+impl Default for BiosModel {
+    fn default() -> Self {
+        BiosModel::SeaBios(SeaBiosModel::default())
+    }
 }
+pub struct SeaBiosModel {}
+impl Default for SeaBiosModel {
+    fn default() -> Self {
+        SeaBiosModel {}
+    }
+}
+pub struct UefiModel {
+    storage: StorageResource
+}
+//impl Default for UefiModel {       
+//    fn default() -> Self {
+//        UefiModel {}
+//    }
+//}

@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use crate::runtime_model::{
     ControllerApi, PcieAddress, PcieBus, PcieDeviceApi, ScsiAddress, ScsiControllerApi,
@@ -24,6 +24,10 @@ impl ScsiControllerApi for PvScsiController {
         _device: Arc<dyn ScsiDeviceApi>,
         _preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String> {
+        todo!()
+    }
+    
+    fn devices(&self) -> HashMap<ScsiAddress, Arc<dyn ScsiDeviceApi>> {
         todo!()
     }
 }

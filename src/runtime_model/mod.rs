@@ -14,7 +14,7 @@ mod usb;
 
 pub use model::RuntimeModel;
 
-pub use boot::Boot;
+pub use boot::BootModel;
 pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
 pub use ide::{IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceType};

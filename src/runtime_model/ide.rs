@@ -97,4 +97,5 @@ pub trait IdeControllerApi: ControllerApi + Display {
         device: Arc<dyn IdeDeviceApi>,
         preferred_address: Option<IdeAddress>,
     ) -> Result<(), String>;
+    fn devices(&self) -> HashMap<IdeAddress, Arc<dyn IdeDeviceApi>>;
 }

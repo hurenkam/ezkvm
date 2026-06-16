@@ -1,7 +1,7 @@
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use super::ControllerApi;
 pub type PcieBus = u8;
@@ -58,4 +58,5 @@ pub trait PcieControllerApi: ControllerApi + Display {
         device: Arc<dyn PcieDeviceApi>,
         preferred_address: Option<PcieAddress>,
     ) -> Result<(), String>;
+    fn devices(&self) -> HashMap<PcieAddress, Arc<dyn PcieDeviceApi>>;
 }

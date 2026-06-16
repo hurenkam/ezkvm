@@ -76,6 +76,7 @@ pub trait SataControllerApi: ControllerApi + Display {
         device: Arc<dyn SataDeviceApi>,
         preferred_address: Option<SataAddress>,
     ) -> Result<(), String>;
+    fn devices(&self) -> HashMap<SataAddress, Arc<dyn SataDeviceApi>>;
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

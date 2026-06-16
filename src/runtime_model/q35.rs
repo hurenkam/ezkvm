@@ -43,6 +43,11 @@ impl PcieControllerApi for Q35RootPortController {
         devices.insert(address, device);
         Ok(())
     }
+    
+    fn devices(&self) -> HashMap<PcieAddress, Arc<dyn PcieDeviceApi>> {
+        let devices = self.pcie_devices.lock().unwrap();
+        devices.clone()
+    }
 }
 impl Q35RootPortController {
     fn select_pcie_address(&self, preferred: Option<PcieAddress>) -> PcieAddress {
@@ -90,6 +95,11 @@ impl SataControllerApi for Q35SataController {
         devices.insert(address, device);
         Ok(())
     }
+    
+    fn devices(&self) -> HashMap<SataAddress, Arc<dyn SataDeviceApi>> {
+        let devices = self.sata_devices.lock().unwrap();
+        devices.clone()
+    }
 }
 impl Display for Q35SataController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -133,6 +143,10 @@ impl UsbControllerApi for Q35UsbController {
         let mut devices = self.usb_devices.lock().unwrap();
         devices.insert(address, device);
         Ok(())
+    }
+    fn devices(&self) -> HashMap<UsbAddress, Arc<dyn UsbDeviceApi>> {
+        let devices = self.usb_devices.lock().unwrap();
+        devices.clone()
     }
 }
 impl Display for Q35UsbController {

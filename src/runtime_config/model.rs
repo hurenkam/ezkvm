@@ -1,8 +1,9 @@
+use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::runtime_model::{
-    Boot, Cpu, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress, PcieBus, PcieDevice,
+    Cpu, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress, PcieBus, PcieDevice,
     SataDevice, ScsiDevice, UsbAddress, UsbBus, UsbDevice,
 };
 
@@ -107,6 +108,42 @@ pub struct Machine {
     pub chipset: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+}
+
+//#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, Getters)]
+pub struct Boot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    secure: Option<bool>,
+    #[serde(flatten)]
+    bios: Bios,
+}
+
+//#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Bios {
+    SeaBios { seabios: SeaBios },
+    Uefi { uefi: Uefi },
+}
+impl Default for Bios {
+    fn default() -> Self {
+        Bios::SeaBios {
+            seabios: SeaBios::default(),
+        }
+    }
+}
+
+//#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct SeaBios {
+    firmware: String,
+}
+
+//#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
+pub struct Uefi {
+    resource: String,
 }
 
 impl fmt::Display for RuntimeConfig {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use super::{ControllerApi, PcieDeviceApi};
 use derive_getters::Getters;
@@ -14,8 +14,13 @@ pub struct ScsiAddress {
     pub target: u8,
     pub lun: u8,
 }
+impl Display for ScsiAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "target {}, lun {}", self.target, self.lun)
+    }
+}
 
-pub trait ScsiDeviceApi {
+pub trait ScsiDeviceApi: Display {
     fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String>;
 }
 pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
@@ -24,6 +29,7 @@ pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
         device: Arc<dyn ScsiDeviceApi>,
         preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String>;
+    fn devices(&self) -> HashMap<ScsiAddress, Arc<dyn ScsiDeviceApi>>;
 }
 #[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct ScsiDevice {

@@ -9,9 +9,8 @@ use std::path::Path;
 
 use crate::config_format::{ImportError, ImportOptions, Importer, ProxmoxImporter, RuntimeConfig};
 use crate::runtime_config::{
-    Cpu, CpuModel, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, VirtualMachine,
+    Boot, Cpu, CpuModel, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, VirtualMachine
 };
-use crate::runtime_model::Boot;
 
 /// Errors that can occur while parsing a Proxmox source file.
 #[derive(Debug, thiserror::Error)]

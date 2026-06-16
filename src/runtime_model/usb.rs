@@ -65,4 +65,5 @@ pub trait UsbControllerApi: ControllerApi + Display {
         device: Arc<dyn UsbDeviceApi>,
         preferred_address: Option<UsbAddress>,
     ) -> Result<(), String>;
+    fn devices(&self) -> HashMap<UsbAddress, Arc<dyn UsbDeviceApi>>;
 }

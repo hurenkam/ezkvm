@@ -10,8 +10,7 @@ use crate::{
     config_format::RuntimeConfig,
     runtime_config::{Device, NetworkResource, Resource, StorageResource, UsbDeviceResource},
     runtime_model::{
-        Boot, PcieDeviceType, UsbDeviceBuilder, ide::IdeDeviceBuilder, sata::SataDeviceBuilder,
-        scsi::ScsiDeviceBuilder,
+        BootModel, PcieDeviceType, UsbDeviceBuilder, boot::BootModelBuilder, ide::IdeDeviceBuilder, sata::SataDeviceBuilder, scsi::ScsiDeviceBuilder
     },
 };
 
@@ -54,22 +53,52 @@ impl Display for BusRegister {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\n")?;
         for (id, value) in &self.pcie_busses {
-            write!(f, "    pcie.{id} {value}\n")?;
+            for (address, device) in value.devices() {
+                write!(f, "    pcie bus {id}, {address}: {device}\n")?;
+            }
+            if value.devices().len() == 0 {
+                write!(f, "    pcie bus {id}, (no devices)\n")?;
+            }
         }
         for (id, value) in &self.pci_busses {
-            write!(f, "    pci.{id} {value}\n")?;
+            for (address, device) in value.devices() {
+                write!(f, "    pci  bus {id}, {address}: {device}\n")?;
+            }
+            if value.devices().len() == 0 {
+                write!(f, "    pci  bus {id}, (no devices)\n")?;
+            }
         }
         for (id, value) in &self.usb_busses {
-            write!(f, "    usb.{id} {value}\n")?;
+            for (address, device) in value.devices() {
+                write!(f, "    usb  bus {id}, {address}: {device}\n")?;
+            }
+            if value.devices().len() == 0 {
+                write!(f, "    usb  bus {id}, (no devices)\n")?;
+            }
         }
         for (id, value) in &self.sata_busses {
-            write!(f, "    sata.{id} {value}\n")?;
+            for (address, device) in value.devices() {
+                write!(f, "    sata bus {id}, {address}: {device}\n")?;
+            }
+            if value.devices().len() == 0 {
+                write!(f, "    sata bus {id}, (no devices)\n")?;
+            }
         }
         for (id, value) in &self.ide_busses {
-            write!(f, "    ide.{id} {value}\n")?;
+            for (address, device) in value.devices() {
+                write!(f, "    ide  bus {id}, {address}: {device}\n")?;
+            }
+            if value.devices().len() == 0 {
+                write!(f, "    ide  bus {id}, (no devices)\n")?;
+            }
         }
         for (id, value) in &self.scsi_busses {
-            write!(f, "    scsi.{id} {value}\n")?;
+            for (address, device) in value.devices() {
+                write!(f, "    scsi bus {id}, {address}: {device}\n")?;
+            }
+            if value.devices().len() == 0 {
+                write!(f, "    scsi bus {id}, (no devices)\n")?;
+            }
         }
         Ok(())
     }
@@ -112,7 +141,7 @@ pub struct RuntimeModel {
     cpu: Cpu,
     memory: Memory,
     chipset: Chipset,
-    boot: Boot,
+    boot: BootModel,
     busses: BusRegister,
     //resources: Vec<Resource>,
 }
@@ -323,7 +352,7 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
             cpu,
             memory: vm.memory,
             chipset,
-            boot: vm.boot,
+            boot: BootModelBuilder::build(&vm.boot, &storage_resources)?,
             busses: register,
         };
 
@@ -419,7 +448,7 @@ impl Display for RuntimeModel {
                 Chipset::I440FX(_) => "I440FX",
             }
         )?;
-        writeln!(f, "  Boot: {:?}", self.boot)?;
+        writeln!(f, "  Boot: {}", self.boot)?;
         writeln!(f, "  Busses: {}", self.busses)?;
         Ok(())
     }

@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
 use derive_new::new;
@@ -53,4 +53,5 @@ pub trait PciControllerApi: ControllerApi + Display {
         device: Arc<dyn PciDeviceApi>,
         preferred_address: Option<PciAddress>,
     ) -> Result<(), String>;
+    fn devices(&self) -> HashMap<PciAddress, Arc<dyn PciDeviceApi>>;
 }
