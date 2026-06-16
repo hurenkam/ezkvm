@@ -26,8 +26,6 @@ virtual_machine:
   machine:
     family: "pc"
     chipset: "q35"
-    version: null
-  cpu: null
   memory:
     size: 8589934592
   devices: []
@@ -48,28 +46,31 @@ resources: []
 
 ### Resource variants
 
-`resources` is a typed list:
+`resources` is a keyed list (untagged enum wrappers):
 
-- `Storage { storage: StorageResource }`
-  - `File { path }`
-  - `BlockDevice { path }`
-- `Network { network: NetworkResource }`
-  - `Tap { name }`
-  - `Bridge { name }`
-- `PciDevice { pci_device: PciDeviceResource }`
-- `PcieDevice { pcie_device: PcieDeviceResource }`
-- `UsbDevice { usb_device: UsbDeviceResource }`
+- `{ storage: StorageResource }`
+  - `{ file: <path> }`
+  - `{ block_device: <path> }`
+- `{ network: NetworkResource }`
+  - `{ name: <logical-name>, tap: <host-tap-iface> }`
+  - `{ name: <logical-name>, bridge: <host-bridge-iface> }`
+- `{ pci_device: PciDeviceResource }`
+- `{ pcie_device: PcieDeviceResource }`
+- `{ usb_device: UsbDeviceResource }`
 
 ### Device variants
 
-`virtual_machine.devices` is a typed list:
+`virtual_machine.devices` is a keyed list (untagged enum wrappers):
 
-- `Pcie { bus?, address?, device }`
-- `Pci { bus?, address?, device }`
-- `Usb { bus?, port?, device }`
-- `Sata { bus?, address?, device }`
-- `Ide { bus?, port?, device }`
-- `Scsi { bus?, address?, device }`
+- `{ pcie: { bus?, device?, function?, type } }`
+- `{ pci: { bus?, address?, device } }`
+- `{ usb: { bus?, address?, device } }`
+- `{ sata: { bus?, address?, type } }`
+- `{ ide: { bus?, address?, type } }`
+- `{ scsi: { bus?, address?, device } }`
+
+Where device-internal `type` fields are used, values are snake_case enum names
+(for example `virtio_net`, `pv_scsi`, `ssd`, `hdd`, `cdrom`).
 
 ## Importer Design
 
@@ -233,34 +234,51 @@ If the file is named `demo-vm.yaml`, the importer validation path accepts this d
 This example is closer to a typical VM definition and includes:
 
 - an explicit CPU model
-- a SATA-attached device entry
+- a SATA device entry
 - a bridge-backed network resource
+- a PCIe network controller entry
 
 ```yaml
 metadata:
-  schema_version: "1.0.0"
-  vm_name: "workstation-01"
+  schema_version: 1.0.0
+  vm_name: workstation-01
+
+resources:
+  - network: { id: "net0", bridge: "br0" }
+  - storage: { id: "disk0", block_device: "/dev/vm0/vm-108-disk0" }
+
 virtual_machine:
   machine:
-    family: "pc"
-    chipset: "q35"
+    family: pc
+    chipset: q35
   cpu:
-    model: "Host"
+    model: Host
+    cores: 8
+    threads: 2
+    sockets: 1
   memory:
     size: 17179869184
   devices:
-    - { type: sata, driver: resource, name: "bootdisk" }
-    - { type: network, driver: resource, name: "lan" }
-resources:
-  - { type: network, name: "lan", driver: bridge, bridge: "br0" }
-  - { type: storage, name: "bootdisk", driver: raw, device: "/dev/vm0/vm-108-disk0" }
+    - sata: { bus: 0, address: 0, type: ssd, resource: "disk0" }
+    - pcie: { bus: 1, device: 7, function: 0, type: virtio_net, resource: "net0" }
 ```
 
 Notes:
 
-- `devices` and `resources` are enum-backed and use an internally tagged representation with `type: ...`.
-- The SATA device payload is currently structural (`device: {}`) in the schema and acts as a typed placement marker.
-- The bridge resource represents host-side network attachment intent; actual runtime realization depends on downstream stages and host capabilities.
+- `devices` and `resources` use keyed wrappers (for example `- sata: {...}` and `- network: {...}`).
+- Some inner payload enums use `type: ...`; use snake_case values such as `virtio_net`.
+- Unlike some draft examples, the current PCIe address shape uses `device` and `function` fields (not `address`).
+- `resources[*].id` is used to resolve device references at runtime.
+- SATA devices require `resource` and it must reference a storage resource id.
+- IDE devices require `resource` and it must reference a storage resource id.
+- PCIe `virtio_net` optionally accepts `resource`; when present it must reference a network resource id.
+- Duplicate resource ids and missing device resource references are reported during conformance validation.
+
+Reference note for `dist/etc/ezkvm/vm.d/wakiza.yaml`:
+
+- The current sample uses parser-compatible PCIe fields: `device`, `function`, and `type: virtio_net`.
+- Device `resource` fields are now consumed by runtime resource resolution.
+- Extra fields such as storage `format` still deserialize but are not yet used by runtime model construction.
 
 ## Common Invalid YAML Example
 

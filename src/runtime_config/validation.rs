@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde_json::json;
@@ -5,6 +6,8 @@ use thiserror::Error;
 
 use super::model::RuntimeConfig;
 use super::parsing::{ParseError, Severity, ValidationIssue};
+use crate::runtime_config::Resource;
+use crate::runtime_model::{IdeDeviceType, PcieDeviceType, SataDeviceType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationReportFormat {
@@ -103,6 +106,7 @@ impl RuntimeConfig {
             &self.virtual_machine.machine.family,
             &self.virtual_machine.machine.chipset,
         );
+        validate_resource_references(&mut issues, self);
 
         if issues.is_empty() {
             Ok(())
@@ -117,6 +121,108 @@ impl RuntimeConfig {
                 );
             }
             Err(ConformanceError::Validation(issues.len(), issues))
+        }
+    }
+}
+
+fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &RuntimeConfig) {
+    let mut seen_ids = HashSet::new();
+    let mut storage_ids = HashSet::new();
+    let mut network_ids = HashSet::new();
+
+    for resource in &config.resources {
+        let id = match resource {
+            Resource::Storage { id, .. }
+            | Resource::Network { id, .. }
+            | Resource::PciDevice { id, .. }
+            | Resource::PcieDevice { id, .. }
+            | Resource::UsbDevice { id, .. } => id,
+        };
+
+        if !seen_ids.insert(id.clone()) {
+            issues.push(
+                ValidationIssue::new("resources", format!("duplicate resource id '{}'", id))
+                    .with_remediation("Ensure each resource has a unique id"),
+            );
+        }
+
+        match resource {
+            Resource::Storage { id, .. } => {
+                storage_ids.insert(id.clone());
+            }
+            Resource::Network { id, .. } => {
+                network_ids.insert(id.clone());
+            }
+            _ => {}
+        }
+    }
+
+    for (idx, device) in config.virtual_machine.devices.iter().enumerate() {
+        match device {
+            crate::runtime_config::Device::Sata { sata } => {
+                let resource_id = match sata.device() {
+                    SataDeviceType::Hdd { resource }
+                    | SataDeviceType::Ssd { resource }
+                    | SataDeviceType::Cdrom { resource } => resource,
+                };
+                if !storage_ids.contains(resource_id) {
+                    issues.push(
+                        ValidationIssue::new(
+                            format!("virtual_machine.devices[{idx}].sata.resource"),
+                            format!(
+                                "references missing storage resource id '{}'",
+                                resource_id
+                            ),
+                        )
+                        .with_remediation(
+                            "Add the referenced storage resource under resources or update the device resource id",
+                        ),
+                    );
+                }
+            }
+            crate::runtime_config::Device::Ide { ide } => {
+                let resource_id = match ide.device() {
+                    IdeDeviceType::Hdd { resource }
+                    | IdeDeviceType::Ssd { resource }
+                    | IdeDeviceType::Cdrom { resource } => resource,
+                };
+                if !storage_ids.contains(resource_id) {
+                    issues.push(
+                        ValidationIssue::new(
+                            format!("virtual_machine.devices[{idx}].ide.resource"),
+                            format!(
+                                "references missing storage resource id '{}'",
+                                resource_id
+                            ),
+                        )
+                        .with_remediation(
+                            "Add the referenced storage resource under resources or update the device resource id",
+                        ),
+                    );
+                }
+            }
+            crate::runtime_config::Device::Pcie { pcie } => {
+                if let PcieDeviceType::VirtioNet {
+                    resource: Some(resource_id),
+                } = pcie.device()
+                {
+                    if !network_ids.contains(resource_id) {
+                        issues.push(
+                            ValidationIssue::new(
+                                format!("virtual_machine.devices[{idx}].pcie.resource"),
+                                format!(
+                                    "references missing network resource id '{}'",
+                                    resource_id
+                                ),
+                            )
+                            .with_remediation(
+                                "Add the referenced network resource under resources or update the device resource id",
+                            ),
+                        );
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

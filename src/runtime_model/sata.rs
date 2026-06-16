@@ -1,10 +1,13 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_model::{Cdrom, Ssd, devices::Hdd};
+use crate::{
+    runtime_config::StorageResource,
+    runtime_model::{Cdrom, Hdd, Ssd},
+};
 
 use super::ControllerApi;
 
@@ -19,7 +22,7 @@ impl Display for SataAddress {
         write!(f, "address {}", self.address)
     }
 }
-#[derive(Debug, Deserialize, Serialize, Getters, new)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct SataDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<SataBus>,
@@ -29,7 +32,40 @@ pub struct SataDevice {
     #[serde(flatten)]
     device: SataDeviceType,
 }
-
+pub struct SataDeviceBuilder {}
+impl SataDeviceBuilder {
+    pub fn build(
+        device_type: &SataDeviceType,
+        storage_resources: &HashMap<String, StorageResource>,
+    ) -> Result<Arc<dyn SataDeviceApi + 'static>, String> {
+        Ok(match device_type {
+            SataDeviceType::Hdd { resource } => Arc::new(Hdd::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by SATA HDD",
+                        resource
+                    )
+                })?,
+            )),
+            SataDeviceType::Ssd { resource } => Arc::new(super::Ssd::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by SATA SSD",
+                        resource
+                    )
+                })?,
+            )),
+            SataDeviceType::Cdrom { resource } => Arc::new(super::Cdrom::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by SATA CDROM",
+                        resource
+                    )
+                })?,
+            )),
+        })
+    }
+}
 pub trait SataDeviceApi: Display {
     fn qemu_args(&self, assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String>;
 }
@@ -42,21 +78,12 @@ pub trait SataControllerApi: ControllerApi + Display {
     ) -> Result<(), String>;
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SataDeviceType {
-    Hdd,
-    Ssd,
-    Cdrom
-}
-impl From<&SataDeviceType> for Arc<dyn SataDeviceApi> {
-    fn from(device: &SataDeviceType) -> Self {
-        match device {
-            SataDeviceType::Hdd => Arc::new(Hdd {}),
-            SataDeviceType::Ssd => Arc::new(Ssd {}),
-            SataDeviceType::Cdrom => Arc::new(Cdrom {}),
-        }
-    }
+    Hdd { resource: String },
+    Ssd { resource: String },
+    Cdrom { resource: String },
 }
 
 impl SataDeviceApi for Hdd {

@@ -1,9 +1,10 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
+use crate::runtime_config::StorageResource;
 use crate::runtime_model::ControllerApi;
 
 pub type IdeBus = u8;
@@ -17,34 +18,72 @@ impl Display for IdeAddress {
         write!(f, "address {}", self.address)
     }
 }
-#[derive(Debug, Deserialize, Serialize, Getters, new)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct IdeDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<IdeBus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
     address: Option<IdeAddress>,
+    #[serde(flatten)]
     device: IdeDeviceType,
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum IdeDeviceType {
-    IdeDisk,
+    Hdd { resource: String },
+    Ssd { resource: String },
+    Cdrom { resource: String },
 }
-impl From<&IdeDeviceType> for Arc<dyn IdeDeviceApi> {
-    fn from(device: &IdeDeviceType) -> Self {
-        match device {
-            IdeDeviceType::IdeDisk => Arc::new(IdeDisk {}),
-        }
+pub struct IdeDeviceBuilder {}
+impl IdeDeviceBuilder {
+    pub fn build(
+        device_type: &IdeDeviceType,
+        storage_resources: &HashMap<String, StorageResource>,
+    ) -> Result<Arc<dyn IdeDeviceApi>, String> {
+        Ok(match device_type {
+            IdeDeviceType::Hdd { resource } => Arc::new(super::Hdd::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by IDE HDD",
+                        resource
+                    )
+                })?,
+            )),
+            IdeDeviceType::Ssd { resource } => Arc::new(super::Ssd::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by IDE SSD",
+                        resource
+                    )
+                })?,
+            )),
+            IdeDeviceType::Cdrom { resource } => Arc::new(super::Cdrom::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by IDE CDROM",
+                        resource
+                    )
+                })?,
+            )),
+        })
     }
 }
-pub struct IdeDisk {}
-impl IdeDeviceApi for IdeDisk {
+impl IdeDeviceApi for super::Hdd {
     fn qemu_args(&self, _assigned_bus: &IdeBus, _assigned_address: IdeAddress) -> Vec<String> {
         todo!()
     }
 }
-impl Display for IdeDisk {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IDE Disk")
+
+impl IdeDeviceApi for super::Ssd {
+    fn qemu_args(&self, _assigned_bus: &IdeBus, _assigned_address: IdeAddress) -> Vec<String> {
+        todo!()
+    }
+}
+
+impl IdeDeviceApi for super::Cdrom {
+    fn qemu_args(&self, _assigned_bus: &IdeBus, _assigned_address: IdeAddress) -> Vec<String> {
+        todo!()
     }
 }
 

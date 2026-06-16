@@ -18,7 +18,7 @@ impl Display for PciAddress {
         write!(f, "dev {}, func {}", self.device, self.function)
     }
 }
-#[derive(Debug, Deserialize, Serialize, Getters, new)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct PciDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<PciBus>,
@@ -26,7 +26,7 @@ pub struct PciDevice {
     address: Option<PciAddress>,
     device: PciDeviceType,
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum PciDeviceType {
     NetworkController,
 }

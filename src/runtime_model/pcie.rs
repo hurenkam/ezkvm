@@ -16,7 +16,7 @@ impl Display for PcieAddress {
         write!(f, "dev {}, func {}", self.device, self.function)
     }
 }
-#[derive(Debug, Deserialize, Serialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
 pub struct PcieDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<PcieBus>,
@@ -27,17 +27,20 @@ pub struct PcieDevice {
     device: PcieDeviceType,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PcieDeviceType {
     PvScsi,
-    VirtioNet,
+    VirtioNet {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resource: Option<String>,
+    },
 }
 impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
     fn from(device: &PcieDeviceType) -> Self {
         match device {
             PcieDeviceType::PvScsi => Arc::new(super::PvScsiController::default()),
-            PcieDeviceType::VirtioNet => Arc::new(super::VirtioNetController::default()),
+            PcieDeviceType::VirtioNet { .. } => Arc::new(super::VirtioNetController::default()),
         }
     }
 }

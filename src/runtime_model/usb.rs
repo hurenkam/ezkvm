@@ -1,10 +1,11 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 use super::ControllerApi;
+use crate::runtime_config::UsbDeviceResource;
 
 pub type UsbBus = u8;
 
@@ -17,7 +18,7 @@ impl Display for UsbAddress {
         write!(f, "port {}", self.port)
     }
 }
-#[derive(Debug, Deserialize, Serialize, Getters, new)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct UsbDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<UsbBus>,
@@ -25,17 +26,33 @@ pub struct UsbDevice {
     address: Option<UsbAddress>,
     device: UsbDeviceType,
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum UsbDeviceType {
     NetworkController,
 }
-impl From<&UsbDeviceType> for Arc<dyn UsbDeviceApi> {
-    fn from(device: &UsbDeviceType) -> Self {
-        match device {
-            UsbDeviceType::NetworkController => {
-                todo!();
-            }
+pub struct UsbDeviceBuilder {}
+impl UsbDeviceBuilder {
+    pub fn build(
+        device_type: &UsbDeviceType,
+        _usb_resources: &HashMap<String, UsbDeviceResource>,
+    ) -> Arc<dyn UsbDeviceApi> {
+        match device_type {
+            UsbDeviceType::NetworkController => Arc::new(UsbNetworkController {}),
         }
+    }
+}
+
+pub struct UsbNetworkController {}
+
+impl Display for UsbNetworkController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "USB Network Controller")
+    }
+}
+
+impl UsbDeviceApi for UsbNetworkController {
+    fn qemu_args(&self, _bus: &UsbBus, _address: UsbAddress) -> Vec<String> {
+        todo!()
     }
 }
 

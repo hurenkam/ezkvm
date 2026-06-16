@@ -52,7 +52,6 @@ fn run() -> Result<(), String> {
             );
         }
         CliCommand::ShowRuntime { name } => {
-            //import_runtime(name)?.show()?;
             print!("{}", import_runtime(name)?);
         }
         CliCommand::Start { name } => {

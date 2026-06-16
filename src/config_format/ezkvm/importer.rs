@@ -390,7 +390,7 @@ resources: []
     }
 
     #[test]
-    fn internally_tagged_enum_yaml_is_accepted() {
+    fn keyed_untagged_enum_yaml_is_accepted() {
         let yaml = r#"
 metadata:
     schema_version: "1.0.0"
@@ -407,21 +407,27 @@ virtual_machine:
     memory:
         size: 17179869184
     devices:
-        - type: sata
-          bus: null
-          address: null
-          device: {}
+        - sata:
+            type: ssd
+            resource: "disk0"
+        - pcie:
+            bus: 0
+            device: 1
+            function: 2
+            type: virtio_net
+            resource: "net0"
 resources:
-    - type: network
-      network:
-        type: bridge
-        name: "vmbr0"
+    - storage:
+        block_device: "/dev/vm/disk0"
+      id: "disk0"
+    - network:
         bridge: "vmbr0"
+      id: "net0"
 "#;
         let filename = Path::new("/tmp/workstation-01.yaml");
         let result = EzkvmImporter::validate(yaml, filename);
         if let Err(ref err) = result {
-            panic!("expected internally tagged yaml to parse, got: {err:?}");
+            panic!("expected keyed untagged yaml to parse, got: {err:?}");
         }
         assert!(result.is_ok());
     }

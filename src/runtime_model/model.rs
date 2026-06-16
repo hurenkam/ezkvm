@@ -6,7 +6,14 @@ use super::{
     Q35Chipset, SataAddress, SataBus, SataControllerApi, SataDeviceApi, ScsiAddress, ScsiBus,
     ScsiControllerApi, ScsiDeviceApi, UsbAddress, UsbBus, UsbControllerApi, UsbDeviceApi,
 };
-use crate::{config_format::RuntimeConfig, runtime_config::Device};
+use crate::{
+    config_format::RuntimeConfig,
+    runtime_config::{Device, NetworkResource, Resource, StorageResource, UsbDeviceResource},
+    runtime_model::{
+        Boot, PcieDeviceType, UsbDeviceBuilder, ide::IdeDeviceBuilder, sata::SataDeviceBuilder,
+        scsi::ScsiDeviceBuilder,
+    },
+};
 
 pub trait ControllerApi {}
 
@@ -46,29 +53,23 @@ impl BusRegister {
 impl Display for BusRegister {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\n")?;
-        write!(f, "    PCIe: \n")?;
         for (id, value) in &self.pcie_busses {
-            write!(f, "      {id}: \n{value}")?;
+            write!(f, "    pcie.{id} {value}\n")?;
         }
-        write!(f, "    PCI: \n")?;
         for (id, value) in &self.pci_busses {
-            write!(f, "      {id}: \n{value}")?;
+            write!(f, "    pci.{id} {value}\n")?;
         }
-        write!(f, "    USB: \n")?;
         for (id, value) in &self.usb_busses {
-            write!(f, "      {id}: \n{value}")?;
+            write!(f, "    usb.{id} {value}\n")?;
         }
-        write!(f, "    SATA: \n")?;
         for (id, value) in &self.sata_busses {
-            write!(f, "      {id}: \n{value}")?;
+            write!(f, "    sata.{id} {value}\n")?;
         }
-        write!(f, "    IDE: \n")?;
         for (id, value) in &self.ide_busses {
-            write!(f, "      {id}: \n{value}")?;
+            write!(f, "    ide.{id} {value}\n")?;
         }
-        write!(f, "    SCSI: \n")?;
         for (id, value) in &self.scsi_busses {
-            write!(f, "      {id}: \n{value}")?;
+            write!(f, "    scsi.{id} {value}\n")?;
         }
         Ok(())
     }
@@ -111,7 +112,9 @@ pub struct RuntimeModel {
     cpu: Cpu,
     memory: Memory,
     chipset: Chipset,
+    boot: Boot,
     busses: BusRegister,
+    //resources: Vec<Resource>,
 }
 impl RuntimeModel {
     pub fn get_pcie_bus(&self, id: PcieBus) -> Arc<dyn PcieControllerApi> {
@@ -273,8 +276,41 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
     type Error = String;
 
     fn try_from(value: RuntimeConfig) -> Result<Self, Self::Error> {
-        let vm = value.virtual_machine;
-        let md = value.metadata;
+        let RuntimeConfig {
+            metadata: md,
+            virtual_machine: vm,
+            resources,
+        } = value;
+
+        let mut storage_resources: HashMap<String, StorageResource> = HashMap::new();
+        let mut network_resources: HashMap<String, NetworkResource> = HashMap::new();
+        let mut usb_resources: HashMap<String, UsbDeviceResource> = HashMap::new();
+        for resource in resources {
+            match resource {
+                Resource::Storage { id, storage } => {
+                    storage_resources.insert(id, storage);
+                }
+                Resource::Network { id, network } => {
+                    network_resources.insert(id, network);
+                }
+                Resource::UsbDevice { id, usb_device } => {
+                    usb_resources.insert(id, usb_device);
+                }
+                Resource::PciDevice {
+                    id: _,
+                    pci_device: _,
+                } => {
+                    // Handle PCI device resources if needed
+                }
+                Resource::PcieDevice {
+                    id: _,
+                    pcie_device: _,
+                } => {
+                    // Handle PCIe device resources if needed
+                }
+            }
+        }
+
         let cpu = vm.cpu.unwrap_or_default();
         let mut register = BusRegister::new();
         let chipset = match vm.machine.chipset.as_str() {
@@ -287,6 +323,7 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
             cpu,
             memory: vm.memory,
             chipset,
+            boot: vm.boot,
             busses: register,
         };
 
@@ -301,9 +338,29 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
         for device in vm.devices {
             match device {
                 Device::Pcie { pcie } => {
+                    let pcie_api: Arc<dyn PcieDeviceApi> = match pcie.device() {
+                        PcieDeviceType::PvScsi => Arc::new(super::PvScsiController::default()),
+                        PcieDeviceType::VirtioNet { resource } => {
+                            let resolved = match resource {
+                                Some(id) => Some(
+                                    network_resources
+                                        .get(id)
+                                        .cloned()
+                                        .ok_or_else(|| {
+                                            format!(
+                                                "missing network resource '{}' referenced by PCIe virtio_net device",
+                                                id
+                                            )
+                                        })?,
+                                ),
+                                None => None,
+                            };
+                            Arc::new(super::VirtioNetController::new(resolved))
+                        }
+                    };
                     model.register_pcie_device(
                         pcie.bus().unwrap_or_default(),
-                        pcie.device().into(),
+                        pcie_api,
                         pcie.address().clone(),
                     )?;
                 }
@@ -317,28 +374,28 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
                 Device::Usb { usb } => {
                     model.register_usb_device(
                         usb.bus().unwrap_or_default(),
-                        usb.device().into(),
+                        UsbDeviceBuilder::build(usb.device(), &usb_resources),
                         usb.address().clone(),
                     )?;
                 }
                 Device::Ide { ide } => {
                     model.register_ide_device(
                         ide.bus().unwrap_or_default(),
-                        ide.device().into(),
+                        IdeDeviceBuilder::build(ide.device(), &storage_resources)?,
                         ide.address().clone(),
                     )?;
                 }
                 Device::Sata { sata } => {
                     model.register_sata_device(
                         sata.bus().unwrap_or_default(),
-                        sata.device().into(),
+                        SataDeviceBuilder::build(sata.device(), &storage_resources)?,
                         sata.address().clone(),
                     )?;
                 }
                 Device::Scsi { scsi } => {
                     model.register_scsi_device(
                         scsi.bus().unwrap_or_default(),
-                        scsi.device().into(),
+                        ScsiDeviceBuilder::build(scsi.device(), &storage_resources)?,
                         scsi.address().clone(),
                     )?;
                 }
@@ -362,6 +419,7 @@ impl Display for RuntimeModel {
                 Chipset::I440FX(_) => "I440FX",
             }
         )?;
+        writeln!(f, "  Boot: {:?}", self.boot)?;
         writeln!(f, "  Busses: {}", self.busses)?;
         Ok(())
     }

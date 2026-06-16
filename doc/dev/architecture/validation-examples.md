@@ -54,11 +54,9 @@ metadata:
 ## Duplicate Storage ID
 
 > **Note:** The `resources` top-level list in the runtime config carries typed `Resource` variants
-> (Storage, Network, PciDevice, etc.) with full YAML-tagged keys. Duplicate-resource validation
-> is not yet implemented; this section describes intended future behaviour.
->
-> Intended validation path (future): `resources[N]` — once implemented, duplicate resource
-> identifiers will be rejected with a `ConformanceError::Validation` issue.
+> (Storage, Network, PciDevice, etc.) using keyed entries (for example `- storage: {...}` and
+> `- network: {...}`). Duplicate resource-id validation is implemented and duplicate ids are
+> rejected with `ConformanceError::Validation` issues on path `resources`.
 
 ---
 

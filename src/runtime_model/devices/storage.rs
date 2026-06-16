@@ -1,22 +1,36 @@
 use std::fmt::Display;
 
-pub struct Cdrom {}
+use derive_getters::Getters;
+use derive_new::new;
+
+use crate::runtime_config::StorageResource;
+
+#[derive(Debug, Clone, Getters, new)]
+pub struct Cdrom {
+    resource: StorageResource,
+}
 impl Display for Cdrom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Cdrom")
+        write!(f, "Cdrom: {:?}", self.resource)
     }
 }
 
-pub struct Hdd {}
+#[derive(Debug, Clone, Getters, new)]
+pub struct Hdd {
+    resource: StorageResource,
+}
 impl Display for Hdd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Hdd")
+        write!(f, "Hdd: {:?}", self.resource)
     }
 }
 
-pub struct Ssd {}
+#[derive(Debug, Clone, Getters, new)]
+pub struct Ssd {
+    resource: StorageResource,
+}
 impl Display for Ssd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ssd")
+        write!(f, "Ssd: {:?}", self.resource)
     }
 }

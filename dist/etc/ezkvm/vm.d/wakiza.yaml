@@ -3,8 +3,9 @@ metadata:
   vm_name: wakiza
 
 resources:
-  - network: { name: "lan", bridge: "br0" }
-  - storage: { name: "sda", block_device: "/dev/vm0/vm-108-disk0", format: "raw" }
+  - { id: "lan", network: { bridge: "br0" } }
+  - { id: "sda", storage: { block_device: "/dev/vm0/vm-108-disk0", format: "raw" } }
+  - { id: "efi", storage: { block_device: "/dev/vm0/vm-108-disk1", format: "raw" } }
 
 virtual_machine:
   machine:
@@ -17,9 +18,9 @@ virtual_machine:
     sockets: 1
   memory:
     size: 16384
+  boot:
+    secure: true
+    uefi: { resource: "efi" }
   devices:
-    #- { sata: sata.0, resource: "sda", device: { type: disk } }
-    #- { pcie: pcie.0, resource: "lan", device: { type: virtio_net } }
-
     - sata: { bus: 0, address: 0, type: ssd, resource: "sda" }
-    - pcie: { bus: 1, address: 7, type: virtio-net, resource: "lan" }
+    - pcie: { bus: 0, device: 1, function: 2, type: virtio_net, resource: "lan" }

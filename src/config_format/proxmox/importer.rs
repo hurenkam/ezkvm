@@ -11,6 +11,7 @@ use crate::config_format::{ImportError, ImportOptions, Importer, ProxmoxImporter
 use crate::runtime_config::{
     Cpu, CpuModel, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, VirtualMachine,
 };
+use crate::runtime_model::Boot;
 
 /// Errors that can occur while parsing a Proxmox source file.
 #[derive(Debug, thiserror::Error)]
@@ -118,6 +119,7 @@ fn parse_source(
             machine: required_machine(machine, &source_name)?,
             cpu: cpu_model.map(|_| Cpu::new(CpuModel::Host, 1, 1, 1)),
             memory: Memory::megabytes(required_memory(memory_min, &source_name)?),
+            boot: Boot::default(),
             devices: Vec::new(),
         },
         resources: Vec::new(),

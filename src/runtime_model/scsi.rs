@@ -5,6 +5,8 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
+use crate::runtime_config::StorageResource;
+use std::collections::HashMap;
 pub type ScsiBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
@@ -23,7 +25,7 @@ pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
         preferred_address: Option<ScsiAddress>,
     ) -> Result<(), String>;
 }
-#[derive(Debug, Deserialize, Serialize, Getters, new)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct ScsiDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<ScsiBus>,
@@ -31,22 +33,63 @@ pub struct ScsiDevice {
     address: Option<ScsiAddress>,
     device: ScsiDeviceType,
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum ScsiDeviceType {
-    ScsiDisk,
-}
-impl From<&ScsiDeviceType> for Arc<dyn ScsiDeviceApi> {
-    fn from(device: &ScsiDeviceType) -> Self {
-        match device {
-            ScsiDeviceType::ScsiDisk => Arc::new(ScsiDisk::default()),
-        }
-    }
+    Hdd { resource: String },
+    Ssd { resource: String },
+    Cdrom { resource: String },
 }
 
+pub struct ScsiDeviceBuilder {}
+impl ScsiDeviceBuilder {
+    pub fn build(
+        device_type: &ScsiDeviceType,
+        storage_resources: &HashMap<String, StorageResource>,
+    ) -> Result<Arc<dyn ScsiDeviceApi>, String> {
+        Ok(match device_type {
+            ScsiDeviceType::Hdd { resource } => Arc::new(super::Hdd::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by SCSI HDD",
+                        resource
+                    )
+                })?,
+            )),
+            ScsiDeviceType::Ssd { resource } => Arc::new(super::Ssd::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by SCSI SSD",
+                        resource
+                    )
+                })?,
+            )),
+            ScsiDeviceType::Cdrom { resource } => Arc::new(super::Cdrom::new(
+                storage_resources.get(resource).cloned().ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by SCSI CDROM",
+                        resource
+                    )
+                })?,
+            )),
+        })
+    }
+}
 #[derive(Default)]
 pub struct ScsiDisk {}
 
-impl ScsiDeviceApi for ScsiDisk {
+impl ScsiDeviceApi for super::Hdd {
+    fn qemu_args(&self, _assigned_bus: &ScsiBus, _assigned_address: ScsiAddress) -> Vec<String> {
+        todo!()
+    }
+}
+
+impl ScsiDeviceApi for super::Ssd {
+    fn qemu_args(&self, _assigned_bus: &ScsiBus, _assigned_address: ScsiAddress) -> Vec<String> {
+        todo!()
+    }
+}
+
+impl ScsiDeviceApi for super::Cdrom {
     fn qemu_args(&self, _assigned_bus: &ScsiBus, _assigned_address: ScsiAddress) -> Vec<String> {
         todo!()
     }

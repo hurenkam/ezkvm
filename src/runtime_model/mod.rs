@@ -1,4 +1,6 @@
+mod boot;
 mod cpu;
+mod devices;
 mod i440fx;
 mod ide;
 mod memory;
@@ -9,11 +11,10 @@ mod q35;
 mod sata;
 mod scsi;
 mod usb;
-mod devices;
 
 pub use model::RuntimeModel;
 
-
+pub use boot::Boot;
 pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
 pub use ide::{IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceType};
@@ -30,13 +31,16 @@ pub use sata::{
 pub use scsi::{
     ScsiAddress, ScsiBus, ScsiControllerApi, ScsiDevice, ScsiDeviceApi, ScsiDeviceType, ScsiDisk,
 };
-pub use usb::{UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceType};
-
+pub use usb::{
+    UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceBuilder, UsbDeviceType,
+};
 
 pub use devices::{
-    // PCI & PCIe devices:
-    PvScsiController, VirtioNetController,
-    
+    Cdrom,
     // Storage devices:
-    Ssd, Cdrom
+    Hdd,
+    // PCI & PCIe devices:
+    PvScsiController,
+    Ssd,
+    VirtioNetController,
 };

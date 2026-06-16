@@ -1,81 +1,96 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
-
 use crate::runtime_model::{
-    Cpu, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress, PcieBus, PcieDevice,
+    Boot, Cpu, IdeDevice, Memory, PciAddress, PciBus, PciDevice, PcieAddress, PcieBus, PcieDevice,
     SataDevice, ScsiDevice, UsbAddress, UsbBus, UsbDevice,
 };
 
 /// Schema version for ezkvm runtime config specification.
 pub const EZKVM_CONFIG_SCHEMA_VERSION: &str = "1.0.0";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum StorageResource {
     File { file: String },
     BlockDevice { block_device: String },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum NetworkResource {
-    Tap { name: String, tap: String },
-    Bridge { name: String, bridge: String },
+    Tap { tap: String },
+    Bridge { bridge: String },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum PciDeviceResource {
     Address { bus: PciBus, address: PciAddress },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum PcieDeviceResource {
     Address { bus: PcieBus, address: PcieAddress },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum UsbDeviceResource {
     Id { vendor_id: u16, device_id: u16 },
     Address { bus: UsbBus, address: UsbAddress },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Resource {
-    Storage { storage: StorageResource },
-    Network { network: NetworkResource },
-    PciDevice { pci_device: PciDeviceResource },
-    PcieDevice { pcie_device: PcieDeviceResource },
-    UsbDevice { usb_device: UsbDeviceResource },
+    Storage {
+        id: String,
+        storage: StorageResource,
+    },
+    Network {
+        id: String,
+        network: NetworkResource,
+    },
+    PciDevice {
+        id: String,
+        pci_device: PciDeviceResource,
+    },
+    PcieDevice {
+        id: String,
+        pcie_device: PcieDeviceResource,
+    },
+    UsbDevice {
+        id: String,
+        usb_device: UsbDeviceResource,
+    },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RuntimeConfig {
     pub metadata: Metadata,
     pub virtual_machine: VirtualMachine,
     pub resources: Vec<Resource>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Metadata {
     pub schema_version: String,
     pub vm_name: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VirtualMachine {
     pub machine: Machine,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cpu: Option<Cpu>,
     pub memory: Memory,
+    pub boot: Boot,
     pub devices: Vec<Device>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Device {
     Pcie { pcie: PcieDevice },
@@ -86,7 +101,7 @@ pub enum Device {
     Scsi { scsi: ScsiDevice },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Machine {
     pub family: String,
     pub chipset: String,
@@ -119,14 +134,16 @@ virtual_machine:
   memory:
     size: 8589934592
   devices:
-    - type: sata
-      device: {}
+    - sata:
+        type: ssd
+        resource: "disk0"
 resources:
-  - type: network
-    network:
-      type: bridge
-      name: "vmbr0"
+  - storage:
+      block_device: "/dev/vm/disk0"
+    id: "disk0"
+  - network:
       bridge: "vmbr0"
+    id: "net0"
 "#;
 
         let config: RuntimeConfig = serde_yaml::from_str(yaml).expect("yaml should deserialize");
@@ -156,16 +173,31 @@ resources:
                 },
                 cpu: None,
                 memory: Memory::gigabytes(8),
+                boot: Boot::default(),
                 devices: vec![Device::Sata {
-                    sata: SataDevice::new(None, None, SataDeviceType::Ssd),
+                    sata: SataDevice::new(
+                        None,
+                        None,
+                        SataDeviceType::Ssd {
+                            resource: "disk0".to_string(),
+                        },
+                    ),
                 }],
             },
-            resources: vec![Resource::Network {
-                network: NetworkResource::Bridge {
-                    name: "net0".to_string(),
-                    bridge: "vmbr0".to_string(),
+            resources: vec![
+                Resource::Storage {
+                    id: "disk0".to_string(),
+                    storage: StorageResource::File {
+                        file: "/path/to/disk.img".to_string(),
+                    },
                 },
-            }],
+                Resource::Network {
+                    id: "net0".to_string(),
+                    network: NetworkResource::Bridge {
+                        bridge: "vmbr0".to_string(),
+                    },
+                },
+            ],
         };
 
         let yaml = serde_yaml::to_string(&config).expect("yaml should serialize");
