@@ -6,12 +6,7 @@
 
 use std::path::PathBuf;
 
-use crate::{
-    config_format::{
-        ExportError, ExportOptions, Exporter, EzkvmExporter, RuntimeConfig, RuntimeModelExporter,
-    },
-    runtime_model::RuntimeModel,
-};
+use crate::config_format::{ExportError, ExportOptions, Exporter, EzkvmExporter, RuntimeConfig};
 
 /// Arguments required to export a runtime configuration to ezkvm YAML.
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -47,7 +42,7 @@ impl Exporter for EzkvmExporter {
         Ok(path)
     }
 }
-
+/*
 impl RuntimeModelExporter for EzkvmExporter {
     /// Exports the runtime configuration as ezkvm YAML.
     fn export(&self, runtime: &RuntimeModel, _args: ExportOptions) -> Result<PathBuf, ExportError> {
@@ -66,3 +61,4 @@ impl RuntimeModelExporter for EzkvmExporter {
         )
     }
 }
+*/

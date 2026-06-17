@@ -1,5 +1,6 @@
 use std::{fmt::Display, sync::Arc};
 
+use derive_getters::Getters;
 use derive_new::new;
 
 use super::{
@@ -15,7 +16,7 @@ pub trait ControllerApi {
 }
 
 #[allow(dead_code)]
-#[derive(new)]
+#[derive(Getters, new)]
 pub struct RuntimeModel {
     name: String,
     cpu: Cpu,

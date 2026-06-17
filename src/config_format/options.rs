@@ -6,6 +6,8 @@
 
 use std::path::PathBuf;
 
+use crate::{config_format::RuntimeModelExporter, runtime_model::RuntimeModel};
+
 use super::{
     Exporter, EzkvmExporter, EzkvmImporter, Importer, LibvirtExporter, LibvirtImporter,
     ProxmoxExporter, ProxmoxImporter, QemuExporter, QemuImporter, RuntimeConfig,
@@ -55,12 +57,22 @@ impl ExportOptions {
     ///
     /// The path written by the exporter, or a stringified error message when export fails.
     pub fn export_runtime(&self, runtime: &RuntimeConfig) -> Result<PathBuf, String> {
+        let model = import_runtime(runtime.metadata.vm_name.clone())?;
         match self {
             ExportOptions::Ezkvm { .. } => EzkvmExporter.export(runtime, self.clone()),
             ExportOptions::Proxmox { .. } => ProxmoxExporter.export(runtime, self.clone()),
-            ExportOptions::Qemu { .. } => QemuExporter.export(runtime, self.clone()),
+            ExportOptions::Qemu { .. } => QemuExporter.export(&model, self.clone()),
             ExportOptions::Libvirt { .. } => LibvirtExporter.export(runtime, self.clone()),
         }
         .map_err(|error| format!("export failed: {error}"))
     }
+}
+
+fn import_runtime(name: String) -> Result<RuntimeModel, String> {
+    let runtime_config = ImportOptions::Ezkvm {
+        host: "./dist/etc/ezkvm/host.yaml".to_string(),
+        vm: name,
+    }
+    .import_runtime()?;
+    RuntimeModel::try_from(runtime_config)
 }

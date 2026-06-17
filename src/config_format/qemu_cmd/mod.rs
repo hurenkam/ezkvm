@@ -4,6 +4,7 @@
 //! - src/README.md
 //! - doc/dev/domain-knowledge/qemu/
 
+mod builder;
 mod exporter;
 mod importer;
 
