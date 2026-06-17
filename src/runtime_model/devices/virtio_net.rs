@@ -1,7 +1,8 @@
 use std::fmt::Display;
+use std::vec;
 
 use crate::runtime_config::NetworkResource;
-use crate::runtime_model::{ControllerApi, PcieAddress, PcieBus, PcieDeviceApi};
+use crate::runtime_model::{PcieAddress, PcieBus, PcieDeviceApi};
 
 #[derive(Default)]
 pub struct VirtioNetController {
@@ -14,15 +15,34 @@ impl VirtioNetController {
     }
 }
 impl PcieDeviceApi for VirtioNetController {
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, bus: &PcieBus, address: PcieAddress) -> Vec<String> {
+        let device_id = format!("net{}f{}", address.device(), address.function());
+        let netdev = match &self.resource {
+            Some(NetworkResource::Tap { tap }) => {
+                format!("tap,id={device_id},ifname={tap}")
+            }
+            Some(NetworkResource::Bridge { bridge }) => {
+                format!("bridge,id={device_id},br={bridge}")
+            }
+            None => format!("user,id={device_id}"),
+        };
+
+        vec![
+            "-netdev".to_string(),
+            netdev,
+            "-device".to_string(),
+            format!(
+                "virtio-net-pci,id={device_id},netdev={device_id},bus=pcie.{bus},addr=0x{:x}.{:x}",
+                address.device(),
+                address.function()
+            ),
+        ]
     }
 
     fn preferred_address(&self) -> Option<PcieAddress> {
         None
     }
 }
-impl ControllerApi for VirtioNetController {}
 impl Display for VirtioNetController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.resource {

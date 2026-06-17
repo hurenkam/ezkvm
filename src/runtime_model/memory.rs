@@ -25,4 +25,8 @@ impl Memory {
             size: tb * 1024 * 1024 * 1024 * 1024,
         }
     }
+
+    pub fn qemu_args(&self) -> Vec<String> {
+        vec!["-m".to_string(), format!("{}M", self.size / 1024 / 1024)]
+    }
 }

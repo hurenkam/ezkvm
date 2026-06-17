@@ -9,7 +9,7 @@ use crate::runtime_config::StorageResource;
 use std::collections::HashMap;
 pub type ScsiBus = u8;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Hash, Eq, PartialEq, new)]
 pub struct ScsiAddress {
     pub target: u8,
     pub lun: u8,
@@ -37,9 +37,11 @@ pub struct ScsiDevice {
     bus: Option<ScsiBus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     address: Option<ScsiAddress>,
+    #[serde(flatten)]
     device: ScsiDeviceType,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ScsiDeviceType {
     Hdd { resource: String },
     Ssd { resource: String },
@@ -84,19 +86,75 @@ impl ScsiDeviceBuilder {
 pub struct ScsiDisk {}
 
 impl ScsiDeviceApi for super::Hdd {
-    fn qemu_args(&self, _assigned_bus: &ScsiBus, _assigned_address: ScsiAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
+        scsi_drive_args(
+            self.resource(),
+            *assigned_bus,
+            assigned_address,
+            "scsi-hd",
+            false,
+        )
     }
 }
 
 impl ScsiDeviceApi for super::Ssd {
-    fn qemu_args(&self, _assigned_bus: &ScsiBus, _assigned_address: ScsiAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
+        scsi_drive_args(
+            self.resource(),
+            *assigned_bus,
+            assigned_address,
+            "scsi-hd",
+            false,
+        )
     }
 }
 
 impl ScsiDeviceApi for super::Cdrom {
-    fn qemu_args(&self, _assigned_bus: &ScsiBus, _assigned_address: ScsiAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
+        scsi_drive_args(
+            self.resource(),
+            *assigned_bus,
+            assigned_address,
+            "scsi-cd",
+            true,
+        )
     }
+}
+
+fn scsi_drive_args(
+    resource: &StorageResource,
+    bus: ScsiBus,
+    address: ScsiAddress,
+    device_type: &str,
+    media_cdrom: bool,
+) -> Vec<String> {
+    let drive_id = format!("drive-scsi{}", address.lun);
+    let device_id = format!("scsi{}", address.lun);
+    let mut drive_options = vec![format!("id={drive_id}")];
+
+    match resource {
+        StorageResource::File { file } => drive_options.push(format!("file={file}")),
+        StorageResource::BlockDevice { block_device } => {
+            drive_options.push(format!("file={block_device}"))
+        }
+    }
+
+    drive_options.push("if=none".to_string());
+    drive_options.push("format=raw".to_string());
+    drive_options.push("discard=unmap".to_string());
+    drive_options.push("detect-zeroes=unmap".to_string());
+    if media_cdrom {
+        drive_options.push("media=cdrom".to_string());
+        drive_options.push("readonly=on".to_string());
+    }
+
+    vec![
+        "-drive".to_string(),
+        drive_options.join(","),
+        "-device".to_string(),
+        format!(
+            "{device_type},bus=scsihw{bus}.0,channel=0,scsi-id={},lun={},drive={drive_id},id={device_id}",
+            address.target, address.lun
+        ),
+    ]
 }

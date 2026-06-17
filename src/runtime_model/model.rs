@@ -10,11 +10,15 @@ use crate::{
     config_format::RuntimeConfig,
     runtime_config::{Device, NetworkResource, Resource, StorageResource, UsbDeviceResource},
     runtime_model::{
-        BootModel, BusRegister, Chipset, PcieDeviceType, TpmApi, UsbDeviceBuilder, boot::BootModelBuilder, ide::IdeDeviceBuilder, sata::SataDeviceBuilder, scsi::ScsiDeviceBuilder, tpm::TpmModelBuilder
+        BootModel, BusRegister, BusRegistrationApi, Chipset, PcieDeviceType, PvScsiController,
+        TpmApi, UsbDeviceBuilder, boot::BootModelBuilder, ide::IdeDeviceBuilder,
+        sata::SataDeviceBuilder, scsi::ScsiDeviceBuilder, tpm::TpmModelBuilder,
     },
 };
 
-pub trait ControllerApi {}
+pub trait ControllerApi {
+    fn qemu_args(&self) -> Vec<String>;
+}
 
 #[allow(dead_code)]
 pub struct RuntimeModel {
@@ -154,11 +158,37 @@ impl RuntimeModel {
         }
     }
     pub fn start(&self) -> Result<(), String> {
-        println!(
-            "lifecycle action 'start' requested for vm '{}'; execution is not implemented yet",
-            self.name
-        );
+        println!("qemu command: {}", self.qemu_command_display());
         Ok(())
+    }
+
+    pub fn qemu_command(&self) -> Vec<String> {
+        self.generate_qemu_command()
+    }
+
+    pub fn qemu_command_display(&self) -> String {
+        self.qemu_command()
+            .into_iter()
+            .map(|arg| shell_escape(&arg))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn generate_qemu_command(&self) -> Vec<String> {
+        let mut args = vec![
+            "qemu-system-x86_64".to_string(),
+            "-name".to_string(),
+            self.name.clone(),
+        ];
+        args.extend(self.cpu.qemu_args());
+        args.extend(self.memory.qemu_args());
+        args.extend(self.chipset.qemu_args());
+        args.extend(self.boot.qemu_args());
+        if let Some(tpm) = &self.tpm {
+            args.extend(tpm.qemu_args(&self.name));
+        }
+        args.extend(self.busses.qemu_args());
+        args
     }
     pub fn stop(&self) -> Result<(), String> {
         println!(
@@ -232,15 +262,7 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
             Some(ref tpm) => Some(TpmModelBuilder::build(tpm, &storage_resources)?),
             None => None,
         };
-        let model = RuntimeModel {
-            name: md.vm_name,
-            cpu,
-            memory: vm.memory,
-            chipset,
-            boot: BootModelBuilder::build(&vm.boot, &storage_resources)?,
-            tpm,
-            busses: register,
-        };
+        let boot = BootModelBuilder::build(&vm.boot, &storage_resources)?;
 
         // TODO:
         //   - spice/vnc/gpu
@@ -252,7 +274,11 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
             match device {
                 Device::Pcie { pcie } => {
                     let pcie_api: Arc<dyn PcieDeviceApi> = match pcie.device() {
-                        PcieDeviceType::PvScsi => Arc::new(super::PvScsiController::default()),
+                        PcieDeviceType::PvScsi => {
+                            let controller = Arc::new(PvScsiController::default());
+                            register.register_scsi_bus(controller.clone())?;
+                            controller
+                        }
                         PcieDeviceType::VirtioNet { resource } => {
                             let resolved = match resource {
                                 Some(id) => Some(
@@ -271,59 +297,116 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
                             Arc::new(super::VirtioNetController::new(resolved))
                         }
                     };
-                    model.register_pcie_device(
-                        pcie.bus().unwrap_or_default(),
-                        pcie_api,
-                        pcie.address().clone(),
-                    )?;
+                    match register.pcie_busses().get(&pcie.bus().unwrap_or_default()) {
+                        Some(controller) => {
+                            controller.register_pcie_device(pcie_api, pcie.address().clone())?
+                        }
+                        None => {
+                            return Err(format!(
+                                "PCIe bus with id {} does not exist",
+                                pcie.bus().unwrap_or_default()
+                            ));
+                        }
+                    }
                 }
                 Device::Pci { pci } => {
-                    model.register_pci_device(
-                        pci.bus().unwrap_or_default(),
-                        pci.device().into(),
-                        pci.address().clone(),
-                    )?;
+                    match register.pci_busses().get(&pci.bus().unwrap_or_default()) {
+                        Some(controller) => controller
+                            .register_pci_device(pci.device().into(), pci.address().clone())?,
+                        None => {
+                            return Err(format!(
+                                "PCI bus with id {} does not exist",
+                                pci.bus().unwrap_or_default()
+                            ));
+                        }
+                    }
                 }
                 Device::Usb { usb } => {
-                    model.register_usb_device(
-                        usb.bus().unwrap_or_default(),
-                        UsbDeviceBuilder::build(usb.device(), &usb_resources),
-                        usb.address().clone(),
-                    )?;
+                    match register.usb_busses().get(&usb.bus().unwrap_or_default()) {
+                        Some(controller) => controller.register_usb_device(
+                            UsbDeviceBuilder::build(usb.device(), &usb_resources),
+                            usb.address().clone(),
+                        )?,
+                        None => {
+                            return Err(format!(
+                                "USB bus with id {} does not exist",
+                                usb.bus().unwrap_or_default()
+                            ));
+                        }
+                    }
                 }
                 Device::Ide { ide } => {
-                    model.register_ide_device(
-                        ide.bus().unwrap_or_default(),
-                        IdeDeviceBuilder::build(ide.device(), &storage_resources)?,
-                        ide.address().clone(),
-                    )?;
+                    match register.ide_busses().get(&ide.bus().unwrap_or_default()) {
+                        Some(controller) => controller.register_ide_device(
+                            IdeDeviceBuilder::build(ide.device(), &storage_resources)?,
+                            ide.address().clone(),
+                        )?,
+                        None => {
+                            return Err(format!(
+                                "IDE bus with id {} does not exist",
+                                ide.bus().unwrap_or_default()
+                            ));
+                        }
+                    }
                 }
                 Device::Sata { sata } => {
-                    model.register_sata_device(
-                        sata.bus().unwrap_or_default(),
-                        SataDeviceBuilder::build(sata.device(), &storage_resources)?,
-                        sata.address().clone(),
-                    )?;
+                    match register.sata_busses().get(&sata.bus().unwrap_or_default()) {
+                        Some(controller) => controller.register_sata_device(
+                            SataDeviceBuilder::build(sata.device(), &storage_resources)?,
+                            sata.address().clone(),
+                        )?,
+                        None => {
+                            return Err(format!(
+                                "SATA bus with id {} does not exist",
+                                sata.bus().unwrap_or_default()
+                            ));
+                        }
+                    }
                 }
                 Device::Scsi { scsi } => {
-                    model.register_scsi_device(
-                        scsi.bus().unwrap_or_default(),
-                        ScsiDeviceBuilder::build(scsi.device(), &storage_resources)?,
-                        scsi.address().clone(),
-                    )?;
+                    match register.scsi_busses().get(&scsi.bus().unwrap_or_default()) {
+                        Some(controller) => controller.register_scsi_device(
+                            ScsiDeviceBuilder::build(scsi.device(), &storage_resources)?,
+                            scsi.address().clone(),
+                        )?,
+                        None => {
+                            return Err(format!(
+                                "SCSI bus with id {} does not exist",
+                                scsi.bus().unwrap_or_default()
+                            ));
+                        }
+                    }
                 }
             }
         }
 
-        Ok(model)
+        Ok(RuntimeModel {
+            name: md.vm_name,
+            cpu,
+            memory: vm.memory,
+            chipset,
+            boot,
+            tpm,
+            busses: register,
+        })
+    }
+}
+
+fn shell_escape(arg: &str) -> String {
+    if arg.chars().all(|ch| {
+        ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '/' | ':' | ',' | '=' | '+')
+    }) {
+        arg.to_string()
+    } else {
+        format!("'{}'", arg.replace('\'', "'\\''"))
     }
 }
 
 impl Display for RuntimeModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "RuntimeModel for VM '{}':", self.name)?;
-        writeln!(f, "  CPU: {:?}", self.cpu)?;
-        writeln!(f, "  Memory: {:?}", self.memory)?;
+        writeln!(f, "  {:?}", self.cpu)?;
+        writeln!(f, "  {:?}", self.memory)?;
         writeln!(
             f,
             "  Chipset: {}",
@@ -332,12 +415,170 @@ impl Display for RuntimeModel {
                 Chipset::I440FX(_) => "I440FX",
             }
         )?;
-        writeln!(f, "  Boot: {}", self.boot)?;
-        writeln!(f, "  TPM: {}", match &self.tpm {
-            Some(tpm) => format!("{}", tpm),
-            None => "None".to_string(),
-        })?;
+        writeln!(f, "  {}", self.boot)?;
+        writeln!(
+            f,
+            "  {}",
+            match &self.tpm {
+                Some(tpm) => format!("{}", tpm),
+                None => "None".to_string(),
+            }
+        )?;
         writeln!(f, "  Busses: {}", self.busses)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RuntimeModel;
+    use crate::runtime_config::RuntimeConfig;
+
+    #[test]
+    fn q35_supported_subset_renders_valid_command() {
+        let runtime_config: RuntimeConfig = serde_json::from_value(serde_json::json!({
+            "metadata": {
+                "schema_version": "1.0.0",
+                "vm_name": "demo"
+            },
+            "virtual_machine": {
+                "machine": {
+                    "family": "pc",
+                    "chipset": "q35"
+                },
+                "memory": {
+                    "size": 8589934592u64
+                },
+                "boot": {
+                    "uefi": {
+                        "resource": "firmware0"
+                    }
+                },
+                "tpm": {
+                    "swtpm": {
+                        "version": 2.0,
+                        "resource": "tpmstate0"
+                    }
+                },
+                "devices": [
+                    {
+                        "pcie": {
+                            "type": "pv_scsi"
+                        }
+                    },
+                    {
+                        "scsi": {
+                            "type": "hdd",
+                            "resource": "disk0"
+                        }
+                    },
+                    {
+                        "pcie": {
+                            "type": "virtio_net",
+                            "resource": "net0"
+                        }
+                    },
+                    {
+                        "ide": {
+                            "type": "cdrom",
+                            "resource": "iso0"
+                        }
+                    }
+                ]
+            },
+            "resources": [
+                {
+                    "id": "firmware0",
+                    "storage": {
+                        "file": "/var/lib/ezkvm/efivars.fd"
+                    }
+                },
+                {
+                    "id": "tpmstate0",
+                    "storage": {
+                        "file": "/var/lib/ezkvm/tpmstate"
+                    }
+                },
+                {
+                    "id": "disk0",
+                    "storage": {
+                        "block_device": "/dev/vm/disk0"
+                    }
+                },
+                {
+                    "id": "iso0",
+                    "storage": {
+                        "file": "/iso/debian.iso"
+                    }
+                },
+                {
+                    "id": "net0",
+                    "network": {
+                        "bridge": "vmbr0"
+                    }
+                }
+            ]
+        }))
+        .expect("json should parse");
+        let model = RuntimeModel::try_from(runtime_config).expect("runtime model should build");
+        let command = model.qemu_command();
+
+        assert_eq!(command[0], "qemu-system-x86_64");
+        assert!(command.contains(&"type=q35".to_string()));
+        assert!(command.contains(&"menu=on,strict=on,reboot-timeout=1000".to_string()));
+        assert!(command.contains(&"if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/var/lib/ezkvm/efivars.fd,size=540672".to_string()));
+        assert!(command.contains(&"socket,id=tpmchar,path=/var/run/ezkvm/demo.swtpm".to_string()));
+        assert!(command.contains(&"pvscsi,id=scsihw0,bus=pcie.0,addr=0x0.0".to_string()));
+        assert!(command.contains(&"id=drive-scsi0,file=/dev/vm/disk0,if=none,format=raw,discard=unmap,detect-zeroes=unmap".to_string()));
+        assert!(
+            command.contains(
+                &"scsi-hd,bus=scsihw0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0,id=scsi0"
+                    .to_string()
+            )
+        );
+        assert!(command.contains(&"bridge,id=net0f1,br=vmbr0".to_string()));
+        assert!(
+            command.contains(
+                &"virtio-net-pci,id=net0f1,netdev=net0f1,bus=pcie.0,addr=0x0.1".to_string()
+            )
+        );
+        assert!(
+            command.contains(
+                &"if=none,id=drive-ide0,file=/iso/debian.iso,format=raw,media=cdrom,readonly=on"
+                    .to_string()
+            )
+        );
+        assert!(command.contains(&"ide-cd,bus=ide.1,unit=0,drive=drive-ide0,id=ide0".to_string()));
+    }
+
+    #[test]
+    fn command_display_shell_escapes_paths_with_spaces() {
+        let yaml = r#"
+metadata:
+    schema_version: "1.0.0"
+    vm_name: "demo"
+virtual_machine:
+    machine:
+        family: "pc"
+        chipset: "q35"
+    memory:
+        size: 1073741824
+    devices:
+        - ide:
+                type: cdrom
+                resource: "iso0"
+resources:
+    - id: "iso0"
+      storage:
+        file: "/iso/Debian 12.iso"
+"#;
+
+        let runtime_config: RuntimeConfig = serde_yaml::from_str(yaml).expect("yaml should parse");
+        let model = RuntimeModel::try_from(runtime_config).expect("runtime model should build");
+        let display = model.qemu_command_display();
+
+        assert!(display.contains(
+            "'if=none,id=drive-ide0,file=/iso/Debian 12.iso,format=raw,media=cdrom,readonly=on'"
+        ));
     }
 }

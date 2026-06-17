@@ -11,6 +11,15 @@ pub struct PcieAddress {
     device: u8,
     function: u8,
 }
+impl PcieAddress {
+    pub fn device(&self) -> u8 {
+        self.device
+    }
+
+    pub fn function(&self) -> u8 {
+        self.function
+    }
+}
 impl Display for PcieAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "dev {}, func {}", self.device, self.function)

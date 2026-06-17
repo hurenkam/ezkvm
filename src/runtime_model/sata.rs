@@ -88,19 +88,53 @@ pub enum SataDeviceType {
 }
 
 impl SataDeviceApi for Hdd {
-    fn qemu_args(&self, _assigned_bus: &SataBus, _assigned_address: SataAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, _assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String> {
+        sata_drive_args(self.resource(), assigned_address.address, "ide-hd", false)
     }
 }
 
 impl SataDeviceApi for Ssd {
-    fn qemu_args(&self, _assigned_bus: &SataBus, _assigned_address: SataAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, _assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String> {
+        sata_drive_args(self.resource(), assigned_address.address, "ide-hd", false)
     }
 }
 
 impl SataDeviceApi for Cdrom {
-    fn qemu_args(&self, _assigned_bus: &SataBus, _assigned_address: SataAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, _assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String> {
+        sata_drive_args(self.resource(), assigned_address.address, "ide-cd", true)
     }
+}
+
+fn sata_drive_args(
+    resource: &StorageResource,
+    address: u8,
+    device_type: &str,
+    media_cdrom: bool,
+) -> Vec<String> {
+    let drive_id = format!("drive-sata{address}");
+    let device_id = format!("sata{address}");
+    let mut drive_options = vec![format!("id={drive_id}")];
+
+    match resource {
+        StorageResource::File { file } => drive_options.push(format!("file={file}")),
+        StorageResource::BlockDevice { block_device } => {
+            drive_options.push(format!("file={block_device}"))
+        }
+    }
+
+    drive_options.push("if=none".to_string());
+    drive_options.push("format=raw".to_string());
+    drive_options.push("discard=unmap".to_string());
+    drive_options.push("detect-zeroes=unmap".to_string());
+    if media_cdrom {
+        drive_options.push("media=cdrom".to_string());
+        drive_options.push("readonly=on".to_string());
+    }
+
+    vec![
+        "-drive".to_string(),
+        drive_options.join(","),
+        "-device".to_string(),
+        format!("{device_type},id={device_id},drive={drive_id},bus=ahci0.{address}"),
+    ]
 }

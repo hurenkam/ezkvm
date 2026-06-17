@@ -11,19 +11,18 @@ mod pcie;
 mod q35;
 mod sata;
 mod scsi;
-mod usb;
 mod tpm;
+mod usb;
 
 pub use model::RuntimeModel;
 
 pub use boot::BootModel;
-pub use tpm::{TpmApi,TpmModel};
+pub use bus_register::{BusRegister, BusRegistrationApi};
 pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
 pub use ide::{IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceType};
 pub use memory::Memory;
-pub use model::{ControllerApi};
-pub use bus_register::{BusRegister,BusRegistrationApi};
+pub use model::ControllerApi;
 pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
 pub use pcie::{
     PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceType,
@@ -35,6 +34,7 @@ pub use sata::{
 pub use scsi::{
     ScsiAddress, ScsiBus, ScsiControllerApi, ScsiDevice, ScsiDeviceApi, ScsiDeviceType, ScsiDisk,
 };
+pub use tpm::{TpmApi, TpmModel};
 pub use usb::{
     UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceBuilder, UsbDeviceType,
 };
@@ -52,4 +52,12 @@ pub use devices::{
 pub enum Chipset {
     Q35(Q35Chipset),
     I440FX(I440fxChipset),
+}
+impl Chipset {
+    pub fn qemu_args(&self) -> Vec<String> {
+        match self {
+            Chipset::Q35(q35) => q35.qemu_args(),
+            Chipset::I440FX(i440fx) => i440fx.qemu_args(),
+        }
+    }
 }

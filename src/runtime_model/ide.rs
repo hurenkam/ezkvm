@@ -9,7 +9,7 @@ use crate::runtime_model::ControllerApi;
 
 pub type IdeBus = u8;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Hash, Eq, PartialEq, new)]
 pub struct IdeAddress {
     pub address: u8,
 }
@@ -70,20 +70,38 @@ impl IdeDeviceBuilder {
     }
 }
 impl IdeDeviceApi for super::Hdd {
-    fn qemu_args(&self, _assigned_bus: &IdeBus, _assigned_address: IdeAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String> {
+        ide_drive_args(
+            self.resource(),
+            *assigned_bus,
+            assigned_address.address,
+            "ide-hd",
+            false,
+        )
     }
 }
 
 impl IdeDeviceApi for super::Ssd {
-    fn qemu_args(&self, _assigned_bus: &IdeBus, _assigned_address: IdeAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String> {
+        ide_drive_args(
+            self.resource(),
+            *assigned_bus,
+            assigned_address.address,
+            "ide-hd",
+            false,
+        )
     }
 }
 
 impl IdeDeviceApi for super::Cdrom {
-    fn qemu_args(&self, _assigned_bus: &IdeBus, _assigned_address: IdeAddress) -> Vec<String> {
-        todo!()
+    fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String> {
+        ide_drive_args(
+            self.resource(),
+            *assigned_bus,
+            assigned_address.address,
+            "ide-cd",
+            true,
+        )
     }
 }
 
@@ -98,4 +116,36 @@ pub trait IdeControllerApi: ControllerApi + Display {
         preferred_address: Option<IdeAddress>,
     ) -> Result<(), String>;
     fn devices(&self) -> HashMap<IdeAddress, Arc<dyn IdeDeviceApi>>;
+}
+
+fn ide_drive_args(
+    resource: &StorageResource,
+    bus: IdeBus,
+    unit: u8,
+    device_type: &str,
+    media_cdrom: bool,
+) -> Vec<String> {
+    let drive_id = format!("drive-ide{unit}");
+    let device_id = format!("ide{unit}");
+    let mut drive_options = vec!["if=none".to_string(), format!("id={drive_id}")];
+
+    match resource {
+        StorageResource::File { file } => drive_options.push(format!("file={file}")),
+        StorageResource::BlockDevice { block_device } => {
+            drive_options.push(format!("file={block_device}"))
+        }
+    }
+
+    drive_options.push("format=raw".to_string());
+    if media_cdrom {
+        drive_options.push("media=cdrom".to_string());
+        drive_options.push("readonly=on".to_string());
+    }
+
+    vec![
+        "-drive".to_string(),
+        drive_options.join(","),
+        "-device".to_string(),
+        format!("{device_type},bus=ide.{bus},unit={unit},drive={drive_id},id={device_id}"),
+    ]
 }
