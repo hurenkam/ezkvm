@@ -6,6 +6,7 @@ resources:
   - { id: "lan", network: { bridge: "br0" } }
   - { id: "sda", storage: { block_device: "/dev/vm0/vm-108-disk0", format: "raw" } }
   - { id: "efi", storage: { block_device: "/dev/vm0/vm-108-disk1", format: "raw" } }
+  - { id: "tpm", storage: { block_device: "/dev/vm0/vm-108-disk2", format: "raw" } }
 
 virtual_machine:
   machine:
@@ -21,6 +22,9 @@ virtual_machine:
   boot:
     secure: true
     uefi: { resource: "efi" }
+  swtpm:
+    version: 2.0
+    resource: "tpm"
   devices:
     - sata: { bus: 0, address: 0, type: ssd, resource: "sda" }
     - pcie: { bus: 0, device: 1, function: 2, type: virtio_net, resource: "lan" }

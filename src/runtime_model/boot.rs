@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::runtime_config::{Bios, Boot, StorageResource};
 
 pub struct BootModelBuilder {}
 impl BootModelBuilder {
-    pub fn build(boot: &Boot, storage_resources: &std::collections::HashMap<String, StorageResource>) -> Result<BootModel, String> {
+    pub fn build(boot: &Boot, storage_resources: &HashMap<String, StorageResource>) -> Result<BootModel, String> {
         let bios = match boot.bios() {
             Bios::SeaBios { seabios: _ } => BiosModel::SeaBios(SeaBiosModel {}),
             Bios::Uefi { uefi } => {

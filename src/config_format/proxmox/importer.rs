@@ -119,6 +119,7 @@ fn parse_source(
             cpu: cpu_model.map(|_| Cpu::new(CpuModel::Host, 1, 1, 1)),
             memory: Memory::megabytes(required_memory(memory_min, &source_name)?),
             boot: Boot::default(),
+            tpm: None,
             devices: Vec::new(),
         },
         resources: Vec::new(),

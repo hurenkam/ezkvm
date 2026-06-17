@@ -12,10 +12,12 @@ mod q35;
 mod sata;
 mod scsi;
 mod usb;
+mod tpm;
 
 pub use model::RuntimeModel;
 
 pub use boot::BootModel;
+pub use tpm::{TpmApi,TpmModel};
 pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
 pub use ide::{IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceType};

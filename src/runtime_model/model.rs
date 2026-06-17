@@ -10,7 +10,7 @@ use crate::{
     config_format::RuntimeConfig,
     runtime_config::{Device, NetworkResource, Resource, StorageResource, UsbDeviceResource},
     runtime_model::{
-        BootModel, BusRegister, Chipset, PcieDeviceType, UsbDeviceBuilder, boot::BootModelBuilder, ide::IdeDeviceBuilder, sata::SataDeviceBuilder, scsi::ScsiDeviceBuilder
+        BootModel, BusRegister, Chipset, PcieDeviceType, TpmApi, UsbDeviceBuilder, boot::BootModelBuilder, ide::IdeDeviceBuilder, sata::SataDeviceBuilder, scsi::ScsiDeviceBuilder, tpm::TpmModelBuilder
     },
 };
 
@@ -23,6 +23,7 @@ pub struct RuntimeModel {
     memory: Memory,
     chipset: Chipset,
     boot: BootModel,
+    tpm: Option<Arc<dyn TpmApi>>,
     busses: BusRegister,
 }
 impl RuntimeModel {
@@ -227,18 +228,21 @@ impl TryFrom<RuntimeConfig> for RuntimeModel {
             "i440fx" => Chipset::I440FX(I440fxChipset::new(&mut register)),
             other => return Err(format!("Unsupported chipset: {}", other)),
         };
+        let tpm = match vm.tpm {
+            Some(ref tpm) => Some(TpmModelBuilder::build(tpm, &storage_resources)?),
+            None => None,
+        };
         let model = RuntimeModel {
             name: md.vm_name,
             cpu,
             memory: vm.memory,
             chipset,
             boot: BootModelBuilder::build(&vm.boot, &storage_resources)?,
+            tpm,
             busses: register,
         };
 
         // TODO:
-        //   - uefi/bios
-        //   - tpm
         //   - spice/vnc/gpu
         //   - serial ports
         //   - audio
@@ -329,6 +333,10 @@ impl Display for RuntimeModel {
             }
         )?;
         writeln!(f, "  Boot: {}", self.boot)?;
+        writeln!(f, "  TPM: {}", match &self.tpm {
+            Some(tpm) => format!("{}", tpm),
+            None => "None".to_string(),
+        })?;
         writeln!(f, "  Busses: {}", self.busses)?;
         Ok(())
     }

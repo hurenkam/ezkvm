@@ -89,6 +89,8 @@ pub struct VirtualMachine {
     pub memory: Memory,
     #[serde(default)]
     pub boot: Boot,
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub tpm: Option<Tpm>,
     pub devices: Vec<Device>,
 }
 
@@ -111,7 +113,6 @@ pub struct Machine {
     pub version: Option<String>,
 }
 
-//#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
 #[derive(Debug, Default, Clone, Deserialize, Serialize, Getters)]
 pub struct Boot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -120,7 +121,6 @@ pub struct Boot {
     bios: Bios,
 }
 
-//#[derive(Debug, Clone, Deserialize, Serialize)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Bios {
@@ -135,15 +135,38 @@ impl Default for Bios {
     }
 }
 
-//#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct SeaBios {
     firmware: String,
 }
 
-//#[derive(Debug, Clone, Deserialize, Serialize, Default, Getters, new)]
 #[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
 pub struct Uefi {
+    resource: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Tpm {
+    Emulated { swtpm: Swtpm },
+    Passthrough { hwtpm: Hwtpm },
+}
+impl Default for Tpm {
+    fn default() -> Self {
+        Tpm::Emulated {
+            swtpm: Swtpm::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
+pub struct Swtpm {
+    version: f32,
+    resource: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
+pub struct Hwtpm {
     resource: String,
 }
 
@@ -212,6 +235,7 @@ resources:
                 cpu: None,
                 memory: Memory::gigabytes(8),
                 boot: Boot::default(),
+                tpm: None,
                 devices: vec![Device::Sata {
                     sata: SataDevice::new(
                         None,
