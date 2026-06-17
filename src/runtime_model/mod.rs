@@ -16,11 +16,13 @@ mod usb;
 
 pub use model::RuntimeModel;
 
-pub use boot::BootModel;
+pub use boot::{BootModel, BootModelBuilder};
 pub use bus_register::{BusRegister, BusRegistrationApi};
 pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
-pub use ide::{IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceType};
+pub use ide::{
+    IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceBuilder, IdeDeviceType,
+};
 pub use memory::Memory;
 pub use model::ControllerApi;
 pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
@@ -29,12 +31,14 @@ pub use pcie::{
 };
 pub use q35::Q35Chipset;
 pub use sata::{
-    SataAddress, SataBus, SataControllerApi, SataDevice, SataDeviceApi, SataDeviceType,
+    SataAddress, SataBus, SataControllerApi, SataDevice, SataDeviceApi, SataDeviceBuilder,
+    SataDeviceType,
 };
 pub use scsi::{
-    ScsiAddress, ScsiBus, ScsiControllerApi, ScsiDevice, ScsiDeviceApi, ScsiDeviceType, ScsiDisk,
+    ScsiAddress, ScsiBus, ScsiControllerApi, ScsiDevice, ScsiDeviceApi, ScsiDeviceBuilder,
+    ScsiDeviceType, ScsiDisk,
 };
-pub use tpm::{TpmApi, TpmModel};
+pub use tpm::{TpmApi, TpmModel, TpmModelBuilder};
 pub use usb::{
     UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceBuilder, UsbDeviceType,
 };

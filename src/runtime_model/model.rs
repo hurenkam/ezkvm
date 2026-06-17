@@ -1,26 +1,21 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{fmt::Display, sync::Arc};
+
+use derive_new::new;
 
 use super::{
-    Cpu, I440fxChipset, IdeAddress, IdeBus, IdeControllerApi, IdeDeviceApi, Memory, PciAddress,
-    PciBus, PciControllerApi, PciDeviceApi, PcieAddress, PcieBus, PcieControllerApi, PcieDeviceApi,
-    Q35Chipset, SataAddress, SataBus, SataControllerApi, SataDeviceApi, ScsiAddress, ScsiBus,
+    Cpu, IdeAddress, IdeBus, IdeControllerApi, IdeDeviceApi, Memory, PciAddress, PciBus,
+    PciControllerApi, PciDeviceApi, PcieAddress, PcieBus, PcieControllerApi, PcieDeviceApi,
+    SataAddress, SataBus, SataControllerApi, SataDeviceApi, ScsiAddress, ScsiBus,
     ScsiControllerApi, ScsiDeviceApi, UsbAddress, UsbBus, UsbControllerApi, UsbDeviceApi,
 };
-use crate::{
-    config_format::RuntimeConfig,
-    runtime_config::{Device, NetworkResource, Resource, StorageResource, UsbDeviceResource},
-    runtime_model::{
-        BootModel, BusRegister, BusRegistrationApi, Chipset, PcieDeviceType, PvScsiController,
-        TpmApi, UsbDeviceBuilder, boot::BootModelBuilder, ide::IdeDeviceBuilder,
-        sata::SataDeviceBuilder, scsi::ScsiDeviceBuilder, tpm::TpmModelBuilder,
-    },
-};
+use crate::runtime_model::{BootModel, BusRegister, Chipset, TpmApi};
 
 pub trait ControllerApi {
     fn qemu_args(&self) -> Vec<String>;
 }
 
 #[allow(dead_code)]
+#[derive(new)]
 pub struct RuntimeModel {
     name: String,
     cpu: Cpu,
@@ -210,194 +205,6 @@ impl RuntimeModel {
             self.name
         );
         Ok(())
-    }
-}
-
-impl TryFrom<&RuntimeModel> for RuntimeConfig {
-    type Error = String;
-
-    fn try_from(_value: &RuntimeModel) -> Result<Self, Self::Error> {
-        Err("exporting runtime model to config is not implemented yet".to_string())
-    }
-}
-
-impl TryFrom<RuntimeConfig> for RuntimeModel {
-    type Error = String;
-
-    fn try_from(value: RuntimeConfig) -> Result<Self, Self::Error> {
-        let RuntimeConfig {
-            metadata: md,
-            virtual_machine: vm,
-            resources,
-        } = value;
-
-        let mut storage_resources: HashMap<String, StorageResource> = HashMap::new();
-        let mut network_resources: HashMap<String, NetworkResource> = HashMap::new();
-        let mut usb_resources: HashMap<String, UsbDeviceResource> = HashMap::new();
-        for resource in resources {
-            match resource {
-                Resource::Storage { id, storage } => {
-                    storage_resources.insert(id, storage);
-                }
-                Resource::Network { id, network } => {
-                    network_resources.insert(id, network);
-                }
-                Resource::UsbDevice { id, usb_device } => {
-                    usb_resources.insert(id, usb_device);
-                }
-                Resource::PciDevice {
-                    id: _,
-                    pci_device: _,
-                } => {
-                    // Handle PCI device resources if needed
-                }
-                Resource::PcieDevice {
-                    id: _,
-                    pcie_device: _,
-                } => {
-                    // Handle PCIe device resources if needed
-                }
-            }
-        }
-
-        let cpu = vm.cpu.unwrap_or_default();
-        let mut register = BusRegister::new();
-        let chipset = match vm.machine.chipset.as_str() {
-            "q35" => Chipset::Q35(Q35Chipset::new(&mut register)),
-            "i440fx" => Chipset::I440FX(I440fxChipset::new(&mut register)),
-            other => return Err(format!("Unsupported chipset: {}", other)),
-        };
-        let tpm = match vm.tpm {
-            Some(ref tpm) => Some(TpmModelBuilder::build(tpm, &storage_resources)?),
-            None => None,
-        };
-        let boot = BootModelBuilder::build(&vm.boot, &storage_resources)?;
-
-        // TODO:
-        //   - spice/vnc/gpu
-        //   - serial ports
-        //   - audio
-        //   - qmp/guest agent
-
-        for device in vm.devices {
-            match device {
-                Device::Pcie { pcie } => {
-                    let pcie_api: Arc<dyn PcieDeviceApi> = match pcie.device() {
-                        PcieDeviceType::PvScsi => {
-                            let controller = Arc::new(PvScsiController::default());
-                            register.register_scsi_bus(controller.clone())?;
-                            controller
-                        }
-                        PcieDeviceType::VirtioNet { resource } => {
-                            let resolved = match resource {
-                                Some(id) => Some(
-                                    network_resources
-                                        .get(id)
-                                        .cloned()
-                                        .ok_or_else(|| {
-                                            format!(
-                                                "missing network resource '{}' referenced by PCIe virtio_net device",
-                                                id
-                                            )
-                                        })?,
-                                ),
-                                None => None,
-                            };
-                            Arc::new(super::VirtioNetController::new(resolved))
-                        }
-                    };
-                    match register.pcie_busses().get(&pcie.bus().unwrap_or_default()) {
-                        Some(controller) => {
-                            controller.register_pcie_device(pcie_api, pcie.address().clone())?
-                        }
-                        None => {
-                            return Err(format!(
-                                "PCIe bus with id {} does not exist",
-                                pcie.bus().unwrap_or_default()
-                            ));
-                        }
-                    }
-                }
-                Device::Pci { pci } => {
-                    match register.pci_busses().get(&pci.bus().unwrap_or_default()) {
-                        Some(controller) => controller
-                            .register_pci_device(pci.device().into(), pci.address().clone())?,
-                        None => {
-                            return Err(format!(
-                                "PCI bus with id {} does not exist",
-                                pci.bus().unwrap_or_default()
-                            ));
-                        }
-                    }
-                }
-                Device::Usb { usb } => {
-                    match register.usb_busses().get(&usb.bus().unwrap_or_default()) {
-                        Some(controller) => controller.register_usb_device(
-                            UsbDeviceBuilder::build(usb.device(), &usb_resources),
-                            usb.address().clone(),
-                        )?,
-                        None => {
-                            return Err(format!(
-                                "USB bus with id {} does not exist",
-                                usb.bus().unwrap_or_default()
-                            ));
-                        }
-                    }
-                }
-                Device::Ide { ide } => {
-                    match register.ide_busses().get(&ide.bus().unwrap_or_default()) {
-                        Some(controller) => controller.register_ide_device(
-                            IdeDeviceBuilder::build(ide.device(), &storage_resources)?,
-                            ide.address().clone(),
-                        )?,
-                        None => {
-                            return Err(format!(
-                                "IDE bus with id {} does not exist",
-                                ide.bus().unwrap_or_default()
-                            ));
-                        }
-                    }
-                }
-                Device::Sata { sata } => {
-                    match register.sata_busses().get(&sata.bus().unwrap_or_default()) {
-                        Some(controller) => controller.register_sata_device(
-                            SataDeviceBuilder::build(sata.device(), &storage_resources)?,
-                            sata.address().clone(),
-                        )?,
-                        None => {
-                            return Err(format!(
-                                "SATA bus with id {} does not exist",
-                                sata.bus().unwrap_or_default()
-                            ));
-                        }
-                    }
-                }
-                Device::Scsi { scsi } => {
-                    match register.scsi_busses().get(&scsi.bus().unwrap_or_default()) {
-                        Some(controller) => controller.register_scsi_device(
-                            ScsiDeviceBuilder::build(scsi.device(), &storage_resources)?,
-                            scsi.address().clone(),
-                        )?,
-                        None => {
-                            return Err(format!(
-                                "SCSI bus with id {} does not exist",
-                                scsi.bus().unwrap_or_default()
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(RuntimeModel {
-            name: md.vm_name,
-            cpu,
-            memory: vm.memory,
-            chipset,
-            boot,
-            tpm,
-            busses: register,
-        })
     }
 }
 

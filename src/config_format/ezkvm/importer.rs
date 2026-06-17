@@ -7,7 +7,9 @@
 use serde_yaml::from_str;
 use std::path::Path;
 
-use crate::config_format::{EzkvmImporter, ImportError, ImportOptions, Importer, RuntimeConfig, RuntimeModelImporter};
+use crate::config_format::{
+    EzkvmImporter, ImportError, ImportOptions, Importer, RuntimeConfig, RuntimeModelImporter,
+};
 use crate::runtime_config::{ConformanceError, ParseError};
 use crate::runtime_model::RuntimeModel;
 
@@ -68,8 +70,7 @@ impl RuntimeModelImporter for EzkvmImporter {
     /// Imports an ezkvm YAML configuration into the canonical runtime model.
     fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError> {
         let runtime_config: RuntimeConfig = Importer::import(self, args)?;
-        RuntimeModel::try_from(runtime_config)
-            .map_err(|e| ImportError::ImportFailed(e.to_string()))
+        RuntimeModel::try_from(runtime_config).map_err(|e| ImportError::ImportFailed(e.to_string()))
     }
 }
 
