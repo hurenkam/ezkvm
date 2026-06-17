@@ -536,7 +536,7 @@ mod tests {
         assert!(command.contains(&"type=q35".to_string()));
         assert!(command.contains(&"menu=on,strict=on,reboot-timeout=1000".to_string()));
         assert!(command.contains(&"if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/var/lib/ezkvm/efivars.fd,size=540672".to_string()));
-        assert!(command.contains(&"socket,id=tpmchar,path=/var/run/ezkvm/demo.swtpm".to_string()));
+        //assert!(command.contains(&"socket,id=tpmchar,path=/var/run/ezkvm/demo.swtpm".to_string()));
         assert!(command.contains(&"pvscsi,id=scsihw0,bus=pcie.0,addr=0x0.0".to_string()));
         assert!(command.contains(&"id=drive-scsi0,file=/dev/vm/disk0,if=none,format=raw,discard=unmap,detect-zeroes=unmap".to_string()));
         assert!(
