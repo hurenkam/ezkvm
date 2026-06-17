@@ -1,4 +1,5 @@
 mod boot;
+mod bus_register;
 mod cpu;
 mod devices;
 mod i440fx;
@@ -19,7 +20,8 @@ pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
 pub use ide::{IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceType};
 pub use memory::Memory;
-pub use model::{BusRegistrationApi, ControllerApi};
+pub use model::{ControllerApi};
+pub use bus_register::{BusRegister,BusRegistrationApi};
 pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
 pub use pcie::{
     PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceType,
@@ -44,3 +46,8 @@ pub use devices::{
     Ssd,
     VirtioNetController,
 };
+
+pub enum Chipset {
+    Q35(Q35Chipset),
+    I440FX(I440fxChipset),
+}
