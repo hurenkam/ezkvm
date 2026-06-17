@@ -60,6 +60,57 @@ metadata:
 
 ---
 
+## Missing IDE Device Resource
+
+**Problem:** An IDE device references a storage resource that doesn't exist.
+
+**Input YAML:**
+
+```yaml
+metadata:
+  schema_version: "1.0.0"
+  vm_name: "workstation"
+virtual_machine:
+  machine:
+    family: "pc"
+    chipset: "q35"
+  memory:
+    size: 8589934592
+  devices:
+    - ide:
+        bus: 0
+        address: 0
+        type: ssd
+        resource: "missing_disk"
+resources: []
+```
+
+**Error Output:**
+
+```
+Validation failed with 1 issue(s):
+  path: virtual_machine.devices[0].ide.resource
+  reason: references missing storage resource id 'missing_disk'
+  remediation: Add the referenced storage resource under resources or update the device resource id
+```
+
+**How to Fix:**
+
+Add the missing storage resource:
+
+```yaml
+resources:
+  - storage:
+      id: "missing_disk"
+      block_device: "/dev/vm/workstation-disk"
+```
+
+**Why This Matters:**
+
+IDE devices (HDD, SSD, CDROM variants) require a storage resource to be defined. The resource id in the device must match a storage resource id in the top-level resources list. This separation allows devices and resources to be managed independently while enforcing referential integrity.
+
+---
+
 ## Invalid Chipset for Machine Family
 
 **Problem:** Chipset value is not supported for the specified machine family.

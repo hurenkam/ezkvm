@@ -87,6 +87,7 @@ pub struct VirtualMachine {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cpu: Option<Cpu>,
     pub memory: Memory,
+    #[serde(default)]
     pub boot: Boot,
     pub devices: Vec<Device>,
 }

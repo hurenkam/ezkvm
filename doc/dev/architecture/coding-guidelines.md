@@ -62,6 +62,15 @@ Tests live in the implementation module (`validation.rs`) and cover:
 
 See [validation rules reference](../requirements/validation-rules.md) for detailed rule documentation and [validation examples](./validation-examples.md) for common failure scenarios.
 
+**Device-to-Resource Binding:**
+
+Devices that require storage or network resources (SATA, IDE, SCSI for storage; PCIe VirtioNet for network) use a builder pattern for runtime resolution:
+- Schema layer (parsing): Devices hold resource IDs as strings (e.g., `resource: "disk0"`)
+- Runtime layer: Device builders (`SataDeviceBuilder`, `IdeDeviceBuilder`, `ScsiDeviceBuilder`, `UsbDeviceBuilder`) resolve IDs to concrete resource objects during `RuntimeModel::try_from()`
+- Validation layer: Conformance validation ensures all device resource references match top-level resource IDs before runtime instantiation
+
+This pattern decouples resource definition from device usage while maintaining type safety and clear error diagnostics when resources are missing or duplicated.
+
 ## Stage Module Organization
 
 Stage modules (config_importer, render_stage, etc.) follow a consistent internal structure:
