@@ -18,6 +18,8 @@ pub use options::{ExportOptions, ImportOptions};
 pub use proxmox::{ProxmoxExporter, ProxmoxImporter, ProxmoxInputArgs, ProxmoxOutputArgs};
 pub use qemu_cmd::{QemuExporter, QemuImporter, QemuInputArgs, QemuOutputArgs};
 
+use crate::runtime_model::RuntimeModel;
+
 /// Runtime configuration used by all importer and exporter stages.
 pub type RuntimeConfig = crate::runtime_config::RuntimeConfig;
 
@@ -55,8 +57,16 @@ pub trait Importer {
     fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError>;
 }
 
+pub trait RuntimeModelImporter {
+    fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError>;
+}
+
 /// Exports RuntimeConfig into a destination format.
 pub trait Exporter {
     /// Writes the runtime configuration to the target format and returns the output path.
     fn export(&self, runtime: &RuntimeConfig, args: ExportOptions) -> Result<PathBuf, ExportError>;
+}
+
+pub trait RuntimeModelExporter {
+    fn export(&self, runtime: &RuntimeModel, args: ExportOptions) -> Result<PathBuf, ExportError>;
 }

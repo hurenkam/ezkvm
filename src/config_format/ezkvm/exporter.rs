@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use crate::config_format::{ExportError, ExportOptions, Exporter, EzkvmExporter, RuntimeConfig};
+use crate::{config_format::{ExportError, ExportOptions, Exporter, EzkvmExporter, RuntimeConfig, RuntimeModelExporter}, runtime_model::RuntimeModel};
 
 /// Arguments required to export a runtime configuration to ezkvm YAML.
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -40,5 +40,16 @@ impl Exporter for EzkvmExporter {
             .map_err(|e| ExportError::ExportFailed(format!("{}: {}", path.display(), e)))?;
 
         Ok(path)
+    }
+}
+
+impl RuntimeModelExporter for EzkvmExporter {
+    /// Exports the runtime configuration as ezkvm YAML.
+    fn export(&self, runtime: &RuntimeModel, _args: ExportOptions) -> Result<PathBuf, ExportError> {
+        let runtime_config = RuntimeConfig::try_from(runtime)
+            .map_err(|e| ExportError::ExportFailed(format!("Failed to convert runtime model: {}", e)))?;
+
+        let path = PathBuf::from(format!("{}.yaml", runtime_config.metadata.vm_name));
+        Exporter::export(self, &runtime_config, ExportOptions::Ezkvm { host: String::new(), vm: Some(path.to_string_lossy().to_string()) })
     }
 }

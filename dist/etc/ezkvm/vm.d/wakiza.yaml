@@ -18,7 +18,7 @@ virtual_machine:
     threads: 2
     sockets: 1
   memory:
-    size: 16384
+    size: 17179869184
   boot:
     secure: true
     uefi: { resource: "efi" }

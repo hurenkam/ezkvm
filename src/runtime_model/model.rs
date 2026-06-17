@@ -212,6 +212,15 @@ impl RuntimeModel {
         Ok(())
     }
 }
+
+impl TryFrom<&RuntimeModel> for RuntimeConfig {
+    type Error = String;
+
+    fn try_from(_value: &RuntimeModel) -> Result<Self, Self::Error> {
+        Err("exporting runtime model to config is not implemented yet".to_string())
+    }
+}
+
 impl TryFrom<RuntimeConfig> for RuntimeModel {
     type Error = String;
 
