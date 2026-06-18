@@ -1,8 +1,7 @@
 use std::fmt::Display;
 use std::vec;
 
-use crate::runtime_config::NetworkResource;
-use crate::runtime_model::{PcieAddress, PcieBus, PcieDeviceApi};
+use crate::runtime_model::{NetworkResource, PcieAddress, PcieBus, PcieDeviceApi};
 
 #[derive(Default)]
 pub struct VirtioNetController {

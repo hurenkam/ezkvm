@@ -2,6 +2,8 @@
 //!
 //! Concrete ezkvm YAML parsing lives in src/config_importer/ezkvm/parsing.rs.
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Severity level for validation issues.

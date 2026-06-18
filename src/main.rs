@@ -12,12 +12,11 @@ fn main() {
 }
 
 fn import_runtime(name: String) -> Result<RuntimeModel, String> {
-    let runtime_config = ImportOptions::Ezkvm {
+    ImportOptions::Ezkvm {
         host: "./dist/etc/ezkvm/host.yaml".to_string(),
         vm: name,
     }
-    .import_runtime()?;
-    RuntimeModel::try_from(runtime_config)
+    .import_runtime()
 }
 
 fn run() -> Result<(), String> {
@@ -36,13 +35,11 @@ fn run() -> Result<(), String> {
     match command {
         CliCommand::Import { input } => {
             let runtime_config = input.import_runtime()?;
-            runtime_config.validate_runtime(None)?;
-            println!("validation passed");
+            println!("imported runtime model:\n{runtime_config}");
         }
         CliCommand::Convert { input, output } => {
             let runtime_config = input.import_runtime()?;
-            runtime_config.validate_runtime(None)?;
-            let path = output.export_runtime(&runtime_config)?;
+            let path = output.export_runtime(runtime_config)?;
             println!("exported output to {}", path.display());
         }
         CliCommand::Export { output } => {

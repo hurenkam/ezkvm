@@ -25,6 +25,11 @@ pub struct BusRegister {
     ide_busses: HashMap<IdeBus, Arc<dyn IdeControllerApi>>,
     scsi_busses: HashMap<ScsiBus, Arc<dyn ScsiControllerApi>>,
 }
+impl Default for BusRegister {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl BusRegister {
     pub fn new() -> Self {
         Self {
@@ -90,53 +95,53 @@ impl BusRegister {
 }
 impl Display for BusRegister {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\n")?;
+        writeln!(f)?;
         for (id, value) in &self.pcie_busses {
             for (address, device) in value.devices() {
-                write!(f, "    pcie bus {id}, {address}: {device}\n")?;
+                writeln!(f, "    pcie bus {id}, {address}: {device}")?;
             }
-            if value.devices().len() == 0 {
-                write!(f, "    pcie bus {id}, (no devices)\n")?;
+            if value.devices().is_empty() {
+                writeln!(f, "    pcie bus {id}, (no devices)")?;
             }
         }
         for (id, value) in &self.pci_busses {
             for (address, device) in value.devices() {
-                write!(f, "    pci  bus {id}, {address}: {device}\n")?;
+                writeln!(f, "    pci  bus {id}, {address}: {device}")?;
             }
-            if value.devices().len() == 0 {
-                write!(f, "    pci  bus {id}, (no devices)\n")?;
+            if value.devices().is_empty() {
+                writeln!(f, "    pci  bus {id}, (no devices)")?;
             }
         }
         for (id, value) in &self.usb_busses {
             for (address, device) in value.devices() {
-                write!(f, "    usb  bus {id}, {address}: {device}\n")?;
+                writeln!(f, "    usb  bus {id}, {address}: {device}")?;
             }
-            if value.devices().len() == 0 {
-                write!(f, "    usb  bus {id}, (no devices)\n")?;
+            if value.devices().is_empty() {
+                writeln!(f, "    usb  bus {id}, (no devices)")?;
             }
         }
         for (id, value) in &self.sata_busses {
             for (address, device) in value.devices() {
-                write!(f, "    sata bus {id}, {address}: {device}\n")?;
+                writeln!(f, "    sata bus {id}, {address}: {device}")?;
             }
-            if value.devices().len() == 0 {
-                write!(f, "    sata bus {id}, (no devices)\n")?;
+            if value.devices().is_empty() {
+                writeln!(f, "    sata bus {id}, (no devices)")?;
             }
         }
         for (id, value) in &self.ide_busses {
             for (address, device) in value.devices() {
-                write!(f, "    ide  bus {id}, {address}: {device}\n")?;
+                writeln!(f, "    ide  bus {id}, {address}: {device}")?;
             }
-            if value.devices().len() == 0 {
-                write!(f, "    ide  bus {id}, (no devices)\n")?;
+            if value.devices().is_empty() {
+                writeln!(f, "    ide  bus {id}, (no devices)")?;
             }
         }
         for (id, value) in &self.scsi_busses {
             for (address, device) in value.devices() {
-                write!(f, "    scsi bus {id}, {address}: {device}\n")?;
+                writeln!(f, "    scsi bus {id}, {address}: {device}")?;
             }
-            if value.devices().len() == 0 {
-                write!(f, "    scsi bus {id}, (no devices)\n")?;
+            if value.devices().is_empty() {
+                writeln!(f, "    scsi bus {id}, (no devices)")?;
             }
         }
         Ok(())

@@ -4,7 +4,7 @@
 //! - src/README.md
 //! - doc/dev/architecture/validation-reporting.md
 
-use crate::runtime_config::ValidationIssue;
+use crate::config_format::ezkvm::ValidationIssue;
 
 /// Attaches best-effort line numbers and YAML snippets to validation issues.
 ///

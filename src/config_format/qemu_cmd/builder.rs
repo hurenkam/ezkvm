@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use crate::runtime_model::RuntimeModel;
 
@@ -12,9 +12,12 @@ impl QemuArgs {
     pub fn extend(&mut self, other: Vec<String>) {
         self.0.extend(other);
     }
+}
+impl Deref for QemuArgs {
+    type Target = Vec<String>;
 
-    pub fn to_vec(&self) -> Vec<String> {
-        self.0.clone()
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

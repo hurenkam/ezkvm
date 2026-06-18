@@ -4,12 +4,19 @@
 //! - src/README.md
 //! - doc/dev/domain-knowledge/proxmox/
 
+#![allow(dead_code)]
+
 use std::ffi::OsStr;
 use std::path::Path;
 
-use crate::config_format::{ImportError, ImportOptions, Importer, ProxmoxImporter, RuntimeConfig};
-use crate::runtime_config::{
-    Boot, Cpu, CpuModel, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Memory, Metadata, VirtualMachine,
+use crate::{
+    config_format::ezkvm::EzkvmConfigSchema,
+    config_format::{
+        ImportError, ImportOptions, Importer, ProxmoxImporter,
+        ezkvm::{Boot, EZKVM_CONFIG_SCHEMA_VERSION, Machine, Metadata, VirtualMachine},
+        proxmox::schema::ProxmoxConfigSchema,
+    },
+    runtime_model::{Cpu, CpuModel, Memory, RuntimeModel, RuntimeModelBuilder},
 };
 
 /// Errors that can occur while parsing a Proxmox source file.
@@ -56,7 +63,7 @@ enum ProxmoxImportError {
 fn parse_source(
     source_text: &str,
     source_name_path: &Path,
-) -> Result<RuntimeConfig, ProxmoxImportError> {
+) -> Result<EzkvmConfigSchema, ProxmoxImportError> {
     let source_name = source_name_path.to_string_lossy().into_owned();
 
     validate_source_name(source_name_path)?;
@@ -109,7 +116,7 @@ fn parse_source(
         }
     }
 
-    Ok(RuntimeConfig {
+    Ok(EzkvmConfigSchema {
         metadata: Metadata {
             schema_version: EZKVM_CONFIG_SCHEMA_VERSION.to_owned(),
             vm_name: required_string(vm_name, &source_name, "name")?,
@@ -254,7 +261,7 @@ fn is_numeric_slot_key(key: &str, prefix: &str) -> bool {
 
 impl Importer for ProxmoxImporter {
     /// Imports a Proxmox VM configuration into the canonical runtime model.
-    fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
+    fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError> {
         let (storage_path, source_path) = match args {
             ImportOptions::Proxmox { storage, vm } => (storage, vm),
             _ => return Err(ImportError::InvalidFormat),
@@ -264,7 +271,10 @@ impl Importer for ProxmoxImporter {
         let source_text = std::fs::read_to_string(&source_path)
             .map_err(|e| ImportError::ImportFailed(format!("{}: {}", source_path, e)))?;
 
-        parse_source(&source_text, Path::new(&source_path))
+        let schema = ProxmoxConfigSchema::parse(&source_text)
+            .map_err(|e| ImportError::ImportFailed(e.to_string()))?;
+
+        RuntimeModelBuilder::build_from_proxmox_config(&schema)
             .map_err(|e| ImportError::ImportFailed(e.to_string()))
     }
 }

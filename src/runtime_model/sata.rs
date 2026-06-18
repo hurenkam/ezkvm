@@ -4,10 +4,7 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    runtime_config::StorageResource,
-    runtime_model::{Cdrom, Hdd, Ssd},
-};
+use crate::runtime_model::{Cdrom, Hdd, Ssd, StorageResource};
 
 use super::ControllerApi;
 

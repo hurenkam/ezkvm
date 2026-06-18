@@ -24,6 +24,7 @@ Note that the vm input path is provided with ```--input.vm```, and host settings
 ```ezkvm convert --input.type proxmox --input.storage /etc/pve/storage.cfg --input.vm <name>.conf --output.type ezkvm --output.host /etc/ezkvm/host.yaml --output.vm <name>.yaml```
 This command imports the given proxmox config file through the `config_format/proxmox` importer and exports via the `config_format/ezkvm` exporter to ```<name>.yaml```.
 Note that ```--input.storage``` is used to locate the proxmox ```storage.cfg``` file which explains how to translate storage paths in the proxmox vm config file to actual device locations.
+Current import coverage includes machine/cpu/memory plus baseline UEFI firmware disk, TPM state, SCSI disks, and bridged network adapters where present in the source config.
 
 5. Import ezkvm config and export as libvirt xml:
 ```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type libvirt --output.vm <name>.xml```

@@ -1,34 +1,12 @@
-use std::{collections::HashMap, fmt::Display};
+use derive_getters::Getters;
+use derive_new::new;
 
-use crate::runtime_config::{Bios, Boot, StorageResource};
+use crate::runtime_model::StorageResource;
 
 const OVMF_CODE_PATH: &str = "/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd";
 const OVMF_VARS_SIZE: usize = 540_672;
 
-pub struct BootModelBuilder {}
-impl BootModelBuilder {
-    pub fn build(
-        boot: &Boot,
-        storage_resources: &HashMap<String, StorageResource>,
-    ) -> Result<BootModel, String> {
-        let bios = match boot.bios() {
-            Bios::SeaBios { seabios: _ } => BiosModel::SeaBios(SeaBiosModel {}),
-            Bios::Uefi { uefi } => {
-                let uefi_resource = storage_resources.get(uefi.resource()).ok_or_else(|| {
-                    format!(
-                        "missing storage resource '{}' referenced by UEFI firmware",
-                        uefi.resource()
-                    )
-                })?;
-                BiosModel::Uefi(UefiModel {
-                    storage: uefi_resource.clone(),
-                })
-            }
-        };
-        Ok(BootModel { bios })
-    }
-}
-
+#[derive(Getters, new)]
 pub struct BootModel {
     bios: BiosModel,
 }
@@ -47,7 +25,7 @@ impl BootModel {
         args
     }
 }
-impl Display for BootModel {
+impl std::fmt::Display for BootModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.bios {
             BiosModel::SeaBios(_) => write!(f, "SeaBios"),
@@ -67,17 +45,14 @@ impl Default for BiosModel {
         BiosModel::SeaBios(SeaBiosModel::default())
     }
 }
+#[derive(Default)]
 pub struct SeaBiosModel {}
 impl SeaBiosModel {
     pub fn qemu_args(&self) -> Vec<String> {
         vec!["-bios".to_string(), "/usr/share/qemu/bios.bin".to_string()]
     }
 }
-impl Default for SeaBiosModel {
-    fn default() -> Self {
-        SeaBiosModel {}
-    }
-}
+#[derive(Getters, new)]
 pub struct UefiModel {
     storage: StorageResource,
 }

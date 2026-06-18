@@ -1,13 +1,14 @@
+#![allow(dead_code)]
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde_json::json;
 use thiserror::Error;
 
-use super::model::RuntimeConfig;
 use super::parsing::{ParseError, Severity, ValidationIssue};
-use crate::runtime_config::Resource;
-use crate::runtime_model::{IdeDeviceType, PcieDeviceType, SataDeviceType};
+use crate::config_format::ezkvm::{Device, EzkvmConfigSchema};
+use crate::runtime_model::{IdeDeviceType, PcieDeviceType, Resource, SataDeviceType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationReportFormat {
@@ -67,7 +68,7 @@ impl ValidationReport {
     }
 }
 
-impl RuntimeConfig {
+impl EzkvmConfigSchema {
     pub fn validate_runtime(&self, source_path: Option<&Path>) -> Result<(), String> {
         let fallback = PathBuf::from(format!("{}.yaml", self.metadata.vm_name));
         let path = source_path.unwrap_or(&fallback);
@@ -111,10 +112,10 @@ impl RuntimeConfig {
         if issues.is_empty() {
             Ok(())
         } else {
-            print!("validation issues:\n");
+            println!("validation issues:");
             for issue in &issues {
-                print!(
-                    "  - [{}] {}: {}\n",
+                println!(
+                    "  - [{}] {}: {}",
                     issue.severity.as_str(),
                     issue.path,
                     issue.reason
@@ -125,7 +126,7 @@ impl RuntimeConfig {
     }
 }
 
-fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &RuntimeConfig) {
+fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &EzkvmConfigSchema) {
     let mut seen_ids = HashSet::new();
     let mut storage_ids = HashSet::new();
     let mut network_ids = HashSet::new();
@@ -159,7 +160,7 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Runt
 
     for (idx, device) in config.virtual_machine.devices.iter().enumerate() {
         match device {
-            crate::runtime_config::Device::Sata { sata } => {
+            Device::Sata { sata } => {
                 let resource_id = match sata.device() {
                     SataDeviceType::Hdd { resource }
                     | SataDeviceType::Ssd { resource }
@@ -180,7 +181,7 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Runt
                     );
                 }
             }
-            crate::runtime_config::Device::Ide { ide } => {
+            Device::Ide { ide } => {
                 let resource_id = match ide.device() {
                     IdeDeviceType::Hdd { resource }
                     | IdeDeviceType::Ssd { resource }
@@ -201,25 +202,21 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Runt
                     );
                 }
             }
-            crate::runtime_config::Device::Pcie { pcie } => {
+            Device::Pcie { pcie } => {
                 if let PcieDeviceType::VirtioNet {
                     resource: Some(resource_id),
                 } = pcie.device()
+                    && !network_ids.contains(resource_id)
                 {
-                    if !network_ids.contains(resource_id) {
-                        issues.push(
-                            ValidationIssue::new(
-                                format!("virtual_machine.devices[{idx}].pcie.resource"),
-                                format!(
-                                    "references missing network resource id '{}'",
-                                    resource_id
-                                ),
-                            )
-                            .with_remediation(
-                                "Add the referenced network resource under resources or update the device resource id",
-                            ),
-                        );
-                    }
+                    issues.push(
+                        ValidationIssue::new(
+                            format!("virtual_machine.devices[{idx}].pcie.resource"),
+                            format!("references missing network resource id '{}'", resource_id),
+                        )
+                        .with_remediation(
+                            "Add the referenced network resource under resources or update the device resource id",
+                        ),
+                    );
                 }
             }
             _ => {}

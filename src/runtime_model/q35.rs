@@ -12,6 +12,7 @@ use super::{
 
 pub struct Q35Chipset {}
 impl Q35Chipset {
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn new(api: &mut dyn BusRegistrationApi) -> Self {
         let pcie_bus = Arc::new(Q35RootPortController::default());
         api.register_pcie_bus(pcie_bus.clone())
@@ -75,10 +76,10 @@ impl PcieControllerApi for Q35RootPortController {
 impl Q35RootPortController {
     fn select_pcie_address(&self, preferred: Option<PcieAddress>) -> PcieAddress {
         let devices = self.pcie_devices.lock().unwrap();
-        if let Some(addr) = preferred {
-            if !devices.contains_key(&addr) {
-                return addr;
-            }
+        if let Some(addr) = preferred
+            && !devices.contains_key(&addr)
+        {
+            return addr;
         }
         // Simple allocation strategy: find the first available address
         for device_num in 0..32 {
@@ -97,7 +98,7 @@ impl Display for Q35RootPortController {
         //write!(f, "        Q35 Root Port Controller\n");
         let devices = self.pcie_devices.lock().unwrap();
         for (addr, device) in devices.iter() {
-            write!(f, "          {addr}: {device}\n")?;
+            writeln!(f, "          {addr}: {device}")?;
         }
         Ok(())
     }
@@ -144,7 +145,7 @@ impl Display for Q35SataController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let devices = self.sata_devices.lock().unwrap();
         for (addr, device) in devices.iter() {
-            write!(f, "          {addr}: {device}\n")?;
+            writeln!(f, "          {addr}: {device}")?;
         }
         Ok(())
     }
@@ -152,10 +153,10 @@ impl Display for Q35SataController {
 impl Q35SataController {
     fn select_sata_address(&self, preferred: Option<SataAddress>) -> SataAddress {
         let devices = self.sata_devices.lock().unwrap();
-        if let Some(addr) = preferred {
-            if !devices.contains_key(&addr) {
-                return addr;
-            }
+        if let Some(addr) = preferred
+            && !devices.contains_key(&addr)
+        {
+            return addr;
         }
         // Simple allocation strategy: find the first available address
         for port in 0..4 {
@@ -210,7 +211,7 @@ impl Display for Q35IdeController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let devices = self.ide_devices.lock().unwrap();
         for (addr, device) in devices.iter() {
-            write!(f, "          {addr}: {device}\n")?;
+            writeln!(f, "          {addr}: {device}")?;
         }
         Ok(())
     }
@@ -219,10 +220,10 @@ impl Display for Q35IdeController {
 impl Q35IdeController {
     fn select_ide_address(&self, preferred: Option<IdeAddress>) -> IdeAddress {
         let devices = self.ide_devices.lock().unwrap();
-        if let Some(addr) = preferred {
-            if !devices.contains_key(&addr) {
-                return addr;
-            }
+        if let Some(addr) = preferred
+            && !devices.contains_key(&addr)
+        {
+            return addr;
         }
 
         for unit in 0..2 {
@@ -269,7 +270,7 @@ impl Display for Q35UsbController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let devices = self.usb_devices.lock().unwrap();
         for (addr, device) in devices.iter() {
-            write!(f, "          {addr}: {device}\n")?;
+            writeln!(f, "          {addr}: {device}")?;
         }
         Ok(())
     }
@@ -277,10 +278,10 @@ impl Display for Q35UsbController {
 impl Q35UsbController {
     fn select_usb_address(&self, preferred: Option<UsbAddress>) -> UsbAddress {
         let devices = self.usb_devices.lock().unwrap();
-        if let Some(addr) = preferred {
-            if !devices.contains_key(&addr) {
-                return addr;
-            }
+        if let Some(addr) = preferred
+            && !devices.contains_key(&addr)
+        {
+            return addr;
         }
         // Simple allocation strategy: find the first available port
         for port_num in 1..=4 {

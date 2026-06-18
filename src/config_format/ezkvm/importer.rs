@@ -7,10 +7,10 @@
 use serde_yaml::from_str;
 use std::path::Path;
 
-use crate::config_format::{
-    EzkvmImporter, ImportError, ImportOptions, Importer, RuntimeConfig, RuntimeModelImporter,
-};
-use crate::runtime_config::{ConformanceError, ParseError};
+use crate::config_format::ezkvm::EzkvmConfigSchema;
+use crate::config_format::ezkvm::builder::{EzkvmHostSchema, EzkvmRuntimeModelBuilder};
+use crate::config_format::ezkvm::{ConformanceError, ParseError};
+use crate::config_format::{EzkvmImporter, ImportError, ImportOptions, Importer};
 use crate::runtime_model::RuntimeModel;
 
 use super::diagnostics::enrich_validation_issues;
@@ -38,8 +38,11 @@ impl EzkvmImporter {
     /// # Returns
     ///
     /// A validated runtime configuration or a conformance error with context.
-    fn validate(yaml: &str, filename: &Path) -> Result<RuntimeConfig, ConformanceError> {
-        let doc = from_str::<RuntimeConfig>(yaml).map_err(ParseError::from)?;
+    pub(crate) fn validate_schema(
+        yaml: &str,
+        filename: &Path,
+    ) -> Result<EzkvmConfigSchema, ConformanceError> {
+        let doc = from_str::<EzkvmConfigSchema>(yaml).map_err(ParseError::from)?;
         match doc.validate_runtime_config(filename) {
             Ok(()) => {}
             Err(ConformanceError::Validation(_, issues)) => {
@@ -54,23 +57,23 @@ impl EzkvmImporter {
 
 impl Importer for EzkvmImporter {
     /// Imports an ezkvm YAML configuration into the canonical runtime model.
-    fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError> {
-        let (_host_path, vm_path) = match args {
+    fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError> {
+        let (host_path, vm_path) = match args {
             ImportOptions::Ezkvm { host, vm } => (host, vm),
             _ => return Err(ImportError::InvalidFormat),
         };
+
         let source_text = std::fs::read_to_string(&vm_path)
             .map_err(|e| ImportError::ImportFailed(format!("{}: {}", vm_path, e)))?;
-        Self::validate(&source_text, Path::new(&vm_path))
-            .map_err(|e| ImportError::ImportFailed(e.to_string()))
-    }
-}
+        let schema = Self::validate_schema(&source_text, Path::new(&vm_path))
+            .map_err(|e| ImportError::ImportFailed(e.to_string()))?;
 
-impl RuntimeModelImporter for EzkvmImporter {
-    /// Imports an ezkvm YAML configuration into the canonical runtime model.
-    fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError> {
-        let runtime_config: RuntimeConfig = Importer::import(self, args)?;
-        RuntimeModel::try_from(runtime_config).map_err(|e| ImportError::ImportFailed(e.to_string()))
+        EzkvmRuntimeModelBuilder::new()
+            .with_host_config(EzkvmHostSchema::new(host_path))
+            .with_vm_config(schema)
+            .with_name(vm_path)
+            .build()
+            .map_err(ImportError::ImportFailed)
     }
 }
 
@@ -80,11 +83,11 @@ mod tests {
 
     use serde_json::Value;
 
-    use crate::{
-        config_format::EzkvmImporter,
-        runtime_config::{
-            ConformanceError, DefaultReportFormatter, ParseError, ReportFormatter, Severity,
-            ValidationIssue, ValidationReport, ValidationReportFormat,
+    use crate::config_format::{
+        EzkvmImporter,
+        ezkvm::{
+            ConformanceError, ParseError, Severity, ValidationIssue, ValidationReport,
+            validation::{DefaultReportFormatter, ReportFormatter, ValidationReportFormat},
         },
     };
 
@@ -140,7 +143,7 @@ resources: []
     /// Accepts a valid ezkvm YAML document.
     fn passing_runtime_config_example() {
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = EzkvmImporter::validate(valid_yaml(), filename);
+        let result = EzkvmImporter::validate_schema(valid_yaml(), filename);
         assert!(result.is_ok());
     }
 
@@ -158,7 +161,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail parsing");
+        let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
         let message = expect_yaml_parse_error(err);
         assert!(message.contains("virtual_machine"));
         assert!(message.contains("missing field `machine`"));
@@ -168,8 +171,8 @@ resources: []
     /// Flags a vm name mismatch against the source filename stem.
     fn vm_name_mismatch() {
         let filename = Path::new("/tmp/another-name.yaml");
-        let err =
-            EzkvmImporter::validate(valid_yaml(), filename).expect_err("should fail validation");
+        let err = EzkvmImporter::validate_schema(valid_yaml(), filename)
+            .expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "metadata.vm_name" && reason.contains("filename stem 'another-name'")
@@ -193,7 +196,8 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail validation");
+        let err =
+            EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "virtual_machine.machine.chipset" && reason.contains("[q35, i440fx]")
@@ -217,7 +221,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail parsing");
+        let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
         let message = expect_yaml_parse_error(err);
         assert!(message.contains("virtual_machine.memory.size"));
         assert!(message.contains("expected usize"));
@@ -241,7 +245,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail parsing");
+        let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
         let message = expect_yaml_parse_error(err);
         assert!(message.contains("virtual_machine.devices"));
         assert!(message.contains("expected a sequence"));
@@ -264,7 +268,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail parsing");
+        let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
 
         match err {
             ConformanceError::Parse(ParseError::Yaml(_)) => {}
@@ -288,7 +292,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = EzkvmImporter::validate(yaml, filename);
+        let result = EzkvmImporter::validate_schema(yaml, filename);
         assert!(result.is_ok());
     }
 
@@ -307,7 +311,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail parsing");
+        let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
         let message = expect_yaml_parse_error(err);
         assert!(message.contains("virtual_machine.machine"));
         assert!(message.contains("missing field `chipset`"));
@@ -329,7 +333,8 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail validation");
+        let err =
+            EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "metadata.vm_name" && reason == "is required and must be a non-empty string"
@@ -352,7 +357,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = EzkvmImporter::validate(yaml, filename);
+        let result = EzkvmImporter::validate_schema(yaml, filename);
         assert!(result.is_ok());
     }
 
@@ -372,7 +377,8 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail validation");
+        let err =
+            EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail validation");
         let issues = expect_validation_issues(err);
         assert!(issues.iter().any(|(path, reason)| {
             path == "metadata.schema_version"
@@ -396,7 +402,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let result = EzkvmImporter::validate(yaml, filename);
+        let result = EzkvmImporter::validate_schema(yaml, filename);
         assert!(result.is_ok());
     }
 
@@ -436,7 +442,7 @@ resources:
       id: "net0"
 "#;
         let filename = Path::new("/tmp/workstation-01.yaml");
-        let result = EzkvmImporter::validate(yaml, filename);
+        let result = EzkvmImporter::validate_schema(yaml, filename);
         if let Err(ref err) = result {
             panic!("expected keyed untagged yaml to parse, got: {err:?}");
         }
@@ -526,7 +532,7 @@ virtual_machine:
 resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail parsing");
+        let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
         let message = expect_yaml_parse_error(err);
 
         assert!(message.contains("virtual_machine"));
@@ -537,7 +543,8 @@ resources: []
     fn conformance_validation_issue_includes_context_and_report_helpers() {
         let yaml = valid_yaml();
         let filename = Path::new("/tmp/other-name.yaml");
-        let err = EzkvmImporter::validate(yaml, filename).expect_err("should fail validation");
+        let err =
+            EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail validation");
         let issue = expect_issue(&err, "metadata.vm_name");
 
         let snippet = issue.source_snippet.as_deref().unwrap_or("");

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use derive_getters::Getters;
 use derive_new::new;
 
-use crate::runtime_config::StorageResource;
+use crate::runtime_model::StorageResource;
 
 #[derive(Debug, Clone, Getters, new)]
 pub struct Cdrom {

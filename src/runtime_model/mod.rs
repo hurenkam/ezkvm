@@ -9,14 +9,19 @@ mod model;
 mod pci;
 mod pcie;
 mod q35;
+mod resources;
 mod sata;
 mod scsi;
 mod tpm;
 mod usb;
 
 pub use model::RuntimeModel;
+pub use resources::{
+    NetworkResource, PciDeviceResource, PcieDeviceResource, Resource, StorageResource,
+    UsbDeviceResource,
+};
 
-pub use boot::{BootModel, BootModelBuilder};
+pub use boot::{BiosModel, BootModel, SeaBiosModel, UefiModel};
 pub use bus_register::{BusRegister, BusRegistrationApi};
 pub use cpu::{Cpu, CpuModel};
 pub use i440fx::I440fxChipset;
@@ -38,7 +43,7 @@ pub use scsi::{
     ScsiAddress, ScsiBus, ScsiControllerApi, ScsiDevice, ScsiDeviceApi, ScsiDeviceBuilder,
     ScsiDeviceType, ScsiDisk,
 };
-pub use tpm::{TpmApi, TpmModel, TpmModelBuilder};
+pub use tpm::{Tpm, TpmApi, TpmModel, TpmModelBuilder};
 pub use usb::{
     UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceBuilder, UsbDeviceType,
 };
@@ -52,6 +57,9 @@ pub use devices::{
     Ssd,
     VirtioNetController,
 };
+
+pub struct RuntimeModelBuilder {}
+pub struct RuntimeModelRenderer {}
 
 pub enum Chipset {
     Q35(Q35Chipset),

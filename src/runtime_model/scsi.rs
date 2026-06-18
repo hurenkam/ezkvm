@@ -1,11 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
+use crate::runtime_model::StorageResource;
+
 use super::{ControllerApi, PcieDeviceApi};
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_config::StorageResource;
 use std::collections::HashMap;
 pub type ScsiBus = u8;
 
@@ -20,7 +21,7 @@ impl Display for ScsiAddress {
     }
 }
 
-pub trait ScsiDeviceApi: Display {
+pub trait ScsiDeviceApi: Display + Send + Sync {
     fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String>;
 }
 pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {

@@ -31,42 +31,42 @@ impl RuntimeModel {
         self.busses
             .pcie_busses()
             .get(&id)
-            .expect(&format!("PCIe bus with id {} does not exist", id))
+            .unwrap_or_else(|| panic!("PCIe bus with id {} does not exist", id))
             .clone()
     }
     pub fn get_pci_bus(&self, id: PciBus) -> Arc<dyn PciControllerApi> {
         self.busses
             .pci_busses()
             .get(&id)
-            .expect(&format!("PCI bus with id {} does not exist", id))
+            .unwrap_or_else(|| panic!("PCI bus with id {} does not exist", id))
             .clone()
     }
     pub fn get_usb_bus(&self, id: UsbBus) -> Arc<dyn UsbControllerApi> {
         self.busses
             .usb_busses()
             .get(&id)
-            .expect(&format!("USB bus with id {} does not exist", id))
+            .unwrap_or_else(|| panic!("USB bus with id {} does not exist", id))
             .clone()
     }
     pub fn get_sata_bus(&self, id: SataBus) -> Arc<dyn SataControllerApi> {
         self.busses
             .sata_busses()
             .get(&id)
-            .expect(&format!("SATA bus with id {} does not exist", id))
+            .unwrap_or_else(|| panic!("SATA bus with id {} does not exist", id))
             .clone()
     }
     pub fn get_ide_bus(&self, id: IdeBus) -> Arc<dyn IdeControllerApi> {
         self.busses
             .ide_busses()
             .get(&id)
-            .expect(&format!("IDE bus with id {} does not exist", id))
+            .unwrap_or_else(|| panic!("IDE bus with id {} does not exist", id))
             .clone()
     }
     pub fn get_scsi_bus(&self, id: ScsiBus) -> Arc<dyn ScsiControllerApi> {
         self.busses
             .scsi_busses()
             .get(&id)
-            .expect(&format!("SCSI bus with id {} does not exist", id))
+            .unwrap_or_else(|| panic!("SCSI bus with id {} does not exist", id))
             .clone()
     }
     pub fn register_pcie_device(
@@ -243,159 +243,5 @@ impl Display for RuntimeModel {
         )?;
         writeln!(f, "  Busses: {}", self.busses)?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::RuntimeModel;
-    use crate::runtime_config::RuntimeConfig;
-
-    #[test]
-    fn q35_supported_subset_renders_valid_command() {
-        let runtime_config: RuntimeConfig = serde_json::from_value(serde_json::json!({
-            "metadata": {
-                "schema_version": "1.0.0",
-                "vm_name": "demo"
-            },
-            "virtual_machine": {
-                "machine": {
-                    "family": "pc",
-                    "chipset": "q35"
-                },
-                "memory": {
-                    "size": 8589934592u64
-                },
-                "boot": {
-                    "uefi": {
-                        "resource": "firmware0"
-                    }
-                },
-                "tpm": {
-                    "swtpm": {
-                        "version": 2.0,
-                        "resource": "tpmstate0"
-                    }
-                },
-                "devices": [
-                    {
-                        "pcie": {
-                            "type": "pv_scsi"
-                        }
-                    },
-                    {
-                        "scsi": {
-                            "type": "hdd",
-                            "resource": "disk0"
-                        }
-                    },
-                    {
-                        "pcie": {
-                            "type": "virtio_net",
-                            "resource": "net0"
-                        }
-                    },
-                    {
-                        "ide": {
-                            "type": "cdrom",
-                            "resource": "iso0"
-                        }
-                    }
-                ]
-            },
-            "resources": [
-                {
-                    "id": "firmware0",
-                    "storage": {
-                        "file": "/var/lib/ezkvm/efivars.fd"
-                    }
-                },
-                {
-                    "id": "tpmstate0",
-                    "storage": {
-                        "file": "/var/lib/ezkvm/tpmstate"
-                    }
-                },
-                {
-                    "id": "disk0",
-                    "storage": {
-                        "block_device": "/dev/vm/disk0"
-                    }
-                },
-                {
-                    "id": "iso0",
-                    "storage": {
-                        "file": "/iso/debian.iso"
-                    }
-                },
-                {
-                    "id": "net0",
-                    "network": {
-                        "bridge": "vmbr0"
-                    }
-                }
-            ]
-        }))
-        .expect("json should parse");
-        let model = RuntimeModel::try_from(runtime_config).expect("runtime model should build");
-        let command = model.qemu_command();
-
-        assert_eq!(command[0], "qemu-system-x86_64");
-        assert!(command.contains(&"type=q35".to_string()));
-        assert!(command.contains(&"menu=on,strict=on,reboot-timeout=1000".to_string()));
-        assert!(command.contains(&"if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/var/lib/ezkvm/efivars.fd,size=540672".to_string()));
-        //assert!(command.contains(&"socket,id=tpmchar,path=/var/run/ezkvm/demo.swtpm".to_string()));
-        assert!(command.contains(&"pvscsi,id=scsihw0,bus=pcie.0,addr=0x0.0".to_string()));
-        assert!(command.contains(&"id=drive-scsi0,file=/dev/vm/disk0,if=none,format=raw,discard=unmap,detect-zeroes=unmap".to_string()));
-        assert!(
-            command.contains(
-                &"scsi-hd,bus=scsihw0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0,id=scsi0"
-                    .to_string()
-            )
-        );
-        assert!(command.contains(&"bridge,id=net0f1,br=vmbr0".to_string()));
-        assert!(
-            command.contains(
-                &"virtio-net-pci,id=net0f1,netdev=net0f1,bus=pcie.0,addr=0x0.1".to_string()
-            )
-        );
-        assert!(
-            command.contains(
-                &"if=none,id=drive-ide0,file=/iso/debian.iso,format=raw,media=cdrom,readonly=on"
-                    .to_string()
-            )
-        );
-        assert!(command.contains(&"ide-cd,bus=ide.1,unit=0,drive=drive-ide0,id=ide0".to_string()));
-    }
-
-    #[test]
-    fn command_display_shell_escapes_paths_with_spaces() {
-        let yaml = r#"
-metadata:
-    schema_version: "1.0.0"
-    vm_name: "demo"
-virtual_machine:
-    machine:
-        family: "pc"
-        chipset: "q35"
-    memory:
-        size: 1073741824
-    devices:
-        - ide:
-                type: cdrom
-                resource: "iso0"
-resources:
-    - id: "iso0"
-      storage:
-        file: "/iso/Debian 12.iso"
-"#;
-
-        let runtime_config: RuntimeConfig = serde_yaml::from_str(yaml).expect("yaml should parse");
-        let model = RuntimeModel::try_from(runtime_config).expect("runtime model should build");
-        let display = model.qemu_command_display();
-
-        assert!(display.contains(
-            "'if=none,id=drive-ide0,file=/iso/Debian 12.iso,format=raw,media=cdrom,readonly=on'"
-        ));
     }
 }

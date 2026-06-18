@@ -4,8 +4,9 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
+use crate::runtime_model::UsbDeviceResource;
+
 use super::ControllerApi;
-use crate::runtime_config::UsbDeviceResource;
 
 pub type UsbBus = u8;
 

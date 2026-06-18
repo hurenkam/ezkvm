@@ -70,10 +70,10 @@ impl Display for PvScsiController {
 impl PvScsiController {
     fn select_scsi_address(&self, preferred: Option<ScsiAddress>) -> ScsiAddress {
         let devices = self.scsi_devices.lock().unwrap();
-        if let Some(address) = preferred {
-            if !devices.contains_key(&address) {
-                return address;
-            }
+        if let Some(address) = preferred
+            && !devices.contains_key(&address)
+        {
+            return address;
         }
 
         for target in 0..16 {

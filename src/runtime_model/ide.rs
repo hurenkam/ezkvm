@@ -4,8 +4,7 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_config::StorageResource;
-use crate::runtime_model::ControllerApi;
+use crate::runtime_model::{ControllerApi, StorageResource};
 
 pub type IdeBus = u8;
 

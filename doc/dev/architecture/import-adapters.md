@@ -99,6 +99,10 @@ Output: virtual_machine
 Diagnostics: []
 ```
 
+Proxmox machine parsing accepts both canonical chipset tokens and versioned Proxmox machine names.
+Examples currently normalized to the same runtime chipset family include `q35`, `pc-q35`,
+`pc-q35-8.1`, `i440fx`, `pc-i440fx`, and `pc-i440fx-8.1`.
+
 ## Non-Goals
 
 - Defining runtime-host path precedence

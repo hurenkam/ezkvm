@@ -1,6 +1,34 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
-use crate::runtime_config::{StorageResource, Tpm};
+use derive_getters::Getters;
+use serde::{Deserialize, Serialize};
+
+use crate::runtime_model::StorageResource;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Tpm {
+    Emulated { swtpm: Swtpm },
+    Passthrough { hwtpm: Hwtpm },
+}
+impl Default for Tpm {
+    fn default() -> Self {
+        Tpm::Emulated {
+            swtpm: Swtpm::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
+pub struct Swtpm {
+    version: f32,
+    resource: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
+pub struct Hwtpm {
+    resource: String,
+}
 
 pub trait TpmApi: Display {
     fn qemu_args(&self, vm_name: &str) -> Vec<String>;
@@ -8,7 +36,7 @@ pub trait TpmApi: Display {
 pub struct TpmModelBuilder {}
 impl TpmModelBuilder {
     pub fn build(
-        tpm: &Tpm,
+        tpm: Tpm,
         storage_resources: &HashMap<String, StorageResource>,
     ) -> Result<Arc<dyn TpmApi>, String> {
         match tpm {
@@ -21,7 +49,7 @@ impl TpmModelBuilder {
                 })?;
                 Ok(Arc::new(TpmModel::Swtpm {
                     swtpm: SwtpmModel {
-                        version: swtpm.version().clone(),
+                        version: *swtpm.version(),
                         resource: resource.clone(),
                     },
                 }))

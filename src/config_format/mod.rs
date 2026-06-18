@@ -20,9 +20,6 @@ pub use qemu_cmd::{QemuExporter, QemuImporter, QemuInputArgs, QemuOutputArgs};
 
 use crate::runtime_model::RuntimeModel;
 
-/// Runtime configuration used by all importer and exporter stages.
-pub type RuntimeConfig = crate::runtime_config::RuntimeConfig;
-
 /// Errors returned when an importer rejects input or fails while reading a source configuration.
 #[derive(Debug, thiserror::Error)]
 pub enum ImportError {
@@ -51,22 +48,14 @@ pub enum ExportError {
     ExportFailed(String),
 }
 
-/// Imports a source configuration into RuntimeConfig.
+/// Imports a source configuration directly into a RuntimeModel.
 pub trait Importer {
-    /// Converts importer-specific options into a validated runtime configuration.
-    fn import(&self, args: ImportOptions) -> Result<RuntimeConfig, ImportError>;
-}
-
-pub trait RuntimeModelImporter {
+    /// Converts source configuration into a validated runtime model.
     fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError>;
 }
 
-/// Exports RuntimeConfig into a destination format.
+/// Exports a RuntimeModel into a destination format.
 pub trait Exporter {
-    /// Writes the runtime configuration to the target format and returns the output path.
-    fn export(&self, runtime: &RuntimeConfig, args: ExportOptions) -> Result<PathBuf, ExportError>;
-}
-
-pub trait RuntimeModelExporter {
-    fn export(&self, runtime: &RuntimeModel, args: ExportOptions) -> Result<PathBuf, ExportError>;
+    /// Writes the runtime model to the target format and returns the output path.
+    fn export(&self, runtime: RuntimeModel, args: ExportOptions) -> Result<PathBuf, ExportError>;
 }

@@ -4,8 +4,14 @@
 //! - src/README.md
 //! - doc/dev/domain-knowledge/proxmox/
 
+mod builder;
 mod exporter;
 mod importer;
+mod schema;
+#[allow(dead_code)]
+pub mod serde_format;
+
+pub use schema::ProxmoxConfigSchema;
 
 /// Imports Proxmox VM configuration files into the canonical runtime model.
 pub struct ProxmoxImporter;
