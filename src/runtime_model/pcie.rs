@@ -45,6 +45,12 @@ pub enum PcieDeviceType {
         resource: Option<String>,
     },
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PcieDeviceKind {
+    PvScsi,
+    VirtioNet,
+}
 impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
     fn from(device: &PcieDeviceType) -> Self {
         match device {
@@ -55,6 +61,11 @@ impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
 }
 
 pub trait PcieDeviceApi: Display {
+    fn device_kind(&self) -> PcieDeviceKind;
+    fn network_resource(&self) -> Option<&crate::runtime_model::NetworkResource> {
+        None
+    }
+
     fn preferred_address(&self) -> Option<PcieAddress> {
         None
     }

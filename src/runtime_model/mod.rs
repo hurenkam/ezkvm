@@ -32,7 +32,8 @@ pub use memory::Memory;
 pub use model::ControllerApi;
 pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
 pub use pcie::{
-    PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceType,
+    PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceKind,
+    PcieDeviceType,
 };
 pub use q35::Q35Chipset;
 pub use sata::{
@@ -55,6 +56,7 @@ pub use devices::{
     // PCI & PCIe devices:
     PvScsiController,
     Ssd,
+    StorageDeviceKind,
     VirtioNetController,
 };
 

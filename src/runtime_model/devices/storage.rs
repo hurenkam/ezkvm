@@ -5,6 +5,13 @@ use derive_new::new;
 
 use crate::runtime_model::StorageResource;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageDeviceKind {
+    Hdd,
+    Ssd,
+    Cdrom,
+}
+
 #[derive(Debug, Clone, Getters, new)]
 pub struct Cdrom {
     resource: StorageResource,

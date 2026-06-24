@@ -4,7 +4,7 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_model::{ControllerApi, StorageResource};
+use crate::runtime_model::{ControllerApi, StorageDeviceKind, StorageResource};
 
 pub type IdeBus = u8;
 
@@ -69,6 +69,14 @@ impl IdeDeviceBuilder {
     }
 }
 impl IdeDeviceApi for super::Hdd {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Hdd
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String> {
         ide_drive_args(
             self.resource(),
@@ -81,6 +89,14 @@ impl IdeDeviceApi for super::Hdd {
 }
 
 impl IdeDeviceApi for super::Ssd {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Ssd
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String> {
         ide_drive_args(
             self.resource(),
@@ -93,6 +109,14 @@ impl IdeDeviceApi for super::Ssd {
 }
 
 impl IdeDeviceApi for super::Cdrom {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Cdrom
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String> {
         ide_drive_args(
             self.resource(),
@@ -105,6 +129,8 @@ impl IdeDeviceApi for super::Cdrom {
 }
 
 pub trait IdeDeviceApi: Display {
+    fn storage_kind(&self) -> StorageDeviceKind;
+    fn storage_resource(&self) -> &StorageResource;
     fn qemu_args(&self, assigned_bus: &IdeBus, assigned_address: IdeAddress) -> Vec<String>;
 }
 

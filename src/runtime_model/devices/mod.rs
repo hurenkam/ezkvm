@@ -3,5 +3,5 @@ mod storage;
 mod virtio_net;
 
 pub use pv_scsi::PvScsiController;
-pub use storage::{Cdrom, Hdd, Ssd};
+pub use storage::{Cdrom, Hdd, Ssd, StorageDeviceKind};
 pub use virtio_net::VirtioNetController;

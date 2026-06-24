@@ -6,8 +6,8 @@
 
 use std::path::PathBuf;
 
-use crate::config_format::ezkvm::builder::EzkvmHostSchema;
-use crate::config_format::ezkvm::renderer::EzkvmRuntimeModelRenderer;
+use crate::config_format::ezkvm::{EzkvmMarshaler, EzkvmSchemaBuilder};
+use crate::config_format::stages::{Marshaler, SchemaBuilder};
 use crate::config_format::{ExportError, ExportOptions, Exporter, EzkvmExporter};
 use crate::runtime_model::RuntimeModel;
 
@@ -31,20 +31,19 @@ impl Exporter for EzkvmExporter {
             _ => return Err(ExportError::InvalidFormat),
         };
 
-        let config_schema = EzkvmRuntimeModelRenderer::new()
-            .with_runtime_model(runtime)
-            .with_host_schema(EzkvmHostSchema::new(output_host))
-            .render()
-            .map_err(|e| {
-                ExportError::ExportFailed(format!("Failed to convert to schema: {}", e))
-            })?;
+        let config_schema = EzkvmSchemaBuilder {
+            host_path: output_host,
+        }
+        .build(runtime)
+        .map_err(|e| ExportError::ExportFailed(format!("Failed to convert to schema: {e}")))?;
 
         let path = output_vm
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(format!("{}.yaml", config_schema.metadata.vm_name)));
 
-        let content = serde_yaml::to_string(&config_schema)
-            .map_err(|e| ExportError::ExportFailed(format!("Failed to serialize schema: {}", e)))?;
+        let content = EzkvmMarshaler
+            .marshal(&config_schema)
+            .map_err(ExportError::ExportFailed)?;
 
         std::fs::write(&path, content)
             .map_err(|e| ExportError::ExportFailed(format!("{}: {}", path.display(), e)))?;

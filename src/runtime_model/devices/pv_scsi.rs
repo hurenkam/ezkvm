@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::runtime_model::{
-    ControllerApi, PcieAddress, PcieBus, PcieDeviceApi, ScsiAddress, ScsiControllerApi,
-    ScsiDeviceApi,
+    ControllerApi, PcieAddress, PcieBus, PcieDeviceApi, PcieDeviceKind, ScsiAddress,
+    ScsiControllerApi, ScsiDeviceApi,
 };
 
 #[derive(Default)]
@@ -15,6 +15,10 @@ pub struct PvScsiController {
 }
 
 impl PcieDeviceApi for PvScsiController {
+    fn device_kind(&self) -> PcieDeviceKind {
+        PcieDeviceKind::PvScsi
+    }
+
     fn qemu_args(&self, bus: &PcieBus, address: PcieAddress) -> Vec<String> {
         let mut args = vec![
             "-device".to_string(),

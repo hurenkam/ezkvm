@@ -5,6 +5,7 @@ use crate::{
     config_format::proxmox::{
         ProxmoxConfigSchema,
         schema::{ProxmoxCompoundValue, ProxmoxOption, ProxmoxValue},
+        storage_resolver::ProxmoxStorageConfig,
     },
     runtime_model::{
         BiosModel, BootModel, BusRegister, BusRegistrationApi, Chipset, Cpu, CpuModel,
@@ -27,7 +28,10 @@ impl RuntimeModelBuilder {
     ///
     /// # Errors
     /// Returns an error if required fields are missing or values cannot be parsed.
-    pub fn build_from_proxmox_config(config: &ProxmoxConfigSchema) -> Result<RuntimeModel, String> {
+    pub fn build_from_proxmox_config(
+        config: &ProxmoxConfigSchema,
+        storage_config: &ProxmoxStorageConfig,
+    ) -> Result<RuntimeModel, String> {
         let global = &config.global.entries;
 
         // Extract required fields with friendly error messages
@@ -57,15 +61,15 @@ impl RuntimeModelBuilder {
         let mut storage_resources: HashMap<String, StorageResource> = HashMap::new();
         let mut network_resources: HashMap<String, NetworkResource> = HashMap::new();
 
-        if let Some(storage) = parse_storage_field(global.get("efidisk0")) {
+        if let Some(storage) = parse_storage_field(global.get("efidisk0"), storage_config) {
             storage_resources.insert("efidisk0".to_string(), storage);
         }
 
-        if let Some(storage) = parse_storage_field(global.get("tpmstate0")) {
+        if let Some(storage) = parse_storage_field(global.get("tpmstate0"), storage_config) {
             storage_resources.insert("tpmstate0".to_string(), storage);
         }
 
-        let mut scsi_disks = collect_scsi_devices(global)?;
+        let mut scsi_disks = collect_scsi_devices(global, storage_config)?;
         scsi_disks.sort_by_key(|(idx, _, _)| *idx);
         for (index, storage, _) in &scsi_disks {
             storage_resources.insert(format!("scsi{index}"), storage.clone());
@@ -192,6 +196,7 @@ enum ProxmoxScsiKind {
 
 fn collect_scsi_devices(
     entries: &std::collections::BTreeMap<String, ProxmoxValue>,
+    storage_config: &ProxmoxStorageConfig,
 ) -> Result<Vec<(usize, StorageResource, ProxmoxScsiKind)>, String> {
     let mut out = Vec::new();
     for (key, value) in entries {
@@ -204,7 +209,7 @@ fn collect_scsi_devices(
         let index = suffix
             .parse::<usize>()
             .map_err(|_| format!("invalid scsi index in key '{key}'"))?;
-        let Some(storage) = parse_storage_field(Some(value)) else {
+        let Some(storage) = parse_storage_field(Some(value), storage_config) else {
             continue;
         };
 
@@ -263,43 +268,17 @@ fn collect_network_devices(
     Ok(out)
 }
 
-fn parse_storage_field(value: Option<&ProxmoxValue>) -> Option<StorageResource> {
+fn parse_storage_field(
+    value: Option<&ProxmoxValue>,
+    storage_config: &ProxmoxStorageConfig,
+) -> Option<StorageResource> {
     let token = match value {
         Some(ProxmoxValue::Scalar { value }) => value.as_str(),
         Some(ProxmoxValue::Compound(compound)) => compound.head.as_str(),
         None => return None,
     };
 
-    parse_proxmox_storage_token(token)
-}
-
-fn parse_proxmox_storage_token(token: &str) -> Option<StorageResource> {
-    if token == "none" || token.is_empty() {
-        return None;
-    }
-
-    if token.starts_with('/') {
-        return Some(StorageResource::File {
-            file: token.to_string(),
-        });
-    }
-
-    let (storage_id, volume) = token.split_once(':')?;
-
-    if storage_id == "local" {
-        return Some(StorageResource::File {
-            file: format!("/var/lib/vz/{volume}"),
-        });
-    }
-
-    let vg = storage_id
-        .strip_suffix("-pool")
-        .unwrap_or(storage_id)
-        .to_string();
-
-    Some(StorageResource::BlockDevice {
-        block_device: format!("/dev/{vg}/{volume}"),
-    })
+    storage_config.token_to_resource(token)
 }
 
 fn option_value<'a>(compound: &'a ProxmoxCompoundValue, key: &str) -> Option<&'a str> {
@@ -369,6 +348,22 @@ fn extract_scalar_u8(
 mod tests {
     use super::*;
 
+    fn storage_cfg() -> ProxmoxStorageConfig {
+        ProxmoxStorageConfig::parse(
+            r#"
+dir: local
+    path /var/lib/vz
+
+lvmthin: vm1-pool
+    vgname vm1
+
+lvm: vm1
+    vgname vm1
+"#,
+        )
+        .expect("storage cfg should parse")
+    }
+
     #[test]
     fn builds_runtime_model_from_basic_proxmox_config() {
         let config_text = r#"
@@ -381,7 +376,8 @@ sockets: 1
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_ok(), "Should successfully build RuntimeModel");
 
         let model = result.unwrap();
@@ -400,7 +396,8 @@ sockets: 1
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_ok());
     }
 
@@ -416,7 +413,8 @@ sockets: 1
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_ok());
     }
 
@@ -432,7 +430,8 @@ sockets: 1
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_ok());
     }
 
@@ -445,7 +444,8 @@ cpu: host
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_err());
         match result {
             Err(e) => assert!(e.contains("name"), "Error should mention 'name': {}", e),
@@ -463,7 +463,8 @@ cores: 2
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_err());
         match result {
             Err(e) => assert!(e.contains("memory"), "Error should mention 'memory': {}", e),
@@ -481,7 +482,8 @@ cpu: host
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_err());
         match result {
             Err(e) => assert!(
@@ -504,7 +506,8 @@ cores: 2
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(result.is_err());
         match result {
             Err(e) => assert!(
@@ -527,7 +530,8 @@ sockets: 1
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(
             result.is_ok(),
             "Should use default CPU model when not specified"
@@ -544,7 +548,8 @@ cpu: host
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema);
+        let storage = storage_cfg();
+        let result = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage);
         assert!(
             result.is_ok(),
             "Should use default CPU topology when not specified"
@@ -569,7 +574,8 @@ net0: virtio=BC:24:11:3A:21:B7,bridge=vmbr0
 "#;
         let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
 
-        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema)
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
             .expect("rich proxmox config should map into runtime model");
 
         let command = model.qemu_command();

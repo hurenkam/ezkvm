@@ -4,12 +4,12 @@
 //! - src/README.md
 //! - doc/dev/architecture/design/vm-spec-parsing-validation.md
 
-use serde_yaml::from_str;
 use std::path::Path;
 
-use crate::config_format::ezkvm::EzkvmConfigSchema;
-use crate::config_format::ezkvm::builder::{EzkvmHostSchema, EzkvmRuntimeModelBuilder};
-use crate::config_format::ezkvm::{ConformanceError, ParseError};
+use crate::config_format::ezkvm::{
+    ConformanceError, EzkvmConfigSchema, EzkvmParser, EzkvmRuntimeBuilder,
+};
+use crate::config_format::stages::{Parser, RuntimeBuilder};
 use crate::config_format::{EzkvmImporter, ImportError, ImportOptions, Importer};
 use crate::runtime_model::RuntimeModel;
 
@@ -42,7 +42,7 @@ impl EzkvmImporter {
         yaml: &str,
         filename: &Path,
     ) -> Result<EzkvmConfigSchema, ConformanceError> {
-        let doc = from_str::<EzkvmConfigSchema>(yaml).map_err(ParseError::from)?;
+        let doc = EzkvmParser.parse(yaml)?;
         match doc.validate_runtime_config(filename) {
             Ok(()) => {}
             Err(ConformanceError::Validation(_, issues)) => {
@@ -68,12 +68,12 @@ impl Importer for EzkvmImporter {
         let schema = Self::validate_schema(&source_text, Path::new(&vm_path))
             .map_err(|e| ImportError::ImportFailed(e.to_string()))?;
 
-        EzkvmRuntimeModelBuilder::new()
-            .with_host_config(EzkvmHostSchema::new(host_path))
-            .with_vm_config(schema)
-            .with_name(vm_path)
-            .build()
-            .map_err(ImportError::ImportFailed)
+        EzkvmRuntimeBuilder {
+            host_path,
+            vm_name: vm_path,
+        }
+        .build(schema)
+        .map_err(ImportError::ImportFailed)
     }
 }
 

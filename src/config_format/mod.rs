@@ -9,12 +9,15 @@ mod libvirt;
 mod options;
 mod proxmox;
 mod qemu_cmd;
+pub mod stages;
 
 use std::path::PathBuf;
 
+pub use ezkvm::{EzkvmExportArgs, EzkvmImportArgs};
 pub use ezkvm::{EzkvmExporter, EzkvmImporter, EzkvmInputArgs, EzkvmOutputArgs};
 pub use libvirt::{LibvirtExporter, LibvirtImporter, LibvirtInputArgs, LibvirtOutputArgs};
 pub use options::{ExportOptions, ImportOptions};
+pub use proxmox::{ProxmoxExportArgs, ProxmoxImportArgs};
 pub use proxmox::{ProxmoxExporter, ProxmoxImporter, ProxmoxInputArgs, ProxmoxOutputArgs};
 pub use qemu_cmd::{QemuExporter, QemuImporter, QemuInputArgs, QemuOutputArgs};
 
@@ -59,3 +62,6 @@ pub trait Exporter {
     /// Writes the runtime model to the target format and returns the output path.
     fn export(&self, runtime: RuntimeModel, args: ExportOptions) -> Result<PathBuf, ExportError>;
 }
+
+#[cfg(test)]
+mod parity_tests;

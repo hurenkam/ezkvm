@@ -7,11 +7,20 @@
 mod builder;
 mod exporter;
 mod importer;
+mod marshaler;
+mod parser;
+mod runtime_builder;
 mod schema;
+mod schema_builder;
 #[allow(dead_code)]
 pub mod serde_format;
+pub(crate) mod storage_resolver;
 
+pub use marshaler::ProxmoxMarshaler;
+pub use parser::ProxmoxParser;
+pub use runtime_builder::ProxmoxRuntimeBuilder;
 pub use schema::ProxmoxConfigSchema;
+pub use schema_builder::ProxmoxSchemaBuilder;
 
 /// Imports Proxmox VM configuration files into the canonical runtime model.
 pub struct ProxmoxImporter;
@@ -42,3 +51,6 @@ pub struct ProxmoxOutputArgs {
     #[serde(rename = "output.vm")]
     pub output_vm: String,
 }
+
+pub type ProxmoxImportArgs = ProxmoxInputArgs;
+pub type ProxmoxExportArgs = ProxmoxOutputArgs;

@@ -7,7 +7,10 @@ use crate::{
         Boot, Device, EZKVM_CONFIG_SCHEMA_VERSION, EzkvmConfigSchema, Machine, Metadata,
         VirtualMachine, builder::EzkvmHostSchema,
     },
-    runtime_model::{BiosModel, NetworkResource, Resource, RuntimeModel, StorageResource},
+    runtime_model::{
+        BiosModel, Chipset, NetworkResource, PcieDeviceKind, Resource, RuntimeModel,
+        StorageDeviceKind, StorageResource,
+    },
 };
 
 #[derive(Default)]
@@ -39,7 +42,7 @@ impl EzkvmRuntimeModelRenderer {
             .as_ref()
             .ok_or_else(|| "missing host schema".to_string())?;
 
-        let chipset = machine_chipset(model.qemu_command());
+        let chipset = machine_chipset(model.chipset());
 
         let mut resources = Vec::new();
         let mut storage_resource_ids: BTreeMap<String, String> = BTreeMap::new();
@@ -86,20 +89,11 @@ impl EzkvmRuntimeModelRenderer {
     }
 }
 
-fn machine_chipset(command: Vec<String>) -> String {
-    for window in command.windows(2) {
-        if let [flag, value] = window
-            && flag == "-machine"
-        {
-            if value.contains("q35") {
-                return "q35".to_string();
-            }
-            if value.contains("i440fx") {
-                return "i440fx".to_string();
-            }
-        }
+fn machine_chipset(chipset: &Chipset) -> String {
+    match chipset {
+        Chipset::Q35(_) => "q35".to_string(),
+        Chipset::I440FX(_) => "i440fx".to_string(),
     }
-    "q35".to_string()
 }
 
 fn render_boot(
@@ -133,12 +127,11 @@ fn render_tpm(
         return Ok(None);
     };
 
-    let tpm_text = format!("{tpm}");
-    let Some(storage) = parse_storage_from_tpm_display(&tpm_text) else {
+    let Some(storage) = tpm.storage_resource().cloned() else {
         return Ok(None);
     };
 
-    let version = parse_tpm_version_from_display(&tpm_text).unwrap_or(2.0);
+    let version = tpm.swtpm_version().unwrap_or(2.0);
     let resource = storage_resource_id(
         &storage,
         resources,
@@ -159,6 +152,12 @@ fn render_devices(
 ) -> Result<Vec<Device>, String> {
     let mut rendered = Vec::new();
 
+    let mut ctx = RenderContext {
+        resources,
+        storage_resource_ids,
+        network_resource_ids,
+    };
+
     let busses = model.busses();
 
     let mut pcie_bus_ids: Vec<u8> = busses.pcie_busses().keys().copied().collect();
@@ -168,21 +167,15 @@ fn render_devices(
             let mut addresses: Vec<_> = controller.devices().into_keys().collect();
             addresses.sort_by_key(|address| (address.device(), address.function()));
             for address in addresses {
-                let args = controller
-                    .devices()
-                    .get(&address)
-                    .map(|device| device.qemu_args(&pcie_bus, address.clone()))
-                    .unwrap_or_default();
-
-                if let Some(device) = render_pcie_device_from_args(
-                    pcie_bus,
-                    address.device(),
-                    address.function(),
-                    &args,
-                    resources,
-                    storage_resource_ids,
-                    network_resource_ids,
-                )? {
+                if let Some(device_impl) = controller.devices().get(&address)
+                    && let Some(device) = render_pcie_device(
+                        pcie_bus,
+                        address.device(),
+                        address.function(),
+                        device_impl.as_ref(),
+                        &mut ctx,
+                    )?
+                {
                     rendered.push(device);
                 }
             }
@@ -196,20 +189,16 @@ fn render_devices(
             let mut addresses: Vec<_> = controller.devices().into_keys().collect();
             addresses.sort_by_key(|address| address.address);
             for address in addresses {
-                let args = controller
-                    .devices()
-                    .get(&address)
-                    .map(|device| device.qemu_args(&ide_bus, address.clone()))
-                    .unwrap_or_default();
-                if let Some(device) = render_storage_device_from_args(
-                    "ide",
-                    ide_bus,
-                    address.address,
-                    &args,
-                    resources,
-                    storage_resource_ids,
-                    network_resource_ids,
-                )? {
+                if let Some(device_impl) = controller.devices().get(&address)
+                    && let Some(device) = render_storage_device(
+                        "ide",
+                        ide_bus,
+                        address.address,
+                        device_impl.storage_resource(),
+                        device_impl.storage_kind(),
+                        &mut ctx,
+                    )?
+                {
                     rendered.push(device);
                 }
             }
@@ -223,20 +212,16 @@ fn render_devices(
             let mut addresses: Vec<_> = controller.devices().into_keys().collect();
             addresses.sort_by_key(|address| address.address);
             for address in addresses {
-                let args = controller
-                    .devices()
-                    .get(&address)
-                    .map(|device| device.qemu_args(&sata_bus, address.clone()))
-                    .unwrap_or_default();
-                if let Some(device) = render_storage_device_from_args(
-                    "sata",
-                    sata_bus,
-                    address.address,
-                    &args,
-                    resources,
-                    storage_resource_ids,
-                    network_resource_ids,
-                )? {
+                if let Some(device_impl) = controller.devices().get(&address)
+                    && let Some(device) = render_storage_device(
+                        "sata",
+                        sata_bus,
+                        address.address,
+                        device_impl.storage_resource(),
+                        device_impl.storage_kind(),
+                        &mut ctx,
+                    )?
+                {
                     rendered.push(device);
                 }
             }
@@ -250,20 +235,16 @@ fn render_devices(
             let mut addresses: Vec<_> = controller.devices().into_keys().collect();
             addresses.sort_by_key(|address| (address.target, address.lun));
             for address in addresses {
-                let args = controller
-                    .devices()
-                    .get(&address)
-                    .map(|device| device.qemu_args(&scsi_bus, address.clone()))
-                    .unwrap_or_default();
-                if let Some(device) = render_scsi_device_from_args(
-                    scsi_bus,
-                    address.target,
-                    address.lun,
-                    &args,
-                    resources,
-                    storage_resource_ids,
-                    network_resource_ids,
-                )? {
+                if let Some(device_impl) = controller.devices().get(&address)
+                    && let Some(device) = render_scsi_device(
+                        scsi_bus,
+                        address.target,
+                        address.lun,
+                        device_impl.storage_resource(),
+                        device_impl.storage_kind(),
+                        &mut ctx,
+                    )?
+                {
                     rendered.push(device);
                 }
             }
@@ -273,82 +254,68 @@ fn render_devices(
     Ok(rendered)
 }
 
-fn render_pcie_device_from_args(
+fn render_pcie_device(
     bus: u8,
     address_device: u8,
     address_function: u8,
-    args: &[String],
-    resources: &mut Vec<Resource>,
-    storage_resource_ids: &mut BTreeMap<String, String>,
-    network_resource_ids: &mut BTreeMap<String, String>,
+    device: &dyn crate::runtime_model::PcieDeviceApi,
+    ctx: &mut RenderContext<'_>,
 ) -> Result<Option<Device>, String> {
-    if args.iter().any(|value| value.contains("pvscsi")) {
-        let value = json!({
-            "pcie": {
-                "bus": bus,
-                "device": address_device,
-                "function": address_function,
-                "type": "pv_scsi"
-            }
-        });
-        let device: Device = serde_json::from_value(value)
-            .map_err(|e| format!("failed to render pv_scsi device: {e}"))?;
-        return Ok(Some(device));
+    match device.device_kind() {
+        PcieDeviceKind::PvScsi => {
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "pv_scsi"
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render pv_scsi device: {e}"))?;
+            Ok(Some(device))
+        }
+        PcieDeviceKind::VirtioNet => {
+            let resource = device.network_resource().map(|network| {
+                network_resource_id(
+                    network,
+                    ctx.resources,
+                    ctx.storage_resource_ids,
+                    ctx.network_resource_ids,
+                )
+            });
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "virtio_net",
+                    "resource": resource
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render virtio_net device: {e}"))?;
+            Ok(Some(device))
+        }
     }
-
-    if let Some(netdev) = find_netdev_arg(args) {
-        let resource = parse_network_resource_from_netdev_arg(netdev).map(|network| {
-            network_resource_id(
-                &network,
-                resources,
-                storage_resource_ids,
-                network_resource_ids,
-            )
-        });
-        let value = json!({
-            "pcie": {
-                "bus": bus,
-                "device": address_device,
-                "function": address_function,
-                "type": "virtio_net",
-                "resource": resource
-            }
-        });
-        let device: Device = serde_json::from_value(value)
-            .map_err(|e| format!("failed to render virtio_net device: {e}"))?;
-        return Ok(Some(device));
-    }
-
-    Ok(None)
 }
 
-fn render_storage_device_from_args(
+fn render_storage_device(
     bus_kind: &str,
     bus: u8,
     address: u8,
-    args: &[String],
-    resources: &mut Vec<Resource>,
-    storage_resource_ids: &mut BTreeMap<String, String>,
-    network_resource_ids: &mut BTreeMap<String, String>,
+    storage: &StorageResource,
+    kind: StorageDeviceKind,
+    ctx: &mut RenderContext<'_>,
 ) -> Result<Option<Device>, String> {
-    let Some(drive_arg) = find_drive_arg(args) else {
-        return Ok(None);
-    };
-    let Some(storage) = parse_storage_from_drive_arg(drive_arg) else {
-        return Ok(None);
-    };
     let resource = storage_resource_id(
-        &storage,
-        resources,
-        storage_resource_ids,
-        network_resource_ids,
+        storage,
+        ctx.resources,
+        ctx.storage_resource_ids,
+        ctx.network_resource_ids,
     );
 
-    let device_type = if drive_arg.contains("media=cdrom") {
-        "cdrom"
-    } else {
-        "hdd"
-    };
+    let device_type = storage_device_type(kind);
 
     let value = match bus_kind {
         "ide" => json!({
@@ -375,32 +342,21 @@ fn render_storage_device_from_args(
     Ok(Some(device))
 }
 
-fn render_scsi_device_from_args(
+fn render_scsi_device(
     bus: u8,
     target: u8,
     lun: u8,
-    args: &[String],
-    resources: &mut Vec<Resource>,
-    storage_resource_ids: &mut BTreeMap<String, String>,
-    network_resource_ids: &mut BTreeMap<String, String>,
+    storage: &StorageResource,
+    kind: StorageDeviceKind,
+    ctx: &mut RenderContext<'_>,
 ) -> Result<Option<Device>, String> {
-    let Some(drive_arg) = find_drive_arg(args) else {
-        return Ok(None);
-    };
-    let Some(storage) = parse_storage_from_drive_arg(drive_arg) else {
-        return Ok(None);
-    };
     let resource = storage_resource_id(
-        &storage,
-        resources,
-        storage_resource_ids,
-        network_resource_ids,
+        storage,
+        ctx.resources,
+        ctx.storage_resource_ids,
+        ctx.network_resource_ids,
     );
-    let device_type = if drive_arg.contains("media=cdrom") {
-        "cdrom"
-    } else {
-        "hdd"
-    };
+    let device_type = storage_device_type(kind);
 
     let value = json!({
         "scsi": {
@@ -416,75 +372,17 @@ fn render_scsi_device_from_args(
     Ok(Some(device))
 }
 
-fn find_drive_arg(args: &[String]) -> Option<&str> {
-    args.iter()
-        .find(|value| value.contains("file=") && value.contains("if=none"))
-        .map(String::as_str)
-}
-
-fn find_netdev_arg(args: &[String]) -> Option<&str> {
-    args.iter()
-        .find(|value| {
-            value.starts_with("bridge,") || value.starts_with("tap,") || value.starts_with("user,")
-        })
-        .map(String::as_str)
-}
-
-fn parse_storage_from_drive_arg(drive_arg: &str) -> Option<StorageResource> {
-    for entry in drive_arg.split(',') {
-        if let Some(file) = entry.strip_prefix("file=") {
-            if file.starts_with("/dev/") {
-                return Some(StorageResource::BlockDevice {
-                    block_device: file.to_string(),
-                });
-            }
-            return Some(StorageResource::File {
-                file: file.to_string(),
-            });
-        }
+fn storage_device_type(kind: StorageDeviceKind) -> &'static str {
+    match kind {
+        StorageDeviceKind::Cdrom => "cdrom",
+        StorageDeviceKind::Hdd | StorageDeviceKind::Ssd => "hdd",
     }
-    None
 }
 
-fn parse_network_resource_from_netdev_arg(netdev: &str) -> Option<NetworkResource> {
-    for entry in netdev.split(',') {
-        if let Some(bridge) = entry.strip_prefix("br=") {
-            return Some(NetworkResource::Bridge {
-                bridge: bridge.to_string(),
-            });
-        }
-        if let Some(tap) = entry.strip_prefix("ifname=") {
-            return Some(NetworkResource::Tap {
-                tap: tap.to_string(),
-            });
-        }
-    }
-    None
-}
-
-fn parse_storage_from_tpm_display(display: &str) -> Option<StorageResource> {
-    if let Some(value) = parse_quoted_after(display, "file: \"") {
-        return Some(StorageResource::File { file: value });
-    }
-    if let Some(value) = parse_quoted_after(display, "block_device: \"") {
-        return Some(StorageResource::BlockDevice {
-            block_device: value,
-        });
-    }
-    None
-}
-
-fn parse_tpm_version_from_display(display: &str) -> Option<f32> {
-    let start = display.find("v")? + 1;
-    let end = display[start..].find(',')? + start;
-    display[start..end].parse::<f32>().ok()
-}
-
-fn parse_quoted_after(input: &str, prefix: &str) -> Option<String> {
-    let start = input.find(prefix)? + prefix.len();
-    let remainder = &input[start..];
-    let end = remainder.find('"')?;
-    Some(remainder[..end].to_string())
+struct RenderContext<'a> {
+    resources: &'a mut Vec<Resource>,
+    storage_resource_ids: &'a mut BTreeMap<String, String>,
+    network_resource_ids: &'a mut BTreeMap<String, String>,
 }
 
 fn storage_resource_id(

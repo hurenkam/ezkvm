@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::vec;
 
-use crate::runtime_model::{NetworkResource, PcieAddress, PcieBus, PcieDeviceApi};
+use crate::runtime_model::{NetworkResource, PcieAddress, PcieBus, PcieDeviceApi, PcieDeviceKind};
 
 #[derive(Default)]
 pub struct VirtioNetController {
@@ -14,6 +14,14 @@ impl VirtioNetController {
     }
 }
 impl PcieDeviceApi for VirtioNetController {
+    fn device_kind(&self) -> PcieDeviceKind {
+        PcieDeviceKind::VirtioNet
+    }
+
+    fn network_resource(&self) -> Option<&NetworkResource> {
+        self.resource.as_ref()
+    }
+
     fn qemu_args(&self, bus: &PcieBus, address: PcieAddress) -> Vec<String> {
         let device_id = format!("net{}f{}", address.device(), address.function());
         let netdev = match &self.resource {

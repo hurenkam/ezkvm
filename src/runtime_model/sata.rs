@@ -4,7 +4,7 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_model::{Cdrom, Hdd, Ssd, StorageResource};
+use crate::runtime_model::{Cdrom, Hdd, Ssd, StorageDeviceKind, StorageResource};
 
 use super::ControllerApi;
 
@@ -64,6 +64,8 @@ impl SataDeviceBuilder {
     }
 }
 pub trait SataDeviceApi: Display {
+    fn storage_kind(&self) -> StorageDeviceKind;
+    fn storage_resource(&self) -> &StorageResource;
     fn qemu_args(&self, assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String>;
 }
 
@@ -85,18 +87,42 @@ pub enum SataDeviceType {
 }
 
 impl SataDeviceApi for Hdd {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Hdd
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, _assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String> {
         sata_drive_args(self.resource(), assigned_address.address, "ide-hd", false)
     }
 }
 
 impl SataDeviceApi for Ssd {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Ssd
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, _assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String> {
         sata_drive_args(self.resource(), assigned_address.address, "ide-hd", false)
     }
 }
 
 impl SataDeviceApi for Cdrom {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Cdrom
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, _assigned_bus: &SataBus, assigned_address: SataAddress) -> Vec<String> {
         sata_drive_args(self.resource(), assigned_address.address, "ide-cd", true)
     }

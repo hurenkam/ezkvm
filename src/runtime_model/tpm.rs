@@ -31,6 +31,14 @@ pub struct Hwtpm {
 }
 
 pub trait TpmApi: Display {
+    fn swtpm_version(&self) -> Option<f32> {
+        None
+    }
+
+    fn storage_resource(&self) -> Option<&StorageResource> {
+        None
+    }
+
     fn qemu_args(&self, vm_name: &str) -> Vec<String>;
 }
 pub struct TpmModelBuilder {}
@@ -62,6 +70,18 @@ pub enum TpmModel {
     Swtpm { swtpm: SwtpmModel },
 }
 impl TpmApi for TpmModel {
+    fn swtpm_version(&self) -> Option<f32> {
+        match self {
+            TpmModel::Swtpm { swtpm } => Some(swtpm.version),
+        }
+    }
+
+    fn storage_resource(&self) -> Option<&StorageResource> {
+        match self {
+            TpmModel::Swtpm { swtpm } => Some(&swtpm.resource),
+        }
+    }
+
     fn qemu_args(&self, vm_name: &str) -> Vec<String> {
         match self {
             TpmModel::Swtpm { swtpm: _ } => {

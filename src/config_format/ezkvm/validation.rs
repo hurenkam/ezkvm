@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use serde_json::json;
 use thiserror::Error;
 
-use super::parsing::{ParseError, Severity, ValidationIssue};
+use super::errors::{ParseError, Severity, ValidationIssue};
 use crate::config_format::ezkvm::{Device, EzkvmConfigSchema};
 use crate::runtime_model::{IdeDeviceType, PcieDeviceType, Resource, SataDeviceType};
 
@@ -451,7 +451,7 @@ impl ConformanceError {
 mod tests {
     use serde_json::Value;
 
-    use super::super::parsing::{Severity, ValidationIssue};
+    use super::super::errors::{Severity, ValidationIssue};
     use super::{DefaultReportFormatter, ReportFormatter, ValidationReport};
 
     // Reporter-001: Human-readable report formatting

@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::Arc};
 
-use crate::runtime_model::StorageResource;
+use crate::runtime_model::{StorageDeviceKind, StorageResource};
 
 use super::{ControllerApi, PcieDeviceApi};
 use derive_getters::Getters;
@@ -22,6 +22,8 @@ impl Display for ScsiAddress {
 }
 
 pub trait ScsiDeviceApi: Display + Send + Sync {
+    fn storage_kind(&self) -> StorageDeviceKind;
+    fn storage_resource(&self) -> &StorageResource;
     fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String>;
 }
 pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
@@ -87,6 +89,14 @@ impl ScsiDeviceBuilder {
 pub struct ScsiDisk {}
 
 impl ScsiDeviceApi for super::Hdd {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Hdd
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
         scsi_drive_args(
             self.resource(),
@@ -99,6 +109,14 @@ impl ScsiDeviceApi for super::Hdd {
 }
 
 impl ScsiDeviceApi for super::Ssd {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Ssd
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
         scsi_drive_args(
             self.resource(),
@@ -111,6 +129,14 @@ impl ScsiDeviceApi for super::Ssd {
 }
 
 impl ScsiDeviceApi for super::Cdrom {
+    fn storage_kind(&self) -> StorageDeviceKind {
+        StorageDeviceKind::Cdrom
+    }
+
+    fn storage_resource(&self) -> &StorageResource {
+        self.resource()
+    }
+
     fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
         scsi_drive_args(
             self.resource(),
