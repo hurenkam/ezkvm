@@ -7,7 +7,7 @@ This page is the index for implementation design notes that describe the current
 The current implementation is split into these module areas:
 
 - entrypoint and crate wiring in `src/main.rs` and `src/lib.rs`
-- source import adapters in `src/config_importer/`
+- source format adapters in `src/config_format/`
 - canonical VM model parsing and validation in `src/runtime_config/`
 - runtime-boundary scaffold plus deterministic rendering in `src/runtime_resolution/` and `src/render_stage/`
 
@@ -31,11 +31,11 @@ The binary entrypoint is still minimal and does not execute the full stage pipel
 | --- | --- | --- |
 | `src/lib.rs` | Crate wiring | `app_name()` |
 | `src/main.rs` | CLI entrypoint | `main()` |
-| `src/config_importer/mod.rs` | Config importer stage boundary | `ConfigArgs`, `ConfigImporter`, `ConfigImportError` |
-| `src/config_importer/ezkvm/mod.rs` | ezkvm YAML adapter | `EzkvmConfigImporter` |
-| `src/config_importer/proxmox/mod.rs` | Proxmox `.conf` adapter | `ProxmoxConfigImporter`, `ProxmoxImportError`, `parse_machine_value()` |
-| `src/config_importer/qemu/mod.rs` | QEMU command line adapter stub | `QemuConfigImporter` |
-| `src/config_importer/libvirt/mod.rs` | Libvirt XML adapter stub | `LibvirtConfigImporter` |
+| `src/config_format/mod.rs` | Import/export stage boundary | `Importer`, `Exporter`, `ImportOptions`, `ExportOptions` |
+| `src/config_format/ezkvm/mod.rs` | ezkvm staged adapter | `EzkvmImporter`, `EzkvmExporter` |
+| `src/config_format/proxmox/mod.rs` | Proxmox staged adapter | `ProxmoxImporter`, `ProxmoxExporter` |
+| `src/config_format/qemu_cmd/mod.rs` | QEMU command staged adapter | `QemuImporter`, `QemuExporter`, `QemuParser`, `QemuRuntimeBuilder`, `QemuSchemaBuilder`, `QemuMarshaler` |
+| `src/config_format/libvirt/mod.rs` | Libvirt adapter boundary | `LibvirtImporter`, `LibvirtExporter` |
 | `src/runtime_config/mod.rs` | Canonical schema exports | `CanonicalDocument`, `ParseError`, `ValidationIssue`, `ConformanceError`, `validate_canonical_yaml()`, `validate_canonical_document()` |
 | `src/runtime_config/model.rs` | Canonical data model | `Metadata`, `VirtualMachine`, `System`, `Machine`, `Cpu`, `Memory`, `StorageEntry`, `NetworkEntry`, `ResourceRef` |
 | `src/runtime_config/parsing.rs` | YAML parsing and structural validation | `Severity`, `ValidationIssue`, `ParseError`, `parse_canonical_document_from_yaml()`, `parse_canonical_document()`, `enrich_validation_issues()` |

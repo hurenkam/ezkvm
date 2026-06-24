@@ -30,6 +30,12 @@ Provides importers and exporters that translate between external VM configuratio
 - For fixed input and options, output must be bit-identical (idempotent)
 - Field ordering and text escaping must be canonical
 
+### QEMU Command Coverage (Current)
+- `qemu_cmd` importer/exporter are implemented with staged adapters (`parser`, `runtime_builder`, `schema_builder`, `marshaler`).
+- Phase-1 mapping focuses on the shared subset: VM name, machine/chipset, CPU topology, and memory.
+- Parser keeps full raw argv in schema so unsupported flags are preserved for parse/marshal roundtrips as passthrough arguments.
+- Runtime conversion remains subset-based; unsupported flags are not mapped into canonical runtime fields.
+
 ### Structural Validation
 - Input files are validated for syntax and semantic consistency at import boundary
 - Source-specific validation (e.g., required fields) occurs during import

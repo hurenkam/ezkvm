@@ -4,9 +4,18 @@
 //! - src/README.md
 //! - doc/dev/domain-knowledge/qemu/
 
-mod builder;
 mod exporter;
 mod importer;
+mod marshaler;
+mod parser;
+mod runtime_builder;
+mod schema;
+mod schema_builder;
+
+pub use marshaler::QemuMarshaler;
+pub use parser::QemuParser;
+pub use runtime_builder::QemuRuntimeBuilder;
+pub use schema_builder::QemuSchemaBuilder;
 
 /// Imports QEMU command files into the canonical runtime model.
 pub struct QemuImporter;

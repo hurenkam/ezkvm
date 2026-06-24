@@ -36,6 +36,8 @@ Input flags:
     - `proxmox`: proxmox config format.
       - `--input.storage <path>`: path and filename of the proxmox storage config file to read.
       - `--input.vm <path>`: path and filename of the proxmox vm config file to read.
+    - `qemu`: qemu commandline input format.
+      - `--input.vm <path>`: path and filename of the qemu commandline file to read.
 
 Output flags:
 - `--output.type <type>`: exporter type.

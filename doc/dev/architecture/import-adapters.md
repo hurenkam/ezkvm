@@ -18,7 +18,7 @@ Define the contract for source-specific import adapters that transform external 
 ## Contract
 
 1. Each import source must be implemented as a dedicated adapter module.
-   - Rust scaffold location: `src/config_importer/`
+   - Rust scaffold location: `src/config_format/`
 2. An adapter must accept:
    - Source payload (for example Proxmox config, raw QEMU CLI capture, or libvirt XML)
    - Import-host context (facts known at import time)
@@ -45,12 +45,16 @@ Define the contract for source-specific import adapters that transform external 
 
 ## Current Scaffold
 
-`EzkvmConfigImporter` validates canonical YAML input against the current schema.
-`ProxmoxConfigImporter` now performs a minimal, deterministic Proxmox `.conf` to canonical mapping behind the same `ConfigImporter` trait.
+`EzkvmImporter` and `ProxmoxImporter` are implemented as staged adapters in `src/config_format`.
 
-`EzkvmConfigImporter` currently accepts exactly one `ConfigArgs` entry (the YAML config path). Any extra args are rejected with a typed `ConfigImportError::UnexpectedArgs` to keep adapter boundaries explicit.
-`ProxmoxConfigImporter` currently accepts exactly one `ConfigArgs` entry (the `.conf` path). Any extra args are rejected with `ConfigImportError::UnexpectedArgs`.
-`QemuConfigImporter` and `LibvirtConfigImporter` stubs also enforce the same strict one-arg contract before returning `UnsupportedImporter`.
+`QemuImporter` is now implemented in `src/config_format/qemu_cmd` using the same 4-stage shape used by other adapters:
+
+- `Parser` (`parser.rs`)
+- `RuntimeBuilder` (`runtime_builder.rs`)
+- `SchemaBuilder` (`schema_builder.rs`)
+- `Marshaler` (`marshaler.rs`)
+
+Current `qemu_cmd` mapping is intentionally subset-based (name, machine/chipset, CPU topology, memory). The parser preserves full raw argv in schema so unsupported flags remain available as passthrough arguments during parse/marshal roundtrips.
 
 ## Current Proxmox Mapping
 
