@@ -4,12 +4,12 @@ use serde_json::json;
 
 use crate::{
     config_format::ezkvm::{
-        Boot, Device, EZKVM_CONFIG_SCHEMA_VERSION, EzkvmConfigSchema, Machine, Metadata,
-        VirtualMachine, builder::EzkvmHostSchema,
+        Boot, Device, EZKVM_CONFIG_SCHEMA_VERSION, EzkvmConfigSchema, HostSchema, Machine,
+        Metadata, VirtualMachine, builder::EzkvmHostSchema,
     },
     runtime_model::{
-        BiosModel, Chipset, NetworkResource, PcieDeviceKind, Resource, RuntimeModel,
-        StorageDeviceKind, StorageResource,
+        Audio, BiosModel, Chipset, Display, GuestAgent, NetworkResource, PcieDeviceKind, Resource,
+        RuntimeModel, StorageDeviceKind, StorageResource,
     },
 };
 
@@ -60,6 +60,9 @@ impl EzkvmRuntimeModelRenderer {
             &mut storage_resource_ids,
             &mut network_resource_ids,
         )?;
+        let display = render_display(model);
+        let audio = render_audio(model);
+        let guest_agent = render_guest_agent(model);
         let devices = render_devices(
             model,
             &mut resources,
@@ -72,6 +75,11 @@ impl EzkvmRuntimeModelRenderer {
                 schema_version: EZKVM_CONFIG_SCHEMA_VERSION.to_string(),
                 vm_name: model.name().clone(),
             },
+            host: HostSchema {
+                display: None,
+                audio: None,
+                resources,
+            },
             virtual_machine: VirtualMachine {
                 machine: Machine {
                     family: "pc".to_string(),
@@ -82,9 +90,11 @@ impl EzkvmRuntimeModelRenderer {
                 memory: model.memory().clone(),
                 boot,
                 tpm,
+                display,
+                audio,
+                guest_agent,
                 devices,
             },
-            resources,
         })
     }
 }
@@ -94,6 +104,18 @@ fn machine_chipset(chipset: &Chipset) -> String {
         Chipset::Q35(_) => "q35".to_string(),
         Chipset::I440FX(_) => "i440fx".to_string(),
     }
+}
+
+fn render_display(model: &RuntimeModel) -> Option<Display> {
+    model.display().as_ref().map(|d| d.config().clone())
+}
+
+fn render_audio(model: &RuntimeModel) -> Option<Audio> {
+    model.audio().as_ref().map(|a| a.config().clone())
+}
+
+fn render_guest_agent(model: &RuntimeModel) -> Option<GuestAgent> {
+    model.guest_agent().as_ref().map(|ga| ga.config().clone())
 }
 
 fn render_boot(
@@ -297,6 +319,79 @@ fn render_pcie_device(
                 .map_err(|e| format!("failed to render virtio_net device: {e}"))?;
             Ok(Some(device))
         }
+        PcieDeviceKind::StandardGpu => {
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "standard_gpu"
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render standard_gpu device: {e}"))?;
+            Ok(Some(device))
+        }
+        PcieDeviceKind::VirtioGpu => {
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "virtio_gpu"
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render virtio_gpu device: {e}"))?;
+            Ok(Some(device))
+        }
+        PcieDeviceKind::PassthroughGpu => {
+            let resource = device
+                .resource_id()
+                .ok_or_else(|| "missing passthrough_gpu resource id".to_string())?;
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "passthrough_gpu",
+                    "resource": resource
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render passthrough_gpu device: {e}"))?;
+            Ok(Some(device))
+        }
+        PcieDeviceKind::Ich9IntelHda => {
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "ich9_intel_hda"
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render ich9_intel_hda device: {e}"))?;
+            Ok(Some(device))
+        }
+        PcieDeviceKind::IvshmemPlain => {
+            let resource = device
+                .resource_id()
+                .ok_or_else(|| "missing ivshmem_plain resource id".to_string())?;
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "ivshmem_plain",
+                    "resource": resource
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render ivshmem_plain device: {e}"))?;
+            Ok(Some(device))
+        }
     }
 }
 
@@ -455,6 +550,40 @@ mod tests {
                 "schema_version": "1.0.0",
                 "vm_name": "demo"
             },
+            "host": {
+                "resources": [
+                    {
+                        "id": "firmware0",
+                        "storage": {
+                            "file": "/var/lib/ezkvm/efivars.fd"
+                        }
+                    },
+                    {
+                        "id": "tpmstate0",
+                        "storage": {
+                            "file": "/var/lib/ezkvm/tpmstate"
+                        }
+                    },
+                    {
+                        "id": "disk0",
+                        "storage": {
+                            "block_device": "/dev/vm/disk0"
+                        }
+                    },
+                    {
+                        "id": "iso0",
+                        "storage": {
+                            "file": "/iso/debian.iso"
+                        }
+                    },
+                    {
+                        "id": "net0",
+                        "network": {
+                            "bridge": "vmbr0"
+                        }
+                    }
+                ]
+            },
             "virtual_machine": {
                 "machine": {
                     "family": "pc",
@@ -497,39 +626,7 @@ mod tests {
                         }
                     }
                 ]
-            },
-            "resources": [
-                {
-                    "id": "firmware0",
-                    "storage": {
-                        "file": "/var/lib/ezkvm/efivars.fd"
-                    }
-                },
-                {
-                    "id": "tpmstate0",
-                    "storage": {
-                        "file": "/var/lib/ezkvm/tpmstate"
-                    }
-                },
-                {
-                    "id": "disk0",
-                    "storage": {
-                        "block_device": "/dev/vm/disk0"
-                    }
-                },
-                {
-                    "id": "iso0",
-                    "storage": {
-                        "file": "/iso/debian.iso"
-                    }
-                },
-                {
-                    "id": "net0",
-                    "network": {
-                        "bridge": "vmbr0"
-                    }
-                }
-            ]
+            }
         }))
         .expect("json should parse as ezkvm config schema");
 
@@ -546,7 +643,7 @@ mod tests {
             .render()
             .expect("renderer should produce output schema");
 
-        assert!(rendered.resources.len() >= 4);
+        assert!(rendered.host.resources.len() >= 4);
         assert!(rendered.virtual_machine.devices.len() >= 3);
         assert!(rendered.virtual_machine.tpm.is_some());
     }

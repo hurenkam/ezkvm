@@ -6,10 +6,11 @@ use derive_new::new;
 use crate::{
     config_format::ezkvm::{Device, EzkvmConfigSchema, schema::BootModelBuilder},
     runtime_model::{
-        BusRegister, BusRegistrationApi, Chipset, I440fxChipset, IdeDeviceBuilder, NetworkResource,
-        PcieDeviceApi, PcieDeviceType, PvScsiController, Q35Chipset, Resource, RuntimeModel,
-        SataDeviceBuilder, ScsiDeviceBuilder, StorageResource, TpmModelBuilder, UsbDeviceBuilder,
-        UsbDeviceResource, VirtioNetController,
+        AudioModelBuilder, BusRegister, BusRegistrationApi, Chipset, DisplayModelBuilder,
+        GuestAgentModelBuilder, I440fxChipset, IdeDeviceBuilder, NetworkResource, PcieDeviceApi,
+        PcieDeviceType, PvScsiController, Q35Chipset, Resource, RuntimeModel, SataDeviceBuilder,
+        ScsiDeviceBuilder, StorageResource, TpmModelBuilder, UsbDeviceBuilder, UsbDeviceResource,
+        VirtioNetController,
     },
 };
 
@@ -54,7 +55,7 @@ impl EzkvmRuntimeModelBuilder {
         };
         let vm = value.virtual_machine;
         let md = value.metadata;
-        let resources = value.resources;
+        let resources = value.host.resources;
 
         let mut storage_resources: HashMap<String, StorageResource> = HashMap::new();
         let mut network_resources: HashMap<String, NetworkResource> = HashMap::new();
@@ -98,11 +99,9 @@ impl EzkvmRuntimeModelBuilder {
         };
         let boot = BootModelBuilder::build(&vm.boot, &storage_resources)?;
 
-        // TODO:
-        //   - spice/vnc/gpu
-        //   - serial ports
-        //   - audio
-        //   - qmp/guest agent
+        let display = vm.display.map(DisplayModelBuilder::build);
+        let audio = vm.audio.map(AudioModelBuilder::build);
+        let guest_agent = vm.guest_agent.map(GuestAgentModelBuilder::build);
 
         for device in vm.devices {
             match device {
@@ -130,6 +129,7 @@ impl EzkvmRuntimeModelBuilder {
                             };
                             Arc::new(VirtioNetController::new(resolved))
                         }
+                        _ => pcie.device().into(),
                     };
                     match register.pcie_busses().get(&pcie.bus().unwrap_or_default()) {
                         Some(controller) => {
@@ -215,7 +215,16 @@ impl EzkvmRuntimeModelBuilder {
         }
 
         Ok(RuntimeModel::new(
-            md.vm_name, cpu, vm.memory, chipset, boot, tpm, register,
+            md.vm_name,
+            cpu,
+            vm.memory,
+            chipset,
+            boot,
+            tpm,
+            display,
+            audio,
+            guest_agent,
+            register,
         ))
     }
 }
@@ -231,6 +240,40 @@ mod tests {
             "metadata": {
                 "schema_version": "1.0.0",
                 "vm_name": "demo"
+            },
+            "host": {
+                "resources": [
+                    {
+                        "id": "firmware0",
+                        "storage": {
+                            "file": "/var/lib/ezkvm/efivars.fd"
+                        }
+                    },
+                    {
+                        "id": "tpmstate0",
+                        "storage": {
+                            "file": "/var/lib/ezkvm/tpmstate"
+                        }
+                    },
+                    {
+                        "id": "disk0",
+                        "storage": {
+                            "block_device": "/dev/vm/disk0"
+                        }
+                    },
+                    {
+                        "id": "iso0",
+                        "storage": {
+                            "file": "/iso/debian.iso"
+                        }
+                    },
+                    {
+                        "id": "net0",
+                        "network": {
+                            "bridge": "vmbr0"
+                        }
+                    }
+                ]
             },
             "virtual_machine": {
                 "machine": {
@@ -274,39 +317,7 @@ mod tests {
                         }
                     }
                 ]
-            },
-            "resources": [
-                {
-                    "id": "firmware0",
-                    "storage": {
-                        "file": "/var/lib/ezkvm/efivars.fd"
-                    }
-                },
-                {
-                    "id": "tpmstate0",
-                    "storage": {
-                        "file": "/var/lib/ezkvm/tpmstate"
-                    }
-                },
-                {
-                    "id": "disk0",
-                    "storage": {
-                        "block_device": "/dev/vm/disk0"
-                    }
-                },
-                {
-                    "id": "iso0",
-                    "storage": {
-                        "file": "/iso/debian.iso"
-                    }
-                },
-                {
-                    "id": "net0",
-                    "network": {
-                        "bridge": "vmbr0"
-                    }
-                }
-            ]
+            }
         }))
         .expect("json should parse");
 
@@ -360,7 +371,8 @@ virtual_machine:
         - ide:
                 type: cdrom
                 resource: "iso0"
-resources:
+host:
+  resources:
     - id: "iso0"
       storage:
         file: "/iso/Debian 12.iso"

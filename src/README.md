@@ -19,6 +19,7 @@ src/README.md
 ```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type qemu```
 This command imports the given ezkvm config file through the `config_format/ezkvm` importer and exports via the `config_format/qemu_cmd` exporter to ```<name>.qemu.cmd```.
 Note that the vm input path is provided with ```--input.vm```, and host settings are provided with ```--input.host```.
+Current ezkvm schema coverage in this flow includes machine/cpu/memory, boot firmware, TPM, storage/network bus devices, host-level resources, and optional display/audio/guest-agent sections when present in the input YAML. GPU is now modeled as a PCI/PCIe device in `virtual_machine.devices` (headless is represented by omitting GPU devices).
 
 4. Import proxmox config file, and save as ezkvm yaml file:
 ```ezkvm convert --input.type proxmox --input.storage /etc/pve/storage.cfg --input.vm <name>.conf --output.type ezkvm --output.host /etc/ezkvm/host.yaml --output.vm <name>.yaml```

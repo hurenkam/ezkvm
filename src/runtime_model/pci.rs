@@ -29,6 +29,8 @@ pub struct PciDevice {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum PciDeviceType {
     NetworkController,
+    QxlGpu,
+    Ac97,
 }
 impl From<&PciDeviceType> for Arc<dyn PciDeviceApi> {
     fn from(device: &PciDeviceType) -> Self {
@@ -36,6 +38,8 @@ impl From<&PciDeviceType> for Arc<dyn PciDeviceApi> {
             PciDeviceType::NetworkController => {
                 todo!();
             }
+            PciDeviceType::QxlGpu => Arc::new(QxlGpuController::default()),
+            PciDeviceType::Ac97 => Arc::new(Ac97Controller::default()),
         }
     }
 }
@@ -45,6 +49,38 @@ pub trait PciDeviceApi: Display {
         None
     }
     fn qemu_args(&self, bus: &PciBus, address: PciAddress) -> Vec<String>;
+}
+
+// GPU Device Controllers
+
+#[derive(Debug, Clone, Default)]
+pub struct QxlGpuController {}
+
+impl Display for QxlGpuController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QXL GPU")
+    }
+}
+
+impl PciDeviceApi for QxlGpuController {
+    fn qemu_args(&self, _bus: &PciBus, _address: PciAddress) -> Vec<String> {
+        vec!["-device".to_string(), "qxl".to_string()]
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Ac97Controller {}
+
+impl Display for Ac97Controller {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AC97 Audio Controller")
+    }
+}
+
+impl PciDeviceApi for Ac97Controller {
+    fn qemu_args(&self, _bus: &PciBus, _address: PciAddress) -> Vec<String> {
+        vec!["-device".to_string(), "AC97".to_string()]
+    }
 }
 
 pub trait PciControllerApi: ControllerApi + Display {

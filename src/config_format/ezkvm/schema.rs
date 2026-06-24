@@ -18,10 +18,70 @@ pub struct Metadata {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HostSchema {
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<DisplaySchema>,
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<AudioSchema>,
+    pub resources: Vec<Resource>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum DisplaySchema {
+    Vnc { vnc: VncSchema },
+    Spice { spice: SpiceSchema },
+    LookingGlass { looking_glass: LookingGlassSchema },
+    Gtk { gtk: GtkSchema },
+    Sdl { sdl: SdlSchema },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VncSchema {
+    pub port: u16,
+    pub listen: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SpiceSchema {
+    pub port: u16,
+    pub listen: String,
+    pub disable_ticketing: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LookingGlassSchema {
+    pub port: u16,
+    pub listen: String,
+    pub disable_ticketing: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GtkSchema {}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SdlSchema {}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum AudioSchema {
+    Alsa { alsa: AlsaSchema },
+    PulseAudio { pulse_audio: PulseAudioSchema },
+    PipeWire { pipe_wire: PipeWireSchema },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AlsaSchema {}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PulseAudioSchema {}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PipeWireSchema {}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EzkvmConfigSchema {
     pub metadata: Metadata,
+    pub host: HostSchema,
     pub virtual_machine: VirtualMachine,
-    pub resources: Vec<Resource>,
 }
 
 impl std::fmt::Display for EzkvmConfigSchema {

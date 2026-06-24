@@ -155,6 +155,9 @@ impl RuntimeModelBuilder {
             chipset,
             boot,
             tpm,
+            None,
+            None,
+            None,
             bus_register,
         ))
     }

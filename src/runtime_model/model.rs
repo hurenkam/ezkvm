@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 use std::{fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
@@ -9,7 +10,9 @@ use super::{
     SataAddress, SataBus, SataControllerApi, SataDeviceApi, ScsiAddress, ScsiBus,
     ScsiControllerApi, ScsiDeviceApi, UsbAddress, UsbBus, UsbControllerApi, UsbDeviceApi,
 };
-use crate::runtime_model::{BootModel, BusRegister, Chipset, TpmApi};
+use crate::runtime_model::{
+    AudioApi, BootModel, BusRegister, Chipset, DisplayApi, GuestAgentApi, TpmApi,
+};
 
 pub trait ControllerApi {
     fn qemu_args(&self) -> Vec<String>;
@@ -24,6 +27,9 @@ pub struct RuntimeModel {
     chipset: Chipset,
     boot: BootModel,
     tpm: Option<Arc<dyn TpmApi>>,
+    display: Option<Arc<dyn DisplayApi>>,
+    audio: Option<Arc<dyn AudioApi>>,
+    guest_agent: Option<Arc<dyn GuestAgentApi>>,
     busses: BusRegister,
 }
 impl RuntimeModel {
@@ -180,8 +186,17 @@ impl RuntimeModel {
         args.extend(self.memory.qemu_args());
         args.extend(self.chipset.qemu_args());
         args.extend(self.boot.qemu_args());
+        if let Some(display) = &self.display {
+            args.extend(display.qemu_args());
+        }
+        if let Some(audio) = &self.audio {
+            args.extend(audio.qemu_args());
+        }
         if let Some(tpm) = &self.tpm {
             args.extend(tpm.qemu_args(&self.name));
+        }
+        if let Some(guest_agent) = &self.guest_agent {
+            args.extend(guest_agent.qemu_args(&self.name));
         }
         args.extend(self.busses.qemu_args());
         args
@@ -239,6 +254,30 @@ impl Display for RuntimeModel {
             match &self.tpm {
                 Some(tpm) => format!("{}", tpm),
                 None => "None".to_string(),
+            }
+        )?;
+        writeln!(
+            f,
+            "  Display: {}",
+            match &self.display {
+                Some(d) => format!("{}", d),
+                None => "none".to_string(),
+            }
+        )?;
+        writeln!(
+            f,
+            "  Audio: {}",
+            match &self.audio {
+                Some(a) => format!("{}", a),
+                None => "none".to_string(),
+            }
+        )?;
+        writeln!(
+            f,
+            "  Guest Agent: {}",
+            match &self.guest_agent {
+                Some(ga) => format!("{}", ga),
+                None => "none".to_string(),
             }
         )?;
         writeln!(f, "  Busses: {}", self.busses)?;

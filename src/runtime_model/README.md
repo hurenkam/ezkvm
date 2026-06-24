@@ -17,14 +17,20 @@ High-level flow:
 1. Collect top-level resources into lookup maps keyed by `id`.
 2. Instantiate chipset and register foundational buses.
 3. Build `BootModel` using `BootModelBuilder`.
-4. Iterate `virtual_machine.devices` and register each device on its target bus.
-5. For resource-backed devices, resolve `resource` ids through builder helpers.
+4. Build optional top-level runtime feature models (`Gpu`, `Display`, `Audio`, `GuestAgent`, `TPM`).
+5. Iterate `virtual_machine.devices` and register each device on its target bus.
+6. For resource-backed devices, resolve `resource` ids through builder helpers.
 
 ### Builder-based resource resolution
 
 Runtime model uses dedicated builders to keep device/resource binding logic localized:
 
 - [src/runtime_model/boot.rs](src/runtime_model/boot.rs): `BootModelBuilder`
+- [src/runtime_model/display.rs](src/runtime_model/display.rs): `DisplayModelBuilder`
+- [src/runtime_model/gpu.rs](src/runtime_model/gpu.rs): `GpuModelBuilder`
+- [src/runtime_model/audio.rs](src/runtime_model/audio.rs): `AudioModelBuilder`
+- [src/runtime_model/guest_agent.rs](src/runtime_model/guest_agent.rs): `GuestAgentModelBuilder`
+- [src/runtime_model/tpm.rs](src/runtime_model/tpm.rs): `TpmModelBuilder`
 - [src/runtime_model/sata.rs](src/runtime_model/sata.rs): `SataDeviceBuilder`
 - [src/runtime_model/ide.rs](src/runtime_model/ide.rs): `IdeDeviceBuilder`
 - [src/runtime_model/scsi.rs](src/runtime_model/scsi.rs): `ScsiDeviceBuilder`
@@ -41,12 +47,17 @@ Each builder accepts the parsed device/boot payload plus the relevant resource m
 - PCIe `virtio_net` optionally carries a network resource id and resolves against network resources.
 - USB devices are constructed through `UsbDeviceBuilder`; usb resource map is already threaded through for feature growth.
 - Boot model is built from boot config and storage resources.
+- Gpu/display/audio/guest-agent are top-level optional runtime features; they are assembled independently from bus registration and contribute command-line arguments when present.
 
 Missing referenced resources return descriptive errors during `RuntimeModel::try_from(...)` construction.
 
 ### Module boundaries
 
 - [src/runtime_model/model.rs](src/runtime_model/model.rs): orchestration, bus registration, runtime assembly.
+- [src/runtime_model/gpu.rs](src/runtime_model/gpu.rs): GPU model (`standard`, `qxl`, `virtio`, `headless`, `passthrough`).
+- [src/runtime_model/display.rs](src/runtime_model/display.rs): display frontend model (`gtk`, `sdl`, `vnc`, `spice`, `looking_glass`).
+- [src/runtime_model/audio.rs](src/runtime_model/audio.rs): audio backend and controller model.
+- [src/runtime_model/guest_agent.rs](src/runtime_model/guest_agent.rs): guest agent channel model.
 - [src/runtime_model/devices](src/runtime_model/devices): concrete device implementations (`Hdd`, `Ssd`, `Cdrom`, `VirtioNetController`, `PvScsiController`).
 - Bus-family modules (`pcie.rs`, `pci.rs`, `usb.rs`, `sata.rs`, `ide.rs`, `scsi.rs`) define device/controller APIs, addresses, and builder logic.
 
@@ -201,5 +212,6 @@ RM --> Caller : Err(String)
 ### Current implementation notes
 
 - Lifecycle actions (`start`, `stop`, `reset`, `shutdown`) are scaffolded and currently log intent.
+- `gpu`, `display`, `audio`, and `guest_agent` are now represented as optional top-level runtime features and emitted into qemu args when configured.
 - Several `qemu_args(...)` methods are placeholders and intentionally not fully implemented yet.
 - Validation of duplicate/missing resource references lives in runtime config validation, while runtime model conversion performs final lookup enforcement.

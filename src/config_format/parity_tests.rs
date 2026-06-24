@@ -149,9 +149,9 @@ net0: virtio=DE:AD:BE:EF:00:42,bridge=vmbr0
     assert_eq!(value["virtual_machine"]["cpu"]["sockets"], 1);
     assert!(value["virtual_machine"]["boot"].get("uefi").is_some());
 
-    let resources = value["resources"]
+    let resources = value["host"]["resources"]
         .as_array()
-        .expect("resources should be an array");
+        .expect("host.resources should be an array");
     assert!(resources.iter().any(|res| {
         res.get("storage")
             .and_then(|s| s.get("block_device"))
@@ -172,6 +172,17 @@ fn ezkvm_to_proxmox_shared_subset_parity() {
 metadata:
   schema_version: "1.0.0"
   vm_name: "parity-e2p"
+host:
+  resources:
+    - id: "fw0"
+      storage:
+        file: "/var/lib/vz/images/parity/efivars.fd"
+    - id: "disk0"
+      storage:
+        block_device: "/dev/vm/vm-200-disk-0"
+    - id: "net0"
+      network:
+        bridge: "vmbr2"
 virtual_machine:
   machine:
     family: "pc"
@@ -195,16 +206,6 @@ virtual_machine:
     - pcie:
         type: "virtio_net"
         resource: "net0"
-resources:
-  - id: "fw0"
-    storage:
-      file: "/var/lib/vz/images/parity/efivars.fd"
-  - id: "disk0"
-    storage:
-      block_device: "/dev/vm/vm-200-disk-0"
-  - id: "net0"
-    network:
-      bridge: "vmbr2"
 "#;
 
     let runtime = import_ezkvm_to_runtime(ezkvm_source, "e2p");

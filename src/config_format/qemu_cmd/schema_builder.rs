@@ -39,8 +39,17 @@ impl SchemaBuilder for QemuSchemaBuilder {
 
         args.extend(runtime.boot().qemu_args());
 
+        if let Some(display) = runtime.display() {
+            args.extend(display.qemu_args());
+        }
+        if let Some(audio) = runtime.audio() {
+            args.extend(audio.qemu_args());
+        }
         if let Some(tpm) = runtime.tpm() {
             args.extend(tpm.qemu_args(runtime.name()));
+        }
+        if let Some(guest_agent) = runtime.guest_agent() {
+            args.extend(guest_agent.qemu_args(runtime.name()));
         }
 
         args.extend(runtime.busses().qemu_args());

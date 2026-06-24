@@ -45,6 +45,9 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
             chipset,
             boot,
             None,
+            None,
+            None,
+            None,
             bus_register,
         ))
     }

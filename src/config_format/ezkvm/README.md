@@ -22,6 +22,8 @@ The ezkvm YAML schema is the canonical runtime schema represented by `RuntimeCon
 metadata:
   schema_version: "1.0.0"
   vm_name: "win11-dev"
+host:
+  resources: []
 virtual_machine:
   machine:
     family: "pc"
@@ -29,7 +31,6 @@ virtual_machine:
   memory:
     size: 8589934592
   devices: []
-resources: []
 ```
 
 ### Top-level structure
@@ -37,16 +38,22 @@ resources: []
 - `metadata`
   - `schema_version: String`
   - `vm_name: String`
+- `host`
+  - `display: Option<DisplaySchema>`
+  - `audio: Option<AudioSchema>`
+  - `resources: Vec<Resource>`
 - `virtual_machine`
   - `machine: { family, chipset, version? }`
   - `cpu: Option<Cpu>`
   - `memory: Memory` (byte-based; currently uses `memory.size` in YAML)
-  - `devices: Vec<Device>`
-- `resources: Vec<Resource>`
+  - `display: Option<Display>`
+  - `audio: Option<Audio>`
+  - `guest_agent: Option<GuestAgent>`
+  - `devices: Vec<Device>` (includes GPU as PCI/PCIe devices; headless if omitted)
 
 ### Resource variants
 
-`resources` is a keyed list (untagged enum wrappers):
+`host.resources` is a keyed list (untagged enum wrappers):
 
 - `{ storage: StorageResource }`
   - `{ file: <path> }`
@@ -94,6 +101,8 @@ Current validation highlights:
   - `virtual_machine.machine.chipset`
 - VM name must match filename stem.
 - For `machine.family == "pc"`, chipset must be `q35` or `i440fx`.
+- Storage/network resource reference checks are enforced for device types that carry `resource` ids.
+- `gpu`, `display`, `audio`, and `guest_agent` are currently optional and pass through runtime model assembly when present.
 
 ## Exporter Design
 
@@ -237,15 +246,18 @@ This example is closer to a typical VM definition and includes:
 - a SATA device entry
 - a bridge-backed network resource
 - a PCIe network controller entry
+- optional display/audio/guest-agent settings
+- GPU device defined in `virtual_machine.devices` as PCI/PCIe type
 
 ```yaml
 metadata:
   schema_version: 1.0.0
   vm_name: workstation-01
 
-resources:
-  - network: { id: "net0", bridge: "br0" }
-  - storage: { id: "disk0", block_device: "/dev/vm0/vm-108-disk0" }
+host:
+  resources:
+    - network: { id: "net0", bridge: "br0" }
+    - storage: { id: "disk0", block_device: "/dev/vm0/vm-108-disk0" }
 
 virtual_machine:
   machine:
@@ -258,6 +270,17 @@ virtual_machine:
     sockets: 1
   memory:
     size: 17179869184
+  gpu:
+    type: virtio
+  display:
+    vnc:
+      listen: 0.0.0.0
+      port: 1
+  audio:
+    backend: pipe_wire
+    controller: ich9_intel_hda
+  guest_agent:
+    enabled: true
   devices:
     - sata: { bus: 0, address: 0, type: ssd, resource: "disk0" }
     - pcie: { bus: 1, device: 7, function: 0, type: virtio_net, resource: "net0" }
@@ -273,6 +296,9 @@ Notes:
 - IDE devices require `resource` and it must reference a storage resource id.
 - PCIe `virtio_net` optionally accepts `resource`; when present it must reference a network resource id.
 - Duplicate resource ids and missing device resource references are reported during conformance validation.
+- `gpu.type` supports `standard`, `qxl`, `virtio`, `headless`, and `passthrough`.
+- `display` supports `gtk`, `sdl`, `vnc`, `spice`, and `looking_glass` wrappers.
+- `audio.backend` supports `none`, `alsa`, `pulse_audio`, and `pipe_wire`; `audio.controller` supports `ich9_intel_hda` and `ac97`.
 
 Reference note for `dist/etc/ezkvm/vm.d/wakiza.yaml`:
 

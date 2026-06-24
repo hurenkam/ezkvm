@@ -63,6 +63,9 @@ mod tests {
             chipset,
             BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
             None,
+            None,
+            None,
+            None,
             busses,
         )
     }

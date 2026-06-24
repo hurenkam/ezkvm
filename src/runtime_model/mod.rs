@@ -1,7 +1,11 @@
+mod audio;
 mod boot;
 mod bus_register;
 mod cpu;
 mod devices;
+mod display;
+mod gpu;
+mod guest_agent;
 mod i440fx;
 mod ide;
 mod memory;
@@ -15,6 +19,10 @@ mod scsi;
 mod tpm;
 mod usb;
 
+pub use audio::{Audio, AudioApi, AudioBackend, AudioController, AudioModelBuilder};
+pub use display::{Display, DisplayApi, DisplayModelBuilder, Gtk, LookingGlass, Sdl, Spice, Vnc};
+pub use gpu::{Gpu, GpuApi, GpuModelBuilder};
+pub use guest_agent::{GuestAgent, GuestAgentApi, GuestAgentModelBuilder};
 pub use model::RuntimeModel;
 pub use resources::{
     NetworkResource, PciDeviceResource, PcieDeviceResource, Resource, StorageResource,

@@ -2,7 +2,8 @@ use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime_model::{
-    Cpu, IdeDevice, Memory, PciDevice, PcieDevice, SataDevice, ScsiDevice, Tpm, UsbDevice,
+    Audio, Cpu, Display, GuestAgent, IdeDevice, Memory, PciDevice, PcieDevice, SataDevice,
+    ScsiDevice, Tpm, UsbDevice,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -15,6 +16,12 @@ pub struct VirtualMachine {
     pub boot: Boot,
     #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
     pub tpm: Option<Tpm>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<Display>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<Audio>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guest_agent: Option<GuestAgent>,
     pub devices: Vec<Device>,
 }
 

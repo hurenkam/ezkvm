@@ -131,7 +131,7 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Ezkv
     let mut storage_ids = HashSet::new();
     let mut network_ids = HashSet::new();
 
-    for resource in &config.resources {
+    for resource in &config.host.resources {
         let id = match resource {
             Resource::Storage { id, .. }
             | Resource::Network { id, .. }

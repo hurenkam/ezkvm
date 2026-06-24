@@ -24,7 +24,7 @@ pub use importer::EzkvmInputArgs;
 pub use marshaler::EzkvmMarshaler;
 pub use parser::EzkvmParser;
 pub use runtime_builder::EzkvmRuntimeBuilder;
-pub use schema::{EZKVM_CONFIG_SCHEMA_VERSION, EzkvmConfigSchema, Metadata};
+pub use schema::{EZKVM_CONFIG_SCHEMA_VERSION, EzkvmConfigSchema, HostSchema, Metadata};
 pub use schema_builder::EzkvmSchemaBuilder;
 pub use validation::ConformanceError;
 pub use virtual_machine::{Bios, Boot, Device, Machine, VirtualMachine};

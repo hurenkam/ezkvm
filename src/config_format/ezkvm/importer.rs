@@ -104,7 +104,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#
     }
 
@@ -158,7 +159,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
@@ -193,7 +195,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err =
@@ -218,7 +221,8 @@ virtual_machine:
     memory:
         size: "8589934592"
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
@@ -242,7 +246,8 @@ virtual_machine:
         size: 8589934592
     devices:
         id: "dev0"
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
@@ -265,7 +270,8 @@ virtual_machine:
     memory:
         size: [8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
@@ -289,7 +295,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let result = EzkvmImporter::validate_schema(yaml, filename);
@@ -308,7 +315,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
@@ -330,7 +338,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err =
@@ -354,7 +363,8 @@ virtual_machine:
     memory:
         size: 0
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let result = EzkvmImporter::validate_schema(yaml, filename);
@@ -374,7 +384,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err =
@@ -399,7 +410,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let result = EzkvmImporter::validate_schema(yaml, filename);
@@ -433,7 +445,8 @@ virtual_machine:
             function: 2
             type: virtio_net
             resource: "net0"
-resources:
+host:
+  resources:
     - storage:
         block_device: "/dev/vm/disk0"
       id: "disk0"
@@ -529,7 +542,8 @@ virtual_machine:
     memory:
         size: 8589934592
     devices: []
-resources: []
+host:
+  resources: []
 "#;
         let filename = Path::new("/tmp/win11-dev.yaml");
         let err = EzkvmImporter::validate_schema(yaml, filename).expect_err("should fail parsing");
