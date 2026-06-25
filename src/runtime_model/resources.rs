@@ -25,7 +25,19 @@ pub enum PciDeviceResource {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum PcieDeviceResource {
-    Address { bus: PcieBus, address: PcieAddress },
+    HostAddress {
+        address: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        multifunction: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rombar: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        romfile: Option<String>,
+    },
+    Address {
+        bus: PcieBus,
+        address: PcieAddress,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -52,7 +64,8 @@ pub enum Resource {
     },
     PcieDevice {
         id: String,
-        pcie_device: PcieDeviceResource,
+        #[serde(rename = "pcie", alias = "pcie_device")]
+        pcie: PcieDeviceResource,
     },
     UsbDevice {
         id: String,

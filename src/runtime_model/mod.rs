@@ -41,7 +41,7 @@ pub use model::ControllerApi;
 pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
 pub use pcie::{
     PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceKind,
-    PcieDeviceType,
+    PcieDeviceType, PciePassthroughSpec,
 };
 pub use q35::Q35Chipset;
 pub use sata::{

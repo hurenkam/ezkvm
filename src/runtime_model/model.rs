@@ -26,6 +26,8 @@ pub struct RuntimeModel {
     memory: Memory,
     chipset: Chipset,
     boot: BootModel,
+    smbios_uuid: Option<String>,
+    vmgenid: Option<String>,
     tpm: Option<Arc<dyn TpmApi>>,
     display: Option<Arc<dyn DisplayApi>>,
     audio: Option<Arc<dyn AudioApi>>,
@@ -183,9 +185,15 @@ impl RuntimeModel {
             self.name.clone(),
         ];
         args.extend(self.cpu.qemu_args());
-        args.extend(self.memory.qemu_args());
+        args.extend(self.memory.qemu_args(&self.cpu));
         args.extend(self.chipset.qemu_args());
         args.extend(self.boot.qemu_args());
+        if let Some(smbios_uuid) = &self.smbios_uuid {
+            args.extend(["-smbios".to_string(), format!("type=1,uuid={smbios_uuid}")]);
+        }
+        if let Some(vmgenid) = &self.vmgenid {
+            args.extend(["-device".to_string(), format!("vmgenid,guid={vmgenid}")]);
+        }
         if let Some(display) = &self.display {
             args.extend(display.qemu_args());
         }

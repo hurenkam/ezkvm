@@ -29,8 +29,7 @@ impl Display for PcieAddress {
 pub struct PcieDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<PcieBus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     address: Option<PcieAddress>,
     #[serde(flatten)]
     device: PcieDeviceType,
@@ -46,6 +45,20 @@ pub enum PcieDeviceType {
     },
     StandardGpu,
     VirtioGpu,
+    Passthrough {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resource: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        host: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        multifunction: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rombar: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        romfile: Option<String>,
+    },
     PassthroughGpu {
         resource: String,
     },
@@ -64,10 +77,22 @@ pub enum PcieDeviceKind {
     VirtioNet,
     StandardGpu,
     VirtioGpu,
+    Passthrough,
     PassthroughGpu,
     Ich9IntelHda,
     IvshmemPlain,
 }
+
+#[derive(Debug, Clone)]
+pub struct PciePassthroughSpec {
+    pub resource: Option<String>,
+    pub host: String,
+    pub id: Option<String>,
+    pub multifunction: Option<bool>,
+    pub rombar: Option<bool>,
+    pub romfile: Option<String>,
+}
+
 impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
     fn from(device: &PcieDeviceType) -> Self {
         match device {
@@ -75,6 +100,22 @@ impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
             PcieDeviceType::VirtioNet { .. } => Arc::new(super::VirtioNetController::default()),
             PcieDeviceType::StandardGpu => Arc::new(StandardGpuController::default()),
             PcieDeviceType::VirtioGpu => Arc::new(VirtioGpuController::default()),
+            PcieDeviceType::Passthrough {
+                resource,
+                host,
+                id,
+                multifunction,
+                rombar,
+                romfile,
+            } => Arc::new(PassthroughPcieController::new(
+                resource.clone(),
+                host.clone()
+                    .unwrap_or_else(|| resource.clone().unwrap_or_default()),
+                id.clone(),
+                *multifunction,
+                *rombar,
+                romfile.clone(),
+            )),
             PcieDeviceType::PassthroughGpu { resource } => {
                 Arc::new(PassthroughGpuController::new(resource.clone()))
             }
@@ -97,10 +138,95 @@ pub trait PcieDeviceApi: Display {
         None
     }
 
+    fn passthrough_spec(&self) -> Option<PciePassthroughSpec> {
+        None
+    }
+
     fn preferred_address(&self) -> Option<PcieAddress> {
         None
     }
     fn qemu_args(&self, bus: &PcieBus, address: PcieAddress) -> Vec<String>;
+}
+
+#[derive(Debug, Clone)]
+pub struct PassthroughPcieController {
+    resource: Option<String>,
+    host: String,
+    id: Option<String>,
+    multifunction: Option<bool>,
+    rombar: Option<bool>,
+    romfile: Option<String>,
+}
+
+impl PassthroughPcieController {
+    pub fn new(
+        resource: Option<String>,
+        host: String,
+        id: Option<String>,
+        multifunction: Option<bool>,
+        rombar: Option<bool>,
+        romfile: Option<String>,
+    ) -> Self {
+        Self {
+            resource,
+            host,
+            id,
+            multifunction,
+            rombar,
+            romfile,
+        }
+    }
+}
+
+impl Display for PassthroughPcieController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PCIe Passthrough ({})", self.host)
+    }
+}
+
+impl PcieDeviceApi for PassthroughPcieController {
+    fn device_kind(&self) -> PcieDeviceKind {
+        PcieDeviceKind::Passthrough
+    }
+
+    fn passthrough_spec(&self) -> Option<PciePassthroughSpec> {
+        Some(PciePassthroughSpec {
+            resource: self.resource.clone(),
+            host: self.host.clone(),
+            id: self.id.clone(),
+            multifunction: self.multifunction,
+            rombar: self.rombar,
+            romfile: self.romfile.clone(),
+        })
+    }
+
+    fn qemu_args(&self, _bus: &PcieBus, address: PcieAddress) -> Vec<String> {
+        let mut device = format!("vfio-pci,host={}", self.host);
+        if let Some(id) = &self.id {
+            device.push_str(&format!(",id={id}"));
+        }
+        if let Some(multifunction) = self.multifunction {
+            device.push_str(&format!(
+                ",multifunction={}",
+                if multifunction { 1 } else { 0 }
+            ));
+        }
+        if let Some(rombar) = self.rombar {
+            device.push_str(&format!(",rombar={}", if rombar { 1 } else { 0 }));
+        }
+        if let Some(romfile) = &self.romfile {
+            device.push_str(&format!(",romfile={romfile}"));
+        }
+
+        let addr = if address.function() == 0 {
+            format!("0x{:x}", address.device())
+        } else {
+            format!("0x{:x}.{}", address.device(), address.function())
+        };
+        device.push_str(&format!(",bus=pcie.0,addr={addr}"));
+
+        vec!["-device".to_string(), device]
+    }
 }
 
 // GPU Device Controllers

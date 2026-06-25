@@ -26,6 +26,9 @@ Current ezkvm schema coverage in this flow includes machine/cpu/memory, boot fir
 This command imports the given proxmox config file through the `config_format/proxmox` importer and exports via the `config_format/ezkvm` exporter to ```<name>.yaml```.
 Note that ```--input.storage``` is used to locate the proxmox ```storage.cfg``` file which explains how to translate storage paths in the proxmox vm config file to actual device locations.
 Current import coverage includes machine/cpu/memory plus baseline UEFI firmware disk, TPM state, SCSI disks, and bridged network adapters where present in the source config.
+Current Proxmox mapping also handles `agent` -> guest-agent, `vga` -> runtime GPU device selection, and `spice` -> display when those fields are present and representable.
+Current Proxmox mapping also preserves hugepages/NUMA memory policy (`hugepages`, `numa`) into runtime memory backend rendering.
+Current Proxmox mapping now models `hostpci*` passthrough devices via `host.resources[].pcie` entries, and links VM-side passthrough devices through `virtual_machine.devices[].pcie.resource`.
 
 5. Import ezkvm config and export as libvirt xml:
 ```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type libvirt --output.vm <name>.xml```

@@ -32,9 +32,9 @@ Provides importers and exporters that translate between external VM configuratio
 
 ### QEMU Command Coverage (Current)
 - `qemu_cmd` importer/exporter are implemented with staged adapters (`parser`, `runtime_builder`, `schema_builder`, `marshaler`).
-- Phase-1 mapping focuses on the shared subset: VM name, machine/chipset, CPU topology, and memory.
+- Runtime import/export maps VM name, machine/chipset, CPU topology, memory, and common display/guest-agent/GPU patterns.
 - Parser keeps full raw argv in schema so unsupported flags are preserved for parse/marshal roundtrips as passthrough arguments.
-- Runtime conversion remains subset-based; unsupported flags are not mapped into canonical runtime fields.
+- Runtime conversion still leaves many source-specific flags unmapped; unsupported flags are not mapped into canonical runtime fields.
 
 ### Structural Validation
 - Input files are validated for syntax and semantic consistency at import boundary

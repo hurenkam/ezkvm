@@ -30,6 +30,9 @@ use crate::{
 /// - `bios`, `efidisk0` — written only when UEFI firmware is configured
 /// - `scsiN` — one entry per SCSI-attached storage device, in bus/address order
 /// - `netN` — one entry per PCIe-attached virtio network device, in bus/address order
+/// - `agent` — written when guest-agent is configured in runtime model
+/// - `vga` — written when a mapped GPU device exists in runtime model
+/// - `spice`/`vnc` — written when display frontend is representable in Proxmox fields
 ///
 /// TPM is not yet mapped.
 pub struct ProxmoxSchemaBuilder {
@@ -49,7 +52,7 @@ impl SchemaBuilder for ProxmoxSchemaBuilder {
             scalar(chipset_name(runtime.chipset())),
         );
 
-        let memory_mb = memory_megabytes(runtime.memory().qemu_args())?;
+        let memory_mb = memory_megabytes(runtime.memory().qemu_args(runtime.cpu()))?;
         entries.insert("memory".to_string(), scalar(&memory_mb.to_string()));
 
         let (cpu_model, cores, sockets) = cpu_topology(runtime.cpu().qemu_args());
@@ -70,6 +73,9 @@ impl SchemaBuilder for ProxmoxSchemaBuilder {
 
         map_scsi_devices(&runtime, &self.storage_config, &mut entries);
         map_net_devices(&runtime, &mut entries);
+        map_guest_agent(&runtime, &mut entries);
+        map_vga(&runtime, &mut entries);
+        map_display(&runtime, &mut entries);
 
         Ok(ProxmoxConfigSchema {
             global: ProxmoxSection { entries },
@@ -130,6 +136,81 @@ fn map_net_devices(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxV
             }
         }
     }
+}
+
+fn map_guest_agent(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    let Some(agent) = model.guest_agent() else {
+        return;
+    };
+    let value = if agent.config().enabled { "1" } else { "0" };
+    entries.insert("agent".to_string(), scalar(value));
+}
+
+fn map_vga(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    if let Some(vga) = detect_vga(model) {
+        entries.insert("vga".to_string(), scalar(vga));
+    }
+}
+
+fn map_display(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    let Some(display) = model.display() else {
+        return;
+    };
+
+    let args = display.qemu_args();
+    for window in args.windows(2) {
+        if let [flag, value] = window {
+            if flag == "-spice" {
+                entries.insert("spice".to_string(), scalar(value));
+                return;
+            }
+            if flag == "-vnc" && value != "none" {
+                entries.insert("vnc".to_string(), scalar(value));
+                return;
+            }
+        }
+    }
+}
+
+fn detect_vga(model: &RuntimeModel) -> Option<&'static str> {
+    let mut pcie_bus_ids: Vec<u8> = model.busses().pcie_busses().keys().copied().collect();
+    pcie_bus_ids.sort_unstable();
+
+    for bus_id in pcie_bus_ids {
+        if let Some(controller) = model.busses().pcie_busses().get(&bus_id) {
+            let mut addresses: Vec<_> = controller.devices().keys().cloned().collect();
+            addresses.sort_by_key(|a| (a.device(), a.function()));
+            for address in addresses {
+                if let Some(device) = controller.devices().get(&address) {
+                    match device.device_kind() {
+                        crate::runtime_model::PcieDeviceKind::StandardGpu => return Some("std"),
+                        crate::runtime_model::PcieDeviceKind::VirtioGpu => return Some("virtio"),
+                        crate::runtime_model::PcieDeviceKind::PassthroughGpu => {
+                            return Some("none");
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    let mut pci_bus_ids: Vec<u8> = model.busses().pci_busses().keys().copied().collect();
+    pci_bus_ids.sort_unstable();
+    for bus_id in pci_bus_ids {
+        if let Some(controller) = model.busses().pci_busses().get(&bus_id) {
+            let mut devices: Vec<_> = controller.devices().into_iter().collect();
+            devices.sort_by_key(|(address, _)| (address.device, address.function));
+            for (address, device) in devices {
+                let args = device.qemu_args(&bus_id, address);
+                if args.iter().any(|arg| arg == "qxl" || arg == "qxl-vga") {
+                    return Some("qxl");
+                }
+            }
+        }
+    }
+
+    None
 }
 
 /// Constructs a scalar Proxmox value.
@@ -546,5 +627,32 @@ scsi1: vm-pool:vm-100-disk-1,cache=writeback,size=64G
             schema.global.entries.contains_key("scsi1"),
             "scsi1 should be present"
         );
+    }
+
+    #[test]
+    fn maps_agent_vga_and_spice_fields() {
+        let model = parse_and_build(
+            r#"
+name: visual-vm
+machine: q35
+memory: 4096
+cpu: host
+cores: 2
+sockets: 1
+agent: 1
+vga: virtio
+spice: port=5905,addr=127.0.0.1,disable-ticketing=on
+"#,
+        );
+
+        let schema = ProxmoxSchemaBuilder {
+            storage_config: storage_cfg(),
+        }
+        .build(model)
+        .expect("mapping should succeed");
+
+        assert_eq!(scalar_value(&schema, "agent"), "1");
+        assert_eq!(scalar_value(&schema, "vga"), "virtio");
+        assert!(scalar_value(&schema, "spice").contains("port=5905"));
     }
 }

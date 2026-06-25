@@ -45,11 +45,19 @@ virtual_machine:
 - `virtual_machine`
   - `machine: { family, chipset, version? }`
   - `cpu: Option<Cpu>`
-  - `memory: Memory` (byte-based; currently uses `memory.size` in YAML)
+  - `memory: Memory` (byte-based, with optional memory backend and NUMA settings)
+  - `smbios_uuid: Option<String>`
+  - `vmgenid: Option<String>`
   - `display: Option<Display>`
   - `audio: Option<Audio>`
   - `guest_agent: Option<GuestAgent>`
   - `devices: Vec<Device>` (includes GPU as PCI/PCIe devices; headless if omitted)
+
+`virtual_machine.memory` fields:
+
+- `size: usize` (required, bytes)
+- `hugepages_kb: Option<usize>`
+- `numa_enabled: bool` (defaults to `false`)
 
 ### Resource variants
 
@@ -77,7 +85,14 @@ virtual_machine:
 - `{ scsi: { bus?, address?, device } }`
 
 Where device-internal `type` fields are used, values are snake_case enum names
-(for example `virtio_net`, `pv_scsi`, `ssd`, `hdd`, `cdrom`).
+(for example `virtio_net`, `pv_scsi`, `passthrough`, `ssd`, `hdd`, `cdrom`).
+
+For `pcie.type: passthrough`, the following fields are supported:
+
+- `host: String` (required PCI BDF such as `0000:0e:11.6`)
+- `id: Option<String>`
+- `rombar: Option<bool>`
+- `romfile: Option<String>`
 
 ## Importer Design
 

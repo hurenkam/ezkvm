@@ -34,11 +34,17 @@ impl Cpu {
         }
     }
 
+    pub fn total_vcpus(&self) -> u32 {
+        self.normalized_sockets() as u32
+            * self.normalized_cores() as u32
+            * self.normalized_threads() as u32
+    }
+
     pub fn qemu_args(&self) -> Vec<String> {
         let sockets = self.normalized_sockets();
         let cores = self.normalized_cores();
         let threads = self.normalized_threads();
-        let total_vcpus = sockets as u32 * cores as u32 * threads as u32;
+        let total_vcpus = self.total_vcpus();
 
         vec![
             "-cpu".to_string(),

@@ -3,13 +3,18 @@ use std::collections::BTreeMap;
 use serde_json::json;
 
 use crate::{
+    config_format::ezkvm::schema::{
+        AlsaSchema, AudioSchema, DisplaySchema, GtkSchema, LookingGlassSchema, PipeWireSchema,
+        PulseAudioSchema, SdlSchema, SpiceSchema, VncSchema,
+    },
     config_format::ezkvm::{
         Boot, Device, EZKVM_CONFIG_SCHEMA_VERSION, EzkvmConfigSchema, HostSchema, Machine,
         Metadata, VirtualMachine, builder::EzkvmHostSchema,
     },
     runtime_model::{
-        Audio, BiosModel, Chipset, Display, GuestAgent, NetworkResource, PcieDeviceKind, Resource,
-        RuntimeModel, StorageDeviceKind, StorageResource,
+        Audio, AudioBackend, BiosModel, Chipset, Display, GuestAgent, NetworkResource,
+        PcieDeviceKind, PcieDeviceResource, PciePassthroughSpec, Resource, RuntimeModel,
+        StorageDeviceKind, StorageResource,
     },
 };
 
@@ -47,6 +52,7 @@ impl EzkvmRuntimeModelRenderer {
         let mut resources = Vec::new();
         let mut storage_resource_ids: BTreeMap<String, String> = BTreeMap::new();
         let mut network_resource_ids: BTreeMap<String, String> = BTreeMap::new();
+        let mut pcie_resource_ids: BTreeMap<String, String> = BTreeMap::new();
 
         let boot = render_boot(
             model,
@@ -60,14 +66,13 @@ impl EzkvmRuntimeModelRenderer {
             &mut storage_resource_ids,
             &mut network_resource_ids,
         )?;
-        let display = render_display(model);
-        let audio = render_audio(model);
         let guest_agent = render_guest_agent(model);
         let devices = render_devices(
             model,
             &mut resources,
             &mut storage_resource_ids,
             &mut network_resource_ids,
+            &mut pcie_resource_ids,
         )?;
 
         Ok(EzkvmConfigSchema {
@@ -76,8 +81,8 @@ impl EzkvmRuntimeModelRenderer {
                 vm_name: model.name().clone(),
             },
             host: HostSchema {
-                display: None,
-                audio: None,
+                display: render_host_display(model),
+                audio: render_host_audio(model),
                 resources,
             },
             virtual_machine: VirtualMachine {
@@ -89,9 +94,11 @@ impl EzkvmRuntimeModelRenderer {
                 cpu: Some(model.cpu().clone()),
                 memory: model.memory().clone(),
                 boot,
+                smbios_uuid: model.smbios_uuid().clone(),
+                vmgenid: model.vmgenid().clone(),
                 tpm,
-                display,
-                audio,
+                display: None,
+                audio: None,
                 guest_agent,
                 devices,
             },
@@ -112,6 +119,50 @@ fn render_display(model: &RuntimeModel) -> Option<Display> {
 
 fn render_audio(model: &RuntimeModel) -> Option<Audio> {
     model.audio().as_ref().map(|a| a.config().clone())
+}
+
+fn render_host_display(model: &RuntimeModel) -> Option<DisplaySchema> {
+    let display = render_display(model)?;
+    Some(match display {
+        Display::Vnc { vnc } => DisplaySchema::Vnc {
+            vnc: VncSchema {
+                port: *vnc.port(),
+                listen: vnc.listen().clone(),
+            },
+        },
+        Display::Spice { spice } => DisplaySchema::Spice {
+            spice: SpiceSchema {
+                port: *spice.port(),
+                listen: spice.listen().clone(),
+                disable_ticketing: *spice.disable_ticketing(),
+            },
+        },
+        Display::LookingGlass { .. } => DisplaySchema::LookingGlass {
+            looking_glass: LookingGlassSchema {
+                port: 0,
+                listen: String::new(),
+                disable_ticketing: false,
+            },
+        },
+        Display::Gtk { .. } => DisplaySchema::Gtk { gtk: GtkSchema {} },
+        Display::Sdl { .. } => DisplaySchema::Sdl { sdl: SdlSchema {} },
+    })
+}
+
+fn render_host_audio(model: &RuntimeModel) -> Option<AudioSchema> {
+    let audio = render_audio(model)?;
+    match audio.backend {
+        AudioBackend::None => None,
+        AudioBackend::Alsa => Some(AudioSchema::Alsa {
+            alsa: AlsaSchema {},
+        }),
+        AudioBackend::PulseAudio => Some(AudioSchema::PulseAudio {
+            pulse_audio: PulseAudioSchema {},
+        }),
+        AudioBackend::PipeWire => Some(AudioSchema::PipeWire {
+            pipe_wire: PipeWireSchema {},
+        }),
+    }
 }
 
 fn render_guest_agent(model: &RuntimeModel) -> Option<GuestAgent> {
@@ -171,6 +222,7 @@ fn render_devices(
     resources: &mut Vec<Resource>,
     storage_resource_ids: &mut BTreeMap<String, String>,
     network_resource_ids: &mut BTreeMap<String, String>,
+    pcie_resource_ids: &mut BTreeMap<String, String>,
 ) -> Result<Vec<Device>, String> {
     let mut rendered = Vec::new();
 
@@ -178,6 +230,7 @@ fn render_devices(
         resources,
         storage_resource_ids,
         network_resource_ids,
+        pcie_resource_ids,
     };
 
     let busses = model.busses();
@@ -345,6 +398,24 @@ fn render_pcie_device(
                 .map_err(|e| format!("failed to render virtio_gpu device: {e}"))?;
             Ok(Some(device))
         }
+        PcieDeviceKind::Passthrough => {
+            let spec = device
+                .passthrough_spec()
+                .ok_or_else(|| "missing passthrough spec".to_string())?;
+            let resource = passthrough_resource_id(&spec, ctx.resources, ctx.pcie_resource_ids);
+            let value = json!({
+                "pcie": {
+                    "bus": bus,
+                    "device": address_device,
+                    "function": address_function,
+                    "type": "passthrough",
+                    "resource": resource
+                }
+            });
+            let device: Device = serde_json::from_value(value)
+                .map_err(|e| format!("failed to render passthrough device: {e}"))?;
+            Ok(Some(device))
+        }
         PcieDeviceKind::PassthroughGpu => {
             let resource = device
                 .resource_id()
@@ -478,6 +549,38 @@ struct RenderContext<'a> {
     resources: &'a mut Vec<Resource>,
     storage_resource_ids: &'a mut BTreeMap<String, String>,
     network_resource_ids: &'a mut BTreeMap<String, String>,
+    pcie_resource_ids: &'a mut BTreeMap<String, String>,
+}
+
+fn passthrough_resource_id(
+    spec: &PciePassthroughSpec,
+    resources: &mut Vec<Resource>,
+    pcie_resource_ids: &mut BTreeMap<String, String>,
+) -> String {
+    let key = format!(
+        "{}|{:?}|{:?}|{:?}",
+        spec.host, spec.multifunction, spec.rombar, spec.romfile
+    );
+
+    if let Some(id) = pcie_resource_ids.get(&key) {
+        return id.clone();
+    }
+
+    let id = spec
+        .resource
+        .clone()
+        .unwrap_or_else(|| format!("hostpci{}", pcie_resource_ids.len()));
+    pcie_resource_ids.insert(key, id.clone());
+    resources.push(Resource::PcieDevice {
+        id: id.clone(),
+        pcie: PcieDeviceResource::HostAddress {
+            address: spec.host.clone(),
+            multifunction: spec.multifunction,
+            rombar: spec.rombar,
+            romfile: spec.romfile.clone(),
+        },
+    });
+    id
 }
 
 fn storage_resource_id(

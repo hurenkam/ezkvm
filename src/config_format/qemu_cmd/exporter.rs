@@ -66,6 +66,8 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
             busses,
         )
     }
@@ -89,5 +91,38 @@ mod tests {
         let content = std::fs::read_to_string(output).expect("output should be readable");
         assert!(content.contains("qemu-system-x86_64"));
         assert!(content.contains("-name export-qemu-vm"));
+    }
+
+    #[test]
+    fn exports_identity_fields_to_qemu_command_file() {
+        let mut busses = BusRegister::new();
+        let runtime = RuntimeModel::new(
+            "identity-vm".to_string(),
+            Cpu::new(CpuModel::Host, 2, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut busses)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            Some("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".to_string()),
+            Some("11111111-2222-3333-4444-555555555555".to_string()),
+            None,
+            None,
+            None,
+            None,
+            busses,
+        );
+
+        let output = "/tmp/ezkvm-test-qemu-export-identity.cmd";
+        let _ = QemuExporter
+            .export(
+                runtime,
+                ExportOptions::Qemu {
+                    vm: Some(output.to_string()),
+                },
+            )
+            .expect("export should succeed");
+
+        let content = std::fs::read_to_string(output).expect("output should be readable");
+        assert!(content.contains("-smbios type=1,uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
+        assert!(content.contains("-device vmgenid,guid=11111111-2222-3333-4444-555555555555"));
     }
 }

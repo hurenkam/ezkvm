@@ -38,7 +38,7 @@ pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
 pub struct ScsiDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<ScsiBus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
     address: Option<ScsiAddress>,
     #[serde(flatten)]
     device: ScsiDeviceType,

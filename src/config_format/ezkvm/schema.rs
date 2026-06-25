@@ -27,6 +27,7 @@ pub struct HostSchema {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum DisplaySchema {
     Vnc { vnc: VncSchema },
     Spice { spice: SpiceSchema },
@@ -62,6 +63,7 @@ pub struct GtkSchema {}
 pub struct SdlSchema {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum AudioSchema {
     Alsa { alsa: AlsaSchema },
     PulseAudio { pulse_audio: PulseAudioSchema },

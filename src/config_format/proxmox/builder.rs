@@ -8,11 +8,12 @@ use crate::{
         storage_resolver::ProxmoxStorageConfig,
     },
     runtime_model::{
-        BiosModel, BootModel, BusRegister, BusRegistrationApi, Chipset, Cpu, CpuModel,
-        I440fxChipset, Memory, NetworkResource, PcieAddress, PcieDeviceApi, PvScsiController,
-        Q35Chipset, RuntimeModel, RuntimeModelBuilder, ScsiAddress, ScsiControllerApi,
-        ScsiDeviceBuilder, ScsiDeviceType, SeaBiosModel, StorageResource, Tpm, TpmModelBuilder,
-        UefiModel, VirtioNetController,
+        BiosModel, BootModel, BusRegister, BusRegistrationApi, Chipset, Cpu, CpuModel, Display,
+        DisplayModelBuilder, GuestAgent, GuestAgentModelBuilder, I440fxChipset, Memory,
+        NetworkResource, PciDeviceApi, PciDeviceType, PcieAddress, PcieDeviceApi, PcieDeviceType,
+        PvScsiController, Q35Chipset, RuntimeModel, RuntimeModelBuilder, ScsiAddress,
+        ScsiControllerApi, ScsiDeviceBuilder, ScsiDeviceType, SeaBiosModel, StorageResource, Tpm,
+        TpmModelBuilder, UefiModel, VirtioNetController,
     },
 };
 
@@ -56,7 +57,32 @@ impl RuntimeModelBuilder {
         let cpu = Cpu::new(parse_cpu_model(&cpu_model), cores, 1, sockets);
 
         // Create Memory from megabytes
-        let memory = Memory::megabytes(memory_mb as usize);
+        let hugepages_kb = parse_hugepages_kb(global);
+        let numa_enabled = parse_numa_enabled(global);
+        let memory = Memory::megabytes(memory_mb as usize)
+            .with_hugepages_kb(hugepages_kb)
+            .with_numa_enabled(numa_enabled);
+
+        let guest_agent = parse_guest_agent(global);
+        let gpu = parse_gpu(global);
+        let smbios_uuid = parse_smbios_uuid(global);
+        let vmgenid = parse_vmgenid(global);
+        // Proxmox implicitly enables SPICE when vga is QXL; infer a default SPICE
+        // display when the conf has no explicit `spice:` field.
+        let display = parse_display(global).or_else(|| {
+            if matches!(gpu, Some(ProxmoxGpu::Qxl)) {
+                serde_json::from_value(serde_json::json!({
+                    "spice": {
+                        "listen": "0.0.0.0",
+                        "port": 5900,
+                        "disable_ticketing": true
+                    }
+                }))
+                .ok()
+            } else {
+                None
+            }
+        });
 
         let mut storage_resources: HashMap<String, StorageResource> = HashMap::new();
         let mut network_resources: HashMap<String, NetworkResource> = HashMap::new();
@@ -80,6 +106,9 @@ impl RuntimeModelBuilder {
         for (index, net) in &net_devices {
             network_resources.insert(format!("net{index}"), net.clone());
         }
+
+        let mut hostpci_devices = collect_hostpci_devices(global)?;
+        hostpci_devices.sort_by_key(|(idx, _)| *idx);
 
         // Determine BIOS type from "bios" field
         let bios_model = match extract_scalar_string(global, "bios") {
@@ -147,6 +176,45 @@ impl RuntimeModelBuilder {
             }
         }
 
+        for (_index, passthrough) in hostpci_devices {
+            match bus_register.pcie_busses().get(&0) {
+                Some(root) => {
+                    let device: Arc<dyn PcieDeviceApi> = (&passthrough).into();
+                    root.register_pcie_device(device, None)?;
+                }
+                None => return Err("PCIe root bus with id 0 does not exist".to_string()),
+            }
+        }
+
+        match gpu {
+            Some(ProxmoxGpu::Standard) => match bus_register.pcie_busses().get(&0) {
+                Some(root) => {
+                    let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::StandardGpu).into();
+                    root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))?;
+                }
+                None => return Err("PCIe root bus with id 0 does not exist".to_string()),
+            },
+            Some(ProxmoxGpu::Virtio) => match bus_register.pcie_busses().get(&0) {
+                Some(root) => {
+                    let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::VirtioGpu).into();
+                    root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))?;
+                }
+                None => return Err("PCIe root bus with id 0 does not exist".to_string()),
+            },
+            Some(ProxmoxGpu::Qxl) => {
+                if let Some(root) = bus_register.pci_busses().get(&0) {
+                    let device: Arc<dyn PciDeviceApi> = (&PciDeviceType::QxlGpu).into();
+                    root.register_pci_device(device, None)?;
+                } else if let Some(root) = bus_register.pcie_busses().get(&0) {
+                    let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::StandardGpu).into();
+                    root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))?;
+                } else {
+                    return Err("Neither PCI nor PCIe root bus exists".to_string());
+                }
+            }
+            Some(ProxmoxGpu::Headless) | None => {}
+        }
+
         // Create RuntimeModel with the builder
         Ok(RuntimeModel::new(
             name,
@@ -154,13 +222,200 @@ impl RuntimeModelBuilder {
             memory,
             chipset,
             boot,
+            smbios_uuid,
+            vmgenid,
             tpm,
+            display.map(DisplayModelBuilder::build),
             None,
-            None,
-            None,
+            guest_agent.map(GuestAgentModelBuilder::build),
             bus_register,
         ))
     }
+}
+
+#[derive(Clone, Copy)]
+enum ProxmoxGpu {
+    Standard,
+    Virtio,
+    Qxl,
+    Headless,
+}
+
+fn parse_guest_agent(
+    entries: &std::collections::BTreeMap<String, ProxmoxValue>,
+) -> Option<GuestAgent> {
+    let value = entries.get("agent")?;
+
+    let enabled = match value {
+        ProxmoxValue::Scalar { value } => {
+            let token = value.trim();
+            !(token == "0"
+                || token.eq_ignore_ascii_case("no")
+                || token.eq_ignore_ascii_case("false"))
+        }
+        ProxmoxValue::Compound(compound) => option_value(compound, "enabled")
+            .map(|v| v != "0")
+            .unwrap_or(true),
+    };
+
+    Some(GuestAgent { enabled })
+}
+
+fn parse_smbios_uuid(entries: &std::collections::BTreeMap<String, ProxmoxValue>) -> Option<String> {
+    let value = entries.get("smbios1")?;
+
+    match value {
+        ProxmoxValue::Scalar { value } => {
+            if let Some(uuid) = parse_uuid_token(value.as_str()) {
+                return Some(uuid);
+            }
+        }
+        ProxmoxValue::Compound(compound) => {
+            if let Some(uuid) = parse_uuid_token(compound.head.as_str()) {
+                return Some(uuid);
+            }
+            if let Some(uuid) = option_value(compound, "uuid")
+                && !uuid.trim().is_empty()
+            {
+                return Some(uuid.trim().to_string());
+            }
+        }
+    }
+
+    None
+}
+
+fn parse_uuid_token(token: &str) -> Option<String> {
+    let raw = token.trim();
+    let uuid = raw.strip_prefix("uuid=")?.trim();
+    if uuid.is_empty() {
+        return None;
+    }
+    Some(uuid.to_string())
+}
+
+fn parse_vmgenid(entries: &std::collections::BTreeMap<String, ProxmoxValue>) -> Option<String> {
+    let value = entries.get("vmgenid")?;
+    let vmgenid = match value {
+        ProxmoxValue::Scalar { value } => value.trim(),
+        ProxmoxValue::Compound(compound) => compound.head.trim(),
+    };
+
+    if vmgenid.is_empty() {
+        return None;
+    }
+
+    Some(vmgenid.to_string())
+}
+
+fn parse_hugepages_kb(entries: &std::collections::BTreeMap<String, ProxmoxValue>) -> Option<usize> {
+    let value = entries.get("hugepages")?;
+    let token = match value {
+        ProxmoxValue::Scalar { value } => value.trim(),
+        ProxmoxValue::Compound(compound) => compound.head.trim(),
+    };
+
+    let hugepages_mb = token.parse::<usize>().ok()?;
+    if hugepages_mb == 0 {
+        return None;
+    }
+
+    Some(hugepages_mb * 1024)
+}
+
+fn parse_numa_enabled(entries: &std::collections::BTreeMap<String, ProxmoxValue>) -> bool {
+    let Some(value) = entries.get("numa") else {
+        return false;
+    };
+
+    let token = match value {
+        ProxmoxValue::Scalar { value } => value.as_str(),
+        ProxmoxValue::Compound(compound) => compound.head.as_str(),
+    };
+
+    parse_proxmox_bool(token).unwrap_or(false)
+}
+
+fn parse_gpu(entries: &std::collections::BTreeMap<String, ProxmoxValue>) -> Option<ProxmoxGpu> {
+    let value = entries.get("vga")?;
+    let token = match value {
+        ProxmoxValue::Scalar { value } => value.as_str(),
+        ProxmoxValue::Compound(compound) => compound.head.as_str(),
+    }
+    .split(',')
+    .next()
+    .unwrap_or_default()
+    .trim()
+    .to_ascii_lowercase();
+
+    if token.is_empty() {
+        return Some(ProxmoxGpu::Standard);
+    }
+    if token == "none" || token == "serial0" {
+        return Some(ProxmoxGpu::Headless);
+    }
+    if token.starts_with("qxl") {
+        return Some(ProxmoxGpu::Qxl);
+    }
+    if token.starts_with("virtio") {
+        return Some(ProxmoxGpu::Virtio);
+    }
+
+    Some(ProxmoxGpu::Standard)
+}
+
+fn parse_display(entries: &std::collections::BTreeMap<String, ProxmoxValue>) -> Option<Display> {
+    if let Some(value) = entries.get("spice") {
+        let spec = match value {
+            ProxmoxValue::Scalar { value } => value.clone(),
+            ProxmoxValue::Compound(compound) => {
+                let mut items = vec![compound.head.clone()];
+                for option in &compound.options {
+                    match option {
+                        ProxmoxOption::Flag { value } => items.push(value.clone()),
+                        ProxmoxOption::KeyValue { key, value } => {
+                            items.push(format!("{key}={value}"))
+                        }
+                    }
+                }
+                items.join(",")
+            }
+        };
+
+        let mut listen = "0.0.0.0".to_string();
+        let mut port: u16 = 5900;
+        let mut disable_ticketing = false;
+
+        for token in spec.split(',').map(str::trim) {
+            if let Some(value) = token.strip_prefix("addr=") {
+                listen = value.to_string();
+            }
+            if let Some(value) = token.strip_prefix("port=")
+                && let Ok(parsed) = value.parse::<u16>()
+            {
+                port = parsed;
+            }
+            if let Some(value) = token.strip_prefix("tls-port=")
+                && let Ok(parsed) = value.parse::<u16>()
+            {
+                port = parsed;
+            }
+            if token == "disable-ticketing=on" {
+                disable_ticketing = true;
+            }
+        }
+
+        return serde_json::from_value(serde_json::json!({
+            "spice": {
+                "listen": listen,
+                "port": port,
+                "disable_ticketing": disable_ticketing
+            }
+        }))
+        .ok();
+    }
+
+    None
 }
 
 enum MachineChipset {
@@ -269,6 +524,84 @@ fn collect_network_devices(
         }
     }
     Ok(out)
+}
+
+fn collect_hostpci_devices(
+    entries: &std::collections::BTreeMap<String, ProxmoxValue>,
+) -> Result<Vec<(usize, PcieDeviceType)>, String> {
+    let mut out = Vec::new();
+
+    for (key, value) in entries {
+        let Some(suffix) = key.strip_prefix("hostpci") else {
+            continue;
+        };
+        if suffix.is_empty() || !suffix.chars().all(|ch| ch.is_ascii_digit()) {
+            continue;
+        }
+
+        let index = suffix
+            .parse::<usize>()
+            .map_err(|_| format!("invalid hostpci index in key '{key}'"))?;
+
+        let (host, resource, multifunction, rombar, romfile) = match value {
+            ProxmoxValue::Scalar { value } => {
+                let host = value.trim().to_string();
+                if host.is_empty() {
+                    continue;
+                }
+                (host, Some(key.clone()), None, None, None)
+            }
+            ProxmoxValue::Compound(compound) => {
+                let host = compound.head.trim().to_string();
+                if host.is_empty() {
+                    continue;
+                }
+
+                let multifunction =
+                    option_value(compound, "multifunction").and_then(parse_proxmox_bool);
+                let rombar = option_value(compound, "rombar").and_then(parse_proxmox_bool);
+                let romfile = option_value(compound, "romfile")
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToString::to_string);
+
+                (host, Some(key.clone()), multifunction, rombar, romfile)
+            }
+        };
+
+        out.push((
+            index,
+            PcieDeviceType::Passthrough {
+                resource,
+                host: Some(host),
+                id: None,
+                multifunction,
+                rombar,
+                romfile,
+            },
+        ));
+    }
+
+    Ok(out)
+}
+
+fn parse_proxmox_bool(value: &str) -> Option<bool> {
+    let token = value.trim();
+    if token.eq_ignore_ascii_case("1")
+        || token.eq_ignore_ascii_case("on")
+        || token.eq_ignore_ascii_case("yes")
+        || token.eq_ignore_ascii_case("true")
+    {
+        return Some(true);
+    }
+    if token.eq_ignore_ascii_case("0")
+        || token.eq_ignore_ascii_case("off")
+        || token.eq_ignore_ascii_case("no")
+        || token.eq_ignore_ascii_case("false")
+    {
+        return Some(false);
+    }
+    None
 }
 
 fn parse_storage_field(
@@ -587,5 +920,204 @@ net0: virtio=BC:24:11:3A:21:B7,bridge=vmbr0
         assert!(command.iter().any(|arg| arg.contains("pvscsi")));
         assert!(command.iter().any(|arg| arg.contains("scsi-hd")));
         assert!(command.iter().any(|arg| arg.contains("br=vmbr0")));
+    }
+
+    #[test]
+    fn maps_guest_agent_and_virtio_gpu_from_proxmox_fields() {
+        let config_text = r#"
+name: agent-gpu-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+agent: 1
+vga: virtio,memory=128
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("should build runtime model");
+
+        let command = model.qemu_command();
+        assert!(command.iter().any(|arg| arg.contains("virtio-gpu-pci")));
+        assert!(
+            command
+                .iter()
+                .any(|arg| arg.contains("org.qemu.guest_agent.0"))
+        );
+    }
+
+    #[test]
+    fn maps_qxl_gpu_and_spice_display_from_proxmox_fields() {
+        let config_text = r#"
+name: qxl-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+vga: qxl,memory=64
+spice: port=5905,addr=127.0.0.1,disable-ticketing=on
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("should build runtime model");
+
+        let command = model.qemu_command();
+        assert!(command.iter().any(|arg| arg == "qxl" || arg == "VGA"));
+        assert!(
+            command
+                .iter()
+                .any(|arg| arg.contains("port=5905,addr=127.0.0.1,disable-ticketing=on"))
+        );
+    }
+
+    #[test]
+    fn infers_spice_display_from_qxl_vga_when_no_spice_field() {
+        let config_text = r#"
+name: qxl-implicit-spice
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+vga: qxl,memory=64
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("should build runtime model");
+
+        let command = model.qemu_command();
+        // SPICE should be inferred even though no explicit spice: field was present
+        assert!(
+            command.iter().any(|arg| arg.contains("port=5900")),
+            "expected inferred SPICE at port 5900, got: {:?}",
+            command
+        );
+    }
+
+    #[test]
+    fn imports_identity_fields_from_proxmox_config() {
+        let config_text = r#"
+name: identity-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+smbios1: uuid=1f0f0f0f-1111-2222-3333-444444444444
+vmgenid: 55555555-6666-7777-8888-999999999999
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("Should successfully build RuntimeModel");
+
+        assert_eq!(
+            model.smbios_uuid().as_deref(),
+            Some("1f0f0f0f-1111-2222-3333-444444444444")
+        );
+        assert_eq!(
+            model.vmgenid().as_deref(),
+            Some("55555555-6666-7777-8888-999999999999")
+        );
+    }
+
+    #[test]
+    fn imports_smbios_uuid_when_not_first_token() {
+        let config_text = r#"
+name: identity-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+smbios1: manufacturer=acme,uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("Should successfully build RuntimeModel");
+
+        assert_eq!(
+            model.smbios_uuid().as_deref(),
+            Some("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        );
+    }
+
+    #[test]
+    fn imports_hostpci_passthrough_devices() {
+        let config_text = r#"
+name: hostpci-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+hostpci0: 0000:0e:11.6,pcie=1,rombar=0
+hostpci1: 0000:01:00.1,pcie=1
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("Should successfully build RuntimeModel");
+
+        let rendered = model.qemu_command();
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("vfio-pci,host=0000:0e:11.6"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("vfio-pci,host=0000:01:00.1"))
+        );
+        assert!(rendered.iter().any(|arg| arg.contains("rombar=0")));
+    }
+
+    #[test]
+    fn imports_hugepages_and_numa_memory_backend() {
+        let config_text = r#"
+name: numa-vm
+memory: 16384
+machine: q35
+cpu: host
+cores: 8
+sockets: 1
+hugepages: 1024
+numa: 1
+"#;
+        let schema = ProxmoxConfigSchema::parse(config_text).expect("Failed to parse config");
+
+        let storage = storage_cfg();
+        let model = RuntimeModelBuilder::build_from_proxmox_config(&schema, &storage)
+            .expect("Should successfully build RuntimeModel");
+
+        let rendered = model.qemu_command();
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("memory-backend-file,id=ram-node0,size=16384M"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("mem-path=/run/hugepages/kvm/1048576kB"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("node,nodeid=0,cpus=0-7,memdev=ram-node0"))
+        );
     }
 }

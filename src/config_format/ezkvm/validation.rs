@@ -130,6 +130,7 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Ezkv
     let mut seen_ids = HashSet::new();
     let mut storage_ids = HashSet::new();
     let mut network_ids = HashSet::new();
+    let mut pcie_ids = HashSet::new();
 
     for resource in &config.host.resources {
         let id = match resource {
@@ -153,6 +154,9 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Ezkv
             }
             Resource::Network { id, .. } => {
                 network_ids.insert(id.clone());
+            }
+            Resource::PcieDevice { id, .. } => {
+                pcie_ids.insert(id.clone());
             }
             _ => {}
         }
@@ -215,6 +219,23 @@ fn validate_resource_references(issues: &mut Vec<ValidationIssue>, config: &Ezkv
                         )
                         .with_remediation(
                             "Add the referenced network resource under resources or update the device resource id",
+                        ),
+                    );
+                }
+
+                if let PcieDeviceType::Passthrough {
+                    resource: Some(resource_id),
+                    ..
+                } = pcie.device()
+                    && !pcie_ids.contains(resource_id)
+                {
+                    issues.push(
+                        ValidationIssue::new(
+                            format!("virtual_machine.devices[{idx}].pcie.resource"),
+                            format!("references missing pcie resource id '{}'", resource_id),
+                        )
+                        .with_remediation(
+                            "Add the referenced pcie resource under resources or update the device resource id",
                         ),
                     );
                 }

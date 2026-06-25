@@ -167,6 +167,58 @@ net0: virtio=DE:AD:BE:EF:00:42,bridge=vmbr0
 }
 
 #[test]
+fn proxmox_hostpci_maps_to_host_resource_reference() {
+    let proxmox_source = r#"
+name: hostpci-parity-vm
+machine: q35
+memory: 4096
+cpu: host
+cores: 2
+sockets: 1
+hostpci0: 0000:0e:11.6,pcie=1,rombar=0
+"#;
+
+    let runtime = import_proxmox_to_runtime(proxmox_source, "p2e-hostpci");
+    let ezkvm_yaml = export_runtime_to_ezkvm(runtime, "p2e-hostpci");
+
+    let value: serde_json::Value =
+        serde_yaml::from_str(&ezkvm_yaml).expect("ezkvm yaml should parse as value");
+
+    let resources = value["host"]["resources"]
+        .as_array()
+        .expect("host.resources should be an array");
+    assert!(resources.iter().any(|res| {
+        res.get("id").and_then(|v| v.as_str()) == Some("hostpci0")
+            && res
+                .get("pcie")
+                .and_then(|p| p.get("address"))
+                .and_then(|v| v.as_str())
+                == Some("0000:0e:11.6")
+            && res
+                .get("pcie")
+                .and_then(|p| p.get("rombar"))
+                .and_then(|v| v.as_bool())
+                == Some(false)
+    }));
+
+    let devices = value["virtual_machine"]["devices"]
+        .as_array()
+        .expect("virtual_machine.devices should be an array");
+    assert!(devices.iter().any(|device| {
+        device
+            .get("pcie")
+            .and_then(|p| p.get("type"))
+            .and_then(|v| v.as_str())
+            == Some("passthrough")
+            && device
+                .get("pcie")
+                .and_then(|p| p.get("resource"))
+                .and_then(|v| v.as_str())
+                == Some("hostpci0")
+    }));
+}
+
+#[test]
 fn ezkvm_to_proxmox_shared_subset_parity() {
     let ezkvm_source = r#"
 metadata:

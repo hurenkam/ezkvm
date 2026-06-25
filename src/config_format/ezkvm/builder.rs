@@ -4,13 +4,16 @@ use derive_getters::Getters;
 use derive_new::new;
 
 use crate::{
-    config_format::ezkvm::{Device, EzkvmConfigSchema, schema::BootModelBuilder},
+    config_format::ezkvm::{
+        Device, EzkvmConfigSchema,
+        schema::{AudioSchema, BootModelBuilder},
+    },
     runtime_model::{
-        AudioModelBuilder, BusRegister, BusRegistrationApi, Chipset, DisplayModelBuilder,
-        GuestAgentModelBuilder, I440fxChipset, IdeDeviceBuilder, NetworkResource, PcieDeviceApi,
-        PcieDeviceType, PvScsiController, Q35Chipset, Resource, RuntimeModel, SataDeviceBuilder,
-        ScsiDeviceBuilder, StorageResource, TpmModelBuilder, UsbDeviceBuilder, UsbDeviceResource,
-        VirtioNetController,
+        Audio, AudioBackend, AudioController, AudioModelBuilder, BusRegister, BusRegistrationApi,
+        Chipset, DisplayModelBuilder, GuestAgentModelBuilder, I440fxChipset, IdeDeviceBuilder,
+        NetworkResource, PcieDeviceApi, PcieDeviceResource, PcieDeviceType, PvScsiController,
+        Q35Chipset, Resource, RuntimeModel, SataDeviceBuilder, ScsiDeviceBuilder, StorageResource,
+        TpmModelBuilder, UsbDeviceBuilder, UsbDeviceResource, VirtioNetController,
     },
 };
 
@@ -59,6 +62,7 @@ impl EzkvmRuntimeModelBuilder {
 
         let mut storage_resources: HashMap<String, StorageResource> = HashMap::new();
         let mut network_resources: HashMap<String, NetworkResource> = HashMap::new();
+        let mut pcie_resources: HashMap<String, PcieDeviceResource> = HashMap::new();
         let mut usb_resources: HashMap<String, UsbDeviceResource> = HashMap::new();
         for resource in resources {
             match resource {
@@ -77,11 +81,8 @@ impl EzkvmRuntimeModelBuilder {
                 } => {
                     // Handle PCI device resources if needed
                 }
-                Resource::PcieDevice {
-                    id: _,
-                    pcie_device: _,
-                } => {
-                    // Handle PCIe device resources if needed
+                Resource::PcieDevice { id, pcie } => {
+                    pcie_resources.insert(id, pcie);
                 }
             }
         }
@@ -98,9 +99,21 @@ impl EzkvmRuntimeModelBuilder {
             None => None,
         };
         let boot = BootModelBuilder::build(&vm.boot, &storage_resources)?;
+        let smbios_uuid = vm.smbios_uuid.clone();
+        let vmgenid = vm.vmgenid.clone();
 
-        let display = vm.display.map(DisplayModelBuilder::build);
-        let audio = vm.audio.map(AudioModelBuilder::build);
+        let display = value
+            .host
+            .display
+            .and_then(|d| serde_json::from_value(serde_json::to_value(d).ok()?).ok())
+            .or(vm.display)
+            .map(DisplayModelBuilder::build);
+        let audio = value
+            .host
+            .audio
+            .map(audio_schema_to_audio)
+            .or(vm.audio)
+            .map(AudioModelBuilder::build);
         let guest_agent = vm.guest_agent.map(GuestAgentModelBuilder::build);
 
         for device in vm.devices {
@@ -128,6 +141,38 @@ impl EzkvmRuntimeModelBuilder {
                                 None => None,
                             };
                             Arc::new(VirtioNetController::new(resolved))
+                        }
+                        PcieDeviceType::Passthrough {
+                            resource,
+                            host,
+                            id,
+                            multifunction,
+                            rombar,
+                            romfile,
+                        } => {
+                            let (
+                                resolved_host,
+                                resolved_multifunction,
+                                resolved_rombar,
+                                resolved_romfile,
+                            ) = resolve_pcie_passthrough(
+                                resource.as_ref(),
+                                host.as_ref(),
+                                *multifunction,
+                                *rombar,
+                                romfile.as_ref(),
+                                &pcie_resources,
+                            )?;
+
+                            let resolved = PcieDeviceType::Passthrough {
+                                resource: resource.clone(),
+                                host: Some(resolved_host),
+                                id: id.clone(),
+                                multifunction: resolved_multifunction,
+                                rombar: resolved_rombar,
+                                romfile: resolved_romfile,
+                            };
+                            (&resolved).into()
                         }
                         _ => pcie.device().into(),
                     };
@@ -220,6 +265,8 @@ impl EzkvmRuntimeModelBuilder {
             vm.memory,
             chipset,
             boot,
+            smbios_uuid,
+            vmgenid,
             tpm,
             display,
             audio,
@@ -227,6 +274,67 @@ impl EzkvmRuntimeModelBuilder {
             register,
         ))
     }
+}
+
+fn audio_schema_to_audio(audio_schema: AudioSchema) -> Audio {
+    let backend = match audio_schema {
+        AudioSchema::Alsa { .. } => AudioBackend::Alsa,
+        AudioSchema::PulseAudio { .. } => AudioBackend::PulseAudio,
+        AudioSchema::PipeWire { .. } => AudioBackend::PipeWire,
+    };
+
+    Audio {
+        backend,
+        controller: AudioController::Ich9IntelHda,
+    }
+}
+
+type ResolvedPciePassthrough = (String, Option<bool>, Option<bool>, Option<String>);
+
+fn resolve_pcie_passthrough(
+    resource_id: Option<&String>,
+    host: Option<&String>,
+    multifunction: Option<bool>,
+    rombar: Option<bool>,
+    romfile: Option<&String>,
+    pcie_resources: &HashMap<String, PcieDeviceResource>,
+) -> Result<ResolvedPciePassthrough, String> {
+    if let Some(resource_id) = resource_id {
+        let resource = pcie_resources.get(resource_id).ok_or_else(|| {
+            format!(
+                "missing pcie resource '{}' referenced by PCIe passthrough device",
+                resource_id
+            )
+        })?;
+
+        return match resource {
+            PcieDeviceResource::HostAddress {
+                address,
+                multifunction,
+                rombar,
+                romfile,
+            } => Ok((address.clone(), *multifunction, *rombar, romfile.clone())),
+            PcieDeviceResource::Address { bus, address } => {
+                let resolved = format!(
+                    "0000:{:02x}:{:02x}.{}",
+                    bus,
+                    address.device(),
+                    address.function()
+                );
+                Ok((resolved, multifunction, rombar, romfile.cloned()))
+            }
+        };
+    }
+
+    let resolved_host = host
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            "PCIe passthrough device requires either 'resource' or legacy 'host'".to_string()
+        })?
+        .to_string();
+
+    Ok((resolved_host, multifunction, rombar, romfile.cloned()))
 }
 
 #[cfg(test)]

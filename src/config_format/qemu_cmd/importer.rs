@@ -50,6 +50,9 @@ mod tests {
             .expect("import should succeed");
 
         assert_eq!(runtime.name(), "vm1");
-        assert_eq!(runtime.memory().qemu_args(), vec!["-m", "2048M"]);
+        assert_eq!(
+            runtime.memory().qemu_args(runtime.cpu()),
+            vec!["-m", "2048M"]
+        );
     }
 }

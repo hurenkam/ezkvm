@@ -14,6 +14,10 @@ pub struct VirtualMachine {
     pub memory: Memory,
     #[serde(default)]
     pub boot: Boot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smbios_uuid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vmgenid: Option<String>,
     #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
     pub tpm: Option<Tpm>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
