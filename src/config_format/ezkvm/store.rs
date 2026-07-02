@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use derive_getters::Getters;
 use derive_new::new;
 
@@ -16,15 +18,18 @@ impl EzkvmConfigFileStore {
     ) -> Result<(), std::io::Error> {
         let file_path = self.config_dir.join(format!("{vm_name}.yaml"));
         std::fs::create_dir_all(&self.config_dir)?;
-        let content = serde_yaml::to_string(&config).map_err(std::io::Error::other)?;
+        //let content = config.to_string();
+        let content = config
+            .to_styled_compact_yaml()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(&file_path, content)?;
         Ok(())
     }
     pub fn load_config(&self, vm_name: &str) -> Result<EzkvmConfigSchema, std::io::Error> {
         let file_path = self.config_dir.join(format!("{vm_name}.yaml"));
         let content = std::fs::read_to_string(&file_path)?;
-        let config: EzkvmConfigSchema =
-            serde_yaml::from_str(&content).map_err(std::io::Error::other)?;
+        let config = EzkvmConfigSchema::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(config)
     }
 }

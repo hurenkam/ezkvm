@@ -5,8 +5,10 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
 serde_json = "1.0"
 thiserror = "2.0"
 derive-new = "0.7.0"
 derive-getters = "0.5.0"
+saphyr = "0.0.6"
+ordered-float = "5.3"
+hashlink = "0.10"

@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_model::{
-    BiosModel, BootModel, Resource, SeaBiosModel, StorageResource, UefiModel,
+use crate::serde_yaml;
+use crate::{
+    config_format::ezkvm::compact_yaml::{ToStyledYaml, emit_styled_yaml},
+    runtime_model::{BiosModel, BootModel, Resource, SeaBiosModel, StorageResource, UefiModel},
 };
 
 use derive_getters::Getters;
@@ -16,6 +18,34 @@ use crate::runtime_model::{
 
 /// Schema version for ezkvm runtime config specification.
 pub const EZKVM_CONFIG_SCHEMA_VERSION: &str = "1.0.0";
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EzkvmConfigSchema {
+    pub metadata: Metadata,
+    pub host: HostSchema,
+    pub virtual_machine: VirtualMachine,
+}
+
+impl ToString for EzkvmConfigSchema {
+    fn to_string(&self) -> String {
+        serde_yaml::to_string(self).unwrap_or_else(|_| "--- failed to serialize ---".to_string())
+    }
+}
+
+impl FromStr for EzkvmConfigSchema {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_yaml::from_str(s).map_err(|e| format!("failed to parse YAML: {e}"))
+    }
+}
+
+impl EzkvmConfigSchema {
+    pub fn to_styled_compact_yaml(&self) -> Result<String, String> {
+        let config_styled = self.to_styled_yaml();
+        emit_styled_yaml(&config_styled)
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Metadata {
@@ -84,20 +114,6 @@ pub struct PulseAudioSchema {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PipeWireSchema {}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EzkvmConfigSchema {
-    pub metadata: Metadata,
-    pub host: HostSchema,
-    pub virtual_machine: VirtualMachine,
-}
-
-impl std::fmt::Display for EzkvmConfigSchema {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let rendered = serde_yaml::to_string(self).map_err(|_| std::fmt::Error)?;
-        f.write_str(&rendered)
-    }
-}
 
 pub struct BootModelBuilder {}
 impl BootModelBuilder {

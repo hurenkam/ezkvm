@@ -4,6 +4,7 @@
 //! - src/README.md
 //! - doc/dev/architecture/design/vm-spec-parsing-validation.md
 
+mod compact_yaml;
 mod runtime_builder;
 mod schema;
 mod schema_builder;
