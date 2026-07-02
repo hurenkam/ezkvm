@@ -1,10 +1,10 @@
-//! Parser stage: qemu command text -> `QemuCommandSchema`.
+//! Parser stage: qemu command text → `QemuCommandSchema`.
 
-use crate::config_format::{qemu_cmd::schema::QemuKnownFields, stages::Parser};
-
-use super::schema::QemuCommandSchema;
+use super::schema::{QemuCommandSchema, QemuKnownFields};
+use crate::config_format::stages::Parser;
 
 /// Parses qemu command-file text into `QemuCommandSchema`.
+#[allow(dead_code)] // TODO: wire to CLI
 pub struct QemuParser;
 
 impl Parser for QemuParser {
@@ -25,6 +25,65 @@ impl Parser for QemuParser {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tokenizer
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)] // TODO: wire to CLI
+fn tokenize_qemu_command(source: &str) -> Result<Vec<String>, String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped = false;
+
+    for ch in source.chars() {
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if !in_single => {
+                escaped = true;
+            }
+            '\'' if !in_double => {
+                in_single = !in_single;
+            }
+            '"' if !in_single => {
+                in_double = !in_double;
+            }
+            c if c.is_whitespace() && !in_single && !in_double => {
+                if !current.is_empty() {
+                    tokens.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if escaped {
+        return Err("unterminated escape in qemu command".to_string());
+    }
+    if in_single || in_double {
+        return Err("unterminated quote in qemu command".to_string());
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    Ok(tokens)
+}
+
+// ---------------------------------------------------------------------------
+// Known-fields extractor (pub(crate) for use in schema_builder)
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)] // TODO: wire to CLI
 pub(crate) fn parse_known_fields(args: &[String]) -> QemuKnownFields {
     let mut known = QemuKnownFields::default();
     let mut i = 0;
@@ -81,6 +140,7 @@ pub(crate) fn parse_known_fields(args: &[String]) -> QemuKnownFields {
     known
 }
 
+#[allow(dead_code)] // TODO: wire to CLI
 fn parse_memory_mb(value: &str) -> Option<u64> {
     let trimmed = value.trim();
     if let Some(v) = trimmed.strip_suffix('M') {
@@ -92,6 +152,7 @@ fn parse_memory_mb(value: &str) -> Option<u64> {
     trimmed.parse::<u64>().ok()
 }
 
+#[allow(dead_code)] // TODO: wire to CLI
 fn parse_smp(value: &str) -> (u8, u8, u8) {
     let mut cores: u8 = 1;
     let mut sockets: u8 = 1;
@@ -110,55 +171,6 @@ fn parse_smp(value: &str) -> (u8, u8, u8) {
     }
 
     (cores, sockets, threads)
-}
-
-fn tokenize_qemu_command(source: &str) -> Result<Vec<String>, String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut escaped = false;
-
-    for ch in source.chars() {
-        if escaped {
-            current.push(ch);
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if !in_single => {
-                escaped = true;
-            }
-            '\'' if !in_double => {
-                in_single = !in_single;
-            }
-            '"' if !in_single => {
-                in_double = !in_double;
-            }
-            c if c.is_whitespace() && !in_single && !in_double => {
-                if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
-                }
-            }
-            _ => current.push(ch),
-        }
-    }
-
-    if escaped {
-        return Err("unterminated escape in qemu command".to_string());
-    }
-    if in_single || in_double {
-        return Err("unterminated quote in qemu command".to_string());
-    }
-
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-
-    Ok(tokens)
 }
 
 #[cfg(test)]

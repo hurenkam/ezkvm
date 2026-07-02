@@ -75,6 +75,14 @@ This pattern decouples resource definition from device usage while maintaining t
 
 Stage modules (config_importer, render_stage, etc.) follow a consistent internal structure:
 
+**Module declaration and export rules:**
+- Use `mod xxx;` declarations in `mod.rs` files only, with crate roots `lib.rs` and `main.rs` as allowed exceptions.
+- Policy exception: inline `#[cfg(test)] mod tests { ... }` modules are allowed in non-`mod.rs` implementation files.
+- Keep submodule declarations private; do not use `pub mod`, `pub(crate) mod`, or `pub(super) mod`.
+- Re-export public surface from `mod.rs` with explicit `pub use ...`.
+- Keep `impl` blocks out of `mod.rs`.
+- When practical, keep `struct` and its `impl` in the same file.
+
 **Type definitions and traits live in `mod.rs`:**
 - Request and response types (e.g., `ConfigArgs`, `RenderRequest`)
 - Trait definitions that define the stage interface (e.g., `ConfigImporter`, `RenderStage`)
@@ -87,7 +95,7 @@ Stage modules (config_importer, render_stage, etc.) follow a consistent internal
 
 **Re-export pattern in `mod.rs`:**
 ```rust
-pub mod ezkvm;
+mod ezkvm;
 pub use ezkvm::EzkvmConfigImporter;
 ```
 

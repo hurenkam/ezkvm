@@ -9,6 +9,7 @@ use crate::runtime_model::{
 
 pub trait BusRegistrationApi {
     fn register_pcie_bus(&mut self, controller: Arc<dyn PcieControllerApi>) -> Result<u8, String>;
+    #[allow(dead_code)] // TODO: wire to CLI
     fn register_pci_bus(&mut self, controller: Arc<dyn PciControllerApi>) -> Result<u8, String>;
     fn register_usb_bus(&mut self, controller: Arc<dyn UsbControllerApi>) -> Result<u8, String>;
     fn register_sata_bus(&mut self, controller: Arc<dyn SataControllerApi>) -> Result<u8, String>;

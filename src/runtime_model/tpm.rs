@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
+use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime_model::StorageResource;
@@ -19,7 +20,7 @@ impl Default for Tpm {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, Getters, new)]
 pub struct Swtpm {
     version: f32,
     resource: String,

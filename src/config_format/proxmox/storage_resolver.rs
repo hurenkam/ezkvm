@@ -16,7 +16,6 @@ use crate::runtime_model::StorageResource;
 pub struct ProxmoxStorageConfig {
     storages: BTreeMap<String, StorageEntry>,
 }
-
 #[derive(Debug, Clone)]
 enum StorageEntry {
     Dir { path: String },
@@ -26,6 +25,11 @@ enum StorageEntry {
 
 impl ProxmoxStorageConfig {
     /// Parses `storage.cfg` text into a lookup table.
+    pub fn new(path: std::path::PathBuf) -> Self {
+        let source = std::fs::read_to_string(path).unwrap_or_default();
+        Self::parse(&source).unwrap_or_default()
+    }
+
     pub fn parse(source: &str) -> Result<Self, String> {
         let mut storages: BTreeMap<String, StorageEntry> = BTreeMap::new();
 

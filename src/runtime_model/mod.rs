@@ -20,7 +20,9 @@ mod tpm;
 mod usb;
 
 pub use audio::{Audio, AudioApi, AudioBackend, AudioController, AudioModelBuilder};
+#[allow(unused_imports)] // TODO: wire to CLI
 pub use display::{Display, DisplayApi, DisplayModelBuilder, Gtk, LookingGlass, Sdl, Spice, Vnc};
+#[allow(unused_imports)] // TODO: wire to CLI
 pub use gpu::{Gpu, GpuApi, GpuModelBuilder};
 pub use guest_agent::{GuestAgent, GuestAgentApi, GuestAgentModelBuilder};
 pub use model::RuntimeModel;
@@ -39,6 +41,7 @@ pub use ide::{
 pub use memory::Memory;
 pub use model::ControllerApi;
 pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
+#[allow(unused_imports)] // TODO: wire to CLI
 pub use pcie::{
     PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceKind,
     PcieDeviceType, PciePassthroughSpec,
@@ -48,11 +51,14 @@ pub use sata::{
     SataAddress, SataBus, SataControllerApi, SataDevice, SataDeviceApi, SataDeviceBuilder,
     SataDeviceType,
 };
+#[allow(unused_imports)] // TODO: wire to CLI
 pub use scsi::{
     ScsiAddress, ScsiBus, ScsiControllerApi, ScsiDevice, ScsiDeviceApi, ScsiDeviceBuilder,
     ScsiDeviceType, ScsiDisk,
 };
-pub use tpm::{Tpm, TpmApi, TpmModel, TpmModelBuilder};
+#[allow(unused_imports)] // TODO: wire to CLI
+pub use tpm::{Swtpm, Tpm, TpmApi, TpmModel, TpmModelBuilder};
+#[allow(unused_imports)] // TODO: wire to CLI
 pub use usb::{
     UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceBuilder, UsbDeviceType,
 };
@@ -67,9 +73,6 @@ pub use devices::{
     StorageDeviceKind,
     VirtioNetController,
 };
-
-pub struct RuntimeModelBuilder {}
-pub struct RuntimeModelRenderer {}
 
 pub enum Chipset {
     Q35(Q35Chipset),

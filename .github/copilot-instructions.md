@@ -56,3 +56,10 @@ When working in `src/**`, treat `README.md` files in the `src` directory tree as
 - Keep stage boundaries explicit in names and file layout.
 - Consult `doc/dev/architecture/coding-guidelines.md` when introducing new Rust modules or abstractions.
 - Before finalizing Rust changes, run a coding-guideline conformance pass on all touched Rust files and report the status.
+- Keep Rust module declarations strict:
+	- use `mod xxx;` declarations only in `mod.rs` files (except crate roots `lib.rs` and `main.rs` where applicable)
+	- policy exception: inline `#[cfg(test)] mod tests { ... }` modules are allowed in non-`mod.rs` implementation files
+	- keep submodule declarations private (`mod xxx;`), never `pub mod` / `pub(crate) mod` / `pub(super) mod`
+	- export submodule API via explicit `pub use ...` re-exports
+	- avoid placing `impl` blocks in `mod.rs`
+	- when practical, colocate `struct` and `impl` in the same file

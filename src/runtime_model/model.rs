@@ -34,6 +34,7 @@ pub struct RuntimeModel {
     guest_agent: Option<Arc<dyn GuestAgentApi>>,
     busses: BusRegister,
 }
+#[allow(dead_code)] // TODO: wire to CLI
 impl RuntimeModel {
     pub fn get_pcie_bus(&self, id: PcieBus) -> Arc<dyn PcieControllerApi> {
         self.busses

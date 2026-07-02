@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use derive_getters::Getters;
+use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -19,14 +20,14 @@ pub struct Gtk {}
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Sdl {}
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct Vnc {
     #[serde(default)]
     listen: String,
     port: u16,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct Spice {
     #[serde(default)]
     listen: String,

@@ -4,31 +4,28 @@
 //! - src/README.md
 //! - doc/dev/domain-knowledge/proxmox/
 
-mod builder;
-mod exporter;
-mod importer;
-mod marshaler;
-mod parser;
 mod runtime_builder;
 mod schema;
 mod schema_builder;
-#[allow(dead_code)]
-pub mod serde_format;
-pub(crate) mod storage_resolver;
+mod storage_resolver;
+mod store;
 
-pub use marshaler::ProxmoxMarshaler;
-pub use parser::ProxmoxParser;
 pub use runtime_builder::ProxmoxRuntimeBuilder;
+#[allow(unused_imports)]
 pub use schema::ProxmoxConfigSchema;
 pub use schema_builder::ProxmoxSchemaBuilder;
+pub use storage_resolver::ProxmoxStorageConfig;
 
 /// Imports Proxmox VM configuration files into the canonical runtime model.
+#[allow(dead_code)] // TODO: wire to CLI
 pub struct ProxmoxImporter;
 
 /// Exports the canonical runtime model to Proxmox-style configuration text.
+#[allow(dead_code)] // TODO: wire to CLI
 pub struct ProxmoxExporter;
 
 /// Arguments required to import a Proxmox VM configuration.
+#[allow(dead_code)] // TODO: wire to CLI
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProxmoxInputArgs {
@@ -41,6 +38,7 @@ pub struct ProxmoxInputArgs {
 }
 
 /// Arguments required to export a runtime configuration to Proxmox format.
+#[allow(dead_code)] // TODO: wire to CLI
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProxmoxOutputArgs {
@@ -52,5 +50,8 @@ pub struct ProxmoxOutputArgs {
     pub output_vm: String,
 }
 
-pub type ProxmoxImportArgs = ProxmoxInputArgs;
-pub type ProxmoxExportArgs = ProxmoxOutputArgs;
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProxmoxOptions {
+    pub storage: String,
+    pub file: String,
+}

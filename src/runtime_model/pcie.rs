@@ -25,7 +25,7 @@ impl Display for PcieAddress {
         write!(f, "dev {}, func {}", self.device, self.function)
     }
 }
-#[derive(Debug, Clone, Deserialize, Serialize, Getters)]
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
 pub struct PcieDevice {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bus: Option<PcieBus>,

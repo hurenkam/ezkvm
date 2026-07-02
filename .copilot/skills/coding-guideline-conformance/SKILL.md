@@ -35,6 +35,11 @@ For each changed Rust file:
 3. **Stage module structure check**
 - Stage boundaries in `mod.rs` prioritize shared boundary types/traits/errors.
 - Implementation helpers live in dedicated implementation/helper modules.
+- `mod` declarations appear only in `mod.rs` files (except crate roots `lib.rs`/`main.rs` where needed).
+- Inline `#[cfg(test)] mod tests { ... }` modules are allowed in non-`mod.rs` implementation files.
+- Submodule declarations are private (`mod x;`), with public API exposed via `pub use ...`.
+- `mod.rs` does not contain `impl` blocks.
+- `struct` and corresponding `impl` are in the same file whenever practical.
 
 4. **Scope/size check**
 - File remains reviewable in one pass (guideline target around 350 lines).

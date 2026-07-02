@@ -11,6 +11,7 @@
 use crate::runtime_model::RuntimeModel;
 
 /// Parses text input into a format-specific schema type.
+#[allow(dead_code)] // TODO: wire to CLI
 pub trait Parser {
     type Schema;
     type Error;
@@ -20,16 +21,19 @@ pub trait Parser {
 /// Builds a canonical `RuntimeModel` from a format-specific schema.
 pub trait RuntimeBuilder {
     type Schema;
-    fn build(&self, schema: Self::Schema) -> Result<RuntimeModel, String>;
+    fn with_schema(self, schema: Self::Schema) -> Self;
+    fn build(self) -> Result<RuntimeModel, String>;
 }
 
 /// Builds a format-specific schema from a canonical `RuntimeModel`.
 pub trait SchemaBuilder {
     type Schema;
-    fn build(&self, runtime: RuntimeModel) -> Result<Self::Schema, String>;
+    fn with_runtime(self, runtime: RuntimeModel) -> Self;
+    fn build(self) -> Result<Self::Schema, String>;
 }
 
 /// Marshals a format-specific schema into text output.
+#[allow(dead_code)] // TODO: wire to CLI
 pub trait Marshaler {
     type Schema;
     type Error;

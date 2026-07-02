@@ -31,6 +31,11 @@ Minimum required checks on changed Rust files:
 - module/file responsibility still matches a single stage concern
 - interfaces remain narrow and explicit
 - stage `mod.rs` files keep boundary types/traits/errors and avoid accumulating implementation helpers
+- `mod` declarations are restricted to `mod.rs` files (with crate-root `lib.rs`/`main.rs` as the practical exception)
+- inline `#[cfg(test)] mod tests { ... }` modules in non-`mod.rs` implementation files are an allowed policy exception
+- submodule declarations are private (`mod x;`) and exported surface is defined with `pub use ...`
+- no `impl` blocks are added to `mod.rs` files
+- `struct` and corresponding `impl` are colocated in the same file whenever practical
 - module boundary changes include corresponding test updates
 
 If a mismatch is found:

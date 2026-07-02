@@ -13,6 +13,7 @@ pub struct Memory {
     numa_enabled: bool,
 }
 impl Memory {
+    #[allow(dead_code)] // TODO: wire to CLI
     pub fn kilobytes(kb: usize) -> Self {
         Self {
             size: kb * 1024,
@@ -27,6 +28,7 @@ impl Memory {
             numa_enabled: false,
         }
     }
+    #[allow(dead_code)] // TODO: wire to CLI
     pub fn gigabytes(gb: usize) -> Self {
         Self {
             size: gb * 1024 * 1024 * 1024,
@@ -34,6 +36,7 @@ impl Memory {
             numa_enabled: false,
         }
     }
+    #[allow(dead_code)] // TODO: wire to CLI
     pub fn terabytes(tb: usize) -> Self {
         Self {
             size: tb * 1024 * 1024 * 1024 * 1024,

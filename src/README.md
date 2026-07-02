@@ -55,9 +55,195 @@ This subcommand is currently a placeholder and returns an error. Use `convert` f
 
 ## Design
 
+### Config Format Architecture
+
+The config format system uses a **bidirectional stage-based pipeline** enabling lossless conversions between VM specification formats.
+
+#### Stage Pattern
+
+Each config format (ezkvm, Proxmox, libvirt, QEMU) implements a pair of stages:
+
+- **RuntimeBuilder** (`stages/runtime_builder.rs`): Converts format-specific schema → `RuntimeModel`
+  - Parses and validates input schema
+  - Resolves resources and allocates buses
+  - Registers devices across bus topologies
+  
+- **SchemaBuilder** (`stages/schema_builder.rs`): Converts `RuntimeModel` → format-specific schema
+  - Traverses runtime model devices deterministically
+  - Synthesizes deterministic resource IDs (e.g., `storage0`, `net0`, `hostpci0`)
+  - Reconstructs schema representation for output
+
+#### Ezkvm Bidirectional Flow
+
+The ezkvm format provides **lossless round-trip conversion**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ezkvm YAML (schema)                                         │
+│ ├─ metadata                                                 │
+│ ├─ host: { display, audio, resources[] }                  │
+│ └─ virtual_machine: { machine, cpu, memory, devices[] }   │
+└─────────────┬───────────────────────────────────────────────┘
+              │ RuntimeBuilder (stages/runtime_builder.rs)
+              │ - Resolve resources → ResourceMaps
+              │ - Initialize chipset → BusRegister
+              │ - Register devices across buses
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ RuntimeModel (internal representation)                      │
+│ ├─ CPUs, memory, chipset, boot firmware                    │
+│ ├─ Display, audio, TPM, guest agent                        │
+│ └─ Buses: PCIe[], SATA[], IDE[], SCSI[], USB[]           │
+└─────────────┬───────────────────────────────────────────────┘
+              │ SchemaBuilder (stages/schema_builder.rs)
+              │ - Traverse runtime buses deterministically
+              │ - Synthesize ResourceIndex (storage0, net0, hostpci0)
+              │ - Split display/audio to host vs VM
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ ezkvm YAML (schema) — semantically identical to input       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Resource Binding Pattern
+
+Resources use a **dual-reference pattern** for safe sharing:
+
+1. **Resource Declaration** (`host.resources[]`):
+   ```yaml
+   resources:
+     - storage: { file: "/var/vm/disk.qcow2" }  # synthesized as storage0
+     - network: { name: "eth0", bridge: "br0" }  # synthesized as net0
+   ```
+
+2. **Device Reference** (`virtual_machine.devices[].*.resource`):
+   ```yaml
+   devices:
+     - sata:
+         address: 0
+         type: { ssd: { resource: "storage0" } }  # reference to declared resource
+   ```
+
+This pattern ensures:
+- Resources are defined once, referenced many times
+- Deterministic ID synthesis across render passes
+- Schema validation against resource availability
+
+#### Bus Topology
+
+Buses are created by the chipset and populated during device registration:
+
+- **PCIe Buses**: Primary mesh for compute devices
+  - Bus 0: Root complex, houses passthrough controllers, NICs, GPUs, storage controllers
+  - Bus N: Additional endpoint buses (extensible)
+  - Supports hotplug (reserved in runtime)
+
+- **Storage Buses** (SATA, IDE, SCSI):
+  - Backed by controllers registered on PCIe
+  - SCSI: Dynamic controller creation if referenced bus has no controller
+
+- **USB Buses**:
+  - Separate topology from PCIe
+  - Host and device ports
+
+Device registration is explicit per-bus to avoid ambiguity.
+
+#### Conversion Examples
+
+**Import ezkvm, validate, and show runtime:**
+```bash
+ezkvm import --input.type ezkvm \
+  --input.host /etc/ezkvm/host.yaml \
+  --input.vm myvm.yaml \
+  --show-runtime
+```
+(Uses `EzkvmRuntimeBuilder::build()` to parse and construct `RuntimeModel`)
+
+**Convert ezkvm to QEMU command line:**
+```bash
+ezkvm convert \
+  --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm myvm.yaml \
+  --output.type qemu --output.vm myvm.qemu.cmd
+```
+(Chains: `EzkvmRuntimeBuilder` → schema→runtime + `QemuCmdSchemaBuilder` → runtime→schema)
+
+**Convert Proxmox to ezkvm:**
+```bash
+ezkvm convert \
+  --input.type proxmox --input.storage /etc/pve/storage.cfg --input.vm myvm.conf \
+  --output.type ezkvm --output.host /etc/ezkvm/host.yaml --output.vm myvm.yaml
+```
+(Chains: `ProxmoxRuntimeBuilder` → schema→runtime + `EzkvmSchemaBuilder` → runtime→schema)
+
 ```plantuml
 @startuml
+title Config Format Pipeline: Bidirectional Conversions via RuntimeModel
 
+package "Input Formats" {
+  component Ezkvm
+  component Proxmox
+  component Libvirt
+  component QemuCmd
+}
+
+package "Stage Builders (RuntimeBuilder)" {
+  component "EzkvmRuntimeBuilder"
+  component "ProxmoxRuntimeBuilder"
+  component "LibvirtRuntimeBuilder"
+  component "QemuCmdRuntimeBuilder"
+}
+
+package "Internal Representation" {
+  component RuntimeModel
+}
+
+package "Stage Builders (SchemaBuilder)" {
+  component "EzkvmSchemaBuilder"
+  component "ProxmoxSchemaBuilder"
+  component "LibvirtSchemaBuilder"
+  component "QemuCmdSchemaBuilder"
+}
+
+package "Output Formats" {
+  component EzkvmOut [Output Ezkvm]
+  component ProxmoxOut [Output Proxmox]
+  component LibvirtOut [Output Libvirt]
+  component QemuCmdOut [Output QemuCmd]
+}
+
+Ezkvm --> EzkvmRuntimeBuilder : schema->runtime
+ProxmoxSchemaBuilder --> ProxmoxOut : runtime->schema
+Libvirt --> LibvirtRuntimeBuilder : schema->runtime
+QemuCmd --> QemuCmdRuntimeBuilder : schema->runtime
+
+EzkvmRuntimeBuilder --> RuntimeModel : build
+ProxmoxRuntimeBuilder --> RuntimeModel : build
+LibvirtRuntimeBuilder --> RuntimeModel : build
+QemuCmdRuntimeBuilder --> RuntimeModel : build
+
+RuntimeModel --> EzkvmSchemaBuilder
+RuntimeModel --> ProxmoxSchemaBuilder
+RuntimeModel --> LibvirtSchemaBuilder
+RuntimeModel --> QemuCmdSchemaBuilder
+
+EzkvmSchemaBuilder --> EzkvmOut
+ProxmoxSchemaBuilder --> ProxmoxOut
+LibvirtSchemaBuilder --> LibvirtOut
+QemuCmdSchemaBuilder --> QemuCmdOut
+
+note right of RuntimeModel
+  Canonical intermediate representation
+  - CPUs, memory, boot, TPM
+  - Display, audio, guest agent
+  - Bus topology (PCIe, SATA, IDE, SCSI, USB)
+  - Device attachment points
+end note
+
+note bottom of ProxmoxSchemaBuilder
+  Deterministic resource ID synthesis:
+  storage0, net0, hostpci0, etc.
+  Ensures consistent YAML across renders
+end note
 @enduml
 ```
 

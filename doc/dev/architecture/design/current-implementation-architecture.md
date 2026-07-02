@@ -2,21 +2,29 @@
 
 This page is the index for implementation design notes that describe the current code shape under `src/`.
 
-## Scope
+## ⚠️ OUTDATED: Architecture Refactored
 
-The current implementation is split into these module areas:
+The implementation has been refactored from a legacy importer/exporter pattern to **bidirectional RuntimeBuilder/SchemaBuilder stages**. Much documentation on this index is **outdated**. For current information, see:
 
-- entrypoint and crate wiring in `src/main.rs` and `src/lib.rs`
-- source format adapters in `src/config_format/`
-- canonical VM model parsing and validation in `src/runtime_config/`
-- runtime-boundary scaffold plus deterministic rendering in `src/runtime_resolution/` and `src/render_stage/`
+- [src/README.md: Config Format Architecture](../../../src/README.md#config-format-architecture) — current overview
+- [src/config_format/ezkvm/README.md](../../../src/config_format/ezkvm/README.md) — ezkvm implementation details
 
-The binary entrypoint is still minimal and does not execute the full stage pipeline. Current stage flow remains:
+## Scope (Updated)
 
-1. source text is imported into a canonical `CanonicalDocument`
-2. canonical data is parsed and validated
-3. runtime resolution is represented by a scaffolded effective model
-4. render returns an ordered QEMU argument vector
+The current implementation is organized as a bidirectional stage-based pipeline:
+
+- **entrypoint and crate wiring** in `src/main.rs` and `src/lib.rs`
+- **bidirectional format adapters** in `src/config_format/<format>/stages/`
+- **canonical runtime model** in `src/runtime_model/`
+- **deterministic output rendering** to CLI arguments, files, or other formats
+
+**New Bidirectional Flow** (replaces old unidirectional import):
+
+1. Schema text → **RuntimeBuilder** → RuntimeModel (format-specific)
+2. RuntimeModel → **SchemaBuilder** → Schema output (format-specific)
+3. Supports lossless round-trip conversion between formats
+4. ResourceIndex pattern: memoized resource ID synthesis (storage0, net0, hostpci0)
+5. BusRegister pattern: device registration across bus topologies
 
 ## Module Notes
 

@@ -1,4 +1,4 @@
-//! QEMU command-file exporter for rendering the runtime configuration to disk.
+//! File I/O for QEMU command files: import and export.
 //!
 //! Related documentation:
 //! - src/README.md
@@ -8,22 +8,53 @@ use std::path::PathBuf;
 
 use crate::{
     config_format::{
-        ExportError, ExportOptions, Exporter, QemuExporter,
-        qemu_cmd::{QemuMarshaler, QemuSchemaBuilder},
-        stages::{Marshaler, SchemaBuilder},
+        ExportError, ExportOptions, Exporter, ImportError, ImportOptions, Importer,
+        qemu_cmd::{QemuMarshaler, QemuRuntimeBuilder, QemuSchemaBuilder, parser::QemuParser},
+        stages::{Marshaler, Parser, RuntimeBuilder, SchemaBuilder},
     },
     runtime_model::RuntimeModel,
 };
 
-impl Exporter for QemuExporter {
+// ---------------------------------------------------------------------------
+// Importer
+// ---------------------------------------------------------------------------
+
+impl Importer for crate::config_format::QemuImporter {
+    /// Imports a QEMU command-file into the canonical runtime model.
+    fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError> {
+        let source_path = match args {
+            ImportOptions::Qemu { vm } => vm,
+            _ => return Err(ImportError::InvalidFormat),
+        };
+
+        let source_text = std::fs::read_to_string(&source_path)
+            .map_err(|e| ImportError::ImportFailed(format!("{}: {}", source_path, e)))?;
+
+        let schema = QemuParser
+            .parse(&source_text)
+            .map_err(ImportError::ImportFailed)?;
+
+        QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
+            .map_err(ImportError::ImportFailed)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Exporter
+// ---------------------------------------------------------------------------
+
+impl Exporter for crate::config_format::QemuExporter {
     fn export(&self, model: RuntimeModel, args: ExportOptions) -> Result<PathBuf, ExportError> {
         let output_vm = match args {
             ExportOptions::Qemu { vm } => vm,
             _ => return Err(ExportError::InvalidFormat),
         };
 
-        let schema = QemuSchemaBuilder
-            .build(model)
+        let schema = QemuSchemaBuilder::default()
+            .with_runtime(model)
+            .build()
             .map_err(|e| ExportError::ExportFailed(format!("runtime mapping failed: {e}")))?;
 
         let content = QemuMarshaler
@@ -46,7 +77,7 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::{
-        config_format::{ExportOptions, Exporter, QemuExporter},
+        config_format::{ExportOptions, Exporter, ImportOptions, Importer, qemu_cmd::QemuExporter},
         runtime_model::{
             BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, Q35Chipset,
             RuntimeModel, SeaBiosModel,
@@ -124,5 +155,27 @@ mod tests {
         let content = std::fs::read_to_string(output).expect("output should be readable");
         assert!(content.contains("-smbios type=1,uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
         assert!(content.contains("-device vmgenid,guid=11111111-2222-3333-4444-555555555555"));
+    }
+
+    #[test]
+    fn imports_basic_qemu_command_file() {
+        let path = "/tmp/ezkvm-test-qemu-import-basic.cmd";
+        std::fs::write(
+            path,
+            "qemu-system-x86_64 -name vm1 -m 2048 -cpu host -smp 2,sockets=1,cores=2,threads=1",
+        )
+        .expect("test qemu command should be written");
+
+        let runtime = crate::config_format::QemuImporter
+            .import(ImportOptions::Qemu {
+                vm: path.to_string(),
+            })
+            .expect("import should succeed");
+
+        assert_eq!(runtime.name(), "vm1");
+        assert_eq!(
+            runtime.memory().qemu_args(runtime.cpu()),
+            vec!["-m", "2048M"]
+        );
     }
 }

@@ -235,17 +235,62 @@ src/config_format/
 ├── options.rs              # ImportOptions and ExportOptions enum dispatch
 ├── ezkvm/
 │   ├── mod.rs
-│   ├── importer.rs         # EzkvmImporter implementation
-│   ├── exporter.rs         # EzkvmExporter implementation
-│   └── diagnostics.rs      # Structured error reporting
+│   ├── io/
+│   │   ├── importer.rs     # EzkvmImporter implementation
+│   │   └── exporter.rs     # EzkvmExporter implementation
+│   ├── schema/
+│   │   ├── schema.rs       # Ezkvm YAML schema data types
+│   │   └── virtual_machine.rs
+│   ├── stages/
+│   │   ├── parser.rs
+│   │   ├── runtime_builder.rs
+│   │   ├── schema_builder.rs
+│   │   └── marshaler.rs
+│   ├── mapping/
+│   │   ├── builder.rs
+│   │   ├── render_devices.rs
+│   │   │   ├── pcie.rs
+│   │   │   ├── resource_ids.rs
+│   │   │   └── storage.rs
+│   │   ├── render_presentation.rs
+│   │   └── renderer.rs
+│   ├── diagnostics/
+│   │   ├── diagnostics.rs
+│   │   └── errors.rs
+│   └── validation/
+│       └── validation.rs
 ├── proxmox/
 │   ├── mod.rs
-│   ├── importer.rs         # ProxmoxImporter implementation
-│   └── exporter.rs         # ProxmoxExporter implementation
+│   ├── io/
+│   │   ├── importer.rs     # ProxmoxImporter implementation
+│   │   └── exporter.rs     # ProxmoxExporter implementation
+│   ├── schema/
+│   │   ├── schema.rs
+│   │   └── serde_format.rs
+│   ├── stages/
+│   │   ├── parser.rs
+│   │   ├── runtime_builder.rs
+│   │   ├── schema_builder.rs
+│   │   └── marshaler.rs
+│   └── mapping/
+│       ├── builder.rs
+│       ├── device_registration.rs
+│       ├── parse_helpers.rs
+│       │   ├── identity_display.rs
+│       │   └── resource_collectors.rs
+│       └── storage_resolver.rs
 ├── qemu_cmd/
 │   ├── mod.rs
-│   ├── importer.rs         # QemuImporter implementation
-│   └── exporter.rs         # QemuExporter implementation
+│   ├── io/
+│   │   ├── importer.rs     # QemuImporter implementation
+│   │   └── exporter.rs     # QemuExporter implementation
+│   ├── schema/
+│   │   └── schema.rs
+│   └── stages/
+│       ├── parser.rs
+│       ├── runtime_builder.rs
+│       ├── schema_builder.rs
+│       └── marshaler.rs
 └── libvirt/
     ├── mod.rs
     ├── importer.rs         # LibvirtImporter implementation

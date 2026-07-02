@@ -1,4 +1,4 @@
-//! SchemaBuilder stage: `RuntimeModel` -> `QemuCommandSchema`.
+//! SchemaBuilder stage: `RuntimeModel` → `QemuCommandSchema`.
 
 use crate::{
     config_format::{
@@ -12,12 +12,25 @@ use crate::{
 };
 
 /// Builds qemu command schema from runtime model.
-pub struct QemuSchemaBuilder;
+#[allow(dead_code)] // TODO: wire to CLI
+#[derive(Default)]
+pub struct QemuSchemaBuilder {
+    runtime: Option<RuntimeModel>,
+}
 
 impl SchemaBuilder for QemuSchemaBuilder {
     type Schema = QemuCommandSchema;
 
-    fn build(&self, runtime: RuntimeModel) -> Result<QemuCommandSchema, String> {
+    fn with_runtime(self, runtime: RuntimeModel) -> Self {
+        Self {
+            runtime: Some(runtime),
+        }
+    }
+
+    fn build(self) -> Result<QemuCommandSchema, String> {
+        let runtime = self.runtime.as_ref().ok_or_else(|| {
+            "QemuSchemaBuilder requires a runtime model to build schema".to_string()
+        })?;
         let qemu_command = runtime.qemu_command();
         let executable = qemu_command
             .first()
@@ -34,12 +47,10 @@ impl SchemaBuilder for QemuSchemaBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        config_format::{qemu_cmd::schema_builder::QemuSchemaBuilder, stages::SchemaBuilder},
-        runtime_model::{
-            BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, Q35Chipset,
-            RuntimeModel, SeaBiosModel,
-        },
+    use super::*;
+    use crate::runtime_model::{
+        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, Q35Chipset,
+        RuntimeModel, SeaBiosModel,
     };
 
     #[test]
@@ -60,8 +71,9 @@ mod tests {
             busses,
         );
 
-        let schema = QemuSchemaBuilder
-            .build(runtime)
+        let schema = QemuSchemaBuilder::default()
+            .with_runtime(runtime)
+            .build()
             .expect("build should succeed");
 
         assert_eq!(schema.executable, "qemu-system-x86_64");

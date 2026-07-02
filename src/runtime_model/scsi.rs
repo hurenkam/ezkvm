@@ -85,6 +85,7 @@ impl ScsiDeviceBuilder {
         })
     }
 }
+#[allow(dead_code)] // TODO: wire to CLI
 #[derive(Default)]
 pub struct ScsiDisk {}
 

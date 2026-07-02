@@ -1,3 +1,4 @@
+#![allow(dead_code)] // TODO: wire to CLI
 use std::{fmt, sync::Arc};
 
 use serde::{Deserialize, Serialize};

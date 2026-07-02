@@ -1,16 +1,18 @@
-# Config Importer Stage
+# Config Importer Stage (OUTDATED - See RuntimeBuilder)
+
+⚠️ **THIS DOCUMENT DESCRIBES LEGACY ARCHITECTURE** — The import pattern described here has been replaced with the **RuntimeBuilder/SchemaBuilder stage pattern**. See [ezkvm README](../../src/config_format/ezkvm/README.md) for current implementation.
 
 Back to index: [Current Implementation Architecture](./current-implementation-architecture.md)
 
 ## Scope
 
-This note covers source import adapters in:
+This note describes the **legacy** import adapters in:
 
-- `src/config_importer/mod.rs`
-- `src/config_importer/ezkvm/mod.rs`
-- `src/config_importer/proxmox/mod.rs`
+- `src/config_importer/mod.rs` (legacy)
+- `src/config_importer/ezkvm/mod.rs` (legacy)
+- `src/config_importer/proxmox/mod.rs` (legacy)
 
-The config importer stage takes importer-specific configuration in `ConfigArgs` and returns a canonical `CanonicalDocument` or a typed adapter error.
+The legacy config importer stage took importer-specific configuration and returned a canonical `CanonicalDocument`. **This pattern is superseded by RuntimeBuilder.**
 
 ## Stage Structure
 

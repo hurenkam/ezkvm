@@ -1,23 +1,33 @@
-//! RuntimeBuilder stage: `QemuCommandSchema` -> `RuntimeModel`.
+//! RuntimeBuilder stage: `QemuCommandSchema` → `RuntimeModel`.
 
-use std::sync::Arc;
-
+#![allow(dead_code)] // TODO: wire to CLI
 use crate::{
     config_format::{qemu_cmd::schema::QemuCommandSchema, stages::RuntimeBuilder},
     runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
-        GuestAgent, GuestAgentModelBuilder, I440fxChipset, Memory, PciDeviceApi, PciDeviceType,
-        PcieAddress, PcieDeviceApi, PcieDeviceType, Q35Chipset, RuntimeModel, SeaBiosModel,
+        BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder,
+        GuestAgentModelBuilder, I440fxChipset, Memory, Q35Chipset, RuntimeModel, SeaBiosModel,
     },
 };
 
 /// Builds a `RuntimeModel` from parsed qemu command schema.
-pub struct QemuRuntimeBuilder;
+#[derive(Default)]
+pub struct QemuRuntimeBuilder {
+    schema: Option<QemuCommandSchema>,
+}
 
 impl RuntimeBuilder for QemuRuntimeBuilder {
     type Schema = QemuCommandSchema;
 
-    fn build(&self, schema: QemuCommandSchema) -> Result<RuntimeModel, String> {
+    fn with_schema(self, schema: Self::Schema) -> Self {
+        Self {
+            schema: Some(schema),
+        }
+    }
+
+    fn build(self) -> Result<RuntimeModel, String> {
+        let schema = self.schema.as_ref().ok_or_else(|| {
+            "QemuRuntimeBuilder requires a schema to build runtime model".to_string()
+        })?;
         let name = schema
             .known
             .name
@@ -64,6 +74,11 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Command parsing helpers
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy)]
 enum MachineChipset {
     Q35,
     I440fx,
@@ -89,14 +104,14 @@ fn parse_machine_chipset(machine: Option<&str>) -> MachineChipset {
     MachineChipset::Q35
 }
 
-fn parse_cpu_model(model: Option<&str>) -> CpuModel {
+fn parse_cpu_model(model: Option<&str>) -> crate::runtime_model::CpuModel {
     match model {
-        Some("host") | None => CpuModel::Host,
-        Some(_) => CpuModel::Host,
+        Some("host") | None => crate::runtime_model::CpuModel::Host,
+        Some(_) => crate::runtime_model::CpuModel::Host,
     }
 }
 
-fn parse_display(args: &[String]) -> Option<Display> {
+fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
     for window in args.windows(2) {
         if let [flag, value] = window
             && flag == "-spice"
@@ -177,12 +192,12 @@ fn parse_display(args: &[String]) -> Option<Display> {
     None
 }
 
-fn parse_guest_agent(args: &[String]) -> Option<GuestAgent> {
+fn parse_guest_agent(args: &[String]) -> Option<crate::runtime_model::GuestAgent> {
     if args
         .iter()
         .any(|arg| arg.contains("org.qemu.guest_agent.0"))
     {
-        return Some(GuestAgent { enabled: true });
+        return Some(crate::runtime_model::GuestAgent { enabled: true });
     }
     None
 }
@@ -227,37 +242,9 @@ fn parse_vmgenid(args: &[String]) -> Option<String> {
     None
 }
 
-fn register_gpu_from_args(args: &[String], busses: &BusRegister) -> Result<(), String> {
-    let gpu = detect_gpu(args);
-    match gpu {
-        Some(ImportedGpu::Standard) => match busses.pcie_busses().get(&0) {
-            Some(root) => {
-                let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::StandardGpu).into();
-                root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))
-            }
-            None => Err("PCIe root bus with id 0 does not exist".to_string()),
-        },
-        Some(ImportedGpu::Virtio) => match busses.pcie_busses().get(&0) {
-            Some(root) => {
-                let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::VirtioGpu).into();
-                root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))
-            }
-            None => Err("PCIe root bus with id 0 does not exist".to_string()),
-        },
-        Some(ImportedGpu::Qxl) => {
-            if let Some(root) = busses.pci_busses().get(&0) {
-                let device: Arc<dyn PciDeviceApi> = (&PciDeviceType::QxlGpu).into();
-                root.register_pci_device(device, None)
-            } else if let Some(root) = busses.pcie_busses().get(&0) {
-                let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::StandardGpu).into();
-                root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))
-            } else {
-                Err("Neither PCI nor PCIe root bus exists".to_string())
-            }
-        }
-        Some(ImportedGpu::Headless) | None => Ok(()),
-    }
-}
+// ---------------------------------------------------------------------------
+// GPU registration
+// ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy)]
 enum ImportedGpu {
@@ -314,9 +301,48 @@ fn detect_gpu(args: &[String]) -> Option<ImportedGpu> {
     None
 }
 
+fn register_gpu_from_args(args: &[String], busses: &BusRegister) -> Result<(), String> {
+    use crate::runtime_model::{
+        PciDeviceApi, PciDeviceType, PcieAddress, PcieDeviceApi, PcieDeviceType,
+    };
+    use std::sync::Arc;
+
+    let gpu = detect_gpu(args);
+    match gpu {
+        Some(ImportedGpu::Standard) => match busses.pcie_busses().get(&0) {
+            Some(root) => {
+                let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::StandardGpu).into();
+                root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))
+            }
+            None => Err("PCIe root bus with id 0 does not exist".to_string()),
+        },
+        Some(ImportedGpu::Virtio) => match busses.pcie_busses().get(&0) {
+            Some(root) => {
+                let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::VirtioGpu).into();
+                root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))
+            }
+            None => Err("PCIe root bus with id 0 does not exist".to_string()),
+        },
+        Some(ImportedGpu::Qxl) => {
+            if let Some(root) = busses.pci_busses().get(&0) {
+                let device: Arc<dyn PciDeviceApi> = (&PciDeviceType::QxlGpu).into();
+                root.register_pci_device(device, None)
+            } else if let Some(root) = busses.pcie_busses().get(&0) {
+                let device: Arc<dyn PcieDeviceApi> = (&PcieDeviceType::StandardGpu).into();
+                root.register_pcie_device(device, Some(PcieAddress::new(1, 0)))
+            } else {
+                Err("Neither PCI nor PCIe root bus exists".to_string())
+            }
+        }
+        Some(ImportedGpu::Headless) | None => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::config_format::{qemu_cmd::QemuParser, stages::Parser, stages::RuntimeBuilder};
+    use crate::config_format::{
+        qemu_cmd::parser::QemuParser, stages::Parser, stages::RuntimeBuilder,
+    };
 
     use super::QemuRuntimeBuilder;
 
@@ -325,8 +351,9 @@ mod tests {
         let cmd = "qemu-system-x86_64 -name vm1 -m 4096 -cpu host -smp 4,sockets=1,cores=4,threads=1 -spice port=5905,addr=127.0.0.1,disable-ticketing=on -device virtio-vga -chardev socket,path=/tmp/vm1.qga,server=on,wait=off,id=qga0 -device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0";
         let schema = QemuParser.parse(cmd).expect("command should parse");
 
-        let runtime = QemuRuntimeBuilder
-            .build(schema)
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
             .expect("runtime build should succeed");
 
         let rendered = runtime.qemu_command();
@@ -348,8 +375,9 @@ mod tests {
         let cmd = "qemu-system-x86_64 -name vm2 -m 2048 -cpu host -smp 2,sockets=1,cores=2,threads=1 -vga qxl";
         let schema = QemuParser.parse(cmd).expect("command should parse");
 
-        let runtime = QemuRuntimeBuilder
-            .build(schema)
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
             .expect("runtime build should succeed");
 
         let rendered = runtime.qemu_command();
@@ -361,8 +389,9 @@ mod tests {
         let cmd = "qemu-system-x86_64 -name vm3 -m 2048 -cpu host -smp 2,sockets=1,cores=2,threads=1 -smbios type=1,uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee -device vmgenid,guid=11111111-2222-3333-4444-555555555555";
         let schema = QemuParser.parse(cmd).expect("command should parse");
 
-        let runtime = QemuRuntimeBuilder
-            .build(schema)
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
             .expect("runtime build should succeed");
 
         assert_eq!(

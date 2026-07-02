@@ -1,6 +1,7 @@
 //! Schema types for qemu command-file import/export.
 
 /// Typed subset extracted from qemu command arguments.
+#[allow(dead_code)] // TODO: wire to CLI
 #[derive(Debug, Clone, Default)]
 pub struct QemuKnownFields {
     pub name: Option<String>,
@@ -16,6 +17,7 @@ pub struct QemuKnownFields {
 ///
 /// `args` keeps the full command argument vector (excluding executable) so unknown
 /// flags are preserved in parse/marshal roundtrips.
+#[allow(dead_code)] // TODO: wire to CLI
 #[derive(Debug, Clone)]
 pub struct QemuCommandSchema {
     pub executable: String,
@@ -23,6 +25,7 @@ pub struct QemuCommandSchema {
     pub known: QemuKnownFields,
 }
 
+#[allow(dead_code)] // TODO: wire to CLI
 impl QemuCommandSchema {
     pub fn new(executable: String, args: Vec<String>, known: QemuKnownFields) -> Self {
         Self {
