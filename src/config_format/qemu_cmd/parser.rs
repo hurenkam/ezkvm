@@ -1,7 +1,7 @@
 //! Parser stage: qemu command text → `QemuCommandSchema`.
 
 use super::schema::{QemuCommandSchema, QemuKnownFields};
-use crate::config_format::stages::Parser;
+use crate::config_format::Parser;
 
 /// Parses qemu command-file text into `QemuCommandSchema`.
 #[allow(dead_code)] // TODO: wire to CLI
@@ -175,7 +175,7 @@ fn parse_smp(value: &str) -> (u8, u8, u8) {
 
 #[cfg(test)]
 mod tests {
-    use crate::config_format::stages::Parser;
+    use crate::config_format::Parser;
 
     use super::QemuParser;
 

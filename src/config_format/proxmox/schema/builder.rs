@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     config_format::{
+        SchemaBuilder,
         proxmox::{
             schema::{
                 ProxmoxCompoundValue, ProxmoxConfigSchema, ProxmoxOption, ProxmoxSection,
@@ -16,7 +17,6 @@ use crate::{
             },
             storage_resolver::ProxmoxStorageConfig,
         },
-        stages::SchemaBuilder,
     },
     runtime_model::RuntimeModel,
 };
@@ -392,8 +392,8 @@ fn net_value_from_pcie_args(args: &[String]) -> Option<ProxmoxValue> {
 
 #[cfg(test)]
 mod tests {
+    use crate::config_format::SchemaBuilder;
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
-    use crate::config_format::stages::SchemaBuilder;
     use crate::runtime_model::{
         BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, Q35Chipset,
         RuntimeModel, SeaBiosModel,

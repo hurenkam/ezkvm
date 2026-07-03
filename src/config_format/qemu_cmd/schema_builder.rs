@@ -2,11 +2,11 @@
 
 use crate::{
     config_format::{
+        SchemaBuilder,
         qemu_cmd::{
             parser::parse_known_fields,
             schema::{QemuCommandSchema, QemuKnownFields},
         },
-        stages::SchemaBuilder,
     },
     runtime_model::RuntimeModel,
 };

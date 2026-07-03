@@ -1,6 +1,6 @@
 //! Marshaler stage: `QemuCommandSchema` → qemu command text.
 
-use crate::config_format::{qemu_cmd::schema::QemuCommandSchema, stages::Marshaler};
+use crate::config_format::{Marshaler, qemu_cmd::schema::QemuCommandSchema};
 
 /// Marshals a qemu command schema into deterministic shell command text.
 #[allow(dead_code)] // TODO: wire to CLI
@@ -32,8 +32,8 @@ fn shell_escape(arg: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::config_format::{
+        Marshaler, Parser,
         qemu_cmd::{parser::QemuParser, schema::QemuCommandSchema},
-        stages::{Marshaler, Parser},
     };
 
     use super::QemuMarshaler;

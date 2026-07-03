@@ -89,9 +89,9 @@ impl FromStr for ProxmoxConfigSchema {
     }
 }
 
-impl Display for ProxmoxConfigSchema {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.render())
+impl ToString for ProxmoxConfigSchema {
+    fn to_string(&self) -> String {
+        self.render()
     }
 }
 

@@ -6,8 +6,8 @@
 
 use crate::{
     config_format::{
+        RuntimeBuilder,
         proxmox::{schema::ProxmoxConfigSchema, storage_resolver::ProxmoxStorageConfig},
-        stages::RuntimeBuilder,
     },
     runtime_model::RuntimeModel,
 };

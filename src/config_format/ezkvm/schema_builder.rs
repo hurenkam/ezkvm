@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     config_format::{
+        SchemaBuilder,
         ezkvm::{
             Bios, Boot, Device, EzkvmConfigSchema, Machine, VirtualMachine,
             schema::{
@@ -11,7 +12,6 @@ use crate::{
                 SpiceSchema, Uefi, VncSchema,
             },
         },
-        stages::SchemaBuilder,
     },
     runtime_model::{
         Audio, AudioBackend, AudioController, BiosModel, BootModel, Chipset, Display, IdeDevice,

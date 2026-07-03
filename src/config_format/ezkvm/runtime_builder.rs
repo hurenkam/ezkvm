@@ -4,19 +4,16 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     config_format::{
-        ezkvm::{
-            Device, EzkvmConfigSchema, Machine,
-            schema::{BootModelBuilder, DisplaySchema},
-        },
-        stages::RuntimeBuilder,
+        RuntimeBuilder,
+        ezkvm::{Bios, Boot, Device, EzkvmConfigSchema, Machine, schema::DisplaySchema},
     },
     runtime_model::{
-        Audio, AudioModelBuilder, BusRegister, BusRegistrationApi, Chipset, Display,
-        DisplayModelBuilder, GuestAgentModelBuilder, I440fxChipset, IdeDeviceBuilder,
+        Audio, AudioModelBuilder, BiosModel, BootModel, BusRegister, BusRegistrationApi, Chipset,
+        Display, DisplayModelBuilder, GuestAgentModelBuilder, I440fxChipset, IdeDeviceBuilder,
         NetworkResource, PciDeviceResource, PcieAddress, PcieDeviceApi, PcieDeviceResource,
         PcieDeviceType, PvScsiController, Q35Chipset, RuntimeModel, SataDeviceBuilder,
-        ScsiControllerApi, ScsiDeviceBuilder, StorageResource, TpmModelBuilder, UsbDeviceBuilder,
-        UsbDeviceResource, VirtioNetController,
+        ScsiControllerApi, ScsiDeviceBuilder, SeaBiosModel, StorageResource, TpmModelBuilder,
+        UefiModel, UsbDeviceBuilder, UsbDeviceResource, VirtioNetController,
     },
 };
 
@@ -69,6 +66,28 @@ impl RuntimeBuilder for EzkvmRuntimeBuilder {
             schema: Some(schema),
             ..self
         }
+    }
+}
+
+struct BootModelBuilder {}
+impl BootModelBuilder {
+    pub fn build(
+        boot: &Boot,
+        storage_resources: &HashMap<String, StorageResource>,
+    ) -> Result<BootModel, String> {
+        let bios = match boot.bios() {
+            Bios::SeaBios { seabios: _ } => BiosModel::SeaBios(SeaBiosModel {}),
+            Bios::Uefi { uefi } => {
+                let uefi_resource = storage_resources.get(uefi.resource()).ok_or_else(|| {
+                    format!(
+                        "missing storage resource '{}' referenced by UEFI firmware",
+                        uefi.resource()
+                    )
+                })?;
+                BiosModel::Uefi(UefiModel::new(uefi_resource.clone()))
+            }
+        };
+        Ok(BootModel::new(bios))
     }
 }
 

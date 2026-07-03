@@ -1,310 +1,206 @@
 # Config Format Module
 
-Provides importers and exporters that translate between external VM configuration formats (ezkvm YAML, Proxmox `.conf`, QEMU command-line, libvirt XML) and the canonical `RuntimeConfig` model used by the rest of the pipeline.
+This module contains format adapters that translate external VM configuration representations into the canonical `RuntimeModel`, and back when supported.
 
-## Requirements
+## Current Architecture
 
-### Multiple Import Sources
-- Import from **ezkvm** YAML format (host + VM config files)
-- Import from **Proxmox** `.conf` format (with storage.cfg context)
-- Import from **QEMU** command-line format or captured scripts
-- Import from **libvirt** XML format
-- Each importer normalizes source-specific semantics into canonical model terms
+The module is trait-driven and stage-oriented.
 
-### Multiple Export Targets
-- Export to **ezkvm** YAML format (host + VM config files)
-- Export to **Proxmox** configuration format
-- Export to **QEMU** command-line format (ordered, quoted arguments)
-- Export to **libvirt** XML format
-- Each exporter renders the canonical model into destination-specific syntax
+Core traits in `mod.rs`:
 
-### Normalized Canonical Model
-- All importers produce the same `RuntimeConfig` type regardless of source
-- Source-specific keys are mapped deterministically to canonical names (e.g., `cpu` → `cpu.model`, `machine` → `chipset`)
-- Canonical model is source-agnostic and independent of any particular VM platform
-- No source-specific fields leak into the canonical model
+- `RuntimeModelLoader`
+  - File/IO entrypoint for loading a format into `RuntimeModel`
+- `RuntimeModelSaver`
+  - File/IO entrypoint for saving a `RuntimeModel` to a format
+- `Parser`
+  - Text -> format schema
+- `RuntimeBuilder`
+  - format schema -> `RuntimeModel`
+- `SchemaBuilder`
+  - `RuntimeModel` -> format schema
+- `Marshaler`
+  - format schema -> text
 
-### Deterministic Format Translation
-- Import phase: source config + import-host context → `RuntimeConfig`
-- Export phase: `RuntimeConfig` + export-specific options → destination format
-- For fixed input and options, output must be bit-identical (idempotent)
-- Field ordering and text escaping must be canonical
+This replaces the older importer/exporter/options dispatch model.
 
-### QEMU Command Coverage (Current)
-- `qemu_cmd` importer/exporter are implemented with staged adapters (`parser`, `runtime_builder`, `schema_builder`, `marshaler`).
-- Runtime import/export maps VM name, machine/chipset, CPU topology, memory, and common display/guest-agent/GPU patterns.
-- Parser keeps full raw argv in schema so unsupported flags are preserved for parse/marshal roundtrips as passthrough arguments.
-- Runtime conversion still leaves many source-specific flags unmapped; unsupported flags are not mapped into canonical runtime fields.
+## Format Status (Current)
 
-### Structural Validation
-- Input files are validated for syntax and semantic consistency at import boundary
-- Source-specific validation (e.g., required fields) occurs during import
-- Schema violations produce structured errors with source location information when available
-- Unsupported source fields warn (not fail) when conversion can proceed safely
+- `ezkvm`
+  - `EzkvmRuntimeBuilder` and `EzkvmSchemaBuilder` are implemented
+  - persistence helper: `EzkvmConfigFileStore`
+- `proxmox`
+  - runtime import path implemented (`ProxmoxLoader` + `ProxmoxRuntimeBuilder`)
+  - runtime export path implemented (`ProxmoxSaver` + `ProxmoxSchemaBuilder`)
+  - schema parser/renderer implemented (`ProxmoxConfigSchema`)
+  - storage token/path resolver implemented (`ProxmoxStorageConfig`)
+- `qemu_cmd`
+  - parser, runtime builder, schema builder, marshaler, loader, and saver implemented
+- `libvirt`
+  - loader and saver exist, but both currently return unsupported errors
 
----
+## Module Layout
 
-# Design
+```text
+src/config_format/
+|- mod.rs
+|- README.md
+|- parity_tests.rs
+|- ezkvm/
+|  |- mod.rs
+|  |- schema.rs
+|  |- runtime_builder.rs
+|  |- schema_builder.rs
+|  |- compact_yaml.rs
+|  |- store.rs
+|  `- README.md
+|- proxmox/
+|  |- mod.rs
+|  |- storage_resolver.rs
+|  |- runtime/
+|  |  |- mod.rs
+|  |  |- builder.rs
+|  |  |- loader.rs
+|  |  `- saver.rs
+|  |- schema/
+|  |  |- mod.rs
+|  |  |- schema.rs
+|  |  `- builder.rs
+|  `- README.md
+|- qemu_cmd/
+|  |- mod.rs
+|  |- schema.rs
+|  |- parser.rs
+|  |- runtime_builder.rs
+|  |- schema_builder.rs
+|  |- marshaler.rs
+|  |- loader.rs
+|  `- saver.rs
+`- libvirt/
+   |- mod.rs
+   |- loader.rs
+   |- saver.rs
+   `- README.md
+```
 
-## Type Overview
-
-The config_format module provides two core trait abstractions and their implementations:
-
-| Symbol | Kind | File | Role |
-|---|---|---|---|
-| `Importer` | Trait | `mod.rs` | Contract for any type that reads source format into `RuntimeConfig` |
-| `Exporter` | Trait | `mod.rs` | Contract for any type that writes `RuntimeConfig` to destination format |
-| `ImportOptions` | Enum | `options.rs` | Selects and configures an importer; dispatches `import_runtime()` |
-| `ExportOptions` | Enum | `options.rs` | Selects and configures an exporter; dispatches `export_runtime()` |
-| `EzkvmImporter` | Struct | `ezkvm/mod.rs` | Importer for ezkvm YAML format |
-| `EzkvmExporter` | Struct | `ezkvm/mod.rs` | Exporter to ezkvm YAML format |
-| `ProxmoxImporter` | Struct | `proxmox/mod.rs` | Importer for Proxmox `.conf` format |
-| `ProxmoxExporter` | Struct | `proxmox/mod.rs` | Exporter to Proxmox configuration format |
-| `QemuImporter` | Struct | `qemu_cmd/mod.rs` | Importer for QEMU command-line format |
-| `QemuExporter` | Struct | `qemu_cmd/mod.rs` | Exporter to QEMU command-line format |
-| `LibvirtImporter` | Struct | `libvirt/mod.rs` | Importer for libvirt XML format |
-| `LibvirtExporter` | Struct | `libvirt/mod.rs` | Exporter to libvirt XML format |
-| `RuntimeConfig` | Type | `runtime_config` | Canonical VM configuration model used by all importers/exporters |
-| `ImportError` | Enum | `mod.rs` | Error types for import failures |
-| `ExportError` | Enum | `mod.rs` | Error types for export failures |
-
----
-
-## Class Diagram
+## Class Diagram (PlantUML)
 
 ```plantuml
-@startuml Config Format Module – Class Diagram
-
-skinparam linetype ortho
-skinparam shadowing false
+@startuml
+left to right direction
 skinparam classAttributeIconSize 0
-skinparam roundcorner 0
 
 package "config_format" {
-  package "mod" {
-    interface Importer << (T,#FFA500) >> {
-      + import(args: ImportOptions) : Result<RuntimeConfig, ImportError>
-    }
-    interface Exporter << (T,#FFA500) >> {
-      + export(runtime, args: ExportOptions) : Result<PathBuf, ExportError>
-    }
-    struct RuntimeConfig << (S,#ADD8E6) >> {
-      {VM model}
-    }
-    struct ImportError << (E,#FFD700) >> {
-      InvalidFormat
-      UnsupportedImporter
-      ImportFailed
-    }
-    struct ExportError << (E,#FFD700) >> {
-      InvalidFormat
-      UnsupportedExporter
-      ExportFailed
-    }
+  interface RuntimeModelLoader {
+    + load(args) -> Result<RuntimeModel, Error>
+  }
+  interface RuntimeModelSaver {
+    + save(runtime, args) -> Result<(), Error>
+  }
+  interface Parser {
+    + parse(source) -> Result<Schema, Error>
+  }
+  interface RuntimeBuilder {
+    + with_schema(schema) -> Self
+    + build() -> Result<RuntimeModel, String>
+  }
+  interface SchemaBuilder {
+    + with_runtime(runtime) -> Self
+    + build() -> Result<Schema, String>
+  }
+  interface Marshaler {
+    + marshal(schema) -> Result<String, Error>
   }
 
-  package "options" {
-    enum ImportOptions << (E,#FFD700) >> {
-      Ezkvm { host, vm }
-      Proxmox { storage, vm }
-      Qemu { vm }
-      Libvirt { vm }
-      ..
-      + import_runtime() : Result<RuntimeConfig, String>
-    }
-    enum ExportOptions << (E,#FFD700) >> {
-      Ezkvm { host, vm }
-      Proxmox { storage, vm }
-      Qemu { vm }
-      Libvirt { vm }
-      ..
-      + export_runtime(runtime) : Result<PathBuf, String>
-    }
-  }
-
-  package "ezkvm" {
-    struct EzkvmImporter << (S,#ADD8E6) >>
-    struct EzkvmExporter << (S,#ADD8E6) >>
-  }
-
-  package "proxmox" {
-    struct ProxmoxImporter << (S,#ADD8E6) >>
-    struct ProxmoxExporter << (S,#ADD8E6) >>
-  }
-
-  package "qemu_cmd" {
-    struct QemuImporter << (S,#ADD8E6) >>
-    struct QemuExporter << (S,#ADD8E6) >>
-  }
-
-  package "libvirt" {
-    struct LibvirtImporter << (S,#ADD8E6) >>
-    struct LibvirtExporter << (S,#ADD8E6) >>
-  }
+  class ImportError
+  class ExportError
 }
 
-Importer <|---- EzkvmImporter
-Exporter <|---- EzkvmExporter
-Importer <|---- ProxmoxImporter
-Exporter <|---- ProxmoxExporter
-Importer <|---- QemuImporter
-Exporter <|---- QemuExporter
-Importer <|---- LibvirtImporter
-Exporter <|---- LibvirtExporter
+package "config_format::ezkvm" {
+  class EzkvmRuntimeBuilder
+  class EzkvmSchemaBuilder
+  class EzkvmConfigFileStore
+}
 
-ImportOptions ...> Importer
-ExportOptions ...> Exporter
-RuntimeConfig <-- Importer
-RuntimeConfig <-- Exporter
-ImportError <.. Importer
-ExportError <.. Exporter
+package "config_format::proxmox" {
+  class ProxmoxRuntimeBuilder
+  class ProxmoxSchemaBuilder
+  class ProxmoxStorageConfig
+  class ProxmoxLoader
+  class ProxmoxSaver
+}
 
+package "config_format::qemu_cmd" {
+  class QemuParser
+  class QemuRuntimeBuilder
+  class QemuSchemaBuilder
+  class QemuMarshaler
+  class QemuLoader
+  class QemuSaver
+}
 
+package "config_format::libvirt" {
+  class LibvirtLoader
+  class LibvirtSaver
+}
 
+RuntimeBuilder <|.. EzkvmRuntimeBuilder
+SchemaBuilder <|.. EzkvmSchemaBuilder
+
+RuntimeBuilder <|.. ProxmoxRuntimeBuilder
+SchemaBuilder <|.. ProxmoxSchemaBuilder
+RuntimeModelLoader <|.. ProxmoxLoader
+RuntimeModelSaver <|.. ProxmoxSaver
+
+Parser <|.. QemuParser
+RuntimeBuilder <|.. QemuRuntimeBuilder
+SchemaBuilder <|.. QemuSchemaBuilder
+Marshaler <|.. QemuMarshaler
+RuntimeModelLoader <|.. QemuLoader
+RuntimeModelSaver <|.. QemuSaver
+
+RuntimeModelLoader <|.. LibvirtLoader
+RuntimeModelSaver <|.. LibvirtSaver
 @enduml
 ```
 
----
-
-## Import/Export Sequence
+## Conversion Sequence (PlantUML)
 
 ```plantuml
-@startuml Config Format Module – Import/Export Sequence
+@startuml
+actor CLI
+participant "Format Loader" as Loader
+participant "Parser (optional)" as Parser
+participant "RuntimeBuilder" as Builder
+participant "RuntimeModel" as Runtime
+participant "SchemaBuilder" as SBuilder
+participant "Marshaler (optional)" as Marshaler
+participant "Format Saver" as Saver
 
-skinparam shadowing false
-skinparam roundcorner 0
-skinparam sequenceArrowThickness 2
-skinparam sequenceMessageAlign left
+CLI -> Loader : load(args)
+alt loader parses raw text
+  Loader -> Parser : parse(source)
+  Parser --> Loader : schema
+end
+Loader -> Builder : with_schema(schema).build()
+Builder --> Loader : RuntimeModel
+Loader --> CLI : RuntimeModel
 
-participant "CLI\n(Convert)" as cli
-participant "ImportOptions" as import_opts
-participant "Importer\n(selected)" as importer
-participant "ExportOptions" as export_opts
-participant "Exporter\n(selected)" as exporter
-
-cli             ->  import_opts      : import_runtime()
-note right
-  Match variant:
-  ezkvm, proxmox, qemu, or libvirt
-  Dispatch to matching importer
-end note
-
-import_opts     ->  importer         : import(args)
-note right
-  Read source file(s)
-  Parse source format
-  Map to canonical model
-  Validate and normalize
-end note
-
-importer        -->  import_opts     : Ok(RuntimeConfig)
-import_opts     --> cli              : Ok(RuntimeConfig)
-
-cli             ->  cli              : runtime = result
-
-cli             ->  export_opts      : export_runtime(&runtime)
-note right
-  Match variant:
-  ezkvm, proxmox, qemu, or libvirt
-  Dispatch to matching exporter
-end note
-
-export_opts     ->  exporter         : export(runtime, args)
-note right
-  Render canonical model
-  Format for target platform
-  Write to destination file
-  Return output path
-end note
-
-exporter        -->  export_opts     : Ok(PathBuf)
-export_opts     --> cli              : Ok(PathBuf)
-
-cli             --> cli              : show "exported to {path}"
-
+CLI -> Saver : save(runtime, args)
+alt saver builds destination schema
+  Saver -> SBuilder : with_runtime(runtime).build()
+  SBuilder --> Saver : schema
+end
+alt saver marshals text output
+  Saver -> Marshaler : marshal(schema)
+  Marshaler --> Saver : text
+end
+Saver --> CLI : Ok / Error
 @enduml
 ```
 
----
+## References
 
-## Module Organization
-
-```
-src/config_format/
-├── mod.rs                  # Core traits (Importer, Exporter) and top-level types
-├── options.rs              # ImportOptions and ExportOptions enum dispatch
-├── ezkvm/
-│   ├── mod.rs
-│   ├── io/
-│   │   ├── importer.rs     # EzkvmImporter implementation
-│   │   └── exporter.rs     # EzkvmExporter implementation
-│   ├── schema/
-│   │   ├── schema.rs       # Ezkvm YAML schema data types
-│   │   └── virtual_machine.rs
-│   ├── stages/
-│   │   ├── parser.rs
-│   │   ├── runtime_builder.rs
-│   │   ├── schema_builder.rs
-│   │   └── marshaler.rs
-│   ├── mapping/
-│   │   ├── builder.rs
-│   │   ├── render_devices.rs
-│   │   │   ├── pcie.rs
-│   │   │   ├── resource_ids.rs
-│   │   │   └── storage.rs
-│   │   ├── render_presentation.rs
-│   │   └── renderer.rs
-│   ├── diagnostics/
-│   │   ├── diagnostics.rs
-│   │   └── errors.rs
-│   └── validation/
-│       └── validation.rs
-├── proxmox/
-│   ├── mod.rs
-│   ├── io/
-│   │   ├── importer.rs     # ProxmoxImporter implementation
-│   │   └── exporter.rs     # ProxmoxExporter implementation
-│   ├── schema/
-│   │   ├── schema.rs
-│   │   └── serde_format.rs
-│   ├── stages/
-│   │   ├── parser.rs
-│   │   ├── runtime_builder.rs
-│   │   ├── schema_builder.rs
-│   │   └── marshaler.rs
-│   └── mapping/
-│       ├── builder.rs
-│       ├── device_registration.rs
-│       ├── parse_helpers.rs
-│       │   ├── identity_display.rs
-│       │   └── resource_collectors.rs
-│       └── storage_resolver.rs
-├── qemu_cmd/
-│   ├── mod.rs
-│   ├── io/
-│   │   ├── importer.rs     # QemuImporter implementation
-│   │   └── exporter.rs     # QemuExporter implementation
-│   ├── schema/
-│   │   └── schema.rs
-│   └── stages/
-│       ├── parser.rs
-│       ├── runtime_builder.rs
-│       ├── schema_builder.rs
-│       └── marshaler.rs
-└── libvirt/
-    ├── mod.rs
-    ├── importer.rs         # LibvirtImporter implementation
-    └── exporter.rs         # LibvirtExporter implementation
-```
-
----
-
-# References
-
-- **CLI Entry Point**: [src/cli/README.md](../cli/README.md) – Command-line parsing and subcommand dispatch to importers/exporters
-- **Model Separation Pipeline**: [doc/dev/architecture/model-separation-pipeline.md](../../doc/dev/architecture/model-separation-pipeline.md) – Design contract for import/export boundaries and stage validation expectations
-- **Import Adapters Contract**: [doc/dev/architecture/import-adapters.md](../../doc/dev/architecture/import-adapters.md) – Specification for implementing new source-format adapters
-- **Canonical Runtime Config**: [src/runtime_config/README.md](../runtime_config/README.md) – Structure and validation for the canonical VM model
-- **VM Specification & Parsing**: [doc/dev/architecture/design/vm-spec-parsing-validation.md](../../doc/dev/architecture/design/vm-spec-parsing-validation.md) – Schema and validation rules for ezkvm YAML format
-- **Proxmox Domain Knowledge**: [doc/dev/domain-knowledge/proxmox/](../../doc/dev/domain-knowledge/proxmox/) – Proxmox-to-canonical mapping reference and format details
-- **Architecture Overview**: [src/README.md](../README.md) – High-level system requirements and command-line syntax
+- `src/README.md`
+- `src/config_format/ezkvm/README.md`
+- `src/config_format/proxmox/README.md`
+- `src/config_format/libvirt/README.md`

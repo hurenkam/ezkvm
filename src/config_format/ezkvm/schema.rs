@@ -1,11 +1,11 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
 use crate::serde_yaml;
 use crate::{
     config_format::ezkvm::compact_yaml::{ToStyledYaml, emit_styled_yaml},
-    runtime_model::{BiosModel, BootModel, Resource, SeaBiosModel, StorageResource, UefiModel},
+    runtime_model::Resource,
 };
 
 use derive_getters::Getters;
@@ -114,28 +114,6 @@ pub struct PulseAudioSchema {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PipeWireSchema {}
-
-pub struct BootModelBuilder {}
-impl BootModelBuilder {
-    pub fn build(
-        boot: &Boot,
-        storage_resources: &HashMap<String, StorageResource>,
-    ) -> Result<BootModel, String> {
-        let bios = match boot.bios() {
-            Bios::SeaBios { seabios: _ } => BiosModel::SeaBios(SeaBiosModel {}),
-            Bios::Uefi { uefi } => {
-                let uefi_resource = storage_resources.get(uefi.resource()).ok_or_else(|| {
-                    format!(
-                        "missing storage resource '{}' referenced by UEFI firmware",
-                        uefi.resource()
-                    )
-                })?;
-                BiosModel::Uefi(UefiModel::new(uefi_resource.clone()))
-            }
-        };
-        Ok(BootModel::new(bios))
-    }
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VirtualMachine {

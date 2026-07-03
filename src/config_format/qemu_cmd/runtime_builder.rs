@@ -2,7 +2,7 @@
 
 #![allow(dead_code)] // TODO: wire to CLI
 use crate::{
-    config_format::{qemu_cmd::schema::QemuCommandSchema, stages::RuntimeBuilder},
+    config_format::{RuntimeBuilder, qemu_cmd::schema::QemuCommandSchema},
     runtime_model::{
         BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder,
         GuestAgentModelBuilder, I440fxChipset, Memory, Q35Chipset, RuntimeModel, SeaBiosModel,
@@ -340,9 +340,7 @@ fn register_gpu_from_args(args: &[String], busses: &BusRegister) -> Result<(), S
 
 #[cfg(test)]
 mod tests {
-    use crate::config_format::{
-        qemu_cmd::parser::QemuParser, stages::Parser, stages::RuntimeBuilder,
-    };
+    use crate::config_format::{Parser, RuntimeBuilder, qemu_cmd::parser::QemuParser};
 
     use super::QemuRuntimeBuilder;
 

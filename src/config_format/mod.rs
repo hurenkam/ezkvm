@@ -6,22 +6,19 @@
 
 mod ezkvm;
 mod libvirt;
-mod options;
 mod proxmox;
 mod qemu_cmd;
-mod stages;
-
-use std::path::PathBuf;
 
 use crate::runtime_model::RuntimeModel;
 pub use ezkvm::{EzkvmConfigFileStore, EzkvmConfigSchema, EzkvmRuntimeBuilder, EzkvmSchemaBuilder};
-pub use libvirt::{LibvirtExporter, LibvirtImporter};
-pub use options::{ExportOptions, ImportOptions};
-pub use proxmox::{ProxmoxExporter, ProxmoxImporter};
-pub use proxmox::{ProxmoxOptions, ProxmoxSchemaBuilder};
-pub use proxmox::{ProxmoxRuntimeBuilder, ProxmoxStorageConfig};
-pub use qemu_cmd::{QemuExporter, QemuImporter};
-pub use stages::{RuntimeBuilder, SchemaBuilder};
+#[allow(unused_imports)]
+pub use libvirt::{LibvirtInputArgs, LibvirtLoader, LibvirtOutputArgs, LibvirtSaver};
+pub use proxmox::{
+    ProxmoxOptions, ProxmoxRuntimeBuilder, ProxmoxSchemaBuilder, ProxmoxStorageConfig,
+};
+#[allow(unused_imports)]
+pub use qemu_cmd::{QemuInputArgs, QemuLoader, QemuOutputArgs, QemuSaver};
+//pub use stages::{RuntimeBuilder, SchemaBuilder};
 
 /// Errors returned when an importer rejects input or fails while reading a source configuration.
 #[allow(dead_code)] // TODO: wire to CLI
@@ -53,20 +50,6 @@ pub enum ExportError {
     ExportFailed(String),
 }
 
-/// Imports a source configuration directly into a RuntimeModel.
-#[allow(dead_code)] // TODO: wire to CLI
-pub trait Importer {
-    /// Converts source configuration into a validated runtime model.
-    fn import(&self, args: ImportOptions) -> Result<RuntimeModel, ImportError>;
-}
-
-/// Exports a RuntimeModel into a destination format.
-#[allow(dead_code)] // TODO: wire to CLI
-pub trait Exporter {
-    /// Writes the runtime model to the target format and returns the output path.
-    fn export(&self, runtime: RuntimeModel, args: ExportOptions) -> Result<PathBuf, ExportError>;
-}
-
 #[allow(dead_code)] // TODO: wire to CLI
 pub trait RuntimeModelLoader {
     type Args;
@@ -81,6 +64,38 @@ pub trait RuntimeModelSaver {
     type Error;
 
     fn save(&self, runtime: RuntimeModel, args: Self::Args) -> Result<(), Self::Error>;
+}
+
+/// Parses text input into a format-specific schema type.
+#[allow(dead_code)]
+pub trait Parser {
+    type Schema;
+    type Error;
+    fn parse(&self, source: &str) -> Result<Self::Schema, Self::Error>;
+}
+
+/// Builds a canonical `RuntimeModel` from a format-specific schema.
+#[allow(dead_code)]
+pub trait RuntimeBuilder {
+    type Schema;
+    fn with_schema(self, schema: Self::Schema) -> Self;
+    fn build(self) -> Result<RuntimeModel, String>;
+}
+
+/// Builds a format-specific schema from a canonical `RuntimeModel`.
+#[allow(dead_code)]
+pub trait SchemaBuilder {
+    type Schema;
+    fn with_runtime(self, runtime: RuntimeModel) -> Self;
+    fn build(self) -> Result<Self::Schema, String>;
+}
+
+/// Marshals a format-specific schema into text output.
+#[allow(dead_code)]
+pub trait Marshaler {
+    type Schema;
+    type Error;
+    fn marshal(&self, schema: &Self::Schema) -> Result<String, Self::Error>;
 }
 
 #[cfg(test)]
