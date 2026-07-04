@@ -5,8 +5,8 @@ use crate::{
     config_format::{RuntimeBuilder, qemu_cmd::schema::QemuCommandSchema},
     runtime_model::{
         BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder, EglHeadless,
-        GuestAgentModelBuilder, I440fxChipset, Memory, Q35Chipset, RuntimeModel, SeaBiosModel,
-        Spice, Vnc,
+        GuestAgentModelBuilder, I440fxChipset, LifecycleConfig, Memory, Q35Chipset, RuntimeModel,
+        SeaBiosModel, Spice, Vnc,
     },
 };
 
@@ -56,6 +56,7 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
         let guest_agent = parse_guest_agent(&schema.args);
         let smbios_uuid = parse_smbios_uuid(&schema.args);
         let vmgenid = parse_vmgenid(&schema.args);
+        let lifecycle = parse_lifecycle(&schema.args);
         register_gpu_from_args(&schema.args, &bus_register)?;
 
         Ok(RuntimeModel::new(
@@ -71,7 +72,8 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
             None,
             guest_agent.map(GuestAgentModelBuilder::build),
             bus_register,
-        ))
+        )
+        .with_lifecycle_config(lifecycle))
     }
 }
 
@@ -299,6 +301,69 @@ fn parse_vmgenid(args: &[String]) -> Option<String> {
     None
 }
 
+fn parse_lifecycle(args: &[String]) -> Option<LifecycleConfig> {
+    let daemonize = args.iter().any(|arg| arg == "-daemonize");
+    let no_shutdown = args.iter().any(|arg| arg == "-no-shutdown");
+
+    let mut pidfile: Option<String> = None;
+    let mut qmp_socket: Option<String> = None;
+    let mut qmp_event_socket: Option<String> = None;
+
+    for window in args.windows(2) {
+        if let [flag, value] = window
+            && flag == "-pidfile"
+        {
+            let value = value.trim();
+            if !value.is_empty() {
+                pidfile = Some(value.to_string());
+            }
+        }
+
+        if let [flag, value] = window
+            && flag == "-chardev"
+        {
+            let mut id: Option<&str> = None;
+            let mut path: Option<&str> = None;
+
+            for token in value.split(',').map(str::trim) {
+                if let Some(v) = token.strip_prefix("id=") {
+                    id = Some(v);
+                }
+                if let Some(v) = token.strip_prefix("path=") {
+                    path = Some(v);
+                }
+            }
+
+            match (id, path) {
+                (Some("qmp"), Some(path)) if !path.is_empty() => {
+                    qmp_socket = Some(path.to_string())
+                }
+                (Some("qmp-event"), Some(path)) if !path.is_empty() => {
+                    qmp_event_socket = Some(path.to_string())
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if pidfile.is_none()
+        && !daemonize
+        && !no_shutdown
+        && qmp_socket.is_none()
+        && qmp_event_socket.is_none()
+    {
+        return None;
+    }
+
+    Some(LifecycleConfig::new(
+        pidfile,
+        daemonize,
+        no_shutdown,
+        qmp_socket,
+        qmp_event_socket,
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // GPU registration
 // ---------------------------------------------------------------------------
@@ -505,6 +570,55 @@ mod tests {
         assert_eq!(
             runtime.vmgenid().as_deref(),
             Some("11111111-2222-3333-4444-555555555555")
+        );
+    }
+
+    #[test]
+    fn imports_lifecycle_and_qmp_monitoring_from_args() {
+        let cmd = "qemu-system-x86_64 -name vm-lifecycle -m 2048 -cpu host -smp 2,sockets=1,cores=2,threads=1 -pidfile /run/qemu/vm-lifecycle.pid -daemonize -no-shutdown -chardev socket,id=qmp,path=/run/qemu/vm-lifecycle.qmp,server=on,wait=off -mon chardev=qmp,mode=control -chardev socket,id=qmp-event,path=/run/qemu/vm-lifecycle.event,server=on,wait=off -mon chardev=qmp-event,mode=control";
+        let schema = QemuParser.parse(cmd).expect("command should parse");
+
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
+            .expect("runtime build should succeed");
+
+        let lifecycle = runtime
+            .lifecycle_config()
+            .as_ref()
+            .expect("lifecycle config should be imported");
+        assert_eq!(
+            lifecycle.pidfile().as_deref(),
+            Some("/run/qemu/vm-lifecycle.pid")
+        );
+        assert!(*lifecycle.daemonize());
+        assert!(*lifecycle.no_shutdown());
+        assert_eq!(
+            lifecycle.qmp_socket().as_deref(),
+            Some("/run/qemu/vm-lifecycle.qmp")
+        );
+        assert_eq!(
+            lifecycle.qmp_event_socket().as_deref(),
+            Some("/run/qemu/vm-lifecycle.event")
+        );
+
+        let rendered = render_qemu_command(&runtime).expect("qemu render should succeed");
+        assert!(rendered.iter().any(|arg| arg == "-daemonize"));
+        assert!(rendered.iter().any(|arg| arg == "-no-shutdown"));
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg == "/run/qemu/vm-lifecycle.pid")
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("socket,id=qmp,path=/run/qemu/vm-lifecycle.qmp"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("socket,id=qmp-event,path=/run/qemu/vm-lifecycle.event"))
         );
     }
 }

@@ -29,6 +29,7 @@ Current import coverage includes machine/cpu/memory plus baseline UEFI firmware 
 Current Proxmox mapping also handles `agent` -> guest-agent, `vga` -> runtime GPU device selection, and `spice` -> display when those fields are present and representable.
 Current Proxmox mapping also preserves hugepages/NUMA memory policy (`hugepages`, `numa`) into runtime memory backend rendering.
 Current Proxmox mapping now models `hostpci*` passthrough devices via `host.resources[].pcie` entries, and links VM-side passthrough devices through `virtual_machine.devices[].pcie.resource`.
+Current Proxmox mapping also imports and exports lifecycle/monitoring configuration (`pidfile`, `daemonize`, `no-shutdown`, and QMP monitor socket fields) through the runtime model and QEMU rendering path.
 
 5. Import ezkvm config and export as libvirt xml:
 ```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type libvirt --output.vm <name>.xml```
@@ -46,12 +47,17 @@ This subcommand is currently a placeholder and returns an error. Use `convert` f
 
 3. Stop vm:
 ```ezkvm stop --name <name>```
+Uses QMP `quit` on the configured lifecycle monitor socket (`lifecycle.qmp_socket`).
 
 4. Reset vm:
 ```ezkvm reset --name <name>```
+Uses QMP `system_reset` on the configured lifecycle monitor socket (`lifecycle.qmp_socket`).
 
 5. Shutdown vm:
 ```ezkvm shutdown --name <name>```
+Uses QMP `system_powerdown` on the configured lifecycle monitor socket (`lifecycle.qmp_socket`).
+
+`stop`, `reset`, and `shutdown` require lifecycle configuration with a QMP socket path. If unset, these commands return an error.
 
 ## Design
 

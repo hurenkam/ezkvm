@@ -97,6 +97,7 @@ impl ProxmoxSchemaBuilder {
         map_scsi_devices(runtime, storage_config, &mut entries);
         map_net_devices(runtime, &mut entries);
         map_usb_devices(runtime, &mut entries);
+        map_lifecycle(runtime, &mut entries);
         map_guest_agent(runtime, &mut entries);
         map_vga(runtime, &mut entries);
         map_display(runtime, &mut entries);
@@ -286,6 +287,29 @@ fn map_guest_agent(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxV
     entries.insert("agent".to_string(), scalar(value));
 }
 
+/// Maps lifecycle and monitoring configuration from the runtime model.
+fn map_lifecycle(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    let Some(config) = model.lifecycle_config() else {
+        return;
+    };
+
+    if let Some(pidfile) = config.pidfile() {
+        entries.insert("pidfile".to_string(), scalar(pidfile));
+    }
+    if *config.daemonize() {
+        entries.insert("daemonize".to_string(), scalar("1"));
+    }
+    if *config.no_shutdown() {
+        entries.insert("no-shutdown".to_string(), scalar("1"));
+    }
+    if let Some(qmp_socket) = config.qmp_socket() {
+        entries.insert("qmpsocket".to_string(), scalar(qmp_socket));
+    }
+    if let Some(qmp_event_socket) = config.qmp_event_socket() {
+        entries.insert("qmp-event-socket".to_string(), scalar(qmp_event_socket));
+    }
+}
+
 /// Maps GPU/video card configuration from the runtime model to `vga` entry.
 fn map_vga(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
     if let Some(vga) = detect_vga(model) {
@@ -463,8 +487,8 @@ mod tests {
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
     use crate::runtime_model::{
         BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
-        Memory, NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel,
-        SeaBiosModel, UsbAddress, UsbHostByBusPortController, UsbHostByIdController,
+        LifecycleConfig, Memory, NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset,
+        RuntimeModel, SeaBiosModel, UsbAddress, UsbHostByBusPortController, UsbHostByIdController,
         UsbTabletController, VirtioNetController,
     };
 
@@ -732,5 +756,65 @@ dir: local
         assert!(value.contains("tls-port=61005"));
         assert!(value.contains("tls-ciphers=HIGH"));
         assert!(value.contains("seamless-migration=on"));
+    }
+
+    #[test]
+    fn exports_lifecycle_and_qmp_monitoring_fields() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "test-lifecycle-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        )
+        .with_lifecycle_config(Some(LifecycleConfig::new(
+            Some("/run/qemu/test-lifecycle-vm.pid".to_string()),
+            true,
+            true,
+            Some("/run/qemu/test-lifecycle-vm.qmp".to_string()),
+            Some("/run/qemu/test-lifecycle-vm.event".to_string()),
+        )));
+
+        let schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(model)
+            .build()
+            .expect("schema build should succeed");
+
+        let get_scalar = |key: &str| {
+            schema
+                .global
+                .entries
+                .get(key)
+                .and_then(|value| match value {
+                    crate::config_format::proxmox::schema::ProxmoxValue::Scalar { value } => {
+                        Some(value.as_str())
+                    }
+                    _ => None,
+                })
+        };
+
+        assert_eq!(
+            get_scalar("pidfile"),
+            Some("/run/qemu/test-lifecycle-vm.pid")
+        );
+        assert_eq!(get_scalar("daemonize"), Some("1"));
+        assert_eq!(get_scalar("no-shutdown"), Some("1"));
+        assert_eq!(
+            get_scalar("qmpsocket"),
+            Some("/run/qemu/test-lifecycle-vm.qmp")
+        );
+        assert_eq!(
+            get_scalar("qmp-event-socket"),
+            Some("/run/qemu/test-lifecycle-vm.event")
+        );
     }
 }

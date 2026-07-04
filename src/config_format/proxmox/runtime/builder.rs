@@ -155,7 +155,8 @@ fn build_proxmox_runtime(
             .guest_agent
             .map(crate::runtime_model::GuestAgentModelBuilder::build),
         bus_register,
-    ))
+    )
+    .with_lifecycle_config(parsed.lifecycle_config))
 }
 
 // ---------------------------------------------------------------------------
@@ -326,13 +327,14 @@ mod device_registration {
 mod field_parsing {
     use crate::{
         config_format::proxmox::schema::ProxmoxValue,
-        runtime_model::{Display, GuestAgent},
+        runtime_model::{Display, GuestAgent, LifecycleConfig},
     };
 
     use super::parse_helpers::{
         ProxmoxGpu, extract_machine_token, extract_scalar_string, extract_scalar_u8,
         extract_scalar_u64, parse_display, parse_gpu, parse_guest_agent, parse_hugepages_kb,
-        parse_numa_enabled, parse_smbios_uuid, parse_tablet_enabled, parse_vmgenid,
+        parse_lifecycle_config, parse_numa_enabled, parse_smbios_uuid, parse_tablet_enabled,
+        parse_vmgenid,
     };
 
     pub(super) struct ParsedGlobalConfig {
@@ -346,6 +348,7 @@ mod field_parsing {
         pub numa_enabled: bool,
         pub guest_agent: Option<GuestAgent>,
         pub tablet_enabled: bool,
+        pub lifecycle_config: Option<LifecycleConfig>,
         pub gpu: Option<ProxmoxGpu>,
         pub smbios_uuid: Option<String>,
         pub vmgenid: Option<String>,
@@ -368,6 +371,7 @@ mod field_parsing {
 
         let guest_agent = parse_guest_agent(global);
         let tablet_enabled = parse_tablet_enabled(global);
+        let lifecycle_config = parse_lifecycle_config(global);
         let gpu = parse_gpu(global);
         let smbios_uuid = parse_smbios_uuid(global);
         let vmgenid = parse_vmgenid(global);
@@ -398,6 +402,7 @@ mod field_parsing {
             numa_enabled,
             guest_agent,
             tablet_enabled,
+            lifecycle_config,
             gpu,
             smbios_uuid,
             vmgenid,
@@ -484,8 +489,8 @@ mod parse_helpers {
             storage_resolver::ProxmoxStorageConfig,
         },
         runtime_model::{
-            CpuModel, Display, GuestAgent, NetworkResource, PcieDeviceType, StorageResource,
-            UsbDeviceResource,
+            CpuModel, Display, GuestAgent, LifecycleConfig, NetworkResource, PcieDeviceType,
+            StorageResource, UsbDeviceResource,
         },
     };
 
@@ -575,6 +580,37 @@ mod parse_helpers {
         };
 
         parse_proxmox_bool(token).unwrap_or(false)
+    }
+
+    pub(super) fn parse_lifecycle_config(
+        entries: &BTreeMap<String, ProxmoxValue>,
+    ) -> Option<LifecycleConfig> {
+        let pidfile = scalar_or_compound_head(entries.get("pidfile"));
+        let daemonize = parse_bool_field(entries, "daemonize").unwrap_or(false);
+        let no_shutdown = parse_bool_field(entries, "no-shutdown")
+            .or_else(|| parse_bool_field(entries, "no_shutdown"))
+            .unwrap_or(false);
+        let qmp_socket = scalar_or_compound_head(entries.get("qmpsocket"))
+            .or_else(|| scalar_or_compound_head(entries.get("qmp_socket")));
+        let qmp_event_socket = scalar_or_compound_head(entries.get("qmp-event-socket"))
+            .or_else(|| scalar_or_compound_head(entries.get("qmp_event_socket")));
+
+        if pidfile.is_none()
+            && !daemonize
+            && !no_shutdown
+            && qmp_socket.is_none()
+            && qmp_event_socket.is_none()
+        {
+            return None;
+        }
+
+        Some(LifecycleConfig::new(
+            pidfile,
+            daemonize,
+            no_shutdown,
+            qmp_socket,
+            qmp_event_socket,
+        ))
     }
 
     pub(super) fn parse_smbios_uuid(entries: &BTreeMap<String, ProxmoxValue>) -> Option<String> {
@@ -1068,6 +1104,26 @@ mod parse_helpers {
 
     fn has_option(compound: &ProxmoxCompoundValue, key: &str, expected: &str) -> bool {
         option_value(compound, key).is_some_and(|value| value == expected)
+    }
+
+    fn parse_bool_field(entries: &BTreeMap<String, ProxmoxValue>, key: &str) -> Option<bool> {
+        let value = entries.get(key)?;
+        let token = match value {
+            ProxmoxValue::Scalar { value } => value.as_str(),
+            ProxmoxValue::Compound(compound) => compound.head.as_str(),
+        };
+        parse_proxmox_bool(token)
+    }
+
+    fn scalar_or_compound_head(value: Option<&ProxmoxValue>) -> Option<String> {
+        let token = match value? {
+            ProxmoxValue::Scalar { value } => value.trim(),
+            ProxmoxValue::Compound(compound) => compound.head.trim(),
+        };
+        if token.is_empty() {
+            return None;
+        }
+        Some(token.to_string())
     }
 
     fn parse_usb_host_resource(value: &ProxmoxValue) -> Result<Option<UsbDeviceResource>, String> {
@@ -1654,5 +1710,57 @@ usb1: host=0451:16a0
                 && arg.contains("vendorid=0x0451")
                 && arg.contains("productid=0x16a0")
         }));
+    }
+
+    #[test]
+    fn imports_lifecycle_and_qmp_monitoring_fields() {
+        let model = build(
+            r#"
+name: lifecycle-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+pidfile: /run/qemu/lifecycle-vm.pid
+daemonize: 1
+no-shutdown: 1
+qmpsocket: /run/qemu/lifecycle-vm.qmp
+qmp-event-socket: /run/qemu/lifecycle-vm.event
+"#,
+        );
+
+        let lifecycle = model
+            .lifecycle_config()
+            .as_ref()
+            .expect("lifecycle config should be imported");
+        assert_eq!(
+            lifecycle.pidfile().as_deref(),
+            Some("/run/qemu/lifecycle-vm.pid")
+        );
+        assert!(*lifecycle.daemonize());
+        assert!(*lifecycle.no_shutdown());
+        assert_eq!(
+            lifecycle.qmp_socket().as_deref(),
+            Some("/run/qemu/lifecycle-vm.qmp")
+        );
+        assert_eq!(
+            lifecycle.qmp_event_socket().as_deref(),
+            Some("/run/qemu/lifecycle-vm.event")
+        );
+
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(rendered.iter().any(|arg| arg == "-daemonize"));
+        assert!(rendered.iter().any(|arg| arg == "-no-shutdown"));
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("socket,id=qmp,path=/run/qemu/lifecycle-vm.qmp"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("socket,id=qmp-event,path=/run/qemu/lifecycle-vm.event"))
+        );
     }
 }

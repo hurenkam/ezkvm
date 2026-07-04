@@ -8,11 +8,13 @@ mod gpu;
 mod guest_agent;
 mod i440fx;
 mod ide;
+mod lifecycle;
 mod memory;
 mod model;
 mod pci;
 mod pcie;
 mod q35;
+mod qmp;
 mod resources;
 mod sata;
 mod scsi;
@@ -27,6 +29,7 @@ pub use display::{
 #[allow(unused_imports)] // TODO: wire to CLI
 pub use gpu::{Gpu, GpuApi, GpuModelBuilder};
 pub use guest_agent::{GuestAgent, GuestAgentApi, GuestAgentModelBuilder};
+pub use lifecycle::LifecycleConfig;
 pub use model::RuntimeModel;
 pub use resources::{
     NetworkResource, PciDeviceResource, PcieDeviceResource, Resource, StorageResource,

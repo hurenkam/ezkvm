@@ -67,6 +67,7 @@ Current parser guarantees:
 - core identity and topology: `name`, `machine`, `memory`, `cpu`, `cores`, `sockets`
 - memory policy: `hugepages`, `numa`
 - guest features: `agent`, `smbios1` uuid, `vmgenid`
+- lifecycle/monitoring fields: `pidfile`, `daemonize`, `no-shutdown`, `qmpsocket`, `qmp-event-socket`
 - display: `spice` and `vnc` transports, including UNIX-socket VNC, SPICE TLS, and optional GL-overlay hints when imported from richer runtime/display sources
 - boot firmware: `bios=ovmf` with optional `efidisk0`
 - TPM state storage if `tpmstate0` exists
@@ -117,6 +118,7 @@ Current runtime -> schema field coverage:
     - supports `host=<hostbus>-<hostport>` form
     - supports `host=<vendor_id>:<product_id>` form
   - `agent`
+  - lifecycle/monitoring fields (`pidfile`, `daemonize`, `no-shutdown`, `qmpsocket`, `qmp-event-socket`)
   - `vga`
   - `spice` or `vnc`
 
@@ -151,7 +153,7 @@ Supported conversions:
 - Runtime import/export USB mapping currently targets tablet and `usb-host` passthrough (hostbus/hostport and vendor/product-id forms); advanced USB controller topology remains out of scope.
 - Runtime export does not currently reconstruct TPM config fields from runtime into Proxmox schema.
 - Runtime export does not currently emit snapshot sections from runtime state.
-- Some Proxmox runtime literals remain intentionally out of scope in current mapping (for example full lifecycle/QMP daemonization and advanced blockdev layering parity).
+- Some Proxmox runtime literals remain intentionally out of scope in current mapping (for example active lifecycle control workflows over QMP and advanced blockdev layering parity).
 
 ## Class Diagram (PlantUML)
 

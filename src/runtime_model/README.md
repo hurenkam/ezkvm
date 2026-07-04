@@ -17,7 +17,7 @@ High-level flow:
 1. Collect top-level resources into lookup maps keyed by `id`.
 2. Instantiate chipset and register foundational buses.
 3. Build `BootModel` using `BootModelBuilder`.
-4. Build optional top-level runtime feature models (`Gpu`, `Display`, `Audio`, `GuestAgent`, `TPM`).
+4. Build optional top-level runtime feature models (`Gpu`, `Display`, `Audio`, `GuestAgent`, `TPM`, `LifecycleConfig`).
 5. Iterate `virtual_machine.devices` and register each device on its target bus.
 6. For resource-backed devices, resolve `resource` ids through builder helpers.
 
@@ -49,6 +49,7 @@ Each builder accepts the parsed device/boot payload plus the relevant resource m
 - USB devices are constructed through `UsbDeviceBuilder`; usb resource map is already threaded through for feature growth.
 - Boot model is built from boot config and storage resources.
 - Gpu/display/audio/guest-agent are top-level optional runtime features; they are assembled independently from bus registration and contribute command-line arguments when present.
+- Lifecycle and monitoring settings are represented by top-level `LifecycleConfig` (pidfile, daemonization, no-shutdown, QMP monitor sockets) and consumed by render stages.
 
 Missing referenced resources return descriptive errors during `RuntimeModel::try_from(...)` construction.
 
@@ -59,6 +60,7 @@ Missing referenced resources return descriptive errors during `RuntimeModel::try
 - [src/runtime_model/display.rs](src/runtime_model/display.rs): display frontend model (`gtk`, `sdl`, `vnc`, `spice`, `looking_glass`).
 - [src/runtime_model/audio.rs](src/runtime_model/audio.rs): audio backend and controller model.
 - [src/runtime_model/guest_agent.rs](src/runtime_model/guest_agent.rs): guest agent channel model.
+- [src/runtime_model/lifecycle.rs](src/runtime_model/lifecycle.rs): lifecycle and monitoring configuration model.
 - [src/runtime_model/devices](src/runtime_model/devices): concrete device implementations (`Hdd`, `Ssd`, `Cdrom`, `VirtioNetController`, `PvScsiController`).
 - Bus-family modules (`pcie.rs`, `pci.rs`, `usb.rs`, `sata.rs`, `ide.rs`, `scsi.rs`) define device/controller APIs, addresses, and builder logic.
 

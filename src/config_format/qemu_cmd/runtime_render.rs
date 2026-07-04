@@ -90,6 +90,8 @@ pub fn render_qemu_command(runtime: &RuntimeModel) -> Result<Vec<String>, String
         ]);
     }
 
+    args.extend(render_lifecycle_args(runtime));
+
     args.extend(render_bus_args(runtime));
 
     Ok(args)
@@ -298,6 +300,44 @@ fn render_audio_args(audio: &crate::runtime_model::Audio) -> Vec<String> {
                 format!("AC97,audiodev={}", backend_id),
             ]);
         }
+    }
+
+    args
+}
+
+fn render_lifecycle_args(runtime: &RuntimeModel) -> Vec<String> {
+    let Some(config) = runtime.lifecycle_config().as_ref() else {
+        return Vec::new();
+    };
+
+    let mut args = Vec::new();
+
+    if let Some(pidfile) = config.pidfile() {
+        args.extend(["-pidfile".to_string(), pidfile.clone()]);
+    }
+    if *config.daemonize() {
+        args.push("-daemonize".to_string());
+    }
+    if *config.no_shutdown() {
+        args.push("-no-shutdown".to_string());
+    }
+
+    if let Some(socket_path) = config.qmp_socket() {
+        args.extend([
+            "-chardev".to_string(),
+            format!("socket,id=qmp,path={socket_path},server=on,wait=off"),
+            "-mon".to_string(),
+            "chardev=qmp,mode=control".to_string(),
+        ]);
+    }
+
+    if let Some(socket_path) = config.qmp_event_socket() {
+        args.extend([
+            "-chardev".to_string(),
+            format!("socket,id=qmp-event,path={socket_path},server=on,wait=off"),
+            "-mon".to_string(),
+            "chardev=qmp-event,mode=control".to_string(),
+        ]);
     }
 
     args
@@ -846,8 +886,8 @@ mod tests {
     use crate::config_format::qemu_cmd::runtime_render::render_qemu_command;
     use crate::runtime_model::{
         BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
-        Memory, PcieAddress, PcieDeviceApi, Q35Chipset, Q35UsbController, RuntimeModel,
-        ScsiAddress, SeaBiosModel, StorageDeviceKind, StorageResource, UsbAddress,
+        LifecycleConfig, Memory, PcieAddress, PcieDeviceApi, Q35Chipset, Q35UsbController,
+        RuntimeModel, ScsiAddress, SeaBiosModel, StorageDeviceKind, StorageResource, UsbAddress,
         UsbControllerApi, UsbDeviceApi, UsbHostByBusPortController, UsbHostByIdController,
         UsbTabletController, VirtioGpuController,
     };
@@ -980,5 +1020,50 @@ mod tests {
         assert!(args.iter().any(|arg| arg.contains("egl-headless,gl=core")));
         assert!(args.iter().any(|arg| arg.contains("virtio-vga-gl")));
         assert!(args.iter().any(|arg| arg.contains("max_hostmem=67108864")));
+    }
+
+    #[test]
+    fn renders_lifecycle_and_qmp_monitoring_args_when_configured() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "lifecycle-vm".to_string(),
+            Cpu::new(CpuModel::Host, 2, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        )
+        .with_lifecycle_config(Some(LifecycleConfig::new(
+            Some("/run/qemu/lifecycle-vm.pid".to_string()),
+            true,
+            true,
+            Some("/run/qemu/lifecycle-vm.qmp".to_string()),
+            Some("/run/qemu/lifecycle-vm.event".to_string()),
+        )));
+
+        let args = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(args.iter().any(|arg| arg == "-pidfile"));
+        assert!(args.iter().any(|arg| arg == "/run/qemu/lifecycle-vm.pid"));
+        assert!(args.iter().any(|arg| arg == "-daemonize"));
+        assert!(args.iter().any(|arg| arg == "-no-shutdown"));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("socket,id=qmp,path=/run/qemu/lifecycle-vm.qmp"))
+        );
+        assert!(args.iter().any(|arg| arg == "chardev=qmp,mode=control"));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("socket,id=qmp-event,path=/run/qemu/lifecycle-vm.event"))
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg == "chardev=qmp-event,mode=control")
+        );
     }
 }
