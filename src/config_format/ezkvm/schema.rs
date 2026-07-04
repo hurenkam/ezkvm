@@ -67,6 +67,7 @@ pub struct HostSchema {
 pub enum DisplaySchema {
     Vnc { vnc: VncSchema },
     Spice { spice: SpiceSchema },
+    EglHeadless { egl_headless: EglHeadlessSchema },
     LookingGlass { looking_glass: LookingGlassSchema },
     Gtk { gtk: GtkSchema },
     Sdl { sdl: SdlSchema },
@@ -76,6 +77,12 @@ pub enum DisplaySchema {
 pub struct VncSchema {
     pub port: u16,
     pub listen: String,
+    #[serde(default)]
+    pub gl_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub socket_path: Option<String>,
+    #[serde(default)]
+    pub password_auth: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -83,7 +90,18 @@ pub struct SpiceSchema {
     pub port: u16,
     pub listen: String,
     pub disable_ticketing: bool,
+    #[serde(default)]
+    pub gl_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_port: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_ciphers: Option<String>,
+    #[serde(default)]
+    pub seamless_migration: bool,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EglHeadlessSchema {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LookingGlassSchema {

@@ -674,7 +674,10 @@ mod parse_helpers {
 
             let mut listen = "0.0.0.0".to_string();
             let mut port: u16 = 5900;
+            let mut tls_port: Option<u16> = None;
+            let mut tls_ciphers: Option<String> = None;
             let mut disable_ticketing = false;
+            let mut seamless_migration = false;
 
             for token in spec.split(',').map(str::trim) {
                 if let Some(value) = token.strip_prefix("addr=") {
@@ -688,21 +691,74 @@ mod parse_helpers {
                 if let Some(value) = token.strip_prefix("tls-port=")
                     && let Ok(parsed) = value.parse::<u16>()
                 {
-                    port = parsed;
+                    tls_port = Some(parsed);
+                    if port == 5900 {
+                        port = parsed;
+                    }
+                }
+                if let Some(value) = token.strip_prefix("tls-ciphers=") {
+                    let value = value.trim();
+                    if !value.is_empty() {
+                        tls_ciphers = Some(value.to_string());
+                    }
                 }
                 if token == "disable-ticketing=on" {
                     disable_ticketing = true;
                 }
+                if token == "seamless-migration=on" {
+                    seamless_migration = true;
+                }
             }
 
-            return serde_json::from_value(serde_json::json!({
-                "spice": {
-                    "listen": listen,
-                    "port": port,
-                    "disable_ticketing": disable_ticketing
+            return Some(Display::Spice {
+                spice: crate::runtime_model::Spice::new(listen, port, disable_ticketing)
+                    .with_tls_port(tls_port)
+                    .with_tls_ciphers(tls_ciphers)
+                    .with_seamless_migration(seamless_migration),
+            });
+        }
+
+        if let Some(value) = entries.get("vnc") {
+            let spec = match value {
+                ProxmoxValue::Scalar { value } => value.clone(),
+                ProxmoxValue::Compound(compound) => {
+                    let mut items = vec![compound.head.clone()];
+                    for option in &compound.options {
+                        match option {
+                            ProxmoxOption::Flag { value } => items.push(value.clone()),
+                            ProxmoxOption::KeyValue { key, value } => {
+                                items.push(format!("{key}={value}"))
+                            }
+                        }
+                    }
+                    items.join(",")
                 }
-            }))
-            .ok();
+            };
+
+            let mut password_auth = false;
+            let target = spec.split(',').next().unwrap_or_default().trim();
+            for token in spec.split(',').map(str::trim) {
+                if token == "password=on" {
+                    password_auth = true;
+                }
+            }
+
+            if let Some(socket_path) = target.strip_prefix("unix:") {
+                return Some(Display::Vnc {
+                    vnc: crate::runtime_model::Vnc::new(String::new(), 0)
+                        .with_socket_path(Some(socket_path.to_string()))
+                        .with_password_auth(password_auth),
+                });
+            }
+
+            if let Some((listen, port)) = target.rsplit_once(':')
+                && let Ok(port) = port.parse::<u16>()
+            {
+                return Some(Display::Vnc {
+                    vnc: crate::runtime_model::Vnc::new(listen.to_string(), port)
+                        .with_password_auth(password_auth),
+                });
+            }
         }
 
         None
@@ -1430,6 +1486,57 @@ vmgenid: 55555555-6666-7777-8888-999999999999
         assert_eq!(
             model.vmgenid().as_deref(),
             Some("55555555-6666-7777-8888-999999999999")
+        );
+    }
+
+    #[test]
+    fn imports_vnc_socket_display_from_proxmox_config() {
+        let model = build(
+            r#"
+name: vnc-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+vnc: unix:/var/run/qemu-server/301.vnc,password=on
+"#,
+        );
+
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("unix:/var/run/qemu-server/301.vnc"))
+        );
+        assert!(rendered.iter().any(|arg| arg.contains("password=on")));
+    }
+
+    #[test]
+    fn imports_spice_tls_display_from_proxmox_config() {
+        let model = build(
+            r#"
+name: spice-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+spice: port=5905,tls-port=61005,addr=127.0.0.1,tls-ciphers=HIGH,seamless-migration=on,disable-ticketing=on
+"#,
+        );
+
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("port=5905") && arg.contains("tls-port=61005"))
+        );
+        assert!(rendered.iter().any(|arg| arg.contains("tls-ciphers=HIGH")));
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("seamless-migration=on"))
         );
     }
 

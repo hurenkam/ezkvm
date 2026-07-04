@@ -280,6 +280,10 @@ impl ToStyledYaml for HostSchema {
                     "sdl".to_string(),
                     raw_node(from_serde(sdl), StyleHint::FlowPreferred),
                 ),
+                DisplaySchema::EglHeadless { egl_headless } => (
+                    "egl_headless".to_string(),
+                    raw_node(from_serde(egl_headless), StyleHint::FlowPreferred),
+                ),
             };
             entries.push(display_entry);
         }
@@ -607,7 +611,9 @@ mod tests {
             emit_styled_yaml(&schema.to_styled_yaml()).expect("compact rendering should succeed");
 
         assert!(
-            rendered.contains("spice: {port: 5900, listen: 0.0.0.0, disable_ticketing: true}"),
+            rendered.contains(
+                "spice: {port: 5900, listen: 0.0.0.0, disable_ticketing: true, gl_enabled: false, seamless_migration: false}"
+            ),
             "spice display should be inline; got:\n{rendered}"
         );
         assert!(

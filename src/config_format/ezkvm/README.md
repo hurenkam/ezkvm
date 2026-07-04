@@ -51,6 +51,10 @@ Important notes:
 - `virtual_machine.cpu` is optional in schema.
 - `host.display` and `host.audio` are flattened optional enums.
 - `virtual_machine.display` and `virtual_machine.audio` are separate VM-side fields.
+- Display schemas preserve additional transport details when present:
+  - VNC can carry a UNIX socket path, password flag, and GL-enabled rendering hint.
+  - SPICE can carry TLS port/cipher settings, seamless migration, and a GL-enabled rendering hint.
+  - `egl_headless` is represented as a distinct display schema variant for QEMU GL-headless rendering.
 
 ## Resources and Devices
 
@@ -134,7 +138,7 @@ Notable current behavior:
 - Runtime -> schema currently does not render:
   - PCI devices
   - USB devices
-- Runtime -> schema always sets `virtual_machine.display: None`.
+- Runtime -> schema renders `virtual_machine.display` when the runtime display is representable, including richer VNC/SPICE transport fields and `egl_headless`.
 - Runtime display is rendered into `host.display`; `LookingGlass` display returns an error because host schema cannot represent it here.
 - Import path treats missing `virtual_machine.cpu` as default CPU; exporting then emits a concrete CPU value.
 

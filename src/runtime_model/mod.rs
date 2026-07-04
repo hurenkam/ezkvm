@@ -21,7 +21,9 @@ mod usb;
 
 pub use audio::{Audio, AudioApi, AudioBackend, AudioController, AudioModelBuilder};
 #[allow(unused_imports)] // TODO: wire to CLI
-pub use display::{Display, DisplayApi, DisplayModelBuilder, Gtk, LookingGlass, Sdl, Spice, Vnc};
+pub use display::{
+    Display, DisplayApi, DisplayModelBuilder, EglHeadless, Gtk, LookingGlass, Sdl, Spice, Vnc,
+};
 #[allow(unused_imports)] // TODO: wire to CLI
 pub use gpu::{Gpu, GpuApi, GpuModelBuilder};
 pub use guest_agent::{GuestAgent, GuestAgentApi, GuestAgentModelBuilder};

@@ -8,8 +8,8 @@ use crate::{
         ezkvm::{
             Bios, Boot, Device, EzkvmConfigSchema, Machine, VirtualMachine,
             schema::{
-                AudioSchema, DisplaySchema, EZKVM_CONFIG_SCHEMA_VERSION, HostSchema, Metadata,
-                SpiceSchema, Uefi, VncSchema,
+                AudioSchema, DisplaySchema, EZKVM_CONFIG_SCHEMA_VERSION, EglHeadlessSchema,
+                HostSchema, Metadata, SpiceSchema, Uefi, VncSchema,
             },
         },
     },
@@ -221,6 +221,9 @@ fn render_host_display(display: &Display) -> Result<DisplaySchema, String> {
             vnc: VncSchema {
                 port: *vnc.port(),
                 listen: vnc.listen().clone(),
+                gl_enabled: *vnc.gl_enabled(),
+                socket_path: vnc.socket_path().clone(),
+                password_auth: *vnc.password_auth(),
             },
         },
         Display::Spice { spice } => DisplaySchema::Spice {
@@ -228,7 +231,14 @@ fn render_host_display(display: &Display) -> Result<DisplaySchema, String> {
                 port: *spice.port(),
                 listen: spice.listen().clone(),
                 disable_ticketing: *spice.disable_ticketing(),
+                gl_enabled: *spice.gl_enabled(),
+                tls_port: *spice.tls_port(),
+                tls_ciphers: spice.tls_ciphers().clone(),
+                seamless_migration: *spice.seamless_migration(),
             },
+        },
+        Display::EglHeadless { .. } => DisplaySchema::EglHeadless {
+            egl_headless: EglHeadlessSchema {},
         },
         Display::LookingGlass { .. } => {
             return Err(

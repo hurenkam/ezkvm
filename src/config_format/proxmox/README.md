@@ -67,7 +67,7 @@ Current parser guarantees:
 - core identity and topology: `name`, `machine`, `memory`, `cpu`, `cores`, `sockets`
 - memory policy: `hugepages`, `numa`
 - guest features: `agent`, `smbios1` uuid, `vmgenid`
-- display: `spice` and implicit display when `vga=qxl`
+- display: `spice` and `vnc` transports, including UNIX-socket VNC, SPICE TLS, and optional GL-overlay hints when imported from richer runtime/display sources
 - boot firmware: `bios=ovmf` with optional `efidisk0`
 - TPM state storage if `tpmstate0` exists
 - storage devices from `scsiN`
@@ -110,6 +110,8 @@ Current runtime -> schema field coverage:
     - includes MAC (`virtio=...`) when present
     - includes `bridge` or `ifname` based backend
     - includes `vhost`, `rx_queue_size`, `tx_queue_size` when present
+  - `vnc` from runtime VNC display configuration, including UNIX sockets and password auth when present
+  - `spice` from runtime SPICE display configuration, including TLS port, TLS ciphers, and seamless migration when present
   - `tablet` from runtime USB tablet device
   - `usbN` from runtime USB host passthrough devices
     - supports `host=<hostbus>-<hostport>` form

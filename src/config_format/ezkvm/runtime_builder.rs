@@ -165,14 +165,24 @@ fn select_audio(schema: &EzkvmConfigSchema) -> Option<Audio> {
 fn convert_host_display(display: &DisplaySchema) -> Option<Display> {
     Some(match display {
         DisplaySchema::Vnc { vnc } => Display::Vnc {
-            vnc: crate::runtime_model::Vnc::new(vnc.listen.clone(), vnc.port),
+            vnc: crate::runtime_model::Vnc::new(vnc.listen.clone(), vnc.port)
+                .with_gl_enabled(vnc.gl_enabled)
+                .with_socket_path(vnc.socket_path.clone())
+                .with_password_auth(vnc.password_auth),
         },
         DisplaySchema::Spice { spice } => Display::Spice {
             spice: crate::runtime_model::Spice::new(
                 spice.listen.clone(),
                 spice.port,
                 spice.disable_ticketing,
-            ),
+            )
+            .with_gl_enabled(spice.gl_enabled)
+            .with_tls_port(spice.tls_port)
+            .with_tls_ciphers(spice.tls_ciphers.clone())
+            .with_seamless_migration(spice.seamless_migration),
+        },
+        DisplaySchema::EglHeadless { .. } => Display::EglHeadless {
+            egl_headless: crate::runtime_model::EglHeadless::default(),
         },
         DisplaySchema::Gtk { .. } => Display::Gtk {
             gtk: crate::runtime_model::Gtk::default(),

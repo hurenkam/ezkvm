@@ -306,23 +306,43 @@ fn map_display(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue
             } else {
                 spice.listen().clone()
             };
-            let mut value = format!("port={},addr={listen}", spice.port());
+            let mut value = if let Some(tls_port) = spice.tls_port() {
+                format!("port={},tls-port={},addr={listen}", spice.port(), tls_port)
+            } else {
+                format!("port={},addr={listen}", spice.port())
+            };
             if *spice.disable_ticketing() {
                 value.push_str(",disable-ticketing=on");
+            }
+            if let Some(tls_ciphers) = spice.tls_ciphers() {
+                value.push_str(&format!(",tls-ciphers={tls_ciphers}"));
+            }
+            if *spice.seamless_migration() {
+                value.push_str(",seamless-migration=on");
             }
             entries.insert("spice".to_string(), scalar(&value));
         }
         Display::Vnc { vnc } => {
-            let listen = if vnc.listen().is_empty() {
-                "0.0.0.0"
+            if let Some(socket_path) = vnc.socket_path() {
+                let mut value = format!("unix:{socket_path}");
+                if *vnc.password_auth() {
+                    value.push_str(",password=on");
+                }
+                entries.insert("vnc".to_string(), scalar(&value));
             } else {
-                vnc.listen()
-            };
-            entries.insert(
-                "vnc".to_string(),
-                scalar(&format!("{listen}:{}", vnc.port())),
-            );
+                let listen = if vnc.listen().is_empty() {
+                    "0.0.0.0"
+                } else {
+                    vnc.listen()
+                };
+                let mut value = format!("{listen}:{}", vnc.port());
+                if *vnc.password_auth() {
+                    value.push_str(",password=on");
+                }
+                entries.insert("vnc".to_string(), scalar(&value));
+            }
         }
+        Display::EglHeadless { .. } => {}
         _ => {}
     }
 }
@@ -442,10 +462,10 @@ mod tests {
     use crate::config_format::SchemaBuilder;
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
     use crate::runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, NetworkResource,
-        PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel, SeaBiosModel, UsbAddress,
-        UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
-        VirtioNetController,
+        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
+        Memory, NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel,
+        SeaBiosModel, UsbAddress, UsbHostByBusPortController, UsbHostByIdController,
+        UsbTabletController, VirtioNetController,
     };
 
     fn storage_config() -> ProxmoxStorageConfig {
@@ -636,5 +656,81 @@ dir: local
 
         assert!(usb_values.iter().any(|value| value == "host=1-7.5.1"));
         assert!(usb_values.iter().any(|value| value == "host=0451:16a0"));
+    }
+
+    #[test]
+    fn exports_vnc_socket_and_spice_tls_display_fields() {
+        let mut bus_register = BusRegister::new();
+        let vnc_model = RuntimeModel::new(
+            "test-vnc-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            Some(DisplayModelBuilder::build(Display::Vnc {
+                vnc: crate::runtime_model::Vnc::new(String::new(), 0)
+                    .with_gl_enabled(true)
+                    .with_socket_path(Some("/var/run/qemu-server/301.vnc".to_string()))
+                    .with_password_auth(true),
+            })),
+            None,
+            None,
+            bus_register,
+        );
+
+        let vnc_schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(vnc_model)
+            .build()
+            .expect("schema build should succeed");
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Scalar { value }) =
+            vnc_schema.global.entries.get("vnc")
+        else {
+            panic!("vnc should be exported as scalar");
+        };
+        assert!(value.contains("unix:/var/run/qemu-server/301.vnc"));
+        assert!(value.contains("password=on"));
+
+        let mut bus_register = BusRegister::new();
+        let spice_model = RuntimeModel::new(
+            "test-spice-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            Some(DisplayModelBuilder::build(Display::Spice {
+                spice: crate::runtime_model::Spice::new("127.0.0.1".to_string(), 5905, true)
+                    .with_gl_enabled(true)
+                    .with_tls_port(Some(61005))
+                    .with_tls_ciphers(Some("HIGH".to_string()))
+                    .with_seamless_migration(true),
+            })),
+            None,
+            None,
+            bus_register,
+        );
+
+        let spice_schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(spice_model)
+            .build()
+            .expect("schema build should succeed");
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Scalar { value }) =
+            spice_schema.global.entries.get("spice")
+        else {
+            panic!("spice should be exported as scalar");
+        };
+        assert!(value.contains("port=5905"));
+        assert!(value.contains("tls-port=61005"));
+        assert!(value.contains("tls-ciphers=HIGH"));
+        assert!(value.contains("seamless-migration=on"));
     }
 }

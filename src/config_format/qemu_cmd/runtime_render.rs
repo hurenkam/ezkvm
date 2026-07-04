@@ -198,24 +198,64 @@ fn render_display_args(display: &Display) -> Vec<String> {
         Display::Gtk { .. } => vec!["-display".to_string(), "gtk".to_string()],
         Display::Sdl { .. } => vec!["-display".to_string(), "sdl".to_string()],
         Display::Vnc { vnc } => {
-            let listen = if vnc.listen().is_empty() {
-                "0.0.0.0"
+            let mut args = Vec::new();
+            if *vnc.gl_enabled() {
+                args.extend(["-display".to_string(), "egl-headless,gl=core".to_string()]);
+            }
+            if let Some(socket_path) = vnc.socket_path() {
+                let mut value = format!("unix:{socket_path}");
+                if *vnc.password_auth() {
+                    value.push_str(",password=on");
+                }
+                args.extend(["-vnc".to_string(), value]);
             } else {
-                vnc.listen()
-            };
-            vec!["-vnc".to_string(), format!("{}:{}", listen, vnc.port())]
+                let listen = if vnc.listen().is_empty() {
+                    "0.0.0.0"
+                } else {
+                    vnc.listen()
+                };
+                let mut value = format!("{}:{}", listen, vnc.port());
+                if *vnc.password_auth() {
+                    value.push_str(",password=on");
+                }
+                args.extend(["-vnc".to_string(), value]);
+            }
+            args
         }
         Display::Spice { spice } => {
+            let mut args = Vec::new();
+            if *spice.gl_enabled() {
+                args.extend(["-display".to_string(), "egl-headless,gl=core".to_string()]);
+            }
             let listen = if spice.listen().is_empty() {
                 "0.0.0.0"
             } else {
                 spice.listen()
             };
-            let mut spec = format!("port={},addr={}", spice.port(), listen);
+            let mut spec = if let Some(tls_port) = spice.tls_port() {
+                format!(
+                    "port={},tls-port={},addr={}",
+                    spice.port(),
+                    tls_port,
+                    listen
+                )
+            } else {
+                format!("port={},addr={}", spice.port(), listen)
+            };
             if *spice.disable_ticketing() {
                 spec.push_str(",disable-ticketing=on");
             }
-            vec!["-spice".to_string(), spec]
+            if let Some(tls_ciphers) = spice.tls_ciphers() {
+                spec.push_str(&format!(",tls-ciphers={tls_ciphers}"));
+            }
+            if *spice.seamless_migration() {
+                spec.push_str(",seamless-migration=on");
+            }
+            args.extend(["-spice".to_string(), spec]);
+            args
+        }
+        Display::EglHeadless { .. } => {
+            vec!["-display".to_string(), "egl-headless,gl=core".to_string()]
         }
         Display::LookingGlass { .. } => vec![
             "-display".to_string(),
@@ -265,6 +305,7 @@ fn render_audio_args(audio: &crate::runtime_model::Audio) -> Vec<String> {
 
 fn render_bus_args(runtime: &RuntimeModel) -> Vec<String> {
     let mut args = Vec::new();
+    let display = runtime.display().as_ref().map(|display| display.config());
 
     let mut pci_bus_ids: Vec<_> = runtime.busses().pci_busses().keys().copied().collect();
     pci_bus_ids.sort_unstable();
@@ -287,7 +328,12 @@ fn render_bus_args(runtime: &RuntimeModel) -> Vec<String> {
             addresses.sort_by_key(|address| (address.device(), address.function()));
             for address in addresses {
                 if let Some(device) = devices.get(&address) {
-                    args.extend(render_pcie_device(bus_id, address.clone(), device.as_ref()));
+                    args.extend(render_pcie_device(
+                        bus_id,
+                        address.clone(),
+                        device.as_ref(),
+                        display,
+                    ));
                 }
             }
         }
@@ -360,7 +406,12 @@ fn render_pci_device(_bus: u8, device: &dyn crate::runtime_model::PciDeviceApi) 
     Vec::new()
 }
 
-fn render_pcie_device(bus: u8, address: PcieAddress, device: &dyn PcieDeviceApi) -> Vec<String> {
+fn render_pcie_device(
+    bus: u8,
+    address: PcieAddress,
+    device: &dyn PcieDeviceApi,
+    display: Option<&Display>,
+) -> Vec<String> {
     if let Some(net) = device.as_any().downcast_ref::<VirtioNetController>() {
         return render_virtio_net_device(bus, address, net);
     }
@@ -405,6 +456,12 @@ fn render_pcie_device(bus: u8, address: PcieAddress, device: &dyn PcieDeviceApi)
     }
 
     if device.as_any().is::<VirtioGpuController>() {
+        if display_uses_gl(display) {
+            return vec![
+                "-device".to_string(),
+                "virtio-vga-gl,id=vga,max_hostmem=67108864".to_string(),
+            ];
+        }
         return vec!["-device".to_string(), "virtio-gpu-pci".to_string()];
     }
 
@@ -425,6 +482,15 @@ fn render_pcie_device(bus: u8, address: PcieAddress, device: &dyn PcieDeviceApi)
     }
 
     Vec::new()
+}
+
+fn display_uses_gl(display: Option<&Display>) -> bool {
+    match display {
+        Some(Display::EglHeadless { .. }) => true,
+        Some(Display::Vnc { vnc }) => *vnc.gl_enabled(),
+        Some(Display::Spice { spice }) => *spice.gl_enabled(),
+        _ => false,
+    }
 }
 
 fn render_virtio_net_device(
@@ -777,10 +843,13 @@ fn format_pcie_addr(address: &PcieAddress) -> String {
 mod tests {
     use std::sync::Arc;
 
+    use crate::config_format::qemu_cmd::runtime_render::render_qemu_command;
     use crate::runtime_model::{
-        Q35UsbController, ScsiAddress, StorageDeviceKind, StorageResource, UsbAddress,
+        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
+        Memory, PcieAddress, PcieDeviceApi, Q35Chipset, Q35UsbController, RuntimeModel,
+        ScsiAddress, SeaBiosModel, StorageDeviceKind, StorageResource, UsbAddress,
         UsbControllerApi, UsbDeviceApi, UsbHostByBusPortController, UsbHostByIdController,
-        UsbTabletController,
+        UsbTabletController, VirtioGpuController,
     };
 
     use super::{
@@ -879,5 +948,37 @@ mod tests {
                 && arg.contains("vendorid=0x0451")
                 && arg.contains("productid=0x16a0")
         }));
+    }
+
+    #[test]
+    fn renders_virtio_vga_gl_when_gl_display_is_enabled() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "gl-vm".to_string(),
+            Cpu::new(CpuModel::Host, 2, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            Some(DisplayModelBuilder::build(Display::Spice {
+                spice: crate::runtime_model::Spice::new("127.0.0.1".to_string(), 5905, true)
+                    .with_gl_enabled(true),
+            })),
+            None,
+            None,
+            bus_register,
+        );
+
+        let gpu: Arc<dyn PcieDeviceApi> = Arc::new(VirtioGpuController::default());
+        model
+            .register_pcie_device(0, gpu, Some(PcieAddress::new(1, 0)))
+            .expect("virtio gpu registration should succeed");
+
+        let args = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(args.iter().any(|arg| arg.contains("egl-headless,gl=core")));
+        assert!(args.iter().any(|arg| arg.contains("virtio-vga-gl")));
+        assert!(args.iter().any(|arg| arg.contains("max_hostmem=67108864")));
     }
 }

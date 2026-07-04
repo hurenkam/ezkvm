@@ -4,8 +4,9 @@
 use crate::{
     config_format::{RuntimeBuilder, qemu_cmd::schema::QemuCommandSchema},
     runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder,
+        BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder, EglHeadless,
         GuestAgentModelBuilder, I440fxChipset, Memory, Q35Chipset, RuntimeModel, SeaBiosModel,
+        Spice, Vnc,
     },
 };
 
@@ -112,13 +113,25 @@ fn parse_cpu_model(model: Option<&str>) -> crate::runtime_model::CpuModel {
 }
 
 fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
+    let gl_enabled = args.windows(2).any(|window| {
+        if let [flag, value] = window
+            && flag == "-display"
+        {
+            return value.starts_with("egl-headless");
+        }
+        false
+    });
+
     for window in args.windows(2) {
         if let [flag, value] = window
             && flag == "-spice"
         {
             let mut listen = "0.0.0.0".to_string();
             let mut port = None;
+            let mut tls_port = None;
+            let mut tls_ciphers = None;
             let mut disable_ticketing = false;
+            let mut seamless_migration = false;
 
             for token in value.split(',').map(str::trim) {
                 if let Some(v) = token.strip_prefix("addr=") {
@@ -128,22 +141,33 @@ fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
                     port = v.parse::<u16>().ok();
                 }
                 if let Some(v) = token.strip_prefix("tls-port=") {
-                    port = v.parse::<u16>().ok();
+                    tls_port = v.parse::<u16>().ok();
+                    if port.is_none() {
+                        port = tls_port;
+                    }
+                }
+                if let Some(v) = token.strip_prefix("tls-ciphers=") {
+                    let token = v.trim();
+                    if !token.is_empty() {
+                        tls_ciphers = Some(token.to_string());
+                    }
                 }
                 if token == "disable-ticketing=on" {
                     disable_ticketing = true;
                 }
+                if token == "seamless-migration=on" {
+                    seamless_migration = true;
+                }
             }
 
             if let Some(port) = port {
-                return serde_json::from_value(serde_json::json!({
-                    "spice": {
-                        "listen": listen,
-                        "port": port,
-                        "disable_ticketing": disable_ticketing
-                    }
-                }))
-                .ok();
+                return Some(crate::runtime_model::Display::Spice {
+                    spice: Spice::new(listen, port, disable_ticketing)
+                        .with_gl_enabled(gl_enabled)
+                        .with_tls_port(tls_port)
+                        .with_tls_ciphers(tls_ciphers)
+                        .with_seamless_migration(seamless_migration),
+                });
             }
         }
     }
@@ -151,20 +175,42 @@ fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
     for window in args.windows(2) {
         if let [flag, value] = window
             && flag == "-vnc"
-            && value != "none"
-            && !value.starts_with("unix:")
         {
-            let target = value.split(',').next().unwrap_or_default();
+            if value == "none" {
+                continue;
+            }
+
+            let mut password_auth = false;
+            let target = value
+                .split(',')
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+
+            for token in value.split(',').map(str::trim) {
+                if token == "password=on" {
+                    password_auth = true;
+                }
+            }
+
+            if let Some(socket_path) = target.strip_prefix("unix:") {
+                return Some(crate::runtime_model::Display::Vnc {
+                    vnc: Vnc::new(String::new(), 0)
+                        .with_gl_enabled(gl_enabled)
+                        .with_socket_path(Some(socket_path.to_string()))
+                        .with_password_auth(password_auth),
+                });
+            }
+
             if let Some((listen, port)) = target.rsplit_once(':')
                 && let Ok(port) = port.parse::<u16>()
             {
-                return serde_json::from_value(serde_json::json!({
-                    "vnc": {
-                        "listen": listen,
-                        "port": port
-                    }
-                }))
-                .ok();
+                return Some(crate::runtime_model::Display::Vnc {
+                    vnc: Vnc::new(listen.to_string(), port)
+                        .with_gl_enabled(gl_enabled)
+                        .with_password_auth(password_auth),
+                });
             }
         }
     }
@@ -173,6 +219,11 @@ fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
         if let [flag, value] = window
             && flag == "-display"
         {
+            if value.starts_with("egl-headless") {
+                return Some(crate::runtime_model::Display::EglHeadless {
+                    egl_headless: EglHeadless::default(),
+                });
+            }
             if value.starts_with("gtk") {
                 return serde_json::from_value(serde_json::json!({ "gtk": {} })).ok();
             }
@@ -187,6 +238,12 @@ fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
                 return serde_json::from_value(serde_json::json!({ "looking_glass": {} })).ok();
             }
         }
+    }
+
+    if gl_enabled {
+        return Some(crate::runtime_model::Display::EglHeadless {
+            egl_headless: EglHeadless::default(),
+        });
     }
 
     None
@@ -368,6 +425,52 @@ mod tests {
             rendered
                 .iter()
                 .any(|arg| arg.contains("port=5905,addr=127.0.0.1,disable-ticketing=on"))
+        );
+    }
+
+    #[test]
+    fn imports_vnc_socket_gl_and_virtio_vga_gl_from_args() {
+        let cmd = "qemu-system-x86_64 -name vm-gl -m 4096 -cpu host -smp 4,sockets=1,cores=4,threads=1 -display egl-headless,gl=core -vnc unix:/var/run/ezkvm/vm-gl.vnc,password=on -device virtio-vga-gl";
+        let schema = QemuParser.parse(cmd).expect("command should parse");
+
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
+            .expect("runtime build should succeed");
+
+        let rendered = render_qemu_command(&runtime).expect("qemu render should succeed");
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg == "egl-headless,gl=core" || arg.contains("egl-headless,gl=core"))
+        );
+        assert!(rendered.iter().any(|arg| arg.contains("virtio-vga-gl")));
+        assert!(rendered.iter().any(
+            |arg| arg.contains("unix:/var/run/ezkvm/vm-gl.vnc") && arg.contains("password=on")
+        ));
+    }
+
+    #[test]
+    fn imports_spice_tls_options_from_args() {
+        let cmd = "qemu-system-x86_64 -name vm-spice -m 4096 -cpu host -smp 4,sockets=1,cores=4,threads=1 -spice port=5905,tls-port=61005,addr=127.0.0.1,tls-ciphers=HIGH,seamless-migration=on,disable-ticketing=on";
+        let schema = QemuParser.parse(cmd).expect("command should parse");
+
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
+            .expect("runtime build should succeed");
+
+        let rendered = render_qemu_command(&runtime).expect("qemu render should succeed");
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("port=5905") && arg.contains("tls-port=61005"))
+        );
+        assert!(rendered.iter().any(|arg| arg.contains("tls-ciphers=HIGH")));
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("seamless-migration=on"))
         );
     }
 
