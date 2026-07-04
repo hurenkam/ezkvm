@@ -266,7 +266,7 @@ fn register_devices(
                     .usb_busses()
                     .get(&bus_id)
                     .ok_or_else(|| format!("USB bus with id {bus_id} does not exist"))?;
-                let runtime = UsbDeviceBuilder::build(usb.device(), &resources.usb);
+                let runtime = UsbDeviceBuilder::build(usb.device(), &resources.usb)?;
                 root.register_usb_device(runtime, usb.address().clone())?;
             }
             Device::Sata { sata } => {

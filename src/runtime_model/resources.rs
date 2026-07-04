@@ -44,6 +44,7 @@ pub enum PcieDeviceResource {
 #[serde(untagged)]
 pub enum UsbDeviceResource {
     Id { vendor_id: u16, device_id: u16 },
+    HostBusPort { hostbus: u16, hostport: String },
     Address { bus: UsbBus, address: UsbAddress },
 }
 

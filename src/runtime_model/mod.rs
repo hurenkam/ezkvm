@@ -49,7 +49,9 @@ pub use pcie::{
     PassthroughPcieController, PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi,
     PcieDeviceType, StandardGpuController, VirtioGpuController,
 };
-pub use q35::Q35Chipset;
+#[allow(unused_imports)]
+// Used by renderer tests and external callers when USB bus rendering is enabled.
+pub use q35::{Q35Chipset, Q35UsbController};
 pub use sata::{
     SataAddress, SataBus, SataControllerApi, SataDevice, SataDeviceApi, SataDeviceBuilder,
     SataDeviceType,
@@ -64,6 +66,7 @@ pub use tpm::{Swtpm, Tpm, TpmApi, TpmModel, TpmModelBuilder};
 #[allow(unused_imports)] // TODO: wire to CLI
 pub use usb::{
     UsbAddress, UsbBus, UsbControllerApi, UsbDevice, UsbDeviceApi, UsbDeviceBuilder, UsbDeviceType,
+    UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
 };
 
 pub use devices::{

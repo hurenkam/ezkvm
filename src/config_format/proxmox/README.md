@@ -72,6 +72,8 @@ Current parser guarantees:
 - TPM state storage if `tpmstate0` exists
 - storage devices from `scsiN`
 - network devices from `netN`
+- USB tablet from `tablet`
+- USB host passthrough devices from `usbN` (`host=<bus>-<port>` and `host=<vendor>:<product>`)
 - passthrough devices from `hostpciN`
 - GPU selection from `vga`
 
@@ -108,6 +110,10 @@ Current runtime -> schema field coverage:
     - includes MAC (`virtio=...`) when present
     - includes `bridge` or `ifname` based backend
     - includes `vhost`, `rx_queue_size`, `tx_queue_size` when present
+  - `tablet` from runtime USB tablet device
+  - `usbN` from runtime USB host passthrough devices
+    - supports `host=<hostbus>-<hostport>` form
+    - supports `host=<vendor_id>:<product_id>` form
   - `agent`
   - `vga`
   - `spice` or `vnc`
@@ -140,6 +146,7 @@ Supported conversions:
 - `storage.cfg` presence is required for runtime import and export paths because token-to-path and path-to-token conversion depends on it.
 - Runtime import reads only the global Proxmox section for active VM configuration; snapshot sections are parsed by schema but not materialized as runtime variants.
 - Runtime import for `netN` currently supports bridge and tap backends plus optional MAC, `vhost`, `rx_queue_size`, and `tx_queue_size`.
+- Runtime import/export USB mapping currently targets tablet and `usb-host` passthrough (hostbus/hostport and vendor/product-id forms); advanced USB controller topology remains out of scope.
 - Runtime export does not currently reconstruct TPM config fields from runtime into Proxmox schema.
 - Runtime export does not currently emit snapshot sections from runtime state.
 - Some Proxmox runtime literals remain intentionally out of scope in current mapping (for example full lifecycle/QMP daemonization and advanced blockdev layering parity).

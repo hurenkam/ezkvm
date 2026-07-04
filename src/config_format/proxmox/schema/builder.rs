@@ -19,8 +19,9 @@ use crate::{
         },
     },
     runtime_model::{
-        Chipset, Display, NetworkResource, QxlGpuController, RuntimeModel, VirtioGpuController,
-        VirtioNetController,
+        Chipset, Display, NetworkResource, QxlGpuController, RuntimeModel,
+        UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
+        VirtioGpuController, VirtioNetController,
     },
 };
 
@@ -95,6 +96,7 @@ impl ProxmoxSchemaBuilder {
 
         map_scsi_devices(runtime, storage_config, &mut entries);
         map_net_devices(runtime, &mut entries);
+        map_usb_devices(runtime, &mut entries);
         map_guest_agent(runtime, &mut entries);
         map_vga(runtime, &mut entries);
         map_display(runtime, &mut entries);
@@ -212,11 +214,63 @@ fn map_net_devices(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxV
             addresses.sort_by_key(|a| (a.device(), a.function()));
 
             for address in addresses {
-                if let Some(device) = devices.get(&address) {
-                    if let Some(value) = net_value_from_pcie_device(device.as_ref()) {
-                        entries.insert(format!("net{net_idx}"), value);
-                        net_idx += 1;
-                    }
+                if let Some(device) = devices.get(&address)
+                    && let Some(value) = net_value_from_pcie_device(device.as_ref())
+                {
+                    entries.insert(format!("net{net_idx}"), value);
+                    net_idx += 1;
+                }
+            }
+        }
+    }
+}
+
+/// Maps USB tablet and host passthrough devices from runtime into Proxmox fields.
+fn map_usb_devices(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    let mut usb_idx: usize = 0;
+
+    let mut usb_bus_ids: Vec<u8> = model.busses().usb_busses().keys().copied().collect();
+    usb_bus_ids.sort_unstable();
+
+    for bus_id in usb_bus_ids {
+        if let Some(controller) = model.busses().usb_busses().get(&bus_id) {
+            let devices = controller.devices();
+            let mut addresses: Vec<_> = devices.keys().cloned().collect();
+            addresses.sort_by_key(|a| a.port.clone());
+
+            for address in addresses {
+                let Some(device) = devices.get(&address) else {
+                    continue;
+                };
+
+                if device
+                    .as_any()
+                    .downcast_ref::<UsbTabletController>()
+                    .is_some()
+                {
+                    entries.insert("tablet".to_string(), scalar("1"));
+                    continue;
+                }
+
+                if let Some(host) = device.as_any().downcast_ref::<UsbHostByBusPortController>() {
+                    entries.insert(
+                        format!("usb{usb_idx}"),
+                        scalar(&format!("host={}-{}", host.hostbus(), host.hostport())),
+                    );
+                    usb_idx += 1;
+                    continue;
+                }
+
+                if let Some(host) = device.as_any().downcast_ref::<UsbHostByIdController>() {
+                    entries.insert(
+                        format!("usb{usb_idx}"),
+                        scalar(&format!(
+                            "host={:04x}:{:04x}",
+                            host.vendor_id(),
+                            host.device_id()
+                        )),
+                    );
+                    usb_idx += 1;
                 }
             }
         }
@@ -389,7 +443,9 @@ mod tests {
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
     use crate::runtime_model::{
         BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, NetworkResource,
-        PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel, SeaBiosModel, VirtioNetController,
+        PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel, SeaBiosModel, UsbAddress,
+        UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
+        VirtioNetController,
     };
 
     fn storage_config() -> ProxmoxStorageConfig {
@@ -511,5 +567,74 @@ dir: local
                 if key == "tx_queue_size" && value == "256"
             )
         }));
+    }
+
+    #[test]
+    fn exports_usb_tablet_and_host_passthrough_fields() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "test-usb-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        );
+
+        model
+            .register_usb_device(
+                0,
+                Arc::new(UsbTabletController {}),
+                Some(UsbAddress::new("1".to_string())),
+            )
+            .expect("usb tablet registration should succeed");
+        model
+            .register_usb_device(
+                0,
+                Arc::new(UsbHostByBusPortController::new(1, "7.5.1".to_string())),
+                Some(UsbAddress::new("2".to_string())),
+            )
+            .expect("usb host (bus/port) registration should succeed");
+        model
+            .register_usb_device(
+                0,
+                Arc::new(UsbHostByIdController::new(0x0451, 0x16a0)),
+                Some(UsbAddress::new("3".to_string())),
+            )
+            .expect("usb host (vendor/product) registration should succeed");
+
+        let schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(model)
+            .build()
+            .expect("schema build should succeed");
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Scalar { value }) =
+            schema.global.entries.get("tablet")
+        else {
+            panic!("tablet should be exported as scalar");
+        };
+        assert_eq!(value, "1");
+
+        let usb_values: Vec<_> = schema
+            .global
+            .entries
+            .iter()
+            .filter_map(|(k, v)| match (k.starts_with("usb"), v) {
+                (true, crate::config_format::proxmox::schema::ProxmoxValue::Scalar { value }) => {
+                    Some(value.clone())
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert!(usb_values.iter().any(|value| value == "host=1-7.5.1"));
+        assert!(usb_values.iter().any(|value| value == "host=0451:16a0"));
     }
 }

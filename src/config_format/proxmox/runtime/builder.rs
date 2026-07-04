@@ -92,6 +92,8 @@ fn build_proxmox_runtime(
     let scsi_disks = collected.scsi_disks;
     let net_devices = collected.net_devices;
     let hostpci_devices = collected.hostpci_devices;
+    let usb_resources = collected.usb_resources;
+    let usb_devices = collected.usb_devices;
 
     let bios_model = match extract_scalar_string(global, "bios") {
         Ok(bios_type) if bios_type.as_str() == "ovmf" => storage_resources
@@ -128,6 +130,12 @@ fn build_proxmox_runtime(
     device_registration::register_scsi_devices(&mut bus_register, &scsi_disks, &storage_resources)?;
     device_registration::register_network_devices(&bus_register, &net_devices)?;
     device_registration::register_hostpci_devices(&bus_register, &hostpci_devices)?;
+    device_registration::register_usb_devices(
+        &bus_register,
+        &usb_devices,
+        &usb_resources,
+        parsed.tablet_enabled,
+    )?;
     device_registration::register_gpu_device(&bus_register, parsed.gpu)?;
 
     Ok(crate::runtime_model::RuntimeModel::new(
@@ -160,7 +168,8 @@ mod device_registration {
     use crate::runtime_model::{
         BusRegister, BusRegistrationApi, PciDeviceApi, PciDeviceType, PcieAddress, PcieDeviceApi,
         PcieDeviceType, PvScsiController, ScsiAddress, ScsiControllerApi, ScsiDeviceBuilder,
-        ScsiDeviceType, StorageResource, VirtioNetController,
+        ScsiDeviceType, StorageResource, UsbAddress, UsbDeviceBuilder, UsbDeviceResource,
+        UsbDeviceType, VirtioNetController,
     };
 
     use super::parse_helpers::{ProxmoxNetDevice, ProxmoxScsiKind};
@@ -241,6 +250,38 @@ mod device_registration {
         Ok(())
     }
 
+    pub(super) fn register_usb_devices(
+        bus_register: &BusRegister,
+        usb_devices: &[(usize, String)],
+        usb_resources: &std::collections::HashMap<String, UsbDeviceResource>,
+        tablet_enabled: bool,
+    ) -> Result<(), String> {
+        if !tablet_enabled && usb_devices.is_empty() {
+            return Ok(());
+        }
+
+        let Some(root) = bus_register.usb_busses().get(&0) else {
+            return Err("USB root bus with id 0 does not exist".to_string());
+        };
+
+        if tablet_enabled {
+            let tablet = UsbDeviceBuilder::build(&UsbDeviceType::Tablet, usb_resources)?;
+            root.register_usb_device(tablet, Some(UsbAddress::new("tablet".to_string())))?;
+        }
+
+        for (index, resource_id) in usb_devices {
+            let device = UsbDeviceBuilder::build(
+                &UsbDeviceType::HostPassthrough {
+                    resource: resource_id.clone(),
+                },
+                usb_resources,
+            )?;
+            root.register_usb_device(device, Some(UsbAddress::new((index + 1).to_string())))?;
+        }
+
+        Ok(())
+    }
+
     pub(super) fn register_gpu_device(
         bus_register: &BusRegister,
         gpu: Option<super::parse_helpers::ProxmoxGpu>,
@@ -291,7 +332,7 @@ mod field_parsing {
     use super::parse_helpers::{
         ProxmoxGpu, extract_machine_token, extract_scalar_string, extract_scalar_u8,
         extract_scalar_u64, parse_display, parse_gpu, parse_guest_agent, parse_hugepages_kb,
-        parse_numa_enabled, parse_smbios_uuid, parse_vmgenid,
+        parse_numa_enabled, parse_smbios_uuid, parse_tablet_enabled, parse_vmgenid,
     };
 
     pub(super) struct ParsedGlobalConfig {
@@ -304,6 +345,7 @@ mod field_parsing {
         pub hugepages_kb: Option<usize>,
         pub numa_enabled: bool,
         pub guest_agent: Option<GuestAgent>,
+        pub tablet_enabled: bool,
         pub gpu: Option<ProxmoxGpu>,
         pub smbios_uuid: Option<String>,
         pub vmgenid: Option<String>,
@@ -325,6 +367,7 @@ mod field_parsing {
         let numa_enabled = parse_numa_enabled(global);
 
         let guest_agent = parse_guest_agent(global);
+        let tablet_enabled = parse_tablet_enabled(global);
         let gpu = parse_gpu(global);
         let smbios_uuid = parse_smbios_uuid(global);
         let vmgenid = parse_vmgenid(global);
@@ -354,6 +397,7 @@ mod field_parsing {
             hugepages_kb,
             numa_enabled,
             guest_agent,
+            tablet_enabled,
             gpu,
             smbios_uuid,
             vmgenid,
@@ -367,12 +411,12 @@ mod resource_collection {
 
     use crate::{
         config_format::proxmox::{schema::ProxmoxValue, storage_resolver::ProxmoxStorageConfig},
-        runtime_model::{PcieDeviceType, StorageResource},
+        runtime_model::{PcieDeviceType, StorageResource, UsbDeviceResource},
     };
 
     use super::parse_helpers::{
         ProxmoxNetDevice, ProxmoxScsiKind, collect_hostpci_devices, collect_network_devices,
-        collect_scsi_devices, parse_storage_field,
+        collect_scsi_devices, collect_usb_devices, parse_storage_field,
     };
 
     pub(super) struct CollectedResources {
@@ -380,6 +424,8 @@ mod resource_collection {
         pub scsi_disks: Vec<(usize, StorageResource, ProxmoxScsiKind)>,
         pub net_devices: Vec<(usize, ProxmoxNetDevice)>,
         pub hostpci_devices: Vec<(usize, PcieDeviceType)>,
+        pub usb_resources: HashMap<String, UsbDeviceResource>,
+        pub usb_devices: Vec<(usize, String)>,
     }
 
     pub(super) fn collect_resources(
@@ -408,11 +454,23 @@ mod resource_collection {
         let mut hostpci_devices = collect_hostpci_devices(global)?;
         hostpci_devices.sort_by_key(|(idx, _)| *idx);
 
+        let mut usb_devices = collect_usb_devices(global)?;
+        usb_devices.sort_by_key(|(idx, _)| *idx);
+        let mut usb_resources: HashMap<String, UsbDeviceResource> = HashMap::new();
+        let mut usb_runtime_devices: Vec<(usize, String)> = Vec::new();
+        for (index, resource) in usb_devices {
+            let resource_id = format!("usb{index}");
+            usb_resources.insert(resource_id.clone(), resource);
+            usb_runtime_devices.push((index, resource_id));
+        }
+
         Ok(CollectedResources {
             storage_resources,
             scsi_disks,
             net_devices,
             hostpci_devices,
+            usb_resources,
+            usb_devices: usb_runtime_devices,
         })
     }
 }
@@ -427,6 +485,7 @@ mod parse_helpers {
         },
         runtime_model::{
             CpuModel, Display, GuestAgent, NetworkResource, PcieDeviceType, StorageResource,
+            UsbDeviceResource,
         },
     };
 
@@ -503,6 +562,19 @@ mod parse_helpers {
         };
 
         Some(GuestAgent { enabled })
+    }
+
+    pub(super) fn parse_tablet_enabled(entries: &BTreeMap<String, ProxmoxValue>) -> bool {
+        let Some(value) = entries.get("tablet") else {
+            return false;
+        };
+
+        let token = match value {
+            ProxmoxValue::Scalar { value } => value.as_str(),
+            ProxmoxValue::Compound(compound) => compound.head.as_str(),
+        };
+
+        parse_proxmox_bool(token).unwrap_or(false)
     }
 
     pub(super) fn parse_smbios_uuid(entries: &BTreeMap<String, ProxmoxValue>) -> Option<String> {
@@ -841,6 +913,31 @@ mod parse_helpers {
         Ok(out)
     }
 
+    pub(super) fn collect_usb_devices(
+        entries: &BTreeMap<String, ProxmoxValue>,
+    ) -> Result<Vec<(usize, UsbDeviceResource)>, String> {
+        let mut out = Vec::new();
+
+        for (key, value) in entries {
+            let Some(suffix) = key.strip_prefix("usb") else {
+                continue;
+            };
+            if suffix.is_empty() || !suffix.chars().all(|ch| ch.is_ascii_digit()) {
+                continue;
+            }
+
+            let index = suffix
+                .parse::<usize>()
+                .map_err(|_| format!("invalid USB index in key '{key}'"))?;
+
+            if let Some(resource) = parse_usb_host_resource(value)? {
+                out.push((index, resource));
+            }
+        }
+
+        Ok(out)
+    }
+
     pub(super) fn parse_storage_field(
         value: Option<&ProxmoxValue>,
         storage_config: &ProxmoxStorageConfig,
@@ -915,6 +1012,59 @@ mod parse_helpers {
 
     fn has_option(compound: &ProxmoxCompoundValue, key: &str, expected: &str) -> bool {
         option_value(compound, key).is_some_and(|value| value == expected)
+    }
+
+    fn parse_usb_host_resource(value: &ProxmoxValue) -> Result<Option<UsbDeviceResource>, String> {
+        let host_value = match value {
+            ProxmoxValue::Scalar { value } => value
+                .strip_prefix("host=")
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+            ProxmoxValue::Compound(compound) => option_value(compound, "host").or_else(|| {
+                compound
+                    .head
+                    .strip_prefix("host=")
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+            }),
+        };
+
+        let Some(host) = host_value else {
+            return Ok(None);
+        };
+
+        if let Some((vendor_hex, product_hex)) = host.split_once(':')
+            && vendor_hex.len() == 4
+            && product_hex.len() == 4
+            && vendor_hex.chars().all(|ch| ch.is_ascii_hexdigit())
+            && product_hex.chars().all(|ch| ch.is_ascii_hexdigit())
+        {
+            let vendor_id = u16::from_str_radix(vendor_hex, 16)
+                .map_err(|_| format!("invalid USB vendor id '{vendor_hex}'"))?;
+            let device_id = u16::from_str_radix(product_hex, 16)
+                .map_err(|_| format!("invalid USB product id '{product_hex}'"))?;
+            return Ok(Some(UsbDeviceResource::Id {
+                vendor_id,
+                device_id,
+            }));
+        }
+
+        if let Some((hostbus, hostport)) = host.split_once('-') {
+            let hostbus = hostbus
+                .trim()
+                .parse::<u16>()
+                .map_err(|_| format!("invalid USB hostbus '{hostbus}'"))?;
+            let hostport = hostport.trim();
+            if hostport.is_empty() {
+                return Err("invalid USB hostport: empty value".to_string());
+            }
+            return Ok(Some(UsbDeviceResource::HostBusPort {
+                hostbus,
+                hostport: hostport.to_string(),
+            }));
+        }
+
+        Ok(None)
     }
 }
 
@@ -1360,5 +1510,42 @@ numa: 1
                 .iter()
                 .any(|arg| arg.contains("node,nodeid=0,cpus=0-7,memdev=ram-node0"))
         );
+    }
+
+    #[test]
+    fn imports_usb_tablet_and_host_passthrough_devices() {
+        let model = build(
+            r#"
+name: usb-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+tablet: 1
+usb0: host=1-7.5.1
+usb1: host=0451:16a0
+"#,
+        );
+
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("qemu-xhci") && arg.contains("id=xhci0"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("usb-tablet") && arg.contains("bus=xhci0.0"))
+        );
+        assert!(rendered.iter().any(|arg| arg.contains("usb-host")
+            && arg.contains("hostbus=1")
+            && arg.contains("hostport=7.5.1")));
+        assert!(rendered.iter().any(|arg| {
+            arg.contains("usb-host")
+                && arg.contains("vendorid=0x0451")
+                && arg.contains("productid=0x16a0")
+        }));
     }
 }

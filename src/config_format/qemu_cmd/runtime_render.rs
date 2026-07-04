@@ -3,9 +3,37 @@ use crate::runtime_model::{
     Ich9IntelHdaController, IvshmemPlainController, Memory, NetworkResource,
     PassthroughGpuController, PassthroughPcieController, PcieAddress, PcieDeviceApi,
     PvScsiController, QxlGpuController, RuntimeModel, ScsiAddress, ScsiControllerApi,
-    StandardGpuController, StorageDeviceKind, StorageResource, VirtioGpuController,
-    VirtioNetController,
+    StandardGpuController, StorageDeviceKind, StorageResource, UsbHostByBusPortController,
+    UsbHostByIdController, UsbTabletController, VirtioGpuController, VirtioNetController,
 };
+
+#[derive(Debug, Clone, Default)]
+struct StorageThrottleLimits {
+    bps_total: Option<u64>,
+    bps_read: Option<u64>,
+    bps_write: Option<u64>,
+    iops_total: Option<u64>,
+    iops_read: Option<u64>,
+    iops_write: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct ThrottleGroupConfig {
+    id: String,
+    limits: StorageThrottleLimits,
+}
+
+#[derive(Debug, Clone)]
+struct StorageBackendConfig {
+    backend_id: String,
+    file_node_name: String,
+    node_name: String,
+    file_path: String,
+    read_only: bool,
+    detect_zeroes_unmap: bool,
+    discard_unmap: bool,
+    throttle_group: Option<ThrottleGroupConfig>,
+}
 
 const OVMF_CODE_PATH: &str = "/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd";
 const OVMF_VARS_SIZE: usize = 540_672;
@@ -265,6 +293,14 @@ fn render_bus_args(runtime: &RuntimeModel) -> Vec<String> {
         }
     }
 
+    let mut usb_bus_ids: Vec<_> = runtime.busses().usb_busses().keys().copied().collect();
+    usb_bus_ids.sort_unstable();
+    for bus_id in usb_bus_ids {
+        if let Some(controller) = runtime.busses().usb_busses().get(&bus_id) {
+            args.extend(render_usb_bus_args(bus_id, controller.as_ref()));
+        }
+    }
+
     let mut sata_bus_ids: Vec<_> = runtime.busses().sata_busses().keys().copied().collect();
     sata_bus_ids.sort_unstable();
     for bus_id in sata_bus_ids {
@@ -467,65 +503,150 @@ fn render_pvscsi_device(
     args
 }
 
+fn render_usb_bus_args(
+    bus: u8,
+    controller: &dyn crate::runtime_model::UsbControllerApi,
+) -> Vec<String> {
+    let devices = controller.devices();
+    if devices.is_empty() {
+        return Vec::new();
+    }
+
+    let controller_id = format!("xhci{bus}");
+    let controller_addr = format!("0x{:x}", 0x1b_u8.saturating_add(bus));
+
+    let mut args = vec![
+        "-device".to_string(),
+        format!("qemu-xhci,p2=15,p3=15,id={controller_id},bus=pcie.0,addr={controller_addr}"),
+    ];
+
+    let mut addresses: Vec<_> = devices.keys().cloned().collect();
+    addresses.sort_by_key(|address| address.port.clone());
+    for address in addresses {
+        if let Some(device) = devices.get(&address) {
+            args.extend(render_usb_device_args(
+                bus,
+                controller_id.as_str(),
+                &address,
+                device.as_ref(),
+            ));
+        }
+    }
+
+    args
+}
+
+fn render_usb_device_args(
+    bus: u8,
+    controller_id: &str,
+    address: &crate::runtime_model::UsbAddress,
+    device: &dyn crate::runtime_model::UsbDeviceApi,
+) -> Vec<String> {
+    let port = format_usb_port(&address.port);
+    let id_suffix = address
+        .port
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect::<String>();
+
+    if device
+        .as_any()
+        .downcast_ref::<UsbTabletController>()
+        .is_some()
+    {
+        return vec![
+            "-device".to_string(),
+            format!("usb-tablet,id=tablet-b{bus}-{id_suffix},bus={controller_id}.0,port={port}"),
+        ];
+    }
+
+    if let Some(host) = device.as_any().downcast_ref::<UsbHostByBusPortController>() {
+        return vec![
+            "-device".to_string(),
+            format!(
+                "usb-host,id=usb-b{bus}-{id_suffix},bus={controller_id}.0,port={port},hostbus={},hostport={}",
+                host.hostbus(),
+                host.hostport()
+            ),
+        ];
+    }
+
+    if let Some(host) = device.as_any().downcast_ref::<UsbHostByIdController>() {
+        return vec![
+            "-device".to_string(),
+            format!(
+                "usb-host,id=usb-b{bus}-{id_suffix},bus={controller_id}.0,port={port},vendorid=0x{:04x},productid=0x{:04x}",
+                host.vendor_id(),
+                host.device_id()
+            ),
+        ];
+    }
+
+    Vec::new()
+}
+
+fn format_usb_port(raw: &str) -> String {
+    let value = raw.trim();
+    if value.is_empty() {
+        return "1".to_string();
+    }
+    if let Some(stripped) = value.strip_prefix("usb")
+        && !stripped.trim().is_empty()
+    {
+        return stripped.trim().to_string();
+    }
+    value.to_string()
+}
+
 fn render_ide_drive_args(
     resource: &StorageResource,
     bus: u8,
     unit: u8,
     kind: StorageDeviceKind,
 ) -> Vec<String> {
-    let drive_id = format!("drive-ide{unit}");
+    let backend_id = format!("drive-ide{unit}");
     let device_id = format!("ide{unit}");
-    let mut drive_options = vec!["if=none".to_string(), format!("id={drive_id}")];
-
-    match resource {
-        StorageResource::File { file } => drive_options.push(format!("file={file}")),
-        StorageResource::BlockDevice { block_device } => {
-            drive_options.push(format!("file={block_device}"))
-        }
-    }
-
-    drive_options.push("format=raw".to_string());
-
     let device_type = match kind {
-        StorageDeviceKind::Cdrom => {
-            drive_options.push("media=cdrom".to_string());
-            drive_options.push("readonly=on".to_string());
-            "ide-cd"
-        }
+        StorageDeviceKind::Cdrom => "ide-cd",
         StorageDeviceKind::Hdd | StorageDeviceKind::Ssd => "ide-hd",
     };
 
-    vec![
-        "-drive".to_string(),
-        drive_options.join(","),
+    let backend = build_storage_backend_config(backend_id, resource, kind, false, false, None);
+
+    let mut args = render_storage_backend_args(&backend);
+    args.extend([
         "-device".to_string(),
-        format!("{device_type},bus=ide.{bus},unit={unit},drive={drive_id},id={device_id}"),
-    ]
+        format!(
+            "{device_type},bus=ide.{bus},unit={unit},drive={},id={device_id}",
+            backend.node_name
+        ),
+    ]);
+
+    args
 }
 
 fn render_sata_drive_args(resource: &StorageResource, address: u8) -> Vec<String> {
-    let drive_id = format!("drive-sata{address}");
+    let backend_id = format!("drive-sata{address}");
     let device_id = format!("sata{address}");
-    let mut drive_options = vec![format!("id={drive_id}")];
+    let backend = build_storage_backend_config(
+        backend_id,
+        resource,
+        StorageDeviceKind::Hdd,
+        true,
+        true,
+        None,
+    );
 
-    match resource {
-        StorageResource::File { file } => drive_options.push(format!("file={file}")),
-        StorageResource::BlockDevice { block_device } => {
-            drive_options.push(format!("file={block_device}"))
-        }
-    }
-
-    drive_options.push("if=none".to_string());
-    drive_options.push("format=raw".to_string());
-    drive_options.push("discard=unmap".to_string());
-    drive_options.push("detect-zeroes=unmap".to_string());
-
-    vec![
-        "-drive".to_string(),
-        drive_options.join(","),
+    let mut args = render_storage_backend_args(&backend);
+    args.extend([
         "-device".to_string(),
-        format!("ide-hd,id={device_id},drive={drive_id},bus=ahci0.{address}"),
-    ]
+        format!(
+            "ide-hd,id={device_id},drive={},bus=ahci0.{address}",
+            backend.node_name
+        ),
+    ]);
+
+    args
 }
 
 fn render_scsi_drive_args(
@@ -534,40 +655,114 @@ fn render_scsi_drive_args(
     address: ScsiAddress,
     kind: StorageDeviceKind,
 ) -> Vec<String> {
-    let drive_id = format!("drive-scsi{}", address.lun);
+    let backend_id = format!("drive-scsi{}", address.lun);
     let device_id = format!("scsi{}", address.lun);
-    let mut drive_options = vec![format!("id={drive_id}")];
-
-    match resource {
-        StorageResource::File { file } => drive_options.push(format!("file={file}")),
-        StorageResource::BlockDevice { block_device } => {
-            drive_options.push(format!("file={block_device}"))
-        }
-    }
-
-    drive_options.push("if=none".to_string());
-    drive_options.push("format=raw".to_string());
-    drive_options.push("discard=unmap".to_string());
-    drive_options.push("detect-zeroes=unmap".to_string());
 
     let device_type = match kind {
-        StorageDeviceKind::Cdrom => {
-            drive_options.push("media=cdrom".to_string());
-            drive_options.push("readonly=on".to_string());
-            "scsi-cd"
-        }
+        StorageDeviceKind::Cdrom => "scsi-cd",
         StorageDeviceKind::Hdd | StorageDeviceKind::Ssd => "scsi-hd",
     };
 
-    vec![
-        "-drive".to_string(),
-        drive_options.join(","),
+    let backend = build_storage_backend_config(backend_id, resource, kind, true, true, None);
+
+    let mut args = render_storage_backend_args(&backend);
+    args.extend([
         "-device".to_string(),
         format!(
-            "{device_type},bus=scsihw{bus}.0,channel=0,scsi-id={},lun={},drive={drive_id},id={device_id}",
-            address.target, address.lun
+            "{device_type},bus=scsihw{bus}.0,channel=0,scsi-id={},lun={},drive={},id={device_id}",
+            address.target, address.lun, backend.node_name
         ),
-    ]
+    ]);
+
+    args
+}
+
+fn build_storage_backend_config(
+    backend_id: String,
+    resource: &StorageResource,
+    kind: StorageDeviceKind,
+    discard_unmap: bool,
+    detect_zeroes_unmap: bool,
+    throttle_group: Option<ThrottleGroupConfig>,
+) -> StorageBackendConfig {
+    let file_path = match resource {
+        StorageResource::File { file } => file.clone(),
+        StorageResource::BlockDevice { block_device } => block_device.clone(),
+    };
+
+    StorageBackendConfig {
+        file_node_name: format!("file-{backend_id}"),
+        node_name: format!("node-{backend_id}"),
+        backend_id,
+        file_path,
+        read_only: kind == StorageDeviceKind::Cdrom,
+        detect_zeroes_unmap,
+        discard_unmap,
+        throttle_group,
+    }
+}
+
+fn render_storage_backend_args(config: &StorageBackendConfig) -> Vec<String> {
+    let mut args = vec![
+        "-blockdev".to_string(),
+        format!(
+            "driver=file,node-name={},filename={}",
+            config.file_node_name, config.file_path
+        ),
+    ];
+
+    let mut backend_fields = vec![
+        "driver=raw".to_string(),
+        format!("id={}", config.backend_id),
+        format!("node-name={}", config.node_name),
+        format!("file={}", config.file_node_name),
+    ];
+
+    if config.read_only {
+        backend_fields.push("read-only=on".to_string());
+    }
+    if config.discard_unmap {
+        backend_fields.push("discard=unmap".to_string());
+    }
+    if config.detect_zeroes_unmap {
+        backend_fields.push("detect-zeroes=unmap".to_string());
+    }
+    if let Some(group) = &config.throttle_group {
+        backend_fields.push(format!("throttle-group={}", group.id));
+    }
+
+    args.extend(["-blockdev".to_string(), backend_fields.join(",")]);
+
+    if let Some(group) = &config.throttle_group {
+        args.extend(render_throttle_group_args(group));
+    }
+
+    args
+}
+
+fn render_throttle_group_args(group: &ThrottleGroupConfig) -> Vec<String> {
+    let mut fields = vec![format!("throttle-group,id={}", group.id)];
+
+    if let Some(value) = group.limits.bps_total {
+        fields.push(format!("x-bps-total={value}"));
+    }
+    if let Some(value) = group.limits.bps_read {
+        fields.push(format!("x-bps-read={value}"));
+    }
+    if let Some(value) = group.limits.bps_write {
+        fields.push(format!("x-bps-write={value}"));
+    }
+    if let Some(value) = group.limits.iops_total {
+        fields.push(format!("x-iops-total={value}"));
+    }
+    if let Some(value) = group.limits.iops_read {
+        fields.push(format!("x-iops-read={value}"));
+    }
+    if let Some(value) = group.limits.iops_write {
+        fields.push(format!("x-iops-write={value}"));
+    }
+
+    vec!["-object".to_string(), fields.join(",")]
 }
 
 fn format_pcie_addr(address: &PcieAddress) -> String {
@@ -575,5 +770,114 @@ fn format_pcie_addr(address: &PcieAddress) -> String {
         format!("0x{:x}", address.device())
     } else {
         format!("0x{:x}.{}", address.device(), address.function())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crate::runtime_model::{
+        Q35UsbController, ScsiAddress, StorageDeviceKind, StorageResource, UsbAddress,
+        UsbControllerApi, UsbDeviceApi, UsbHostByBusPortController, UsbHostByIdController,
+        UsbTabletController,
+    };
+
+    use super::{
+        StorageThrottleLimits, ThrottleGroupConfig, build_storage_backend_config,
+        render_scsi_drive_args, render_storage_backend_args, render_usb_bus_args,
+    };
+
+    #[test]
+    fn renders_scsi_disks_using_blockdev_nodes() {
+        let args = render_scsi_drive_args(
+            &StorageResource::File {
+                file: "/var/lib/vm/disk0.raw".to_string(),
+            },
+            0,
+            ScsiAddress::new(0, 0),
+            StorageDeviceKind::Ssd,
+        );
+
+        assert!(args.iter().any(|arg| arg == "-blockdev"));
+        assert!(args.iter().any(|arg| arg.contains("driver=file")));
+        assert!(args.iter().any(|arg| arg.contains("driver=raw")));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("scsi-hd") && arg.contains("drive=node-drive-scsi0"))
+        );
+    }
+
+    #[test]
+    fn renders_optional_throttle_group_object_when_configured() {
+        let config = build_storage_backend_config(
+            "drive-scsi2".to_string(),
+            &StorageResource::BlockDevice {
+                block_device: "/dev/zvol/tank/vm-200-disk-0".to_string(),
+            },
+            StorageDeviceKind::Hdd,
+            true,
+            true,
+            Some(ThrottleGroupConfig {
+                id: "tg-scsi2".to_string(),
+                limits: StorageThrottleLimits {
+                    bps_total: Some(104857600),
+                    ..StorageThrottleLimits::default()
+                },
+            }),
+        );
+
+        let args = render_storage_backend_args(&config);
+        assert!(args.iter().any(|arg| arg == "-object"));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("throttle-group,id=tg-scsi2"))
+        );
+        assert!(args.iter().any(|arg| arg.contains("x-bps-total=104857600")));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("throttle-group=tg-scsi2"))
+        );
+    }
+
+    #[test]
+    fn renders_usb_controller_and_host_devices() {
+        let controller = Q35UsbController::default();
+
+        let tablet: Arc<dyn UsbDeviceApi> = Arc::new(UsbTabletController {});
+        controller
+            .register_usb_device(tablet, Some(UsbAddress::new("1".to_string())))
+            .expect("tablet registration should succeed");
+
+        let host_by_port: Arc<dyn UsbDeviceApi> =
+            Arc::new(UsbHostByBusPortController::new(1, "7.5.1".to_string()));
+        controller
+            .register_usb_device(host_by_port, Some(UsbAddress::new("5".to_string())))
+            .expect("usb host (bus/port) registration should succeed");
+
+        let host_by_id: Arc<dyn UsbDeviceApi> =
+            Arc::new(UsbHostByIdController::new(0x0451, 0x16a0));
+        controller
+            .register_usb_device(host_by_id, Some(UsbAddress::new("6".to_string())))
+            .expect("usb host (vendor/product) registration should succeed");
+
+        let args = render_usb_bus_args(0, &controller);
+
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("qemu-xhci") && arg.contains("id=xhci0"))
+        );
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("usb-tablet") && arg.contains("port=1"))
+        );
+        assert!(args.iter().any(|arg| arg.contains("usb-host")
+            && arg.contains("hostbus=1")
+            && arg.contains("hostport=7.5.1")));
+        assert!(args.iter().any(|arg| {
+            arg.contains("usb-host")
+                && arg.contains("vendorid=0x0451")
+                && arg.contains("productid=0x16a0")
+        }));
     }
 }

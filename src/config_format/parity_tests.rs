@@ -244,6 +244,13 @@ mod tests {
             {
                 paths.push(PathBuf::from(file_path));
             }
+
+            if let Some(file_path) = arg
+                .split(',')
+                .find_map(|segment| segment.strip_prefix("filename="))
+            {
+                paths.push(PathBuf::from(file_path));
+            }
         }
 
         paths
