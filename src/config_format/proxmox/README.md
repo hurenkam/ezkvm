@@ -105,6 +105,9 @@ Current runtime -> schema field coverage:
   - `bios`, `efidisk0` for UEFI
   - `scsiN` from runtime SCSI devices
   - `netN` from runtime PCIe virtio-net devices
+    - includes MAC (`virtio=...`) when present
+    - includes `bridge` or `ifname` based backend
+    - includes `vhost`, `rx_queue_size`, `tx_queue_size` when present
   - `agent`
   - `vga`
   - `spice` or `vnc`
@@ -136,6 +139,7 @@ Supported conversions:
 - Proxmox import/export currently focuses on the shared supported subset used by runtime parity tests rather than full Proxmox command-line equivalence.
 - `storage.cfg` presence is required for runtime import and export paths because token-to-path and path-to-token conversion depends on it.
 - Runtime import reads only the global Proxmox section for active VM configuration; snapshot sections are parsed by schema but not materialized as runtime variants.
+- Runtime import for `netN` currently supports bridge and tap backends plus optional MAC, `vhost`, `rx_queue_size`, and `tx_queue_size`.
 - Runtime export does not currently reconstruct TPM config fields from runtime into Proxmox schema.
 - Runtime export does not currently emit snapshot sections from runtime state.
 - Some Proxmox runtime literals remain intentionally out of scope in current mapping (for example full lifecycle/QMP daemonization and advanced blockdev layering parity).

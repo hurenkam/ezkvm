@@ -1,9 +1,9 @@
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
-use super::ControllerApi;
 pub type PcieBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Hash, Eq, PartialEq, new)]
@@ -42,6 +42,14 @@ pub enum PcieDeviceType {
     VirtioNet {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         resource: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mac_address: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rx_queue_size: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tx_queue_size: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vhost: Option<bool>,
     },
     StandardGpu,
     VirtioGpu,
@@ -71,33 +79,23 @@ pub enum PcieDeviceType {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PcieDeviceKind {
-    PvScsi,
-    VirtioNet,
-    StandardGpu,
-    VirtioGpu,
-    Passthrough,
-    PassthroughGpu,
-    Ich9IntelHda,
-    IvshmemPlain,
-}
-
-#[derive(Debug, Clone)]
-pub struct PciePassthroughSpec {
-    pub resource: Option<String>,
-    pub host: String,
-    pub id: Option<String>,
-    pub multifunction: Option<bool>,
-    pub rombar: Option<bool>,
-    pub romfile: Option<String>,
-}
-
 impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
     fn from(device: &PcieDeviceType) -> Self {
         match device {
             PcieDeviceType::PvScsi => Arc::new(super::PvScsiController::default()),
-            PcieDeviceType::VirtioNet { .. } => Arc::new(super::VirtioNetController::default()),
+            PcieDeviceType::VirtioNet {
+                mac_address,
+                rx_queue_size,
+                tx_queue_size,
+                vhost,
+                ..
+            } => Arc::new(super::VirtioNetController::new(
+                None,
+                mac_address.clone(),
+                *rx_queue_size,
+                *tx_queue_size,
+                *vhost,
+            )),
             PcieDeviceType::StandardGpu => Arc::new(StandardGpuController::default()),
             PcieDeviceType::VirtioGpu => Arc::new(VirtioGpuController::default()),
             PcieDeviceType::Passthrough {
@@ -108,7 +106,6 @@ impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
                 rombar,
                 romfile,
             } => Arc::new(PassthroughPcieController::new(
-                resource.clone(),
                 host.clone()
                     .unwrap_or_else(|| resource.clone().unwrap_or_default()),
                 id.clone(),
@@ -130,27 +127,17 @@ impl From<&PcieDeviceType> for Arc<dyn PcieDeviceApi> {
 }
 
 pub trait PcieDeviceApi: Display {
-    fn device_kind(&self) -> PcieDeviceKind;
-    fn network_resource(&self) -> Option<&crate::runtime_model::NetworkResource> {
-        None
-    }
-    fn resource_id(&self) -> Option<&str> {
-        None
-    }
+    fn as_any(&self) -> &dyn Any;
 
-    fn passthrough_spec(&self) -> Option<PciePassthroughSpec> {
-        None
-    }
+    fn device_kind(&self) -> PcieDeviceType;
 
     fn preferred_address(&self) -> Option<PcieAddress> {
         None
     }
-    fn qemu_args(&self, bus: &PcieBus, address: PcieAddress) -> Vec<String>;
 }
 
 #[derive(Debug, Clone)]
 pub struct PassthroughPcieController {
-    resource: Option<String>,
     host: String,
     id: Option<String>,
     multifunction: Option<bool>,
@@ -160,7 +147,6 @@ pub struct PassthroughPcieController {
 
 impl PassthroughPcieController {
     pub fn new(
-        resource: Option<String>,
         host: String,
         id: Option<String>,
         multifunction: Option<bool>,
@@ -168,13 +154,32 @@ impl PassthroughPcieController {
         romfile: Option<String>,
     ) -> Self {
         Self {
-            resource,
             host,
             id,
             multifunction,
             rombar,
             romfile,
         }
+    }
+
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
+    pub fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
+    pub fn multifunction(&self) -> Option<bool> {
+        self.multifunction
+    }
+
+    pub fn rombar(&self) -> Option<bool> {
+        self.rombar
+    }
+
+    pub fn romfile(&self) -> Option<&str> {
+        self.romfile.as_deref()
     }
 }
 
@@ -185,47 +190,19 @@ impl Display for PassthroughPcieController {
 }
 
 impl PcieDeviceApi for PassthroughPcieController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::Passthrough
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
-    fn passthrough_spec(&self) -> Option<PciePassthroughSpec> {
-        Some(PciePassthroughSpec {
-            resource: self.resource.clone(),
-            host: self.host.clone(),
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::Passthrough {
+            resource: None,
+            host: Some(self.host.clone()),
             id: self.id.clone(),
             multifunction: self.multifunction,
             rombar: self.rombar,
             romfile: self.romfile.clone(),
-        })
-    }
-
-    fn qemu_args(&self, _bus: &PcieBus, address: PcieAddress) -> Vec<String> {
-        let mut device = format!("vfio-pci,host={}", self.host);
-        if let Some(id) = &self.id {
-            device.push_str(&format!(",id={id}"));
         }
-        if let Some(multifunction) = self.multifunction {
-            device.push_str(&format!(
-                ",multifunction={}",
-                if multifunction { 1 } else { 0 }
-            ));
-        }
-        if let Some(rombar) = self.rombar {
-            device.push_str(&format!(",rombar={}", if rombar { 1 } else { 0 }));
-        }
-        if let Some(romfile) = &self.romfile {
-            device.push_str(&format!(",romfile={romfile}"));
-        }
-
-        let addr = if address.function() == 0 {
-            format!("0x{:x}", address.device())
-        } else {
-            format!("0x{:x}.{}", address.device(), address.function())
-        };
-        device.push_str(&format!(",bus=pcie.0,addr={addr}"));
-
-        vec!["-device".to_string(), device]
     }
 }
 
@@ -241,12 +218,12 @@ impl Display for StandardGpuController {
 }
 
 impl PcieDeviceApi for StandardGpuController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::StandardGpu
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        vec!["-device".to_string(), "VGA".to_string()]
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::StandardGpu
     }
 }
 
@@ -260,12 +237,12 @@ impl Display for VirtioGpuController {
 }
 
 impl PcieDeviceApi for VirtioGpuController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::VirtioGpu
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        vec!["-device".to_string(), "virtio-gpu-pci".to_string()]
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::VirtioGpu
     }
 }
 
@@ -278,6 +255,10 @@ impl PassthroughGpuController {
     pub fn new(resource: String) -> Self {
         Self { resource }
     }
+
+    pub fn resource(&self) -> &str {
+        &self.resource
+    }
 }
 
 impl Display for PassthroughGpuController {
@@ -287,16 +268,14 @@ impl Display for PassthroughGpuController {
 }
 
 impl PcieDeviceApi for PassthroughGpuController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::PassthroughGpu
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
-    fn resource_id(&self) -> Option<&str> {
-        Some(&self.resource)
-    }
-
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        vec!["-device".to_string(), "vfio-pci".to_string()]
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::PassthroughGpu {
+            resource: self.resource.clone(),
+        }
     }
 }
 
@@ -309,6 +288,10 @@ impl Ich9IntelHdaController {
     pub fn new(codec: Option<String>) -> Self {
         Self { codec }
     }
+
+    pub fn codec(&self) -> Option<&str> {
+        self.codec.as_deref()
+    }
 }
 
 impl Display for Ich9IntelHdaController {
@@ -318,17 +301,14 @@ impl Display for Ich9IntelHdaController {
 }
 
 impl PcieDeviceApi for Ich9IntelHdaController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::Ich9IntelHda
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        let mut args = vec!["-device".to_string(), "ich9-intel-hda".to_string()];
-        if let Some(codec) = &self.codec {
-            args.push("-device".to_string());
-            args.push(codec.clone());
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::Ich9IntelHda {
+            codec: self.codec.clone(),
         }
-        args
     }
 }
 
@@ -341,6 +321,10 @@ impl IvshmemPlainController {
     pub fn new(resource: String) -> Self {
         Self { resource }
     }
+
+    pub fn resource(&self) -> &str {
+        &self.resource
+    }
 }
 
 impl Display for IvshmemPlainController {
@@ -350,20 +334,18 @@ impl Display for IvshmemPlainController {
 }
 
 impl PcieDeviceApi for IvshmemPlainController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::IvshmemPlain
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 
-    fn resource_id(&self) -> Option<&str> {
-        Some(&self.resource)
-    }
-
-    fn qemu_args(&self, _bus: &PcieBus, _address: PcieAddress) -> Vec<String> {
-        vec!["-device".to_string(), "ivshmem-plain".to_string()]
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::IvshmemPlain {
+            resource: self.resource.clone(),
+        }
     }
 }
 
-pub trait PcieControllerApi: ControllerApi + Display {
+pub trait PcieControllerApi: Display {
     fn register_pcie_device(
         &self,
         device: Arc<dyn PcieDeviceApi>,

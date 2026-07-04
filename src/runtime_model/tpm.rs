@@ -39,8 +39,6 @@ pub trait TpmApi: Display {
     fn storage_resource(&self) -> Option<&StorageResource> {
         None
     }
-
-    fn qemu_args(&self, vm_name: &str) -> Vec<String>;
 }
 pub struct TpmModelBuilder {}
 impl TpmModelBuilder {
@@ -80,24 +78,6 @@ impl TpmApi for TpmModel {
     fn storage_resource(&self) -> Option<&StorageResource> {
         match self {
             TpmModel::Swtpm { swtpm } => Some(&swtpm.resource),
-        }
-    }
-
-    fn qemu_args(&self, vm_name: &str) -> Vec<String> {
-        match self {
-            TpmModel::Swtpm { swtpm: _ } => {
-                let socket_path = format!("/var/run/ezkvm/{vm_name}.swtpm");
-
-                let args = vec![
-                    "-chardev".to_string(),
-                    format!("socket,id=tpmchar,path={socket_path}"),
-                    "-tpmdev".to_string(),
-                    "emulator,id=tpmdev,chardev=tpmchar".to_string(),
-                    "-device".to_string(),
-                    "tpm-tis,tpmdev=tpmdev".to_string(),
-                ];
-                args
-            }
         }
     }
 }

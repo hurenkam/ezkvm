@@ -158,12 +158,12 @@ mod device_registration {
     use std::sync::Arc;
 
     use crate::runtime_model::{
-        BusRegister, BusRegistrationApi, NetworkResource, PciDeviceApi, PciDeviceType, PcieAddress,
-        PcieDeviceApi, PcieDeviceType, PvScsiController, ScsiAddress, ScsiControllerApi,
-        ScsiDeviceBuilder, ScsiDeviceType, StorageResource, VirtioNetController,
+        BusRegister, BusRegistrationApi, PciDeviceApi, PciDeviceType, PcieAddress, PcieDeviceApi,
+        PcieDeviceType, PvScsiController, ScsiAddress, ScsiControllerApi, ScsiDeviceBuilder,
+        ScsiDeviceType, StorageResource, VirtioNetController,
     };
 
-    use super::parse_helpers::ProxmoxScsiKind;
+    use super::parse_helpers::{ProxmoxNetDevice, ProxmoxScsiKind};
 
     pub(super) fn register_scsi_devices(
         bus_register: &mut BusRegister,
@@ -204,11 +204,16 @@ mod device_registration {
 
     pub(super) fn register_network_devices(
         bus_register: &BusRegister,
-        net_devices: &[(usize, NetworkResource)],
+        net_devices: &[(usize, ProxmoxNetDevice)],
     ) -> Result<(), String> {
-        for (index, network_resource) in net_devices {
-            let pcie_device: Arc<dyn PcieDeviceApi> =
-                Arc::new(VirtioNetController::new(Some(network_resource.clone())));
+        for (index, config) in net_devices {
+            let pcie_device: Arc<dyn PcieDeviceApi> = Arc::new(VirtioNetController::new(
+                Some(config.resource.clone()),
+                config.mac_address.clone(),
+                config.rx_queue_size,
+                config.tx_queue_size,
+                config.vhost,
+            ));
             let preferred = Some(PcieAddress::new(0x10 + *index as u8, 0));
             match bus_register.pcie_busses().get(&0) {
                 Some(root) => root.register_pcie_device(pcie_device, preferred)?,
@@ -362,18 +367,18 @@ mod resource_collection {
 
     use crate::{
         config_format::proxmox::{schema::ProxmoxValue, storage_resolver::ProxmoxStorageConfig},
-        runtime_model::{NetworkResource, PcieDeviceType, StorageResource},
+        runtime_model::{PcieDeviceType, StorageResource},
     };
 
     use super::parse_helpers::{
-        ProxmoxScsiKind, collect_hostpci_devices, collect_network_devices, collect_scsi_devices,
-        parse_storage_field,
+        ProxmoxNetDevice, ProxmoxScsiKind, collect_hostpci_devices, collect_network_devices,
+        collect_scsi_devices, parse_storage_field,
     };
 
     pub(super) struct CollectedResources {
         pub storage_resources: HashMap<String, StorageResource>,
         pub scsi_disks: Vec<(usize, StorageResource, ProxmoxScsiKind)>,
-        pub net_devices: Vec<(usize, NetworkResource)>,
+        pub net_devices: Vec<(usize, ProxmoxNetDevice)>,
         pub hostpci_devices: Vec<(usize, PcieDeviceType)>,
     }
 
@@ -446,6 +451,15 @@ mod parse_helpers {
         Hdd,
         Ssd,
         Cdrom,
+    }
+
+    #[derive(Clone)]
+    pub(super) struct ProxmoxNetDevice {
+        pub resource: NetworkResource,
+        pub mac_address: Option<String>,
+        pub rx_queue_size: Option<u16>,
+        pub tx_queue_size: Option<u16>,
+        pub vhost: Option<bool>,
     }
 
     // --- chipset / cpu / identity ---
@@ -712,7 +726,7 @@ mod parse_helpers {
 
     pub(super) fn collect_network_devices(
         entries: &BTreeMap<String, ProxmoxValue>,
-    ) -> Result<Vec<(usize, NetworkResource)>, String> {
+    ) -> Result<Vec<(usize, ProxmoxNetDevice)>, String> {
         let mut out = Vec::new();
         for (key, value) in entries {
             let Some(suffix) = key.strip_prefix("net") else {
@@ -725,9 +739,9 @@ mod parse_helpers {
                 .parse::<usize>()
                 .map_err(|_| format!("invalid network index in key '{key}'"))?;
 
-            let network = match value {
+            let config = match value {
                 ProxmoxValue::Compound(compound) => {
-                    if let Some(bridge) = option_value(compound, "bridge") {
+                    let resource = if let Some(bridge) = option_value(compound, "bridge") {
                         Some(NetworkResource::Bridge {
                             bridge: bridge.to_string(),
                         })
@@ -735,13 +749,34 @@ mod parse_helpers {
                         option_value(compound, "ifname").map(|tap| NetworkResource::Tap {
                             tap: tap.to_string(),
                         })
-                    }
+                    };
+
+                    let mac_address = compound
+                        .head
+                        .split_once('=')
+                        .map(|(_, value)| value.trim())
+                        .filter(|value| !value.is_empty())
+                        .map(ToString::to_string);
+
+                    let rx_queue_size = option_value(compound, "rx_queue_size")
+                        .and_then(|value| value.parse::<u16>().ok());
+                    let tx_queue_size = option_value(compound, "tx_queue_size")
+                        .and_then(|value| value.parse::<u16>().ok());
+                    let vhost = option_value(compound, "vhost").and_then(parse_proxmox_bool);
+
+                    resource.map(|resource| ProxmoxNetDevice {
+                        resource,
+                        mac_address,
+                        rx_queue_size,
+                        tx_queue_size,
+                        vhost,
+                    })
                 }
                 ProxmoxValue::Scalar { .. } => None,
             };
 
-            if let Some(network) = network {
-                out.push((index, network));
+            if let Some(config) = config {
+                out.push((index, config));
             }
         }
         Ok(out)
@@ -888,6 +923,7 @@ mod tests {
     use crate::config_format::proxmox::{
         schema::ProxmoxConfigSchema, storage_resolver::ProxmoxStorageConfig,
     };
+    use crate::config_format::qemu_cmd::runtime_render::render_qemu_command;
 
     use super::{ProxmoxRuntimeBuilder, RuntimeBuilder};
 
@@ -1113,12 +1149,47 @@ net0: virtio=BC:24:11:3A:21:B7,bridge=vmbr0
 "#,
         );
 
-        let command = model.qemu_command();
+        let command = render_qemu_command(&model).expect("qemu render should succeed");
         assert!(command.iter().any(|arg| arg.contains("if=pflash,unit=1")));
         assert!(command.iter().any(|arg| arg.contains("tpm-tis")));
         assert!(command.iter().any(|arg| arg.contains("pvscsi")));
         assert!(command.iter().any(|arg| arg.contains("scsi-hd")));
         assert!(command.iter().any(|arg| arg.contains("br=vmbr0")));
+        assert!(
+            command
+                .iter()
+                .any(|arg| arg.contains("mac=BC:24:11:3A:21:B7"))
+        );
+    }
+
+    #[test]
+    fn imports_network_queue_sizes_and_vhost_into_runtime() {
+        let model = build(
+            r#"
+name: network-queues-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+net0: virtio=AA:BB:CC:DD:EE:FF,ifname=tap301i0,vhost=on,rx_queue_size=1024,tx_queue_size=256
+"#,
+        );
+
+        let command = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(
+            command
+                .iter()
+                .any(|arg| arg.contains("tap,id=") && arg.contains("ifname=tap301i0"))
+        );
+        assert!(command.iter().any(|arg| arg.contains("vhost=on")));
+        assert!(
+            command
+                .iter()
+                .any(|arg| arg.contains("mac=AA:BB:CC:DD:EE:FF"))
+        );
+        assert!(command.iter().any(|arg| arg.contains("rx_queue_size=1024")));
+        assert!(command.iter().any(|arg| arg.contains("tx_queue_size=256")));
     }
 
     #[test]
@@ -1135,7 +1206,7 @@ agent: 1
 vga: virtio,memory=128
 "#,
         );
-        let command = model.qemu_command();
+        let command = render_qemu_command(&model).expect("qemu render should succeed");
         assert!(command.iter().any(|arg| arg.contains("virtio-gpu-pci")));
         assert!(
             command
@@ -1158,7 +1229,7 @@ vga: qxl,memory=64
 spice: port=5905,addr=127.0.0.1,disable-ticketing=on
 "#,
         );
-        let command = model.qemu_command();
+        let command = render_qemu_command(&model).expect("qemu render should succeed");
         assert!(command.iter().any(|arg| arg == "qxl" || arg == "VGA"));
         assert!(
             command
@@ -1180,7 +1251,7 @@ sockets: 1
 vga: qxl,memory=64
 "#,
         );
-        let command = model.qemu_command();
+        let command = render_qemu_command(&model).expect("qemu render should succeed");
         assert!(
             command.iter().any(|arg| arg.contains("port=5900")),
             "expected inferred SPICE at port 5900, got: {:?}",
@@ -1245,7 +1316,7 @@ hostpci0: 0000:0e:11.6,pcie=1,rombar=0
 hostpci1: 0000:01:00.1,pcie=1
 "#,
         );
-        let rendered = model.qemu_command();
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
         assert!(
             rendered
                 .iter()
@@ -1273,7 +1344,7 @@ hugepages: 1024
 numa: 1
 "#,
         );
-        let rendered = model.qemu_command();
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
         assert!(
             rendered
                 .iter()

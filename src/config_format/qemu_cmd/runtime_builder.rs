@@ -340,7 +340,10 @@ fn register_gpu_from_args(args: &[String], busses: &BusRegister) -> Result<(), S
 
 #[cfg(test)]
 mod tests {
-    use crate::config_format::{Parser, RuntimeBuilder, qemu_cmd::parser::QemuParser};
+    use crate::config_format::{
+        Parser, RuntimeBuilder,
+        qemu_cmd::{parser::QemuParser, runtime_render::render_qemu_command},
+    };
 
     use super::QemuRuntimeBuilder;
 
@@ -354,7 +357,7 @@ mod tests {
             .build()
             .expect("runtime build should succeed");
 
-        let rendered = runtime.qemu_command();
+        let rendered = render_qemu_command(&runtime).expect("qemu render should succeed");
         assert!(rendered.iter().any(|arg| arg.contains("virtio-gpu-pci")));
         assert!(
             rendered
@@ -378,7 +381,7 @@ mod tests {
             .build()
             .expect("runtime build should succeed");
 
-        let rendered = runtime.qemu_command();
+        let rendered = render_qemu_command(&runtime).expect("qemu render should succeed");
         assert!(rendered.iter().any(|arg| arg == "qxl" || arg == "VGA"));
     }
 

@@ -41,7 +41,6 @@ pub struct LookingGlass {}
 
 pub trait DisplayApi: fmt::Display {
     fn config(&self) -> &Display;
-    fn qemu_args(&self) -> Vec<String>;
 }
 
 pub struct DisplayModelBuilder {}
@@ -59,39 +58,6 @@ struct DisplayModel {
 impl DisplayApi for DisplayModel {
     fn config(&self) -> &Display {
         &self.display
-    }
-
-    fn qemu_args(&self) -> Vec<String> {
-        match &self.display {
-            Display::Gtk { .. } => vec!["-display".to_string(), "gtk".to_string()],
-            Display::Sdl { .. } => vec!["-display".to_string(), "sdl".to_string()],
-            Display::Vnc { vnc } => {
-                let listen = if vnc.listen.is_empty() {
-                    "0.0.0.0"
-                } else {
-                    &vnc.listen
-                };
-                vec!["-vnc".to_string(), format!("{}:{}", listen, vnc.port)]
-            }
-            Display::Spice { spice } => {
-                let listen = if spice.listen.is_empty() {
-                    "0.0.0.0"
-                } else {
-                    &spice.listen
-                };
-                let mut spec = format!("port={},addr={}", spice.port, listen);
-                if spice.disable_ticketing {
-                    spec.push_str(",disable-ticketing=on");
-                }
-                vec!["-spice".to_string(), spec]
-            }
-            Display::LookingGlass { .. } => vec![
-                "-display".to_string(),
-                "none".to_string(),
-                "-vnc".to_string(),
-                "none".to_string(),
-            ],
-        }
     }
 }
 

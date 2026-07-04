@@ -42,57 +42,6 @@ impl BusRegister {
             scsi_busses: HashMap::new(),
         }
     }
-    pub fn qemu_args(&self) -> Vec<String> {
-        let mut args = Vec::new();
-        let mut pcie_keys: Vec<_> = self.pcie_busses.keys().copied().collect();
-        pcie_keys.sort_unstable();
-        for key in pcie_keys {
-            if let Some(controller) = self.pcie_busses.get(&key) {
-                args.extend(controller.qemu_args());
-            }
-        }
-
-        let mut pci_keys: Vec<_> = self.pci_busses.keys().copied().collect();
-        pci_keys.sort_unstable();
-        for key in pci_keys {
-            if let Some(controller) = self.pci_busses.get(&key) {
-                args.extend(controller.qemu_args());
-            }
-        }
-
-        let mut usb_keys: Vec<_> = self.usb_busses.keys().copied().collect();
-        usb_keys.sort_unstable();
-        for key in usb_keys {
-            if let Some(controller) = self.usb_busses.get(&key) {
-                args.extend(controller.qemu_args());
-            }
-        }
-
-        let mut sata_keys: Vec<_> = self.sata_busses.keys().copied().collect();
-        sata_keys.sort_unstable();
-        for key in sata_keys {
-            if let Some(controller) = self.sata_busses.get(&key) {
-                args.extend(controller.qemu_args());
-            }
-        }
-
-        let mut ide_keys: Vec<_> = self.ide_busses.keys().copied().collect();
-        ide_keys.sort_unstable();
-        for key in ide_keys {
-            if let Some(controller) = self.ide_busses.get(&key) {
-                args.extend(controller.qemu_args());
-            }
-        }
-
-        let mut scsi_keys: Vec<_> = self.scsi_busses.keys().copied().collect();
-        scsi_keys.sort_unstable();
-        for key in scsi_keys {
-            if let Some(_controller) = self.scsi_busses.get(&key) {
-                // SCSI device rendering is owned by the controller's PCIe device emitter.
-            }
-        }
-        args
-    }
 }
 impl Display for BusRegister {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

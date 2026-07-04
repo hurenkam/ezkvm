@@ -15,9 +15,9 @@ use crate::{
     },
     runtime_model::{
         Audio, AudioBackend, AudioController, BiosModel, BootModel, Chipset, Display, IdeDevice,
-        IdeDeviceType, NetworkResource, PcieAddress, PcieDevice, PcieDeviceKind,
-        PcieDeviceResource, PcieDeviceType, Resource, RuntimeModel, SataDevice, SataDeviceType,
-        ScsiDevice, ScsiDeviceType, StorageDeviceKind, StorageResource, Tpm,
+        IdeDeviceType, NetworkResource, PcieAddress, PcieDevice, PcieDeviceResource,
+        PcieDeviceType, Resource, RuntimeModel, SataDevice, SataDeviceType, ScsiDevice,
+        ScsiDeviceType, StorageDeviceKind, StorageResource, Tpm, VirtioNetController,
     },
 };
 
@@ -339,47 +339,54 @@ fn render_pcie_device(
     device: &dyn crate::runtime_model::PcieDeviceApi,
     resources: &mut ResourceIndex,
 ) -> Result<PcieDevice, String> {
-    let device_type = match device.device_kind() {
-        PcieDeviceKind::PvScsi => PcieDeviceType::PvScsi,
-        PcieDeviceKind::VirtioNet => PcieDeviceType::VirtioNet {
-            resource: device
-                .network_resource()
-                .cloned()
-                .map(|network| resources.network_id(network)),
-        },
-        PcieDeviceKind::StandardGpu => PcieDeviceType::StandardGpu,
-        PcieDeviceKind::VirtioGpu => PcieDeviceType::VirtioGpu,
-        PcieDeviceKind::Passthrough => {
-            let spec = device
-                .passthrough_spec()
-                .ok_or_else(|| "passthrough device is missing passthrough metadata".to_string())?;
-            let resource = match device.resource_id() {
-                Some(id) => Some(id.to_string()),
-                None => Some(resources.hostpci_id(PcieDeviceResource::HostAddress {
-                    address: spec.host,
-                    multifunction: spec.multifunction,
-                    rombar: spec.rombar,
-                    romfile: spec.romfile,
-                })),
-            };
-
-            PcieDeviceType::Passthrough {
-                resource,
-                host: None,
-                id: spec.id,
-                multifunction: None,
-                rombar: None,
-                romfile: None,
-            }
-        }
-        PcieDeviceKind::PassthroughGpu => PcieDeviceType::PassthroughGpu {
-            resource: device.resource_id().unwrap_or_default().to_string(),
-        },
-        PcieDeviceKind::Ich9IntelHda => PcieDeviceType::Ich9IntelHda { codec: None },
-        PcieDeviceKind::IvshmemPlain => PcieDeviceType::IvshmemPlain {
-            resource: device.resource_id().unwrap_or_default().to_string(),
-        },
-    };
+    let mut device_type = device.device_kind();
+    enrich_pcie_device_type_for_ezkvm(&mut device_type, device, resources)?;
 
     Ok(PcieDevice::new(Some(0), Some(address), device_type))
+}
+
+fn enrich_pcie_device_type_for_ezkvm(
+    device_type: &mut PcieDeviceType,
+    device: &dyn crate::runtime_model::PcieDeviceApi,
+    resources: &mut ResourceIndex,
+) -> Result<(), String> {
+    match device_type {
+        PcieDeviceType::VirtioNet { resource, .. } => {
+            if let Some(net) = device.as_any().downcast_ref::<VirtioNetController>() {
+                *resource = net
+                    .resource()
+                    .cloned()
+                    .map(|resource| resources.network_id(resource));
+                return Ok(());
+            }
+            Err("virtio_net pcie device kind mismatch while rendering ezkvm schema".to_string())
+        }
+        PcieDeviceType::Passthrough {
+            resource,
+            host,
+            multifunction,
+            rombar,
+            romfile,
+            ..
+        } => {
+            let Some(host_address) = host.take() else {
+                return Err(
+                    "passthrough pcie device missing host address while rendering ezkvm schema"
+                        .to_string(),
+                );
+            };
+
+            *resource = Some(resources.hostpci_id(PcieDeviceResource::HostAddress {
+                address: host_address,
+                multifunction: *multifunction,
+                rombar: *rombar,
+                romfile: romfile.clone(),
+            }));
+            *multifunction = None;
+            *rombar = None;
+            *romfile = None;
+            Ok(())
+        }
+        _ => Ok(()),
+    }
 }

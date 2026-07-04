@@ -21,7 +21,6 @@ fn default_true() -> bool {
 
 pub trait GuestAgentApi: fmt::Display {
     fn config(&self) -> &GuestAgent;
-    fn qemu_args(&self, vm_name: &str) -> Vec<String>;
 }
 
 pub struct GuestAgentModelBuilder {}
@@ -41,21 +40,6 @@ struct GuestAgentModel {
 impl GuestAgentApi for GuestAgentModel {
     fn config(&self) -> &GuestAgent {
         &self.config
-    }
-
-    fn qemu_args(&self, vm_name: &str) -> Vec<String> {
-        if !self.config.enabled {
-            return vec![];
-        }
-        let socket_path = format!("/var/run/ezkvm/{vm_name}.agent");
-        vec![
-            "-chardev".to_string(),
-            format!("socket,path={socket_path},server=on,wait=off,id=qga0"),
-            "-device".to_string(),
-            "virtio-serial".to_string(),
-            "-device".to_string(),
-            "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0".to_string(),
-        ]
     }
 }
 

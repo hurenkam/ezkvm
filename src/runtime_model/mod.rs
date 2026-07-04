@@ -39,12 +39,15 @@ pub use ide::{
     IdeAddress, IdeBus, IdeControllerApi, IdeDevice, IdeDeviceApi, IdeDeviceBuilder, IdeDeviceType,
 };
 pub use memory::Memory;
-pub use model::ControllerApi;
-pub use pci::{PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType};
+pub use pci::{
+    Ac97Controller, PciAddress, PciBus, PciControllerApi, PciDevice, PciDeviceApi, PciDeviceType,
+    QxlGpuController,
+};
 #[allow(unused_imports)] // TODO: wire to CLI
 pub use pcie::{
-    PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi, PcieDeviceKind,
-    PcieDeviceType, PciePassthroughSpec,
+    Ich9IntelHdaController, IvshmemPlainController, PassthroughGpuController,
+    PassthroughPcieController, PcieAddress, PcieBus, PcieControllerApi, PcieDevice, PcieDeviceApi,
+    PcieDeviceType, StandardGpuController, VirtioGpuController,
 };
 pub use q35::Q35Chipset;
 pub use sata::{
@@ -77,12 +80,4 @@ pub use devices::{
 pub enum Chipset {
     Q35(Q35Chipset),
     I440FX(I440fxChipset),
-}
-impl Chipset {
-    pub fn qemu_args(&self) -> Vec<String> {
-        match self {
-            Chipset::Q35(q35) => q35.qemu_args(),
-            Chipset::I440FX(i440fx) => i440fx.qemu_args(),
-        }
-    }
 }

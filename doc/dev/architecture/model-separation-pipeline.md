@@ -84,7 +84,7 @@ import(source=proxmox.conf, import_host=H1)
 resolve_runtime(canonical_vm=C, runtime_host=H2)
   -> effective_runtime=R
 
-render_qemu_args(runtime=R)
+render_command(runtime=R)
   -> ["-machine", "q35", "-m", "8192", ...]
 ```
 

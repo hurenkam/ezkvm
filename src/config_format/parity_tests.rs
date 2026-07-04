@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use std::{env, fs, path::PathBuf};
+    use std::{collections::BTreeMap, env, fs, path::PathBuf};
 
     use crate::{
         config_format::{
@@ -11,9 +11,20 @@ mod tests {
                 ProxmoxConfigSchema, ProxmoxRuntimeBuilder, ProxmoxSchemaBuilder,
                 ProxmoxStorageConfig,
             },
+            qemu_cmd::runtime_render::render_qemu_command,
         },
         runtime_model::{Chipset, RuntimeModel},
     };
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct VirtioNetSnapshot {
+        id: String,
+        backend: String,
+        mac_address: Option<String>,
+        rx_queue_size: Option<u16>,
+        tx_queue_size: Option<u16>,
+        vhost: Option<bool>,
+    }
 
     #[derive(Debug, PartialEq, Eq)]
     struct SupportedParitySnapshot {
@@ -26,6 +37,7 @@ mod tests {
         uses_uefi: bool,
         scsi_disk_count: usize,
         virtio_net_count: usize,
+        virtio_nets: Vec<VirtioNetSnapshot>,
         guest_agent_enabled: bool,
     }
 
@@ -57,56 +69,105 @@ mod tests {
             .unwrap_or_else(|e| panic!("failed to build runtime from {}: {e}", conf_path.display()))
     }
 
-    fn cpu_topology(cpu_args: &[String]) -> (String, u8, u8) {
-        let mut model = "host".to_string();
-        let mut cores: u8 = 1;
-        let mut sockets: u8 = 1;
-
-        let mut iter = cpu_args.iter();
-        while let Some(arg) = iter.next() {
-            if arg == "-cpu"
-                && let Some(next) = iter.next()
-            {
-                model = next.clone();
-            }
-            if arg == "-smp"
-                && let Some(next) = iter.next()
-            {
-                for token in next.split(',') {
-                    if let Some(value) = token.strip_prefix("cores=") {
-                        cores = value.parse::<u8>().unwrap_or(1);
-                    }
-                    if let Some(value) = token.strip_prefix("sockets=") {
-                        sockets = value.parse::<u8>().unwrap_or(1);
-                    }
-                }
-            }
-        }
-
-        (model, cores, sockets)
+    fn cpu_topology(runtime: &RuntimeModel) -> (String, u8, u8) {
+        (
+            "host".to_string(),
+            runtime.cpu().cores().max(1),
+            runtime.cpu().sockets().max(1),
+        )
     }
 
     fn memory_mb(runtime: &RuntimeModel) -> u64 {
-        for pair in runtime.memory().qemu_args(runtime.cpu()).windows(2) {
-            if let [flag, value] = pair
-                && flag == "-m"
-            {
-                return value
-                    .trim_end_matches('M')
-                    .parse::<u64>()
-                    .unwrap_or_else(|e| panic!("failed to parse -m value '{value}': {e}"));
-            }
-        }
-        panic!("runtime memory args did not contain -m");
+        (runtime.memory().size() / 1024 / 1024) as u64
     }
 
     fn qemu_device_count(command: &[String], needle: &str) -> usize {
         command.iter().filter(|arg| arg.contains(needle)).count()
     }
 
+    fn parse_csv_kv(input: &str) -> BTreeMap<String, String> {
+        let mut map = BTreeMap::new();
+        for token in input.split(',') {
+            let Some((key, value)) = token.split_once('=') else {
+                continue;
+            };
+            map.insert(key.to_string(), value.to_string());
+        }
+        map
+    }
+
+    fn parse_bool(value: &str) -> Option<bool> {
+        match value {
+            "1" | "on" | "true" | "yes" => Some(true),
+            "0" | "off" | "false" | "no" => Some(false),
+            _ => None,
+        }
+    }
+
+    fn virtio_net_snapshots(command: &[String]) -> Vec<VirtioNetSnapshot> {
+        let mut netdev_by_id: BTreeMap<String, (String, Option<bool>)> = BTreeMap::new();
+        let mut snapshots = Vec::new();
+
+        for pair in command.windows(2) {
+            if let [flag, value] = pair
+                && flag == "-netdev"
+            {
+                let params = parse_csv_kv(value);
+                let Some(id) = params.get("id").cloned() else {
+                    continue;
+                };
+
+                let backend = if let Some(bridge) = params.get("br") {
+                    format!("bridge:{bridge}")
+                } else if let Some(tap) = params.get("ifname") {
+                    format!("tap:{tap}")
+                } else {
+                    value.split(',').next().unwrap_or("unknown").to_string()
+                };
+
+                let vhost = params.get("vhost").and_then(|v| parse_bool(v));
+                netdev_by_id.insert(id, (backend, vhost));
+            }
+        }
+
+        for pair in command.windows(2) {
+            if let [flag, value] = pair
+                && flag == "-device"
+                && value.contains("virtio-net-pci")
+            {
+                let params = parse_csv_kv(value);
+                let Some(id) = params.get("id").cloned() else {
+                    continue;
+                };
+                let netdev_id = params.get("netdev").cloned().unwrap_or_else(|| id.clone());
+                let (backend, vhost) = netdev_by_id
+                    .get(&netdev_id)
+                    .cloned()
+                    .unwrap_or_else(|| ("unknown".to_string(), None));
+
+                snapshots.push(VirtioNetSnapshot {
+                    id,
+                    backend,
+                    mac_address: params.get("mac").cloned(),
+                    rx_queue_size: params
+                        .get("rx_queue_size")
+                        .and_then(|value| value.parse::<u16>().ok()),
+                    tx_queue_size: params
+                        .get("tx_queue_size")
+                        .and_then(|value| value.parse::<u16>().ok()),
+                    vhost,
+                });
+            }
+        }
+
+        snapshots.sort_by(|a, b| a.id.cmp(&b.id));
+        snapshots
+    }
+
     fn snapshot_supported_subset(runtime: &RuntimeModel) -> SupportedParitySnapshot {
-        let (cpu_model, cores, sockets) = cpu_topology(&runtime.cpu().qemu_args());
-        let command = runtime.qemu_command();
+        let (cpu_model, cores, sockets) = cpu_topology(runtime);
+        let command = render_qemu_command(runtime)
+            .unwrap_or_else(|e| panic!("failed to render qemu command: {e}"));
 
         SupportedParitySnapshot {
             name: runtime.name().to_string(),
@@ -121,6 +182,7 @@ mod tests {
             uses_uefi: command.iter().any(|arg| arg.contains("if=pflash,unit=1")),
             scsi_disk_count: qemu_device_count(&command, "scsi-hd"),
             virtio_net_count: qemu_device_count(&command, "virtio-net-pci"),
+            virtio_nets: virtio_net_snapshots(&command),
             guest_agent_enabled: command
                 .iter()
                 .any(|arg| arg.contains("org.qemu.guest_agent.0")),
@@ -265,7 +327,8 @@ mod tests {
 
             for conf_path in conf_files {
                 let runtime = runtime_from_conf(&conf_path, &storage_cfg_path);
-                let command = runtime.qemu_command();
+                let command = render_qemu_command(&runtime)
+                    .unwrap_or_else(|e| panic!("failed to render qemu command: {e}"));
                 assert_basic_startup_shape(&command, &conf_path.display().to_string());
                 checked += 1;
             }
@@ -314,7 +377,8 @@ mod tests {
             for conf_path in conf_files {
                 checked += 1;
                 let runtime = runtime_from_conf(&conf_path, &storage_cfg_path);
-                let command = runtime.qemu_command();
+                let command = render_qemu_command(&runtime)
+                    .unwrap_or_else(|e| panic!("failed to render qemu command: {e}"));
                 let missing_paths: Vec<PathBuf> = file_backing_paths_from_qemu_command(&command)
                     .into_iter()
                     .filter(|path| !path.exists())

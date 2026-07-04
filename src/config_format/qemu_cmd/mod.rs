@@ -8,6 +8,7 @@ mod loader;
 mod marshaler;
 mod parser;
 mod runtime_builder;
+pub mod runtime_render;
 mod saver;
 mod schema;
 mod schema_builder;

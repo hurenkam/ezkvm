@@ -14,10 +14,6 @@ use crate::runtime_model::{
     AudioApi, BootModel, BusRegister, Chipset, DisplayApi, GuestAgentApi, TpmApi,
 };
 
-pub trait ControllerApi {
-    fn qemu_args(&self) -> Vec<String>;
-}
-
 #[allow(dead_code)]
 #[derive(Getters, new)]
 pub struct RuntimeModel {
@@ -163,52 +159,11 @@ impl RuntimeModel {
         }
     }
     pub fn start(&self) -> Result<(), String> {
-        println!("qemu command: {}", self.qemu_command_display());
+        println!(
+            "lifecycle action 'start' requested for vm '{}'; execution is not implemented yet",
+            self.name
+        );
         Ok(())
-    }
-
-    pub fn qemu_command(&self) -> Vec<String> {
-        self.generate_qemu_command()
-    }
-
-    pub fn qemu_command_display(&self) -> String {
-        self.qemu_command()
-            .into_iter()
-            .map(|arg| shell_escape(&arg))
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    fn generate_qemu_command(&self) -> Vec<String> {
-        let mut args = vec![
-            "qemu-system-x86_64".to_string(),
-            "-name".to_string(),
-            self.name.clone(),
-        ];
-        args.extend(self.cpu.qemu_args());
-        args.extend(self.memory.qemu_args(&self.cpu));
-        args.extend(self.chipset.qemu_args());
-        args.extend(self.boot.qemu_args());
-        if let Some(smbios_uuid) = &self.smbios_uuid {
-            args.extend(["-smbios".to_string(), format!("type=1,uuid={smbios_uuid}")]);
-        }
-        if let Some(vmgenid) = &self.vmgenid {
-            args.extend(["-device".to_string(), format!("vmgenid,guid={vmgenid}")]);
-        }
-        if let Some(display) = &self.display {
-            args.extend(display.qemu_args());
-        }
-        if let Some(audio) = &self.audio {
-            args.extend(audio.qemu_args());
-        }
-        if let Some(tpm) = &self.tpm {
-            args.extend(tpm.qemu_args(&self.name));
-        }
-        if let Some(guest_agent) = &self.guest_agent {
-            args.extend(guest_agent.qemu_args(&self.name));
-        }
-        args.extend(self.busses.qemu_args());
-        args
     }
     pub fn stop(&self) -> Result<(), String> {
         println!(
@@ -230,16 +185,6 @@ impl RuntimeModel {
             self.name
         );
         Ok(())
-    }
-}
-
-fn shell_escape(arg: &str) -> String {
-    if arg.chars().all(|ch| {
-        ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '/' | ':' | ',' | '=' | '+')
-    }) {
-        arg.to_string()
-    } else {
-        format!("'{}'", arg.replace('\'', "'\\''"))
     }
 }
 

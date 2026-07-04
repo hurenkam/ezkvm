@@ -5,6 +5,7 @@ use crate::{
         SchemaBuilder,
         qemu_cmd::{
             parser::parse_known_fields,
+            runtime_render::render_qemu_command,
             schema::{QemuCommandSchema, QemuKnownFields},
         },
     },
@@ -31,7 +32,8 @@ impl SchemaBuilder for QemuSchemaBuilder {
         let runtime = self.runtime.as_ref().ok_or_else(|| {
             "QemuSchemaBuilder requires a runtime model to build schema".to_string()
         })?;
-        let qemu_command = runtime.qemu_command();
+        let qemu_command = render_qemu_command(runtime)
+            .map_err(|e| format!("runtime qemu rendering failed: {e}"))?;
         let executable = qemu_command
             .first()
             .cloned()

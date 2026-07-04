@@ -6,8 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::runtime_model::UsbDeviceResource;
 
-use super::ControllerApi;
-
 pub type UsbBus = u8;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Hash, Eq, PartialEq, new)]
@@ -51,16 +49,10 @@ impl Display for UsbNetworkController {
     }
 }
 
-impl UsbDeviceApi for UsbNetworkController {
-    fn qemu_args(&self, _bus: &UsbBus, _address: UsbAddress) -> Vec<String> {
-        todo!()
-    }
-}
+impl UsbDeviceApi for UsbNetworkController {}
 
-pub trait UsbDeviceApi: Display {
-    fn qemu_args(&self, bus: &UsbBus, address: UsbAddress) -> Vec<String>;
-}
-pub trait UsbControllerApi: ControllerApi + Display {
+pub trait UsbDeviceApi: Display {}
+pub trait UsbControllerApi: Display {
     fn register_usb_device(
         &self,
         device: Arc<dyn UsbDeviceApi>,

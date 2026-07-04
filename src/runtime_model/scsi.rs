@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use crate::runtime_model::{StorageDeviceKind, StorageResource};
 
-use super::{ControllerApi, PcieDeviceApi};
+use super::PcieDeviceApi;
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
@@ -24,9 +24,8 @@ impl Display for ScsiAddress {
 pub trait ScsiDeviceApi: Display + Send + Sync {
     fn storage_kind(&self) -> StorageDeviceKind;
     fn storage_resource(&self) -> &StorageResource;
-    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String>;
 }
-pub trait ScsiControllerApi: ControllerApi + PcieDeviceApi {
+pub trait ScsiControllerApi: PcieDeviceApi {
     fn register_scsi_device(
         &self,
         device: Arc<dyn ScsiDeviceApi>,
@@ -97,16 +96,6 @@ impl ScsiDeviceApi for super::Hdd {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
-
-    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
-        scsi_drive_args(
-            self.resource(),
-            *assigned_bus,
-            assigned_address,
-            "scsi-hd",
-            false,
-        )
-    }
 }
 
 impl ScsiDeviceApi for super::Ssd {
@@ -116,16 +105,6 @@ impl ScsiDeviceApi for super::Ssd {
 
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
-    }
-
-    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
-        scsi_drive_args(
-            self.resource(),
-            *assigned_bus,
-            assigned_address,
-            "scsi-hd",
-            false,
-        )
     }
 }
 
@@ -137,52 +116,4 @@ impl ScsiDeviceApi for super::Cdrom {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
-
-    fn qemu_args(&self, assigned_bus: &ScsiBus, assigned_address: ScsiAddress) -> Vec<String> {
-        scsi_drive_args(
-            self.resource(),
-            *assigned_bus,
-            assigned_address,
-            "scsi-cd",
-            true,
-        )
-    }
-}
-
-fn scsi_drive_args(
-    resource: &StorageResource,
-    bus: ScsiBus,
-    address: ScsiAddress,
-    device_type: &str,
-    media_cdrom: bool,
-) -> Vec<String> {
-    let drive_id = format!("drive-scsi{}", address.lun);
-    let device_id = format!("scsi{}", address.lun);
-    let mut drive_options = vec![format!("id={drive_id}")];
-
-    match resource {
-        StorageResource::File { file } => drive_options.push(format!("file={file}")),
-        StorageResource::BlockDevice { block_device } => {
-            drive_options.push(format!("file={block_device}"))
-        }
-    }
-
-    drive_options.push("if=none".to_string());
-    drive_options.push("format=raw".to_string());
-    drive_options.push("discard=unmap".to_string());
-    drive_options.push("detect-zeroes=unmap".to_string());
-    if media_cdrom {
-        drive_options.push("media=cdrom".to_string());
-        drive_options.push("readonly=on".to_string());
-    }
-
-    vec![
-        "-drive".to_string(),
-        drive_options.join(","),
-        "-device".to_string(),
-        format!(
-            "{device_type},bus=scsihw{bus}.0,channel=0,scsi-id={},lun={},drive={drive_id},id={device_id}",
-            address.target, address.lun
-        ),
-    ]
 }

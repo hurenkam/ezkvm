@@ -1,49 +1,67 @@
+use std::any::Any;
 use std::fmt::Display;
-use std::vec;
 
-use crate::runtime_model::{NetworkResource, PcieAddress, PcieBus, PcieDeviceApi, PcieDeviceKind};
+use crate::runtime_model::{NetworkResource, PcieAddress, PcieDeviceApi, PcieDeviceType};
 
 #[derive(Default)]
 pub struct VirtioNetController {
     resource: Option<NetworkResource>,
+    mac_address: Option<String>,
+    rx_queue_size: Option<u16>,
+    tx_queue_size: Option<u16>,
+    vhost: Option<bool>,
 }
 
 impl VirtioNetController {
-    pub fn new(resource: Option<NetworkResource>) -> Self {
-        Self { resource }
-    }
-}
-impl PcieDeviceApi for VirtioNetController {
-    fn device_kind(&self) -> PcieDeviceKind {
-        PcieDeviceKind::VirtioNet
+    pub fn new(
+        resource: Option<NetworkResource>,
+        mac_address: Option<String>,
+        rx_queue_size: Option<u16>,
+        tx_queue_size: Option<u16>,
+        vhost: Option<bool>,
+    ) -> Self {
+        Self {
+            resource,
+            mac_address,
+            rx_queue_size,
+            tx_queue_size,
+            vhost,
+        }
     }
 
-    fn network_resource(&self) -> Option<&NetworkResource> {
+    pub fn resource(&self) -> Option<&NetworkResource> {
         self.resource.as_ref()
     }
 
-    fn qemu_args(&self, bus: &PcieBus, address: PcieAddress) -> Vec<String> {
-        let device_id = format!("net{}f{}", address.device(), address.function());
-        let netdev = match &self.resource {
-            Some(NetworkResource::Tap { tap }) => {
-                format!("tap,id={device_id},ifname={tap}")
-            }
-            Some(NetworkResource::Bridge { bridge }) => {
-                format!("bridge,id={device_id},br={bridge}")
-            }
-            None => format!("user,id={device_id}"),
-        };
+    pub fn mac_address(&self) -> Option<&str> {
+        self.mac_address.as_deref()
+    }
 
-        vec![
-            "-netdev".to_string(),
-            netdev,
-            "-device".to_string(),
-            format!(
-                "virtio-net-pci,id={device_id},netdev={device_id},bus=pcie.{bus},addr=0x{:x}.{:x}",
-                address.device(),
-                address.function()
-            ),
-        ]
+    pub fn rx_queue_size(&self) -> Option<u16> {
+        self.rx_queue_size
+    }
+
+    pub fn tx_queue_size(&self) -> Option<u16> {
+        self.tx_queue_size
+    }
+
+    pub fn vhost(&self) -> Option<bool> {
+        self.vhost
+    }
+}
+impl PcieDeviceApi for VirtioNetController {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn device_kind(&self) -> PcieDeviceType {
+        PcieDeviceType::VirtioNet {
+            resource: None,
+            mac_address: self.mac_address.clone(),
+            rx_queue_size: self.rx_queue_size,
+            tx_queue_size: self.tx_queue_size,
+            vhost: self.vhost,
+        }
     }
 
     fn preferred_address(&self) -> Option<PcieAddress> {

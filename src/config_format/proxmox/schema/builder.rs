@@ -18,7 +18,10 @@ use crate::{
             storage_resolver::ProxmoxStorageConfig,
         },
     },
-    runtime_model::RuntimeModel,
+    runtime_model::{
+        Chipset, Display, NetworkResource, QxlGpuController, RuntimeModel, VirtioGpuController,
+        VirtioNetController,
+    },
 };
 
 /// Builds a `ProxmoxConfigSchema` from a `RuntimeModel`.
@@ -71,10 +74,10 @@ impl ProxmoxSchemaBuilder {
             scalar(chipset_name(runtime.chipset())),
         );
 
-        let memory_mb = memory_megabytes(runtime.memory().qemu_args(runtime.cpu()))?;
+        let memory_mb = (runtime.memory().size() / 1024 / 1024) as u64;
         entries.insert("memory".to_string(), scalar(&memory_mb.to_string()));
 
-        let (cpu_model, cores, sockets) = cpu_topology(runtime.cpu().qemu_args());
+        let (cpu_model, cores, sockets) = cpu_topology(runtime);
         entries.insert("cpu".to_string(), scalar(&cpu_model));
         entries.insert("cores".to_string(), scalar(&cores.to_string()));
         entries.insert("sockets".to_string(), scalar(&sockets.to_string()));
@@ -167,11 +170,28 @@ fn map_scsi_devices(
 
             for address in addresses {
                 if let Some(device) = devices.get(&address) {
-                    let args = device.qemu_args(&bus_id, address);
-                    if let Some(value) = scsi_value_from_drive_args(&args, storage) {
-                        entries.insert(format!("scsi{scsi_idx}"), value);
-                        scsi_idx += 1;
-                    }
+                    let token = storage.resource_to_token(device.storage_resource());
+                    let options = if device.storage_kind()
+                        == crate::runtime_model::StorageDeviceKind::Cdrom
+                    {
+                        vec![ProxmoxOption::KeyValue {
+                            key: "media".to_string(),
+                            value: "cdrom".to_string(),
+                        }]
+                    } else {
+                        vec![ProxmoxOption::KeyValue {
+                            key: "cache".to_string(),
+                            value: "writeback".to_string(),
+                        }]
+                    };
+                    entries.insert(
+                        format!("scsi{scsi_idx}"),
+                        ProxmoxValue::Compound(ProxmoxCompoundValue {
+                            head: token,
+                            options,
+                        }),
+                    );
+                    scsi_idx += 1;
                 }
             }
         }
@@ -193,8 +213,7 @@ fn map_net_devices(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxV
 
             for address in addresses {
                 if let Some(device) = devices.get(&address) {
-                    let args = device.qemu_args(&bus_id, address);
-                    if let Some(value) = net_value_from_pcie_args(&args) {
+                    if let Some(value) = net_value_from_pcie_device(device.as_ref()) {
                         entries.insert(format!("net{net_idx}"), value);
                         net_idx += 1;
                     }
@@ -226,18 +245,31 @@ fn map_display(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue
         return;
     };
 
-    let args = display.qemu_args();
-    for window in args.windows(2) {
-        if let [flag, value] = window {
-            if flag == "-spice" {
-                entries.insert("spice".to_string(), scalar(value));
-                return;
+    match display.config() {
+        Display::Spice { spice } => {
+            let listen = if spice.listen().is_empty() {
+                "0.0.0.0".to_string()
+            } else {
+                spice.listen().clone()
+            };
+            let mut value = format!("port={},addr={listen}", spice.port());
+            if *spice.disable_ticketing() {
+                value.push_str(",disable-ticketing=on");
             }
-            if flag == "-vnc" && value != "none" {
-                entries.insert("vnc".to_string(), scalar(value));
-                return;
-            }
+            entries.insert("spice".to_string(), scalar(&value));
         }
+        Display::Vnc { vnc } => {
+            let listen = if vnc.listen().is_empty() {
+                "0.0.0.0"
+            } else {
+                vnc.listen()
+            };
+            entries.insert(
+                "vnc".to_string(),
+                scalar(&format!("{listen}:{}", vnc.port())),
+            );
+        }
+        _ => {}
     }
 }
 
@@ -251,152 +283,113 @@ fn scalar(value: &str) -> ProxmoxValue {
     }
 }
 
-fn chipset_name(chipset: &crate::runtime_model::Chipset) -> &'static str {
+fn chipset_name(chipset: &Chipset) -> &'static str {
     match chipset {
-        crate::runtime_model::Chipset::Q35(_) => "q35",
-        crate::runtime_model::Chipset::I440FX(_) => "i440fx",
+        Chipset::Q35(_) => "q35",
+        Chipset::I440FX(_) => "i440fx",
     }
 }
+fn cpu_topology(runtime: &RuntimeModel) -> (String, u8, u8) {
+    let model = match runtime.cpu().model() {
+        crate::runtime_model::CpuModel::Host => "host".to_string(),
+    };
 
-fn memory_megabytes(memory_args: Vec<String>) -> Result<u64, String> {
-    for window in memory_args.windows(2) {
-        if let [flag, value] = window
-            && flag == "-m"
-        {
-            let stripped = value.trim_end_matches('M');
-            return stripped
-                .parse::<u64>()
-                .map_err(|_| format!("failed to parse memory value '{value}'"));
-        }
-    }
-    Err("memory size not found in qemu args".to_string())
+    (
+        model,
+        runtime.cpu().cores().max(1),
+        runtime.cpu().sockets().max(1),
+    )
 }
 
-fn cpu_topology(cpu_args: Vec<String>) -> (String, u8, u8) {
-    let mut model = "host".to_string();
-    let mut cores: u8 = 1;
-    let mut sockets: u8 = 1;
-
-    let mut iter = cpu_args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "-cpu"
-            && let Some(next) = iter.next()
-        {
-            model = next.clone();
-        }
-        if arg == "-smp"
-            && let Some(next) = iter.next()
-        {
-            for token in next.split(',') {
-                if let Some(v) = token.strip_prefix("cores=") {
-                    cores = v.parse().unwrap_or(1);
-                }
-                if let Some(v) = token.strip_prefix("sockets=") {
-                    sockets = v.parse().unwrap_or(1);
+fn detect_vga(model: &RuntimeModel) -> Option<&'static str> {
+    let mut pci_bus_ids: Vec<_> = model.busses().pci_busses().keys().copied().collect();
+    pci_bus_ids.sort_unstable();
+    for bus_id in pci_bus_ids {
+        if let Some(controller) = model.busses().pci_busses().get(&bus_id) {
+            for device in controller.devices().values() {
+                if device.as_any().is::<QxlGpuController>() {
+                    return Some("qxl");
                 }
             }
         }
     }
 
-    (model, cores, sockets)
-}
-
-fn detect_vga(model: &RuntimeModel) -> Option<&'static str> {
-    if let Some(d) = model.display() {
-        for window in d.qemu_args().windows(2) {
-            if let [flag, value] = window
-                && flag == "-vga"
-            {
-                return match value.as_str() {
-                    "virtio" => Some("virtio"),
-                    "qxl" => Some("qxl"),
-                    "std" => Some("std"),
-                    "vmware" => Some("vmware"),
-                    _ => Some("std"),
-                };
+    let mut pcie_bus_ids: Vec<_> = model.busses().pcie_busses().keys().copied().collect();
+    pcie_bus_ids.sort_unstable();
+    for bus_id in pcie_bus_ids {
+        if let Some(controller) = model.busses().pcie_busses().get(&bus_id) {
+            for device in controller.devices().values() {
+                if device.as_any().is::<VirtioGpuController>() {
+                    return Some("virtio");
+                }
             }
         }
     }
     None
 }
-
-fn scsi_value_from_drive_args(
-    args: &[String],
-    storage: &ProxmoxStorageConfig,
+fn net_value_from_pcie_device(
+    device: &dyn crate::runtime_model::PcieDeviceApi,
 ) -> Option<ProxmoxValue> {
-    use crate::runtime_model::StorageResource;
+    let net = device.as_any().downcast_ref::<VirtioNetController>()?;
+    let mut options = Vec::new();
+    let mut head = "virtio".to_string();
 
-    let drive_value = args
-        .iter()
-        .find(|a| a.contains("file=") && a.contains("if=none"))?;
-
-    let file_path = drive_value
-        .split(',')
-        .find_map(|token| token.strip_prefix("file="))
-        .map(str::to_string)?;
-    let token = storage.resource_to_token(&if file_path.starts_with("/dev/") {
-        StorageResource::BlockDevice {
-            block_device: file_path,
+    match net.resource() {
+        Some(NetworkResource::Bridge { bridge }) => {
+            options.push(ProxmoxOption::KeyValue {
+                key: "bridge".to_string(),
+                value: bridge.clone(),
+            });
         }
-    } else {
-        StorageResource::File { file: file_path }
-    });
+        Some(NetworkResource::Tap { tap }) => {
+            options.push(ProxmoxOption::KeyValue {
+                key: "ifname".to_string(),
+                value: tap.clone(),
+            });
+        }
+        None => return None,
+    }
 
-    let is_cdrom = drive_value.contains("media=cdrom");
+    if let Some(vhost) = net.vhost() {
+        options.push(ProxmoxOption::KeyValue {
+            key: "vhost".to_string(),
+            value: if vhost { "on" } else { "off" }.to_string(),
+        });
+    }
 
-    let options = if is_cdrom {
-        vec![ProxmoxOption::KeyValue {
-            key: "media".to_string(),
-            value: "cdrom".to_string(),
-        }]
-    } else {
-        vec![ProxmoxOption::KeyValue {
-            key: "cache".to_string(),
-            value: "writeback".to_string(),
-        }]
-    };
+    if let Some(mac) = net.mac_address() {
+        head = format!("virtio={mac}");
+    }
+
+    if let Some(rx_queue_size) = net.rx_queue_size() {
+        options.push(ProxmoxOption::KeyValue {
+            key: "rx_queue_size".to_string(),
+            value: rx_queue_size.to_string(),
+        });
+    }
+
+    if let Some(tx_queue_size) = net.tx_queue_size() {
+        options.push(ProxmoxOption::KeyValue {
+            key: "tx_queue_size".to_string(),
+            value: tx_queue_size.to_string(),
+        });
+    }
 
     Some(ProxmoxValue::Compound(ProxmoxCompoundValue {
-        head: token,
+        head,
         options,
-    }))
-}
-
-fn net_value_from_pcie_args(args: &[String]) -> Option<ProxmoxValue> {
-    let netdev_value = args
-        .iter()
-        .find(|a| a.starts_with("bridge,") || a.starts_with("tap,") || a.starts_with("user,"))?;
-
-    let option = if let Some(bridge) = netdev_value.split(',').find_map(|t| t.strip_prefix("br=")) {
-        ProxmoxOption::KeyValue {
-            key: "bridge".to_string(),
-            value: bridge.to_string(),
-        }
-    } else if let Some(tap) = netdev_value
-        .split(',')
-        .find_map(|t| t.strip_prefix("ifname="))
-    {
-        ProxmoxOption::KeyValue {
-            key: "ifname".to_string(),
-            value: tap.to_string(),
-        }
-    } else {
-        return None;
-    };
-
-    Some(ProxmoxValue::Compound(ProxmoxCompoundValue {
-        head: "virtio".to_string(),
-        options: vec![option],
     }))
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::config_format::SchemaBuilder;
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
     use crate::runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, Q35Chipset,
-        RuntimeModel, SeaBiosModel,
+        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Memory, NetworkResource,
+        PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel, SeaBiosModel, VirtioNetController,
     };
 
     fn storage_config() -> ProxmoxStorageConfig {
@@ -444,5 +437,79 @@ dir: local
             }),
             Some("test-vm")
         );
+    }
+
+    #[test]
+    fn exports_network_mac_queue_and_vhost_to_proxmox_net_entry() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "test-net-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        );
+
+        let net: Arc<dyn PcieDeviceApi> = Arc::new(VirtioNetController::new(
+            Some(NetworkResource::Tap {
+                tap: "tap301i0".to_string(),
+            }),
+            Some("AA:BB:CC:DD:EE:FF".to_string()),
+            Some(1024),
+            Some(256),
+            Some(true),
+        ));
+        model
+            .register_pcie_device(0, net, Some(PcieAddress::new(0x10, 0)))
+            .expect("pcie network registration should succeed");
+
+        let schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(model)
+            .build()
+            .expect("schema build should succeed");
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Compound(net0)) =
+            schema.global.entries.get("net0")
+        else {
+            panic!("net0 should be exported as a compound value");
+        };
+
+        assert_eq!(net0.head, "virtio=AA:BB:CC:DD:EE:FF");
+        assert!(net0.options.iter().any(|option| {
+            matches!(
+                option,
+                crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+                if key == "ifname" && value == "tap301i0"
+            )
+        }));
+        assert!(net0.options.iter().any(|option| {
+            matches!(
+                option,
+                crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+                if key == "vhost" && value == "on"
+            )
+        }));
+        assert!(net0.options.iter().any(|option| {
+            matches!(
+                option,
+                crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+                if key == "rx_queue_size" && value == "1024"
+            )
+        }));
+        assert!(net0.options.iter().any(|option| {
+            matches!(
+                option,
+                crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+                if key == "tx_queue_size" && value == "256"
+            )
+        }));
     }
 }

@@ -71,6 +71,7 @@ src/config_format/
 |  |- schema.rs
 |  |- parser.rs
 |  |- runtime_builder.rs
+|  |- runtime_render.rs
 |  |- schema_builder.rs
 |  |- marshaler.rs
 |  |- loader.rs
@@ -204,7 +205,7 @@ Saver --> CLI : Ok / Error
 - Cross-format parity validation currently targets a supported semantic subset (identity, machine/chipset, CPU topology, memory sizing, UEFI presence, baseline storage/network counts, guest-agent flag).
 - Parity tests do not require exact command-line text parity with Proxmox output ordering or every Proxmox-specific runtime literal.
 - Host-gated startup smoke tests are optional (`#[ignore]`) and must be explicitly enabled with `EZKVM_ENABLE_HOST_START_SMOKE=1`.
-- Host-gated startup smoke checks rely on host path preflight and call `RuntimeModel::start()`, which currently validates command assembly and emits the launch command rather than spawning QEMU.
+- Host-gated startup smoke checks rely on host path preflight and call `RuntimeModel::start()`, which currently logs lifecycle intent rather than spawning QEMU.
 
 ## References
 

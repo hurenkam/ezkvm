@@ -5,9 +5,9 @@ use std::{
 };
 
 use super::{
-    BusRegistrationApi, ControllerApi, IdeAddress, IdeControllerApi, IdeDeviceApi, PcieAddress,
-    PcieControllerApi, PcieDeviceApi, SataAddress, SataControllerApi, SataDeviceApi, UsbAddress,
-    UsbControllerApi, UsbDeviceApi,
+    BusRegistrationApi, IdeAddress, IdeControllerApi, IdeDeviceApi, PcieAddress, PcieControllerApi,
+    PcieDeviceApi, SataAddress, SataControllerApi, SataDeviceApi, UsbAddress, UsbControllerApi,
+    UsbDeviceApi,
 };
 
 pub struct Q35Chipset {}
@@ -28,33 +28,10 @@ impl Q35Chipset {
             .expect("Failed to register USB bus");
         Self {}
     }
-    pub fn qemu_args(&self) -> Vec<String> {
-        vec![
-            "-machine".to_string(),
-            "type=q35".to_string(),
-            "-readconfig".to_string(),
-            "/usr/share/qemu-server/pve-q35-4.0.cfg".to_string(),
-            "-nodefaults".to_string(),
-        ]
-    }
 }
 #[derive(Default)]
 pub struct Q35RootPortController {
     pcie_devices: Mutex<HashMap<PcieAddress, Arc<dyn PcieDeviceApi>>>,
-}
-impl ControllerApi for Q35RootPortController {
-    fn qemu_args(&self) -> Vec<String> {
-        let devices = self.pcie_devices.lock().unwrap();
-        let mut args = Vec::new();
-        let mut addresses: Vec<_> = devices.keys().cloned().collect();
-        addresses.sort_by_key(|address| (address.device(), address.function()));
-        for addr in addresses {
-            if let Some(device) = devices.get(&addr) {
-                args.extend(device.qemu_args(&0, addr.clone()));
-            }
-        }
-        args
-    }
 }
 impl PcieControllerApi for Q35RootPortController {
     fn register_pcie_device(
@@ -107,23 +84,6 @@ impl Display for Q35RootPortController {
 pub struct Q35SataController {
     sata_devices: Mutex<HashMap<SataAddress, Arc<dyn SataDeviceApi>>>,
 }
-impl ControllerApi for Q35SataController {
-    fn qemu_args(&self) -> Vec<String> {
-        let devices = self.sata_devices.lock().unwrap();
-        let mut args = vec![
-            "-device".to_string(),
-            "ahci,id=ahci0,bus=pcie.0,addr=0x7".to_string(),
-        ];
-        let mut addresses: Vec<_> = devices.keys().cloned().collect();
-        addresses.sort_by_key(|address| address.address);
-        for addr in addresses {
-            if let Some(device) = devices.get(&addr) {
-                args.extend(device.qemu_args(&0, addr.clone()));
-            }
-        }
-        args
-    }
-}
 impl SataControllerApi for Q35SataController {
     fn register_sata_device(
         &self,
@@ -172,21 +132,6 @@ impl Q35SataController {
 #[derive(Default)]
 pub struct Q35IdeController {
     ide_devices: Mutex<HashMap<IdeAddress, Arc<dyn IdeDeviceApi>>>,
-}
-
-impl ControllerApi for Q35IdeController {
-    fn qemu_args(&self) -> Vec<String> {
-        let devices = self.ide_devices.lock().unwrap();
-        let mut args = Vec::new();
-        let mut addresses: Vec<_> = devices.keys().cloned().collect();
-        addresses.sort_by_key(|address| address.address);
-        for addr in addresses {
-            if let Some(device) = devices.get(&addr) {
-                args.extend(device.qemu_args(&1, addr.clone()));
-            }
-        }
-        args
-    }
 }
 
 impl IdeControllerApi for Q35IdeController {
@@ -239,16 +184,6 @@ impl Q35IdeController {
 #[derive(Default)]
 pub struct Q35UsbController {
     usb_devices: Mutex<HashMap<UsbAddress, Arc<dyn UsbDeviceApi>>>,
-}
-impl ControllerApi for Q35UsbController {
-    fn qemu_args(&self) -> Vec<String> {
-        let devices = self.usb_devices.lock().unwrap();
-        let mut args = Vec::new();
-        for (addr, device) in devices.iter() {
-            args.extend(device.qemu_args(&0, addr.clone()));
-        }
-        args
-    }
 }
 impl UsbControllerApi for Q35UsbController {
     fn register_usb_device(

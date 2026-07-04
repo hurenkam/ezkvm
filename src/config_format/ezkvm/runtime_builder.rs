@@ -318,10 +318,20 @@ fn build_pcie_device(
     resources: &ResourceMaps,
 ) -> Result<Arc<dyn PcieDeviceApi>, String> {
     Ok(match device {
-        PcieDeviceType::VirtioNet { resource } => Arc::new(VirtioNetController::new(
+        PcieDeviceType::VirtioNet {
+            resource,
+            mac_address,
+            rx_queue_size,
+            tx_queue_size,
+            vhost,
+        } => Arc::new(VirtioNetController::new(
             resource
                 .as_ref()
                 .and_then(|id| resources.network.get(id).cloned()),
+            mac_address.clone(),
+            *rx_queue_size,
+            *tx_queue_size,
+            *vhost,
         )),
         PcieDeviceType::Passthrough {
             resource,

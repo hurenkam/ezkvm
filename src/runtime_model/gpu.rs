@@ -15,7 +15,6 @@ pub enum Gpu {
 
 pub trait GpuApi: fmt::Display {
     fn gpu_type(&self) -> &Gpu;
-    fn qemu_args(&self) -> Vec<String>;
 }
 
 pub struct GpuModelBuilder {}
@@ -33,16 +32,6 @@ struct GpuModel {
 impl GpuApi for GpuModel {
     fn gpu_type(&self) -> &Gpu {
         &self.gpu
-    }
-
-    fn qemu_args(&self) -> Vec<String> {
-        match &self.gpu {
-            Gpu::Standard => vec!["-vga".to_string(), "std".to_string()],
-            Gpu::Qxl => vec!["-vga".to_string(), "qxl".to_string()],
-            Gpu::Virtio => vec!["-device".to_string(), "virtio-vga".to_string()],
-            Gpu::Headless => vec!["-vga".to_string(), "none".to_string()],
-            Gpu::Passthrough => vec![],
-        }
     }
 }
 

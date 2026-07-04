@@ -1,10 +1,9 @@
+use std::any::Any;
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
-
-use super::ControllerApi;
 
 pub type PciBus = u8;
 
@@ -45,10 +44,11 @@ impl From<&PciDeviceType> for Arc<dyn PciDeviceApi> {
 }
 
 pub trait PciDeviceApi: Display {
+    fn as_any(&self) -> &dyn Any;
+
     fn preferred_address(&self) -> Option<PciAddress> {
         None
     }
-    fn qemu_args(&self, bus: &PciBus, address: PciAddress) -> Vec<String>;
 }
 
 // GPU Device Controllers
@@ -63,8 +63,8 @@ impl Display for QxlGpuController {
 }
 
 impl PciDeviceApi for QxlGpuController {
-    fn qemu_args(&self, _bus: &PciBus, _address: PciAddress) -> Vec<String> {
-        vec!["-device".to_string(), "qxl".to_string()]
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -78,12 +78,12 @@ impl Display for Ac97Controller {
 }
 
 impl PciDeviceApi for Ac97Controller {
-    fn qemu_args(&self, _bus: &PciBus, _address: PciAddress) -> Vec<String> {
-        vec!["-device".to_string(), "AC97".to_string()]
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
-pub trait PciControllerApi: ControllerApi + Display {
+pub trait PciControllerApi: Display {
     fn register_pci_device(
         &self,
         device: Arc<dyn PciDeviceApi>,

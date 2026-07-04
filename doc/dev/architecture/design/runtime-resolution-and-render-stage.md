@@ -21,7 +21,7 @@ skinparam classAttributeIconSize 0
 class RuntimeResolutionStage << (S,#98FB98) >>
 
 class EffectiveRuntimeModel << (S,#98FB98) >> {
-  +qemu_args: Vec<String>
+  +runtime_state: RuntimeModel
 }
 
 class RenderRequest << (S,#98FB98) >> {
@@ -46,7 +46,7 @@ DeterministicRenderStage ..> EffectiveRuntimeModel
 ## Current Behavior
 
 - Runtime resolution methods are not yet implemented beyond publishing the effective model shape.
-- Deterministic rendering is a pass-through clone of `EffectiveRuntimeModel.qemu_args`.
+- Deterministic rendering consumes effective runtime state and emits deterministic command arguments.
 - The render trait boundary is synchronous and object-safe.
 
 ## Render Flow
@@ -58,9 +58,8 @@ participant "DeterministicRenderStage" as Renderer
 participant "EffectiveRuntimeModel" as Runtime
 
 Caller -> Renderer : render(RenderRequest)
-Renderer -> Runtime : read qemu_args
-Runtime --> Renderer : Vec<String>
-Renderer --> Caller : cloned Vec<String>
+Renderer -> Runtime : read runtime_state
+Renderer --> Caller : Vec<String>
 @enduml
 ```
 

@@ -45,6 +45,7 @@ Each builder accepts the parsed device/boot payload plus the relevant resource m
 
 - SATA/IDE/SCSI device variants carry storage resource ids and are resolved against storage resources.
 - PCIe `virtio_net` optionally carries a network resource id and resolves against network resources.
+- PCIe `virtio_net` additionally supports optional metadata for MAC address, queue sizing (`rx_queue_size`, `tx_queue_size`), and `vhost` offload preference.
 - USB devices are constructed through `UsbDeviceBuilder`; usb resource map is already threaded through for feature growth.
 - Boot model is built from boot config and storage resources.
 - Gpu/display/audio/guest-agent are top-level optional runtime features; they are assembled independently from bus registration and contribute command-line arguments when present.
@@ -212,6 +213,6 @@ RM --> Caller : Err(String)
 ### Current implementation notes
 
 - Lifecycle actions (`start`, `stop`, `reset`, `shutdown`) are scaffolded and currently log intent.
-- `gpu`, `display`, `audio`, and `guest_agent` are now represented as optional top-level runtime features and emitted into qemu args when configured.
-- Several `qemu_args(...)` methods are placeholders and intentionally not fully implemented yet.
+- `gpu`, `display`, `audio`, and `guest_agent` are represented as optional top-level runtime features.
+- Runtime model is qemu-agnostic. QEMU command rendering is owned by `src/config_format/qemu_cmd/runtime_render.rs`.
 - Validation of duplicate/missing resource references lives in runtime config validation, while runtime model conversion performs final lookup enforcement.
