@@ -131,6 +131,15 @@ Supported conversions:
   - maps file and block-device resources back to storage tokens when possible
   - falls back to absolute path text when no mapping exists
 
+## Assumptions And Limitations
+
+- Proxmox import/export currently focuses on the shared supported subset used by runtime parity tests rather than full Proxmox command-line equivalence.
+- `storage.cfg` presence is required for runtime import and export paths because token-to-path and path-to-token conversion depends on it.
+- Runtime import reads only the global Proxmox section for active VM configuration; snapshot sections are parsed by schema but not materialized as runtime variants.
+- Runtime export does not currently reconstruct TPM config fields from runtime into Proxmox schema.
+- Runtime export does not currently emit snapshot sections from runtime state.
+- Some Proxmox runtime literals remain intentionally out of scope in current mapping (for example full lifecycle/QMP daemonization and advanced blockdev layering parity).
+
 ## Class Diagram (PlantUML)
 
 ```plantuml

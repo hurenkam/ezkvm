@@ -198,6 +198,14 @@ Saver --> CLI : Ok / Error
 @enduml
 ```
 
+## Assumptions And Limitations
+
+- The input fixture corpus under `input/` is treated as read-only reference material for parity and regression tests.
+- Cross-format parity validation currently targets a supported semantic subset (identity, machine/chipset, CPU topology, memory sizing, UEFI presence, baseline storage/network counts, guest-agent flag).
+- Parity tests do not require exact command-line text parity with Proxmox output ordering or every Proxmox-specific runtime literal.
+- Host-gated startup smoke tests are optional (`#[ignore]`) and must be explicitly enabled with `EZKVM_ENABLE_HOST_START_SMOKE=1`.
+- Host-gated startup smoke checks rely on host path preflight and call `RuntimeModel::start()`, which currently validates command assembly and emits the launch command rather than spawning QEMU.
+
 ## References
 
 - `src/README.md`
