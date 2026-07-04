@@ -19,9 +19,9 @@ use crate::{
         },
     },
     runtime_model::{
-        Chipset, Display, NetworkResource, QxlGpuController, RuntimeModel, StorageDeviceKind,
-        UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
-        VirtioGpuController, VirtioNetController,
+        Chipset, CpuModel, Display, NetworkResource, QxlGpuController, RuntimeModel,
+        StorageCachePolicy, StorageDeviceKind, StorageDeviceOptions, UsbHostByBusPortController,
+        UsbHostByIdController, UsbTabletController, VirtioGpuController, VirtioNetController,
     },
 };
 
@@ -177,7 +177,7 @@ fn map_scsi_devices(
             for address in addresses {
                 if let Some(device) = devices.get(&address) {
                     let token = storage.resource_to_token(device.storage_resource());
-                    let options = if device.storage_kind()
+                    let mut options = if device.storage_kind()
                         == crate::runtime_model::StorageDeviceKind::Cdrom
                     {
                         vec![ProxmoxOption::KeyValue {
@@ -190,6 +190,7 @@ fn map_scsi_devices(
                             value: "writeback".to_string(),
                         }]
                     };
+                    append_storage_device_options(device.options(), &mut options);
                     entries.insert(
                         format!("scsi{scsi_idx}"),
                         ProxmoxValue::Compound(ProxmoxCompoundValue {
@@ -226,7 +227,7 @@ fn map_ide_devices(
 
                 let proxmox_index = 2 + address.address as usize;
                 let token = storage.resource_to_token(device.storage_resource());
-                let options = if device.storage_kind() == StorageDeviceKind::Cdrom {
+                let mut options = if device.storage_kind() == StorageDeviceKind::Cdrom {
                     vec![ProxmoxOption::KeyValue {
                         key: "media".to_string(),
                         value: "cdrom".to_string(),
@@ -237,6 +238,7 @@ fn map_ide_devices(
                         value: "writeback".to_string(),
                     }]
                 };
+                append_storage_device_options(device.options(), &mut options);
 
                 entries.insert(
                     format!("ide{proxmox_index}"),
@@ -498,15 +500,66 @@ fn chipset_name(chipset: &Chipset) -> &'static str {
     }
 }
 fn cpu_topology(runtime: &RuntimeModel) -> (String, u8, u8) {
-    let model = match runtime.cpu().model() {
-        crate::runtime_model::CpuModel::Host => "host".to_string(),
+    let mut model = match runtime.cpu().model() {
+        CpuModel::Host => "host".to_string(),
+        CpuModel::Named { name } => name.clone(),
     };
+
+    for feature in runtime.cpu().enabled_features() {
+        if !feature.trim().is_empty() {
+            model.push_str(&format!(",+{}", feature.trim()));
+        }
+    }
+    for feature in runtime.cpu().disabled_features() {
+        if !feature.trim().is_empty() {
+            model.push_str(&format!(",-{}", feature.trim()));
+        }
+    }
 
     (
         model,
         runtime.cpu().cores().max(1),
         runtime.cpu().sockets().max(1),
     )
+}
+
+fn append_storage_device_options(options: &StorageDeviceOptions, fields: &mut Vec<ProxmoxOption>) {
+    if let Some(cache_policy) = *options.cache_policy() {
+        fields.retain(
+            |option| !matches!(option, ProxmoxOption::KeyValue { key, .. } if key == "cache"),
+        );
+        fields.push(ProxmoxOption::KeyValue {
+            key: "cache".to_string(),
+            value: cache_policy_to_proxmox(cache_policy).to_string(),
+        });
+    }
+
+    if let Some(rotation_rate) = *options.rotation_rate() {
+        fields.push(ProxmoxOption::KeyValue {
+            key: "rotation_rate".to_string(),
+            value: rotation_rate.to_string(),
+        });
+    }
+
+    if let Some(boot_index) = *options.boot_index() {
+        fields.push(ProxmoxOption::KeyValue {
+            key: "bootindex".to_string(),
+            value: boot_index.to_string(),
+        });
+    }
+
+    if let Some(device_id) = options.device_id().as_ref()
+        && !device_id.trim().is_empty()
+    {
+        fields.push(ProxmoxOption::KeyValue {
+            key: "serial".to_string(),
+            value: device_id.trim().to_string(),
+        });
+    }
+}
+
+fn cache_policy_to_proxmox(policy: StorageCachePolicy) -> &'static str {
+    policy.as_proxmox_value()
 }
 
 fn detect_vga(model: &RuntimeModel) -> Option<&'static str> {
@@ -597,10 +650,11 @@ mod tests {
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
     use crate::runtime_model::{
         BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display,
-        DisplayModelBuilder, IdeAddress, IdeDeviceBuilder, IdeDeviceType, LifecycleConfig, Memory,
-        NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel, SeaBiosModel,
-        SerialConfig, StorageResource, UsbAddress, UsbHostByBusPortController,
-        UsbHostByIdController, UsbTabletController, VirtioNetController,
+        DisplayModelBuilder, Hdd, IdeAddress, IdeDeviceBuilder, IdeDeviceType, LifecycleConfig,
+        Memory, NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel,
+        SeaBiosModel, SerialConfig, StorageCachePolicy, StorageDeviceOptions, StorageResource,
+        UsbAddress, UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
+        VirtioNetController,
     };
 
     fn storage_config() -> ProxmoxStorageConfig {
@@ -1007,6 +1061,85 @@ dir: local
             option,
             crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
             if key == "path" && value == "/run/qemu/test-device-vm.serial0"
+        )));
+    }
+
+    #[test]
+    fn exports_cpu_feature_flags_and_storage_advanced_options() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "test-phase4-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1)
+                .with_features(vec!["kvm_pv_eoi".to_string()], vec!["vmx".to_string()]),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        );
+
+        let options = StorageDeviceOptions::from_parts(
+            Some(7200),
+            Some(1),
+            Some("DISK-SN-01".to_string()),
+            Some(StorageCachePolicy::None),
+        );
+        model
+            .register_ide_device(
+                0,
+                Arc::new(Hdd::with_options(
+                    StorageResource::File {
+                        file: "/var/lib/vz/images/test.raw".to_string(),
+                    },
+                    options,
+                )),
+                Some(IdeAddress::new(0)),
+            )
+            .expect("IDE registration should succeed");
+
+        let schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(model)
+            .build()
+            .expect("schema build should succeed");
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Scalar { value }) =
+            schema.global.entries.get("cpu")
+        else {
+            panic!("cpu should be exported as scalar");
+        };
+        assert!(value.contains("+kvm_pv_eoi"));
+        assert!(value.contains("-vmx"));
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Compound(ide2)) =
+            schema.global.entries.get("ide2")
+        else {
+            panic!("ide2 should be exported as compound value");
+        };
+        assert!(ide2.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "cache" && value == "none"
+        )));
+        assert!(ide2.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "rotation_rate" && value == "7200"
+        )));
+        assert!(ide2.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "bootindex" && value == "1"
+        )));
+        assert!(ide2.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "serial" && value == "DISK-SN-01"
         )));
     }
 }

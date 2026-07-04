@@ -33,7 +33,7 @@ pub use display::{
 pub use gpu::{Gpu, GpuApi, GpuModelBuilder};
 pub use guest_agent::{GuestAgent, GuestAgentApi, GuestAgentModelBuilder};
 pub use lifecycle::LifecycleConfig;
-pub use model::RuntimeModel;
+pub use model::{PowerManagementConfig, RuntimeModel};
 pub use resources::{
     NetworkResource, PciDeviceResource, PcieDeviceResource, Resource, StorageResource,
     UsbDeviceResource,
@@ -85,7 +85,9 @@ pub use devices::{
     // PCI & PCIe devices:
     PvScsiController,
     Ssd,
+    StorageCachePolicy,
     StorageDeviceKind,
+    StorageDeviceOptions,
     VirtioNetController,
 };
 

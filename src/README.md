@@ -30,6 +30,7 @@ Current Proxmox mapping also handles `agent` -> guest-agent, `vga` -> runtime GP
 Current Proxmox mapping also preserves hugepages/NUMA memory policy (`hugepages`, `numa`) into runtime memory backend rendering.
 Current Proxmox mapping now models `hostpci*` passthrough devices via `host.resources[].pcie` entries, and links VM-side passthrough devices through `virtual_machine.devices[].pcie.resource`.
 Current Proxmox mapping also imports and exports lifecycle/monitoring configuration (`pidfile`, `daemonize`, `no-shutdown`, and QMP monitor socket fields) through the runtime model and QEMU rendering path.
+Current Proxmox mapping also preserves advanced CPU tuning in the `cpu` field (custom model plus `+feature`/`-feature` flags), and per-disk advanced options where representable (`cache`, `rotation_rate`, `bootindex`, `serial`).
 
 5. Import ezkvm config and export as libvirt xml:
 ```ezkvm convert --input.type ezkvm --input.host /etc/ezkvm/host.yaml --input.vm <name>.yaml --output.type libvirt --output.vm <name>.xml```
@@ -37,6 +38,12 @@ Current Proxmox mapping also imports and exports lifecycle/monitoring configurat
 6. Standalone export subcommand:
 ```ezkvm export --output.type proxmox --output.storage /etc/pve/storage.cfg --output.vm <name>.conf```
 This subcommand is currently a placeholder and returns an error. Use `convert` for import+export flow.
+
+QEMU command import/export now also preserves advanced tuning options where present:
+- CPU model + feature flags from `-cpu model,+feature,-feature`
+- power management globals from `-global ICH9-LPC.disable_s3=...` and `-global ICH9-LPC.disable_s4=...`
+- iSCSI initiator name from `-iscsi initiator-name=...`
+- per-disk cache and metadata options (`cache`, `rotation_rate`, `bootindex`, `serial`) on rendered storage devices
 
 ### Runtime operations
 1. Show runtime:

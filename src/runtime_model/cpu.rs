@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 pub enum CpuModel {
     #[default]
     Host,
+    Named {
+        name: String,
+    },
 }
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize, Debug, Clone, Default, new)]
@@ -13,6 +16,12 @@ pub struct Cpu {
     cores: u8,
     threads: u8,
     sockets: u8,
+    #[serde(default)]
+    #[new(default)]
+    enabled_features: Vec<String>,
+    #[serde(default)]
+    #[new(default)]
+    disabled_features: Vec<String>,
 }
 
 impl Cpu {
@@ -30,6 +39,20 @@ impl Cpu {
 
     pub fn sockets(&self) -> u8 {
         self.sockets
+    }
+
+    pub fn enabled_features(&self) -> &[String] {
+        &self.enabled_features
+    }
+
+    pub fn disabled_features(&self) -> &[String] {
+        &self.disabled_features
+    }
+
+    pub fn with_features(mut self, enabled: Vec<String>, disabled: Vec<String>) -> Self {
+        self.enabled_features = enabled;
+        self.disabled_features = disabled;
+        self
     }
 
     fn normalized_cores(&self) -> u8 {

@@ -4,7 +4,7 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_model::{StorageDeviceKind, StorageResource};
+use crate::runtime_model::{StorageDeviceKind, StorageDeviceOptions, StorageResource};
 
 pub type IdeBus = u8;
 
@@ -76,6 +76,10 @@ impl IdeDeviceApi for super::Hdd {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
+    }
 }
 
 impl IdeDeviceApi for super::Ssd {
@@ -85,6 +89,10 @@ impl IdeDeviceApi for super::Ssd {
 
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
+    }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
     }
 }
 
@@ -96,11 +104,16 @@ impl IdeDeviceApi for super::Cdrom {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
+    }
 }
 
 pub trait IdeDeviceApi: Display {
     fn storage_kind(&self) -> StorageDeviceKind;
     fn storage_resource(&self) -> &StorageResource;
+    fn options(&self) -> &StorageDeviceOptions;
 }
 
 pub trait IdeControllerApi: Display {

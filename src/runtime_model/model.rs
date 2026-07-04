@@ -16,6 +16,21 @@ use crate::runtime_model::{
 
 use super::qmp::execute_qmp_command;
 
+#[derive(Debug, Clone, Default, Getters)]
+pub struct PowerManagementConfig {
+    disable_s3: Option<bool>,
+    disable_s4: Option<bool>,
+}
+
+impl PowerManagementConfig {
+    pub fn new(disable_s3: Option<bool>, disable_s4: Option<bool>) -> Self {
+        Self {
+            disable_s3,
+            disable_s4,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Getters)]
 pub struct RuntimeModel {
@@ -33,6 +48,8 @@ pub struct RuntimeModel {
     lifecycle_config: Option<LifecycleConfig>,
     balloon_config: Option<BalloonConfig>,
     serial_config: Option<SerialConfig>,
+    iscsi_initiator: Option<String>,
+    power_management_config: Option<PowerManagementConfig>,
     busses: BusRegister,
 }
 #[allow(dead_code)] // TODO: wire to CLI
@@ -67,6 +84,8 @@ impl RuntimeModel {
             lifecycle_config: None,
             balloon_config: None,
             serial_config: None,
+            iscsi_initiator: None,
+            power_management_config: None,
             busses,
         }
     }
@@ -83,6 +102,19 @@ impl RuntimeModel {
 
     pub fn with_serial_config(mut self, serial_config: Option<SerialConfig>) -> Self {
         self.serial_config = serial_config;
+        self
+    }
+
+    pub fn with_iscsi_initiator(mut self, iscsi_initiator: Option<String>) -> Self {
+        self.iscsi_initiator = iscsi_initiator;
+        self
+    }
+
+    pub fn with_power_management_config(
+        mut self,
+        power_management_config: Option<PowerManagementConfig>,
+    ) -> Self {
+        self.power_management_config = power_management_config;
         self
     }
 
@@ -315,6 +347,19 @@ impl Display for RuntimeModel {
             f,
             "  Serial: {}",
             match &self.serial_config {
+                Some(_) => "configured".to_string(),
+                None => "none".to_string(),
+            }
+        )?;
+        writeln!(
+            f,
+            "  iSCSI Initiator: {}",
+            self.iscsi_initiator.as_deref().unwrap_or("none")
+        )?;
+        writeln!(
+            f,
+            "  Power Mgmt: {}",
+            match &self.power_management_config {
                 Some(_) => "configured".to_string(),
                 None => "none".to_string(),
             }

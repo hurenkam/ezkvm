@@ -3,8 +3,9 @@ use crate::runtime_model::{
     Ich9IntelHdaController, IvshmemPlainController, Memory, NetworkResource,
     PassthroughGpuController, PassthroughPcieController, PcieAddress, PcieDeviceApi,
     PvScsiController, QxlGpuController, RuntimeModel, ScsiAddress, ScsiControllerApi,
-    StandardGpuController, StorageDeviceKind, StorageResource, UsbHostByBusPortController,
-    UsbHostByIdController, UsbTabletController, VirtioGpuController, VirtioNetController,
+    StandardGpuController, StorageCachePolicy, StorageDeviceKind, StorageDeviceOptions,
+    StorageResource, UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
+    VirtioGpuController, VirtioNetController,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -32,6 +33,7 @@ struct StorageBackendConfig {
     read_only: bool,
     detect_zeroes_unmap: bool,
     discard_unmap: bool,
+    cache_policy: Option<StorageCachePolicy>,
     throttle_group: Option<ThrottleGroupConfig>,
 }
 
@@ -94,6 +96,8 @@ pub fn render_qemu_command(runtime: &RuntimeModel) -> Result<Vec<String>, String
     args.extend(render_serial_args(runtime));
 
     args.extend(render_lifecycle_args(runtime));
+    args.extend(render_power_management_args(runtime));
+    args.extend(render_iscsi_args(runtime));
 
     args.extend(render_bus_args(runtime));
 
@@ -135,8 +139,23 @@ pub fn render_memory_args(memory: &Memory, cpu: &Cpu) -> Vec<String> {
 
 fn render_cpu_args(cpu: &Cpu) -> Vec<String> {
     let model_name = match cpu.model() {
-        CpuModel::Host => "host",
+        CpuModel::Host => "host".to_string(),
+        CpuModel::Named { name } => name.clone(),
     };
+
+    let mut cpu_spec = model_name;
+    for feature in cpu.enabled_features().iter().map(String::as_str) {
+        let feature = feature.trim();
+        if !feature.is_empty() {
+            cpu_spec.push_str(&format!(",+{feature}"));
+        }
+    }
+    for feature in cpu.disabled_features().iter().map(String::as_str) {
+        let feature = feature.trim();
+        if !feature.is_empty() {
+            cpu_spec.push_str(&format!(",-{feature}"));
+        }
+    }
 
     let sockets = cpu.sockets().max(1);
     let cores = cpu.cores().max(1);
@@ -145,7 +164,7 @@ fn render_cpu_args(cpu: &Cpu) -> Vec<String> {
 
     vec![
         "-cpu".to_string(),
-        model_name.to_string(),
+        cpu_spec,
         "-smp".to_string(),
         format!("{total_vcpus},sockets={sockets},cores={cores},threads={threads}"),
     ]
@@ -346,6 +365,43 @@ fn render_lifecycle_args(runtime: &RuntimeModel) -> Vec<String> {
     args
 }
 
+fn render_power_management_args(runtime: &RuntimeModel) -> Vec<String> {
+    let Some(config) = runtime.power_management_config().as_ref() else {
+        return Vec::new();
+    };
+
+    let mut args = Vec::new();
+    if let Some(disable_s3) = config.disable_s3() {
+        args.extend([
+            "-global".to_string(),
+            format!("ICH9-LPC.disable_s3={}", if *disable_s3 { 1 } else { 0 }),
+        ]);
+    }
+    if let Some(disable_s4) = config.disable_s4() {
+        args.extend([
+            "-global".to_string(),
+            format!("ICH9-LPC.disable_s4={}", if *disable_s4 { 1 } else { 0 }),
+        ]);
+    }
+
+    args
+}
+
+fn render_iscsi_args(runtime: &RuntimeModel) -> Vec<String> {
+    let Some(initiator_name) = runtime.iscsi_initiator().as_ref() else {
+        return Vec::new();
+    };
+
+    if initiator_name.trim().is_empty() {
+        return Vec::new();
+    }
+
+    vec![
+        "-iscsi".to_string(),
+        format!("initiator-name={}", initiator_name.trim()),
+    ]
+}
+
 fn render_balloon_args(runtime: &RuntimeModel) -> Vec<String> {
     let Some(config) = runtime.balloon_config().as_ref() else {
         return Vec::new();
@@ -450,6 +506,7 @@ fn render_bus_args(runtime: &RuntimeModel) -> Vec<String> {
                     args.extend(render_sata_drive_args(
                         device.storage_resource(),
                         address.address,
+                        device.options(),
                     ));
                 }
             }
@@ -470,6 +527,7 @@ fn render_bus_args(runtime: &RuntimeModel) -> Vec<String> {
                         1,
                         address.address,
                         device.storage_kind(),
+                        device.options(),
                     ));
                 }
             }
@@ -647,6 +705,7 @@ fn render_pvscsi_device(
                 0,
                 scsi_addr,
                 device.storage_kind(),
+                device.options(),
             ));
         }
     }
@@ -754,6 +813,7 @@ fn render_ide_drive_args(
     bus: u8,
     unit: u8,
     kind: StorageDeviceKind,
+    options: &StorageDeviceOptions,
 ) -> Vec<String> {
     let backend_id = format!("drive-ide{unit}");
     let device_id = format!("ide{unit}");
@@ -762,21 +822,28 @@ fn render_ide_drive_args(
         StorageDeviceKind::Hdd | StorageDeviceKind::Ssd => "ide-hd",
     };
 
-    let backend = build_storage_backend_config(backend_id, resource, kind, false, false, None);
+    let backend =
+        build_storage_backend_config(backend_id, resource, kind, false, false, options, None);
 
     let mut args = render_storage_backend_args(&backend);
-    args.extend([
-        "-device".to_string(),
-        format!(
-            "{device_type},bus=ide.{bus},unit={unit},drive={},id={device_id}",
-            backend.node_name
-        ),
-    ]);
+    let mut device_fields = vec![
+        device_type.to_string(),
+        format!("bus=ide.{bus}"),
+        format!("unit={unit}"),
+        format!("drive={}", backend.node_name),
+        format!("id={device_id}"),
+    ];
+    append_storage_device_options(options, &mut device_fields);
+    args.extend(["-device".to_string(), device_fields.join(",")]);
 
     args
 }
 
-fn render_sata_drive_args(resource: &StorageResource, address: u8) -> Vec<String> {
+fn render_sata_drive_args(
+    resource: &StorageResource,
+    address: u8,
+    options: &StorageDeviceOptions,
+) -> Vec<String> {
     let backend_id = format!("drive-sata{address}");
     let device_id = format!("sata{address}");
     let backend = build_storage_backend_config(
@@ -785,17 +852,19 @@ fn render_sata_drive_args(resource: &StorageResource, address: u8) -> Vec<String
         StorageDeviceKind::Hdd,
         true,
         true,
+        options,
         None,
     );
 
     let mut args = render_storage_backend_args(&backend);
-    args.extend([
-        "-device".to_string(),
-        format!(
-            "ide-hd,id={device_id},drive={},bus=ahci0.{address}",
-            backend.node_name
-        ),
-    ]);
+    let mut device_fields = vec![
+        "ide-hd".to_string(),
+        format!("id={device_id}"),
+        format!("drive={}", backend.node_name),
+        format!("bus=ahci0.{address}"),
+    ];
+    append_storage_device_options(options, &mut device_fields);
+    args.extend(["-device".to_string(), device_fields.join(",")]);
 
     args
 }
@@ -805,6 +874,7 @@ fn render_scsi_drive_args(
     bus: u8,
     address: ScsiAddress,
     kind: StorageDeviceKind,
+    options: &StorageDeviceOptions,
 ) -> Vec<String> {
     let backend_id = format!("drive-scsi{}", address.lun);
     let device_id = format!("scsi{}", address.lun);
@@ -814,16 +884,21 @@ fn render_scsi_drive_args(
         StorageDeviceKind::Hdd | StorageDeviceKind::Ssd => "scsi-hd",
     };
 
-    let backend = build_storage_backend_config(backend_id, resource, kind, true, true, None);
+    let backend =
+        build_storage_backend_config(backend_id, resource, kind, true, true, options, None);
 
     let mut args = render_storage_backend_args(&backend);
-    args.extend([
-        "-device".to_string(),
-        format!(
-            "{device_type},bus=scsihw{bus}.0,channel=0,scsi-id={},lun={},drive={},id={device_id}",
-            address.target, address.lun, backend.node_name
-        ),
-    ]);
+    let mut device_fields = vec![
+        device_type.to_string(),
+        format!("bus=scsihw{bus}.0"),
+        "channel=0".to_string(),
+        format!("scsi-id={}", address.target),
+        format!("lun={}", address.lun),
+        format!("drive={}", backend.node_name),
+        format!("id={device_id}"),
+    ];
+    append_storage_device_options(options, &mut device_fields);
+    args.extend(["-device".to_string(), device_fields.join(",")]);
 
     args
 }
@@ -834,6 +909,7 @@ fn build_storage_backend_config(
     kind: StorageDeviceKind,
     discard_unmap: bool,
     detect_zeroes_unmap: bool,
+    options: &StorageDeviceOptions,
     throttle_group: Option<ThrottleGroupConfig>,
 ) -> StorageBackendConfig {
     let file_path = match resource {
@@ -849,6 +925,7 @@ fn build_storage_backend_config(
         read_only: kind == StorageDeviceKind::Cdrom,
         detect_zeroes_unmap,
         discard_unmap,
+        cache_policy: *options.cache_policy(),
         throttle_group,
     }
 }
@@ -877,6 +954,9 @@ fn render_storage_backend_args(config: &StorageBackendConfig) -> Vec<String> {
     }
     if config.detect_zeroes_unmap {
         backend_fields.push("detect-zeroes=unmap".to_string());
+    }
+    if let Some(cache_policy) = config.cache_policy {
+        backend_fields.push(format!("cache={}", cache_policy.as_qemu_cache_value()));
     }
     if let Some(group) = &config.throttle_group {
         backend_fields.push(format!("throttle-group={}", group.id));
@@ -924,6 +1004,20 @@ fn format_pcie_addr(address: &PcieAddress) -> String {
     }
 }
 
+fn append_storage_device_options(options: &StorageDeviceOptions, fields: &mut Vec<String>) {
+    if let Some(rotation_rate) = *options.rotation_rate() {
+        fields.push(format!("rotation_rate={rotation_rate}"));
+    }
+    if let Some(boot_index) = *options.boot_index() {
+        fields.push(format!("bootindex={boot_index}"));
+    }
+    if let Some(device_id) = options.device_id().as_ref()
+        && !device_id.trim().is_empty()
+    {
+        fields.push(format!("serial={}", device_id.trim()));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -931,8 +1025,9 @@ mod tests {
     use crate::config_format::qemu_cmd::runtime_render::render_qemu_command;
     use crate::runtime_model::{
         BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display,
-        DisplayModelBuilder, LifecycleConfig, Memory, PcieAddress, PcieDeviceApi, Q35Chipset,
-        Q35UsbController, RuntimeModel, ScsiAddress, SeaBiosModel, SerialConfig, StorageDeviceKind,
+        DisplayModelBuilder, LifecycleConfig, Memory, PcieAddress, PcieDeviceApi,
+        PowerManagementConfig, Q35Chipset, Q35UsbController, RuntimeModel, ScsiAddress,
+        SeaBiosModel, SerialConfig, StorageCachePolicy, StorageDeviceKind, StorageDeviceOptions,
         StorageResource, UsbAddress, UsbControllerApi, UsbDeviceApi, UsbHostByBusPortController,
         UsbHostByIdController, UsbTabletController, VirtioGpuController,
     };
@@ -951,6 +1046,7 @@ mod tests {
             0,
             ScsiAddress::new(0, 0),
             StorageDeviceKind::Ssd,
+            &StorageDeviceOptions::default(),
         );
 
         assert!(args.iter().any(|arg| arg == "-blockdev"));
@@ -972,6 +1068,7 @@ mod tests {
             StorageDeviceKind::Hdd,
             true,
             true,
+            &StorageDeviceOptions::default(),
             Some(ThrottleGroupConfig {
                 id: "tg-scsi2".to_string(),
                 limits: StorageThrottleLimits {
@@ -992,6 +1089,71 @@ mod tests {
             args.iter()
                 .any(|arg| arg.contains("throttle-group=tg-scsi2"))
         );
+    }
+
+    #[test]
+    fn renders_cpu_features_power_globals_and_iscsi() {
+        let mut bus_register = BusRegister::new();
+        let runtime = RuntimeModel::new(
+            "phase4-vm".to_string(),
+            Cpu::new(
+                CpuModel::Named {
+                    name: "Skylake-Client".to_string(),
+                },
+                4,
+                1,
+                1,
+            )
+            .with_features(vec!["kvm_pv_eoi".to_string()], vec!["vmx".to_string()]),
+            Memory::megabytes(4096),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        )
+        .with_iscsi_initiator(Some("iqn.1993-08.org.debian:01:c58d3b2cb8dd".to_string()))
+        .with_power_management_config(Some(PowerManagementConfig::new(Some(true), Some(false))));
+
+        let args = render_qemu_command(&runtime).expect("qemu render should succeed");
+        assert!(args.iter().any(|arg| {
+            arg.contains("Skylake-Client") && arg.contains("+kvm_pv_eoi") && arg.contains("-vmx")
+        }));
+        assert!(args.iter().any(|arg| arg == "ICH9-LPC.disable_s3=1"));
+        assert!(args.iter().any(|arg| arg == "ICH9-LPC.disable_s4=0"));
+        assert!(
+            args.iter()
+                .any(|arg| arg == "initiator-name=iqn.1993-08.org.debian:01:c58d3b2cb8dd")
+        );
+    }
+
+    #[test]
+    fn renders_storage_cache_and_metadata_options() {
+        let options = StorageDeviceOptions::from_parts(
+            Some(7200),
+            Some(3),
+            Some("DISK-SERIAL-01".to_string()),
+            Some(StorageCachePolicy::None),
+        );
+
+        let args = render_scsi_drive_args(
+            &StorageResource::File {
+                file: "/var/lib/vm/disk1.raw".to_string(),
+            },
+            0,
+            ScsiAddress::new(0, 1),
+            StorageDeviceKind::Hdd,
+            &options,
+        );
+
+        assert!(args.iter().any(|arg| arg.contains("cache=none")));
+        assert!(args.iter().any(|arg| arg.contains("rotation_rate=7200")));
+        assert!(args.iter().any(|arg| arg.contains("bootindex=3")));
+        assert!(args.iter().any(|arg| arg.contains("serial=DISK-SERIAL-01")));
     }
 
     #[test]

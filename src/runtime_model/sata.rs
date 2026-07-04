@@ -4,7 +4,9 @@ use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime_model::{Cdrom, Hdd, Ssd, StorageDeviceKind, StorageResource};
+use crate::runtime_model::{
+    Cdrom, Hdd, Ssd, StorageDeviceKind, StorageDeviceOptions, StorageResource,
+};
 
 pub type SataBus = u8;
 
@@ -64,6 +66,7 @@ impl SataDeviceBuilder {
 pub trait SataDeviceApi: Display {
     fn storage_kind(&self) -> StorageDeviceKind;
     fn storage_resource(&self) -> &StorageResource;
+    fn options(&self) -> &StorageDeviceOptions;
 }
 
 pub trait SataControllerApi: Display {
@@ -91,6 +94,10 @@ impl SataDeviceApi for Hdd {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
+    }
 }
 
 impl SataDeviceApi for Ssd {
@@ -101,6 +108,10 @@ impl SataDeviceApi for Ssd {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
+    }
 }
 
 impl SataDeviceApi for Cdrom {
@@ -110,5 +121,9 @@ impl SataDeviceApi for Cdrom {
 
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
+    }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
     }
 }

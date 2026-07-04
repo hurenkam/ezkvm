@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::Arc};
 
-use crate::runtime_model::{StorageDeviceKind, StorageResource};
+use crate::runtime_model::{StorageDeviceKind, StorageDeviceOptions, StorageResource};
 
 use super::PcieDeviceApi;
 use derive_getters::Getters;
@@ -24,6 +24,7 @@ impl Display for ScsiAddress {
 pub trait ScsiDeviceApi: Display + Send + Sync {
     fn storage_kind(&self) -> StorageDeviceKind;
     fn storage_resource(&self) -> &StorageResource;
+    fn options(&self) -> &StorageDeviceOptions;
 }
 pub trait ScsiControllerApi: PcieDeviceApi {
     fn register_scsi_device(
@@ -96,6 +97,10 @@ impl ScsiDeviceApi for super::Hdd {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
+    }
 }
 
 impl ScsiDeviceApi for super::Ssd {
@@ -106,6 +111,10 @@ impl ScsiDeviceApi for super::Ssd {
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
     }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
+    }
 }
 
 impl ScsiDeviceApi for super::Cdrom {
@@ -115,5 +124,9 @@ impl ScsiDeviceApi for super::Cdrom {
 
     fn storage_resource(&self) -> &StorageResource {
         self.resource()
+    }
+
+    fn options(&self) -> &StorageDeviceOptions {
+        self.options()
     }
 }

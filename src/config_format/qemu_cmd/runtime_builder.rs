@@ -4,9 +4,10 @@
 use crate::{
     config_format::{RuntimeBuilder, qemu_cmd::schema::QemuCommandSchema},
     runtime_model::{
-        BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder,
-        EglHeadless, GuestAgentModelBuilder, I440fxChipset, LifecycleConfig, Memory, Q35Chipset,
-        RuntimeModel, SeaBiosModel, SerialConfig, Spice, Vnc,
+        BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel,
+        DisplayModelBuilder, EglHeadless, GuestAgentModelBuilder, I440fxChipset, LifecycleConfig,
+        Memory, PowerManagementConfig, Q35Chipset, RuntimeModel, SeaBiosModel, SerialConfig, Spice,
+        Vnc,
     },
 };
 
@@ -35,12 +36,15 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
             .clone()
             .unwrap_or_else(|| "qemu-vm".to_string());
 
+        let (cpu_model, enabled_features, disabled_features) =
+            parse_cpu_model_and_features(schema.known.cpu_model.as_deref());
         let cpu = Cpu::new(
-            parse_cpu_model(schema.known.cpu_model.as_deref()),
+            cpu_model,
             schema.known.cores.unwrap_or(1),
             schema.known.threads.unwrap_or(1),
             schema.known.sockets.unwrap_or(1),
-        );
+        )
+        .with_features(enabled_features, disabled_features);
 
         let memory = Memory::megabytes(schema.known.memory_mb.unwrap_or(1024) as usize);
 
@@ -59,6 +63,8 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
         let lifecycle = parse_lifecycle(&schema.args);
         let balloon = parse_balloon(&schema.args);
         let serial = parse_serial(&schema.args);
+        let iscsi_initiator = parse_iscsi_initiator(&schema.args);
+        let power_management = parse_power_management(&schema.args);
         register_gpu_from_args(&schema.args, &bus_register)?;
 
         Ok(RuntimeModel::new(
@@ -77,7 +83,9 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
         )
         .with_lifecycle_config(lifecycle)
         .with_balloon_config(balloon)
-        .with_serial_config(serial))
+        .with_serial_config(serial)
+        .with_iscsi_initiator(iscsi_initiator)
+        .with_power_management_config(power_management))
     }
 }
 
@@ -111,11 +119,83 @@ fn parse_machine_chipset(machine: Option<&str>) -> MachineChipset {
     MachineChipset::Q35
 }
 
-fn parse_cpu_model(model: Option<&str>) -> crate::runtime_model::CpuModel {
-    match model {
-        Some("host") | None => crate::runtime_model::CpuModel::Host,
-        Some(_) => crate::runtime_model::CpuModel::Host,
+fn parse_cpu_model_and_features(model: Option<&str>) -> (CpuModel, Vec<String>, Vec<String>) {
+    let Some(spec) = model else {
+        return (CpuModel::Host, Vec::new(), Vec::new());
+    };
+
+    let mut parts = spec
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty());
+    let base = parts.next().unwrap_or("host");
+    let model = if base.eq_ignore_ascii_case("host") {
+        CpuModel::Host
+    } else {
+        CpuModel::Named {
+            name: base.to_string(),
+        }
+    };
+
+    let mut enabled = Vec::new();
+    let mut disabled = Vec::new();
+    for part in parts {
+        if let Some(feature) = part.strip_prefix('+')
+            && !feature.trim().is_empty()
+        {
+            enabled.push(feature.trim().to_string());
+        }
+        if let Some(feature) = part.strip_prefix('-')
+            && !feature.trim().is_empty()
+        {
+            disabled.push(feature.trim().to_string());
+        }
     }
+
+    (model, enabled, disabled)
+}
+
+fn parse_iscsi_initiator(args: &[String]) -> Option<String> {
+    for window in args.windows(2) {
+        if let [flag, value] = window
+            && flag == "-iscsi"
+        {
+            for token in value.split(',').map(str::trim) {
+                if let Some(name) = token.strip_prefix("initiator-name=") {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        return Some(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn parse_power_management(args: &[String]) -> Option<PowerManagementConfig> {
+    let mut disable_s3 = None;
+    let mut disable_s4 = None;
+
+    for window in args.windows(2) {
+        if let [flag, value] = window
+            && flag == "-global"
+        {
+            if let Some(raw) = value.strip_prefix("ICH9-LPC.disable_s3=") {
+                disable_s3 = Some(matches!(raw.trim(), "1" | "on" | "true"));
+            }
+            if let Some(raw) = value.strip_prefix("ICH9-LPC.disable_s4=") {
+                disable_s4 = Some(matches!(raw.trim(), "1" | "on" | "true"));
+            }
+        }
+    }
+
+    if disable_s3.is_none() && disable_s4.is_none() {
+        return None;
+    }
+
+    Some(PowerManagementConfig::new(disable_s3, disable_s4))
 }
 
 fn parse_display(args: &[String]) -> Option<crate::runtime_model::Display> {
@@ -721,5 +801,48 @@ mod tests {
                 .iter()
                 .any(|arg| arg.contains("isa-serial,chardev=serial0"))
         );
+    }
+
+    #[test]
+    fn imports_cpu_features_power_globals_and_iscsi_from_args() {
+        let cmd = "qemu-system-x86_64 -name vm-phase4 -m 2048 -cpu Skylake-Client,+kvm_pv_eoi,-vmx -smp 2,sockets=1,cores=2,threads=1 -global ICH9-LPC.disable_s3=1 -global ICH9-LPC.disable_s4=0 -iscsi initiator-name=iqn.1993-08.org.debian:01:c58d3b2cb8dd";
+        let schema = QemuParser.parse(cmd).expect("command should parse");
+
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
+            .expect("runtime build should succeed");
+
+        match runtime.cpu().model() {
+            crate::runtime_model::CpuModel::Named { name } => {
+                assert_eq!(name, "Skylake-Client")
+            }
+            _ => panic!("expected named CPU model"),
+        }
+        assert!(
+            runtime
+                .cpu()
+                .enabled_features()
+                .iter()
+                .any(|feature| feature == "kvm_pv_eoi")
+        );
+        assert!(
+            runtime
+                .cpu()
+                .disabled_features()
+                .iter()
+                .any(|feature| feature == "vmx")
+        );
+        assert_eq!(
+            runtime.iscsi_initiator().as_deref(),
+            Some("iqn.1993-08.org.debian:01:c58d3b2cb8dd")
+        );
+
+        let power = runtime
+            .power_management_config()
+            .as_ref()
+            .expect("power management should be imported");
+        assert_eq!(power.disable_s3(), &Some(true));
+        assert_eq!(power.disable_s4(), &Some(false));
     }
 }
