@@ -119,7 +119,7 @@ mod tests {
         );
 
         let output = "/tmp/ezkvm-test-qemu-export-identity.cmd";
-        let _ = QemuSaver
+        QemuSaver
             .save(
                 runtime,
                 QemuOutputArgs {

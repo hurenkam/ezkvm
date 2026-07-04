@@ -1,4 +1,5 @@
 mod builder;
+#[allow(clippy::module_inception)]
 mod schema;
 
 pub use builder::ProxmoxSchemaBuilder;

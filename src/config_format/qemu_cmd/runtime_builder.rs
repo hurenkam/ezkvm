@@ -4,9 +4,9 @@
 use crate::{
     config_format::{RuntimeBuilder, qemu_cmd::schema::QemuCommandSchema},
     runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder, EglHeadless,
-        GuestAgentModelBuilder, I440fxChipset, LifecycleConfig, Memory, Q35Chipset, RuntimeModel,
-        SeaBiosModel, Spice, Vnc,
+        BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, DisplayModelBuilder,
+        EglHeadless, GuestAgentModelBuilder, I440fxChipset, LifecycleConfig, Memory, Q35Chipset,
+        RuntimeModel, SeaBiosModel, SerialConfig, Spice, Vnc,
     },
 };
 
@@ -57,6 +57,8 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
         let smbios_uuid = parse_smbios_uuid(&schema.args);
         let vmgenid = parse_vmgenid(&schema.args);
         let lifecycle = parse_lifecycle(&schema.args);
+        let balloon = parse_balloon(&schema.args);
+        let serial = parse_serial(&schema.args);
         register_gpu_from_args(&schema.args, &bus_register)?;
 
         Ok(RuntimeModel::new(
@@ -73,7 +75,9 @@ impl RuntimeBuilder for QemuRuntimeBuilder {
             guest_agent.map(GuestAgentModelBuilder::build),
             bus_register,
         )
-        .with_lifecycle_config(lifecycle))
+        .with_lifecycle_config(lifecycle)
+        .with_balloon_config(balloon)
+        .with_serial_config(serial))
     }
 }
 
@@ -364,6 +368,64 @@ fn parse_lifecycle(args: &[String]) -> Option<LifecycleConfig> {
     ))
 }
 
+fn parse_balloon(args: &[String]) -> Option<BalloonConfig> {
+    for window in args.windows(2) {
+        if let [flag, value] = window
+            && flag == "-device"
+            && value.starts_with("virtio-balloon-pci")
+        {
+            let mut free_page_reporting = false;
+            for token in value.split(',').map(str::trim) {
+                if let Some(v) = token.strip_prefix("free-page-reporting=") {
+                    free_page_reporting = matches!(v, "on" | "1" | "true");
+                }
+            }
+
+            return Some(BalloonConfig::new(true, free_page_reporting));
+        }
+    }
+
+    None
+}
+
+fn parse_serial(args: &[String]) -> Option<SerialConfig> {
+    let mut socket_path: Option<String> = None;
+    let mut server = true;
+    let mut wait = false;
+
+    for window in args.windows(2) {
+        if let [flag, value] = window
+            && flag == "-chardev"
+            && value.contains("id=serial0")
+            && value.starts_with("socket")
+        {
+            for token in value.split(',').map(str::trim) {
+                if let Some(v) = token.strip_prefix("path=")
+                    && !v.is_empty()
+                {
+                    socket_path = Some(v.to_string());
+                }
+                if let Some(v) = token.strip_prefix("server=") {
+                    server = matches!(v, "on" | "1" | "true");
+                }
+                if let Some(v) = token.strip_prefix("wait=") {
+                    wait = matches!(v, "on" | "1" | "true");
+                }
+            }
+        }
+    }
+
+    let serial_device_present = args.iter().any(|arg| {
+        arg.contains("isa-serial") && arg.contains("chardev=serial0")
+            || arg.contains("chardev:serial0")
+    });
+    if !serial_device_present {
+        return None;
+    }
+
+    Some(SerialConfig::new(socket_path, server, wait))
+}
+
 // ---------------------------------------------------------------------------
 // GPU registration
 // ---------------------------------------------------------------------------
@@ -619,6 +681,45 @@ mod tests {
             rendered
                 .iter()
                 .any(|arg| arg.contains("socket,id=qmp-event,path=/run/qemu/vm-lifecycle.event"))
+        );
+    }
+
+    #[test]
+    fn imports_balloon_and_serial_from_args() {
+        let cmd = "qemu-system-x86_64 -name vm-devices -m 2048 -cpu host -smp 2,sockets=1,cores=2,threads=1 -device virtio-balloon-pci,id=balloon0,free-page-reporting=on -chardev socket,id=serial0,path=/run/qemu/vm-devices.serial0,server=on,wait=off -device isa-serial,chardev=serial0";
+        let schema = QemuParser.parse(cmd).expect("command should parse");
+
+        let runtime = QemuRuntimeBuilder::default()
+            .with_schema(schema)
+            .build()
+            .expect("runtime build should succeed");
+
+        let balloon = runtime
+            .balloon_config()
+            .as_ref()
+            .expect("balloon config should be imported");
+        assert!(*balloon.enabled());
+        assert!(*balloon.free_page_reporting());
+
+        let serial = runtime
+            .serial_config()
+            .as_ref()
+            .expect("serial config should be imported");
+        assert_eq!(
+            serial.socket_path().as_deref(),
+            Some("/run/qemu/vm-devices.serial0")
+        );
+        assert!(*serial.server());
+        assert!(!*serial.wait());
+
+        let rendered = render_qemu_command(&runtime).expect("qemu render should succeed");
+        assert!(rendered.iter().any(
+            |arg| arg.contains("virtio-balloon-pci") && arg.contains("free-page-reporting=on")
+        ));
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("isa-serial,chardev=serial0"))
         );
     }
 }

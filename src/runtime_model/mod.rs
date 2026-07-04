@@ -1,4 +1,5 @@
 mod audio;
+mod balloon;
 mod boot;
 mod bus_register;
 mod cpu;
@@ -18,10 +19,12 @@ mod qmp;
 mod resources;
 mod sata;
 mod scsi;
+mod serial;
 mod tpm;
 mod usb;
 
 pub use audio::{Audio, AudioApi, AudioBackend, AudioController, AudioModelBuilder};
+pub use balloon::BalloonConfig;
 #[allow(unused_imports)] // TODO: wire to CLI
 pub use display::{
     Display, DisplayApi, DisplayModelBuilder, EglHeadless, Gtk, LookingGlass, Sdl, Spice, Vnc,
@@ -35,6 +38,7 @@ pub use resources::{
     NetworkResource, PciDeviceResource, PcieDeviceResource, Resource, StorageResource,
     UsbDeviceResource,
 };
+pub use serial::SerialConfig;
 
 pub use boot::{BiosModel, BootModel, SeaBiosModel, UefiModel};
 pub use bus_register::{BusRegister, BusRegistrationApi};

@@ -90,6 +90,7 @@ fn build_proxmox_runtime(
     let collected = resource_collection::collect_resources(global, storage_config)?;
     let storage_resources = collected.storage_resources;
     let scsi_disks = collected.scsi_disks;
+    let ide_disks = collected.ide_disks;
     let net_devices = collected.net_devices;
     let hostpci_devices = collected.hostpci_devices;
     let usb_resources = collected.usb_resources;
@@ -128,6 +129,7 @@ fn build_proxmox_runtime(
     };
 
     device_registration::register_scsi_devices(&mut bus_register, &scsi_disks, &storage_resources)?;
+    device_registration::register_ide_devices(&bus_register, &ide_disks, &storage_resources)?;
     device_registration::register_network_devices(&bus_register, &net_devices)?;
     device_registration::register_hostpci_devices(&bus_register, &hostpci_devices)?;
     device_registration::register_usb_devices(
@@ -156,7 +158,9 @@ fn build_proxmox_runtime(
             .map(crate::runtime_model::GuestAgentModelBuilder::build),
         bus_register,
     )
-    .with_lifecycle_config(parsed.lifecycle_config))
+    .with_lifecycle_config(parsed.lifecycle_config)
+    .with_balloon_config(parsed.balloon_config)
+    .with_serial_config(parsed.serial_config))
 }
 
 // ---------------------------------------------------------------------------
@@ -167,13 +171,13 @@ mod device_registration {
     use std::sync::Arc;
 
     use crate::runtime_model::{
-        BusRegister, BusRegistrationApi, PciDeviceApi, PciDeviceType, PcieAddress, PcieDeviceApi,
-        PcieDeviceType, PvScsiController, ScsiAddress, ScsiControllerApi, ScsiDeviceBuilder,
-        ScsiDeviceType, StorageResource, UsbAddress, UsbDeviceBuilder, UsbDeviceResource,
-        UsbDeviceType, VirtioNetController,
+        BusRegister, BusRegistrationApi, IdeAddress, IdeDeviceBuilder, IdeDeviceType, PciDeviceApi,
+        PciDeviceType, PcieAddress, PcieDeviceApi, PcieDeviceType, PvScsiController, ScsiAddress,
+        ScsiControllerApi, ScsiDeviceBuilder, ScsiDeviceType, StorageResource, UsbAddress,
+        UsbDeviceBuilder, UsbDeviceResource, UsbDeviceType, VirtioNetController,
     };
 
-    use super::parse_helpers::{ProxmoxNetDevice, ProxmoxScsiKind};
+    use super::parse_helpers::{ProxmoxIdeKind, ProxmoxNetDevice, ProxmoxScsiKind};
 
     pub(super) fn register_scsi_devices(
         bus_register: &mut BusRegister,
@@ -229,6 +233,36 @@ mod device_registration {
                 Some(root) => root.register_pcie_device(pcie_device, preferred)?,
                 None => return Err("PCIe root bus with id 0 does not exist".to_string()),
             }
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn register_ide_devices(
+        bus_register: &BusRegister,
+        ide_disks: &[(usize, StorageResource, ProxmoxIdeKind)],
+        storage_resources: &std::collections::HashMap<String, StorageResource>,
+    ) -> Result<(), String> {
+        if ide_disks.is_empty() {
+            return Ok(());
+        }
+
+        let Some(root) = bus_register.ide_busses().get(&0) else {
+            return Err("IDE root bus with id 0 does not exist".to_string());
+        };
+
+        for (index, _storage, kind) in ide_disks {
+            let resource = format!("ide{index}");
+            let device_type = match kind {
+                ProxmoxIdeKind::Cdrom => IdeDeviceType::Cdrom { resource },
+                ProxmoxIdeKind::Ssd => IdeDeviceType::Ssd { resource },
+                ProxmoxIdeKind::Hdd => IdeDeviceType::Hdd { resource },
+            };
+            let device = IdeDeviceBuilder::build(&device_type, storage_resources)?;
+
+            // Q35 IDE secondary channel maps to Proxmox ide2 (unit 0) and ide3 (unit 1).
+            let unit = index.saturating_sub(2) as u8;
+            root.register_ide_device(device, Some(IdeAddress::new(unit)))?;
         }
 
         Ok(())
@@ -327,14 +361,14 @@ mod device_registration {
 mod field_parsing {
     use crate::{
         config_format::proxmox::schema::ProxmoxValue,
-        runtime_model::{Display, GuestAgent, LifecycleConfig},
+        runtime_model::{BalloonConfig, Display, GuestAgent, LifecycleConfig, SerialConfig},
     };
 
     use super::parse_helpers::{
         ProxmoxGpu, extract_machine_token, extract_scalar_string, extract_scalar_u8,
-        extract_scalar_u64, parse_display, parse_gpu, parse_guest_agent, parse_hugepages_kb,
-        parse_lifecycle_config, parse_numa_enabled, parse_smbios_uuid, parse_tablet_enabled,
-        parse_vmgenid,
+        extract_scalar_u64, parse_balloon_config, parse_display, parse_gpu, parse_guest_agent,
+        parse_hugepages_kb, parse_lifecycle_config, parse_numa_enabled, parse_serial_config,
+        parse_smbios_uuid, parse_tablet_enabled, parse_vmgenid,
     };
 
     pub(super) struct ParsedGlobalConfig {
@@ -349,6 +383,8 @@ mod field_parsing {
         pub guest_agent: Option<GuestAgent>,
         pub tablet_enabled: bool,
         pub lifecycle_config: Option<LifecycleConfig>,
+        pub balloon_config: Option<BalloonConfig>,
+        pub serial_config: Option<SerialConfig>,
         pub gpu: Option<ProxmoxGpu>,
         pub smbios_uuid: Option<String>,
         pub vmgenid: Option<String>,
@@ -372,6 +408,8 @@ mod field_parsing {
         let guest_agent = parse_guest_agent(global);
         let tablet_enabled = parse_tablet_enabled(global);
         let lifecycle_config = parse_lifecycle_config(global);
+        let balloon_config = parse_balloon_config(global);
+        let serial_config = parse_serial_config(global);
         let gpu = parse_gpu(global);
         let smbios_uuid = parse_smbios_uuid(global);
         let vmgenid = parse_vmgenid(global);
@@ -403,6 +441,8 @@ mod field_parsing {
             guest_agent,
             tablet_enabled,
             lifecycle_config,
+            balloon_config,
+            serial_config,
             gpu,
             smbios_uuid,
             vmgenid,
@@ -420,13 +460,15 @@ mod resource_collection {
     };
 
     use super::parse_helpers::{
-        ProxmoxNetDevice, ProxmoxScsiKind, collect_hostpci_devices, collect_network_devices,
-        collect_scsi_devices, collect_usb_devices, parse_storage_field,
+        ProxmoxIdeKind, ProxmoxNetDevice, ProxmoxScsiKind, collect_hostpci_devices,
+        collect_ide_devices, collect_network_devices, collect_scsi_devices, collect_usb_devices,
+        parse_storage_field,
     };
 
     pub(super) struct CollectedResources {
         pub storage_resources: HashMap<String, StorageResource>,
         pub scsi_disks: Vec<(usize, StorageResource, ProxmoxScsiKind)>,
+        pub ide_disks: Vec<(usize, StorageResource, ProxmoxIdeKind)>,
         pub net_devices: Vec<(usize, ProxmoxNetDevice)>,
         pub hostpci_devices: Vec<(usize, PcieDeviceType)>,
         pub usb_resources: HashMap<String, UsbDeviceResource>,
@@ -453,6 +495,12 @@ mod resource_collection {
             storage_resources.insert(format!("scsi{index}"), storage.clone());
         }
 
+        let mut ide_disks = collect_ide_devices(global, storage_config)?;
+        ide_disks.sort_by_key(|(idx, _, _)| *idx);
+        for (index, storage, _) in &ide_disks {
+            storage_resources.insert(format!("ide{index}"), storage.clone());
+        }
+
         let mut net_devices = collect_network_devices(global)?;
         net_devices.sort_by_key(|(idx, _)| *idx);
 
@@ -472,6 +520,7 @@ mod resource_collection {
         Ok(CollectedResources {
             storage_resources,
             scsi_disks,
+            ide_disks,
             net_devices,
             hostpci_devices,
             usb_resources,
@@ -489,8 +538,8 @@ mod parse_helpers {
             storage_resolver::ProxmoxStorageConfig,
         },
         runtime_model::{
-            CpuModel, Display, GuestAgent, LifecycleConfig, NetworkResource, PcieDeviceType,
-            StorageResource, UsbDeviceResource,
+            BalloonConfig, CpuModel, Display, GuestAgent, LifecycleConfig, NetworkResource,
+            PcieDeviceType, SerialConfig, StorageResource, UsbDeviceResource,
         },
     };
 
@@ -512,6 +561,13 @@ mod parse_helpers {
 
     #[derive(Clone, Copy)]
     pub(super) enum ProxmoxScsiKind {
+        Hdd,
+        Ssd,
+        Cdrom,
+    }
+
+    #[derive(Clone, Copy)]
+    pub(super) enum ProxmoxIdeKind {
         Hdd,
         Ssd,
         Cdrom,
@@ -611,6 +667,63 @@ mod parse_helpers {
             qmp_socket,
             qmp_event_socket,
         ))
+    }
+
+    pub(super) fn parse_balloon_config(
+        entries: &BTreeMap<String, ProxmoxValue>,
+    ) -> Option<BalloonConfig> {
+        let value = entries.get("balloon")?;
+        let (enabled, free_page_reporting) = match value {
+            ProxmoxValue::Scalar { value } => {
+                let enabled = value.trim() != "0";
+                (enabled, false)
+            }
+            ProxmoxValue::Compound(compound) => {
+                let enabled = compound.head.trim() != "0";
+                let free_page_reporting = option_value(compound, "free-page-reporting")
+                    .and_then(parse_proxmox_bool)
+                    .unwrap_or(false);
+                (enabled, free_page_reporting)
+            }
+        };
+
+        Some(BalloonConfig::new(enabled, free_page_reporting))
+    }
+
+    pub(super) fn parse_serial_config(
+        entries: &BTreeMap<String, ProxmoxValue>,
+    ) -> Option<SerialConfig> {
+        let value = entries.get("serial0")?;
+        match value {
+            ProxmoxValue::Scalar { value } => {
+                let token = value.trim();
+                if token.eq_ignore_ascii_case("socket") {
+                    Some(SerialConfig::new(None, true, false))
+                } else {
+                    None
+                }
+            }
+            ProxmoxValue::Compound(compound) => {
+                let mode = compound.head.trim();
+                if !mode.eq_ignore_ascii_case("socket") {
+                    return None;
+                }
+
+                let socket_path = option_value(compound, "path")
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToString::to_string);
+
+                let server = option_value(compound, "server")
+                    .and_then(parse_proxmox_bool)
+                    .unwrap_or(true);
+                let wait = option_value(compound, "wait")
+                    .and_then(parse_proxmox_bool)
+                    .unwrap_or(false);
+
+                Some(SerialConfig::new(socket_path, server, wait))
+            }
+        }
     }
 
     pub(super) fn parse_smbios_uuid(entries: &BTreeMap<String, ProxmoxValue>) -> Option<String> {
@@ -881,6 +994,49 @@ mod parse_helpers {
                     }
                 }
                 ProxmoxValue::Scalar { .. } => ProxmoxScsiKind::Hdd,
+            };
+
+            out.push((index, storage, kind));
+        }
+        Ok(out)
+    }
+
+    pub(super) fn collect_ide_devices(
+        entries: &BTreeMap<String, ProxmoxValue>,
+        storage_config: &ProxmoxStorageConfig,
+    ) -> Result<Vec<(usize, StorageResource, ProxmoxIdeKind)>, String> {
+        let mut out = Vec::new();
+        for (key, value) in entries {
+            let Some(suffix) = key.strip_prefix("ide") else {
+                continue;
+            };
+            if suffix.is_empty() || !suffix.chars().all(|ch| ch.is_ascii_digit()) {
+                continue;
+            }
+            let index = suffix
+                .parse::<usize>()
+                .map_err(|_| format!("invalid ide index in key '{key}'"))?;
+
+            // Current runtime IDE renderer models secondary channel units only.
+            if index < 2 {
+                continue;
+            }
+
+            let Some(storage) = parse_storage_field(Some(value), storage_config) else {
+                continue;
+            };
+
+            let kind = match value {
+                ProxmoxValue::Compound(compound) => {
+                    if has_option(compound, "media", "cdrom") {
+                        ProxmoxIdeKind::Cdrom
+                    } else if has_option(compound, "ssd", "1") {
+                        ProxmoxIdeKind::Ssd
+                    } else {
+                        ProxmoxIdeKind::Hdd
+                    }
+                }
+                ProxmoxValue::Scalar { .. } => ProxmoxIdeKind::Hdd,
             };
 
             out.push((index, storage, kind));
@@ -1761,6 +1917,42 @@ qmp-event-socket: /run/qemu/lifecycle-vm.event
             rendered
                 .iter()
                 .any(|arg| arg.contains("socket,id=qmp-event,path=/run/qemu/lifecycle-vm.event"))
+        );
+    }
+
+    #[test]
+    fn imports_ide_balloon_and_serial_fields() {
+        let model = build(
+            r#"
+name: devices-vm
+memory: 4096
+machine: q35
+cpu: host
+cores: 2
+sockets: 1
+ide2: local:iso/debian.iso,media=cdrom
+balloon: 1,free-page-reporting=on
+serial0: socket,path=/run/qemu/devices-vm.serial0,server=on,wait=off
+"#,
+        );
+
+        let rendered = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(rendered.iter().any(|arg| arg.contains("ide-cd")
+            && arg.contains("bus=ide.1")
+            && arg.contains("unit=0")));
+        assert!(rendered.iter().any(
+            |arg| arg.contains("virtio-balloon-pci") && arg.contains("free-page-reporting=on")
+        ));
+        assert!(rendered.iter().any(|arg| {
+            arg.contains("socket,id=serial0")
+                && arg.contains("path=/run/qemu/devices-vm.serial0")
+                && arg.contains("server=on")
+                && arg.contains("wait=off")
+        }));
+        assert!(
+            rendered
+                .iter()
+                .any(|arg| arg.contains("isa-serial,chardev=serial0"))
         );
     }
 }

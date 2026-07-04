@@ -90,6 +90,9 @@ pub fn render_qemu_command(runtime: &RuntimeModel) -> Result<Vec<String>, String
         ]);
     }
 
+    args.extend(render_balloon_args(runtime));
+    args.extend(render_serial_args(runtime));
+
     args.extend(render_lifecycle_args(runtime));
 
     args.extend(render_bus_args(runtime));
@@ -341,6 +344,48 @@ fn render_lifecycle_args(runtime: &RuntimeModel) -> Vec<String> {
     }
 
     args
+}
+
+fn render_balloon_args(runtime: &RuntimeModel) -> Vec<String> {
+    let Some(config) = runtime.balloon_config().as_ref() else {
+        return Vec::new();
+    };
+    if !*config.enabled() {
+        return Vec::new();
+    }
+
+    vec![
+        "-device".to_string(),
+        format!(
+            "virtio-balloon-pci,id=balloon0,free-page-reporting={}",
+            if *config.free_page_reporting() {
+                "on"
+            } else {
+                "off"
+            }
+        ),
+    ]
+}
+
+fn render_serial_args(runtime: &RuntimeModel) -> Vec<String> {
+    let Some(config) = runtime.serial_config().as_ref() else {
+        return Vec::new();
+    };
+
+    let Some(socket_path) = config.socket_path() else {
+        return Vec::new();
+    };
+
+    vec![
+        "-chardev".to_string(),
+        format!(
+            "socket,id=serial0,path={socket_path},server={},wait={}",
+            if *config.server() { "on" } else { "off" },
+            if *config.wait() { "on" } else { "off" }
+        ),
+        "-device".to_string(),
+        "isa-serial,chardev=serial0".to_string(),
+    ]
 }
 
 fn render_bus_args(runtime: &RuntimeModel) -> Vec<String> {
@@ -885,11 +930,11 @@ mod tests {
 
     use crate::config_format::qemu_cmd::runtime_render::render_qemu_command;
     use crate::runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
-        LifecycleConfig, Memory, PcieAddress, PcieDeviceApi, Q35Chipset, Q35UsbController,
-        RuntimeModel, ScsiAddress, SeaBiosModel, StorageDeviceKind, StorageResource, UsbAddress,
-        UsbControllerApi, UsbDeviceApi, UsbHostByBusPortController, UsbHostByIdController,
-        UsbTabletController, VirtioGpuController,
+        BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display,
+        DisplayModelBuilder, LifecycleConfig, Memory, PcieAddress, PcieDeviceApi, Q35Chipset,
+        Q35UsbController, RuntimeModel, ScsiAddress, SeaBiosModel, SerialConfig, StorageDeviceKind,
+        StorageResource, UsbAddress, UsbControllerApi, UsbDeviceApi, UsbHostByBusPortController,
+        UsbHostByIdController, UsbTabletController, VirtioGpuController,
     };
 
     use super::{
@@ -1064,6 +1109,46 @@ mod tests {
         assert!(
             args.iter()
                 .any(|arg| arg == "chardev=qmp-event,mode=control")
+        );
+    }
+
+    #[test]
+    fn renders_balloon_and_serial_devices_when_configured() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "device-vm".to_string(),
+            Cpu::new(CpuModel::Host, 2, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        )
+        .with_balloon_config(Some(BalloonConfig::new(true, true)))
+        .with_serial_config(Some(SerialConfig::new(
+            Some("/run/qemu/device-vm.serial0".to_string()),
+            true,
+            false,
+        )));
+
+        let args = render_qemu_command(&model).expect("qemu render should succeed");
+        assert!(args.iter().any(
+            |arg| arg.contains("virtio-balloon-pci") && arg.contains("free-page-reporting=on")
+        ));
+        assert!(args.iter().any(|arg| {
+            arg.contains("socket,id=serial0")
+                && arg.contains("path=/run/qemu/device-vm.serial0")
+                && arg.contains("server=on")
+                && arg.contains("wait=off")
+        }));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("isa-serial,chardev=serial0"))
         );
     }
 }

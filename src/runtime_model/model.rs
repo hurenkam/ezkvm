@@ -10,7 +10,8 @@ use super::{
     ScsiControllerApi, ScsiDeviceApi, UsbAddress, UsbBus, UsbControllerApi, UsbDeviceApi,
 };
 use crate::runtime_model::{
-    AudioApi, BootModel, BusRegister, Chipset, DisplayApi, GuestAgentApi, LifecycleConfig, TpmApi,
+    AudioApi, BalloonConfig, BootModel, BusRegister, Chipset, DisplayApi, GuestAgentApi,
+    LifecycleConfig, SerialConfig, TpmApi,
 };
 
 use super::qmp::execute_qmp_command;
@@ -30,6 +31,8 @@ pub struct RuntimeModel {
     audio: Option<Arc<dyn AudioApi>>,
     guest_agent: Option<Arc<dyn GuestAgentApi>>,
     lifecycle_config: Option<LifecycleConfig>,
+    balloon_config: Option<BalloonConfig>,
+    serial_config: Option<SerialConfig>,
     busses: BusRegister,
 }
 #[allow(dead_code)] // TODO: wire to CLI
@@ -62,12 +65,24 @@ impl RuntimeModel {
             audio,
             guest_agent,
             lifecycle_config: None,
+            balloon_config: None,
+            serial_config: None,
             busses,
         }
     }
 
     pub fn with_lifecycle_config(mut self, lifecycle_config: Option<LifecycleConfig>) -> Self {
         self.lifecycle_config = lifecycle_config;
+        self
+    }
+
+    pub fn with_balloon_config(mut self, balloon_config: Option<BalloonConfig>) -> Self {
+        self.balloon_config = balloon_config;
+        self
+    }
+
+    pub fn with_serial_config(mut self, serial_config: Option<SerialConfig>) -> Self {
+        self.serial_config = serial_config;
         self
     }
 
@@ -284,6 +299,22 @@ impl Display for RuntimeModel {
             f,
             "  Lifecycle: {}",
             match &self.lifecycle_config {
+                Some(_) => "configured".to_string(),
+                None => "none".to_string(),
+            }
+        )?;
+        writeln!(
+            f,
+            "  Balloon: {}",
+            match &self.balloon_config {
+                Some(_) => "configured".to_string(),
+                None => "none".to_string(),
+            }
+        )?;
+        writeln!(
+            f,
+            "  Serial: {}",
+            match &self.serial_config {
                 Some(_) => "configured".to_string(),
                 None => "none".to_string(),
             }

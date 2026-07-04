@@ -180,9 +180,8 @@ fn render_block(
                     out.push(format!("{}{}: {}", " ".repeat(indent), key, nested));
                 }
 
-                match seperator {
-                    Some(sep) => out.push(sep.to_string()),
-                    None => {}
+                if let Some(sep) = seperator {
+                    out.push(sep.to_string());
                 }
             }
             Ok(out.join("\n"))
@@ -210,9 +209,8 @@ fn render_block(
                     out.push(format!("{}- {}", " ".repeat(indent), nested));
                 }
 
-                match seperator {
-                    Some(sep) => out.push(sep.to_string()),
-                    None => {}
+                if let Some(sep) = seperator {
+                    out.push(sep.to_string());
                 }
             }
             Ok(out.join("\n"))

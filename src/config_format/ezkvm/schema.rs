@@ -1,3 +1,4 @@
+use std::fmt::{Display as FmtDisplay, Formatter};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -26,9 +27,12 @@ pub struct EzkvmConfigSchema {
     pub virtual_machine: VirtualMachine,
 }
 
-impl ToString for EzkvmConfigSchema {
-    fn to_string(&self) -> String {
-        serde_yaml::to_string(self).unwrap_or_else(|_| "--- failed to serialize ---".to_string())
+impl FmtDisplay for EzkvmConfigSchema {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match serde_yaml::to_string(self) {
+            Ok(serialized) => f.write_str(&serialized),
+            Err(_) => f.write_str("--- failed to serialize ---"),
+        }
     }
 }
 

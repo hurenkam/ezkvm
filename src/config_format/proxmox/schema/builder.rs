@@ -19,7 +19,7 @@ use crate::{
         },
     },
     runtime_model::{
-        Chipset, Display, NetworkResource, QxlGpuController, RuntimeModel,
+        Chipset, Display, NetworkResource, QxlGpuController, RuntimeModel, StorageDeviceKind,
         UsbHostByBusPortController, UsbHostByIdController, UsbTabletController,
         VirtioGpuController, VirtioNetController,
     },
@@ -95,9 +95,12 @@ impl ProxmoxSchemaBuilder {
         }
 
         map_scsi_devices(runtime, storage_config, &mut entries);
+        map_ide_devices(runtime, storage_config, &mut entries);
         map_net_devices(runtime, &mut entries);
         map_usb_devices(runtime, &mut entries);
         map_lifecycle(runtime, &mut entries);
+        map_balloon(runtime, &mut entries);
+        map_serial(runtime, &mut entries);
         map_guest_agent(runtime, &mut entries);
         map_vga(runtime, &mut entries);
         map_display(runtime, &mut entries);
@@ -196,6 +199,52 @@ fn map_scsi_devices(
                     );
                     scsi_idx += 1;
                 }
+            }
+        }
+    }
+}
+
+/// Maps IDE storage devices into Proxmox `ide2`/`ide3` entries.
+fn map_ide_devices(
+    model: &RuntimeModel,
+    storage: &ProxmoxStorageConfig,
+    entries: &mut BTreeMap<String, ProxmoxValue>,
+) {
+    let mut ide_bus_ids: Vec<u8> = model.busses().ide_busses().keys().copied().collect();
+    ide_bus_ids.sort_unstable();
+
+    for bus_id in ide_bus_ids {
+        if let Some(controller) = model.busses().ide_busses().get(&bus_id) {
+            let devices = controller.devices();
+            let mut addresses: Vec<_> = devices.keys().cloned().collect();
+            addresses.sort_by_key(|a| a.address);
+
+            for address in addresses {
+                let Some(device) = devices.get(&address) else {
+                    continue;
+                };
+
+                let proxmox_index = 2 + address.address as usize;
+                let token = storage.resource_to_token(device.storage_resource());
+                let options = if device.storage_kind() == StorageDeviceKind::Cdrom {
+                    vec![ProxmoxOption::KeyValue {
+                        key: "media".to_string(),
+                        value: "cdrom".to_string(),
+                    }]
+                } else {
+                    vec![ProxmoxOption::KeyValue {
+                        key: "cache".to_string(),
+                        value: "writeback".to_string(),
+                    }]
+                };
+
+                entries.insert(
+                    format!("ide{proxmox_index}"),
+                    ProxmoxValue::Compound(ProxmoxCompoundValue {
+                        head: token,
+                        options,
+                    }),
+                );
             }
         }
     }
@@ -308,6 +357,67 @@ fn map_lifecycle(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxVal
     if let Some(qmp_event_socket) = config.qmp_event_socket() {
         entries.insert("qmp-event-socket".to_string(), scalar(qmp_event_socket));
     }
+}
+
+/// Maps balloon configuration from runtime into Proxmox `balloon` field.
+fn map_balloon(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    let Some(config) = model.balloon_config() else {
+        return;
+    };
+
+    if !*config.enabled() {
+        entries.insert("balloon".to_string(), scalar("0"));
+        return;
+    }
+
+    if *config.free_page_reporting() {
+        entries.insert(
+            "balloon".to_string(),
+            ProxmoxValue::Compound(ProxmoxCompoundValue {
+                head: "1".to_string(),
+                options: vec![ProxmoxOption::KeyValue {
+                    key: "free-page-reporting".to_string(),
+                    value: "on".to_string(),
+                }],
+            }),
+        );
+        return;
+    }
+
+    entries.insert("balloon".to_string(), scalar("1"));
+}
+
+/// Maps serial console config to Proxmox `serial0` socket mode field.
+fn map_serial(model: &RuntimeModel, entries: &mut BTreeMap<String, ProxmoxValue>) {
+    let Some(config) = model.serial_config() else {
+        return;
+    };
+
+    if let Some(path) = config.socket_path() {
+        let mut options = Vec::new();
+        options.push(ProxmoxOption::KeyValue {
+            key: "path".to_string(),
+            value: path.clone(),
+        });
+        options.push(ProxmoxOption::KeyValue {
+            key: "server".to_string(),
+            value: if *config.server() { "on" } else { "off" }.to_string(),
+        });
+        options.push(ProxmoxOption::KeyValue {
+            key: "wait".to_string(),
+            value: if *config.wait() { "on" } else { "off" }.to_string(),
+        });
+        entries.insert(
+            "serial0".to_string(),
+            ProxmoxValue::Compound(ProxmoxCompoundValue {
+                head: "socket".to_string(),
+                options,
+            }),
+        );
+        return;
+    }
+
+    entries.insert("serial0".to_string(), scalar("socket"));
 }
 
 /// Maps GPU/video card configuration from the runtime model to `vga` entry.
@@ -486,10 +596,11 @@ mod tests {
     use crate::config_format::SchemaBuilder;
     use crate::config_format::proxmox::storage_resolver::ProxmoxStorageConfig;
     use crate::runtime_model::{
-        BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display, DisplayModelBuilder,
-        LifecycleConfig, Memory, NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset,
-        RuntimeModel, SeaBiosModel, UsbAddress, UsbHostByBusPortController, UsbHostByIdController,
-        UsbTabletController, VirtioNetController,
+        BalloonConfig, BiosModel, BootModel, BusRegister, Chipset, Cpu, CpuModel, Display,
+        DisplayModelBuilder, IdeAddress, IdeDeviceBuilder, IdeDeviceType, LifecycleConfig, Memory,
+        NetworkResource, PcieAddress, PcieDeviceApi, Q35Chipset, RuntimeModel, SeaBiosModel,
+        SerialConfig, StorageResource, UsbAddress, UsbHostByBusPortController,
+        UsbHostByIdController, UsbTabletController, VirtioNetController,
     };
 
     fn storage_config() -> ProxmoxStorageConfig {
@@ -816,5 +927,86 @@ dir: local
             get_scalar("qmp-event-socket"),
             Some("/run/qemu/test-lifecycle-vm.event")
         );
+    }
+
+    #[test]
+    fn exports_ide_balloon_and_serial_fields() {
+        let mut bus_register = BusRegister::new();
+        let model = RuntimeModel::new(
+            "test-device-vm".to_string(),
+            Cpu::new(CpuModel::Host, 4, 1, 1),
+            Memory::megabytes(2048),
+            Chipset::Q35(Q35Chipset::new(&mut bus_register)),
+            BootModel::new(BiosModel::SeaBios(SeaBiosModel::default())),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            bus_register,
+        )
+        .with_balloon_config(Some(BalloonConfig::new(true, true)))
+        .with_serial_config(Some(SerialConfig::new(
+            Some("/run/qemu/test-device-vm.serial0".to_string()),
+            true,
+            false,
+        )));
+
+        let ide_resource = StorageResource::File {
+            file: "/var/lib/vz/template/iso/installer.iso".to_string(),
+        };
+        let storage = std::collections::HashMap::from([("ide2".to_string(), ide_resource)]);
+        let ide_cdrom = IdeDeviceBuilder::build(
+            &IdeDeviceType::Cdrom {
+                resource: "ide2".to_string(),
+            },
+            &storage,
+        )
+        .expect("IDE CD-ROM build should succeed");
+        model
+            .register_ide_device(0, ide_cdrom, Some(IdeAddress::new(0)))
+            .expect("IDE CD-ROM registration should succeed");
+
+        let schema = super::ProxmoxSchemaBuilder::default()
+            .with_storage_config(storage_config())
+            .with_runtime(model)
+            .build()
+            .expect("schema build should succeed");
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Compound(ide2)) =
+            schema.global.entries.get("ide2")
+        else {
+            panic!("ide2 should be exported as compound value");
+        };
+        assert!(ide2.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "media" && value == "cdrom"
+        )));
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Compound(balloon)) =
+            schema.global.entries.get("balloon")
+        else {
+            panic!("balloon should be exported as compound value");
+        };
+        assert_eq!(balloon.head, "1");
+        assert!(balloon.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "free-page-reporting" && value == "on"
+        )));
+
+        let Some(crate::config_format::proxmox::schema::ProxmoxValue::Compound(serial0)) =
+            schema.global.entries.get("serial0")
+        else {
+            panic!("serial0 should be exported as compound value");
+        };
+        assert_eq!(serial0.head, "socket");
+        assert!(serial0.options.iter().any(|option| matches!(
+            option,
+            crate::config_format::proxmox::schema::ProxmoxOption::KeyValue { key, value }
+            if key == "path" && value == "/run/qemu/test-device-vm.serial0"
+        )));
     }
 }
