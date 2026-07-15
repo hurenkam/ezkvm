@@ -1,4 +1,4 @@
 mod ezkvm;
-mod qemu;
 mod proxmox;
-pub use ezkvm::{EzkvmHostSchema, EzkvmSchemaBuilder, EzkvmDeviceHandler, EzkvmVmSchema};
+mod qemu;
+pub use ezkvm::{EzkvmDeviceHandler, EzkvmHostSchema, EzkvmSchemaBuilder, EzkvmVmSchema};

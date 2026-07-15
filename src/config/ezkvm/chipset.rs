@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::config::{EzkvmSchemaBuilder, EzkvmDeviceHandler};
+use crate::config::{EzkvmDeviceHandler, EzkvmSchemaBuilder};
 use crate::runtime::{Chipset, Q35Chipset, RootDevice};
 
 pub struct EzkvmChipsetHandler;

@@ -1,6 +1,8 @@
 use std::sync::Mutex;
 
-use crate::runtime::{BusDevice, IdeAddress, SataAddress, SataDevice, ScsiAddress, scsi::ScsiDevice};
+use crate::runtime::{
+    BusDevice, IdeAddress, SataAddress, SataDevice, ScsiAddress, scsi::ScsiDevice,
+};
 
 #[allow(dead_code)]
 pub trait StorageDevice: BusDevice {

@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use crate::runtime::{BusDevice, BusDeviceRegistry, PciDevice, PcieAddress, PcieDevice, isa::{IsaAddress, IsaDevice}, pci::PciAddress};
+use crate::runtime::{
+    BusDevice, BusDeviceRegistry, PciDevice, PcieAddress, PcieDevice, isa::{IsaAddress, IsaDevice}, pci::PciAddress, scsi::ScsiDevice,
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -19,7 +21,11 @@ pub struct PvScsi {
 
 impl PvScsi {
     pub fn new(bus_devices: Arc<Mutex<BusDeviceRegistry>>) -> Self {
-        let bus_id = bus_devices.lock().unwrap().add_bus(std::any::TypeId::of::<Self>());
+        let bus_id = bus_devices
+            .lock()
+            .unwrap()
+            .add_bus(std::any::TypeId::of::<dyn ScsiDevice>());
+        println!("PvScsi::new(): scsi bus id: {}, type id: {:?}, type name: {}", bus_id, std::any::TypeId::of::<dyn ScsiDevice>(), std::any::type_name::<dyn ScsiDevice>());
         PvScsi {
             address: Mutex::new(None),
             bus_id,

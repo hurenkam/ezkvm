@@ -1,4 +1,5 @@
 mod chipset;
+mod devices;
 mod ide;
 mod isa;
 mod memory;
@@ -8,9 +9,9 @@ mod q35;
 mod sata;
 mod scsi;
 mod storage;
-mod devices;
 
 pub use chipset::Chipset;
+pub use devices::PvScsi;
 pub use ide::{IdeAddress, IdeDevice};
 pub use memory::Memory;
 pub use pci::PciDevice;
@@ -19,7 +20,6 @@ pub use q35::Q35Chipset;
 pub use sata::{SataAddress, SataDevice};
 pub use scsi::ScsiAddress;
 pub use storage::{Ssd, StorageDevice};
-pub use devices::PvScsi;
 
 use derive_getters::Getters;
 use std::collections::HashMap;
@@ -35,21 +35,21 @@ pub struct BusDeviceRegistry(pub HashMap<TypeId, HashMap<u8, Vec<Arc<dyn BusDevi
 #[allow(dead_code)]
 impl BusDeviceRegistry {
     pub fn add_bus(&mut self, device_type: TypeId) -> u8 {
-        println!("Adding bus for device type: {:?}", device_type);
+        //println!("Adding bus for device type: {:?}", device_type);
         self.0.entry(device_type).or_default();
         let registry = self.0.get_mut(&device_type).expect("Registry should exist");
         let bus_id = registry.len() as u8;
         registry.insert(bus_id, Vec::new());
         bus_id
     }
-    pub fn add_bus_device(&mut self, device_type: TypeId, bus_id: u8, device: Arc<dyn BusDevice>) {
+    pub fn add_bus_device(&mut self, bus_type: TypeId, bus_id: u8, device: Arc<dyn BusDevice>) {
         println!(
-            "Adding device for bus id: {}, type: {:?} ({})",
+            "Adding device for bus id: {}, type id: {:?}, device name: {}",
             bus_id,
-            device_type,
-            device.get_name()
+            bus_type,
+            device.get_name(),
         );
-        let registry = self.0.get_mut(&device_type).expect("Registry should exist");
+        let registry = self.0.get_mut(&bus_type).expect("Registry should exist");
         let bus = registry.get_mut(&bus_id).expect("Bus should exist");
         bus.push(device);
     }

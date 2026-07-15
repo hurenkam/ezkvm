@@ -41,9 +41,11 @@ fn main() {
     println!("runtime: {:?}", runtime);
 
     let host_schema = config::EzkvmHostSchema {};
-    let vm_schema = config::EzkvmVmSchema::try_from((runtime, host_schema)).expect("Failed to build VM schema");
+    let vm_schema =
+        config::EzkvmVmSchema::try_from((runtime, host_schema)).expect("Failed to build VM schema");
     println!("ezkvm schema: {:?}", vm_schema);
 
-    let runtime = Runtime::try_from((vm_schema, host_schema)).expect("Failed to build runtime from VM schema");
+    let runtime = Runtime::try_from((vm_schema, host_schema))
+        .expect("Failed to build runtime from VM schema");
     println!("runtime: {:?}", runtime);
 }

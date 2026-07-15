@@ -62,7 +62,6 @@ impl TryFrom<(Runtime, ProxmoxHostSchema)> for ProxmoxVmSchema {
 impl TryFrom<(ProxmoxVmSchema, ProxmoxHostSchema)> for Runtime {
     type Error = ();
 
-    
     fn try_from(value: (ProxmoxVmSchema, ProxmoxHostSchema)) -> Result<Self, Self::Error> {
         let (_vm_schema, _host_schema) = value;
         let builder = RuntimeBuilder::new();

@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "playground"
+name = "ezkvm"
 version = "0.1.0"
 dependencies = [
  "derive-getters",
