@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use crate::runtime::{PvScsi, Q35Chipset, SataAddress, ScsiAddress, Ssd};
+use crate::runtime::{PvScsi, Q35Chipset, Runtime, SataAddress, ScsiAddress, Ssd};
 
-mod ezkvm;
-mod qemu;
+mod config;
 mod runtime;
 
 fn main() {
@@ -41,8 +40,10 @@ fn main() {
     let runtime = builder.build().unwrap();
     println!("runtime: {:?}", runtime);
 
-    let host_schema = ezkvm::EzkvmHostSchema {};
-    let vm_schema = ezkvm::build_schema(runtime, host_schema).unwrap();
+    let host_schema = config::EzkvmHostSchema {};
+    let vm_schema = config::EzkvmVmSchema::try_from((runtime, host_schema)).expect("Failed to build VM schema");
+    println!("ezkvm schema: {:?}", vm_schema);
 
-    println!("vm_schema: {:?}", vm_schema);
+    let runtime = Runtime::try_from((vm_schema, host_schema)).expect("Failed to build runtime from VM schema");
+    println!("runtime: {:?}", runtime);
 }

@@ -86,15 +86,3 @@ impl TryFrom<(EzkvmVmSchema, EzkvmHostSchema)> for Runtime {
         builder.build()
     }
 }
-
-pub fn build_schema(runtime: Runtime, host_schema: EzkvmHostSchema) -> Result<EzkvmVmSchema, ()> {
-    EzkvmVmSchema::try_from((runtime, host_schema))
-}
-
-#[allow(dead_code)]
-pub fn build_runtime(
-    vm_schema: EzkvmVmSchema,
-    host_schema: EzkvmHostSchema,
-) -> Result<Runtime, ()> {
-    Runtime::try_from((vm_schema, host_schema))
-}

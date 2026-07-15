@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::runtime::{BusDevice, BusDeviceRegistry, PciDevice, PcieAddress, PcieDevice, isa::{IsaAddress, IsaDevice}, pci::PciAddress};
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum Address {
     Pcie(PcieAddress),

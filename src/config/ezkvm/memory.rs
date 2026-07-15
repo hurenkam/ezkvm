@@ -4,7 +4,7 @@ use derive_getters::Getters;
 use derive_new::new;
 
 use crate::{
-    ezkvm::{EzkvmDeviceHandler, EzkvmSchemaBuilder},
+    config::{EzkvmSchemaBuilder, EzkvmDeviceHandler},
     runtime::{Memory, RootDevice},
 };
 

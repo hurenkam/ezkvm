@@ -1,12 +1,11 @@
-use crate::{
-    ezkvm::{EzkvmDeviceHandler, EzkvmSchemaBuilder},
-    runtime::{Chipset, Q35Chipset, RootDevice},
-};
 use std::{
     any::TypeId,
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+use crate::config::{EzkvmSchemaBuilder, EzkvmDeviceHandler};
+use crate::runtime::{Chipset, Q35Chipset, RootDevice};
 
 pub struct EzkvmChipsetHandler;
 impl EzkvmDeviceHandler for EzkvmChipsetHandler {
