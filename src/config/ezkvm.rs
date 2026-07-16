@@ -1,19 +1,20 @@
 mod chipset;
+mod display;
+mod guest_agent;
 mod memory;
+mod resources;
+mod runtime_types;
+mod schema;
+mod tpm;
+mod types;
+pub use schema::EzkvmConfigSchema;
 
-use crate::runtime::{RootDevice, Runtime, RuntimeBuilder};
-use chipset::{EzkvmChipset, EzkvmChipsetHandler};
-use memory::{EzkvmMemory, EzkvmMemoryHandler};
-
-use std::{any::TypeId, collections::HashMap};
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct EzkvmHostSchema {}
-#[derive(Debug, Clone, Copy, Default)]
-pub struct EzkvmVmSchema {
-    memory: Option<EzkvmMemory>,
-    chipset: Option<EzkvmChipset>,
-}
+use crate::{
+    config::ezkvm::{
+        chipset::{Chipset, EzkvmChipsetHandler, I440FXChipset, Q35Chipset}, memory::{EzkvmMemoryHandler, Memory},
+    }, runtime::{BusDeviceRegistry, RootDevice, Runtime, RuntimeBuilder},
+};
+use std::{any::TypeId, collections::HashMap, sync::{Arc, Mutex}};
 
 type EzkvmSchemaHandler = fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>;
 pub trait EzkvmDeviceHandler {
@@ -23,24 +24,52 @@ pub trait EzkvmDeviceHandler {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct EzkvmSchemaBuilder {
-    host_schema: EzkvmHostSchema,
-    vm_schema: EzkvmVmSchema,
     handlers: HashMap<TypeId, EzkvmSchemaHandler>,
+    memory: Option<memory::Memory>,
+    chipset: Option<chipset::Chipset>,
+    bus_devices: Arc<Mutex<BusDeviceRegistry>>
 }
 impl EzkvmSchemaBuilder {
-    pub fn new(
-        host_schema: EzkvmHostSchema,
-        handlers: HashMap<TypeId, EzkvmSchemaHandler>,
-    ) -> Self {
+    pub fn new() -> Self {
+        let mut handlers = HashMap::new();
+        handlers.extend(EzkvmMemoryHandler::handlers());
+        handlers.extend(EzkvmChipsetHandler::handlers());
         EzkvmSchemaBuilder {
-            host_schema,
-            vm_schema: EzkvmVmSchema::default(),
             handlers,
+            memory: None,
+            chipset: None,
+            bus_devices: Arc::new(Mutex::new(BusDeviceRegistry(HashMap::new()))),
         }
     }
 
-    pub fn build(self) -> Result<EzkvmVmSchema, ()> {
-        Ok(self.vm_schema)
+    pub fn build(self) -> Result<EzkvmConfigSchema, ()> {
+        Ok(EzkvmConfigSchema {
+            virtual_machine: schema::VirtualMachine {
+                memory: self.memory.ok_or(())?,
+                machine: schema::Machine {
+                    chipset: self.chipset.ok_or(())?,
+                    version: None,
+                },
+                cpu: None,
+                boot: schema::Boot::default(),
+                smbios_uuid: None,
+                vmgenid: None,
+                tpm: None,
+                display: None,
+                audio: None,
+                guest_agent: None,
+                devices: vec![],
+            },
+            metadata: schema::Metadata {
+                schema_version: "1.0".to_string(),
+                vm_name: "vm".to_string(),
+            },
+            host: schema::HostSchema {
+                display: None,
+                audio: None,
+                resources: vec![],
+            },
+        })
     }
 
     pub fn with_device(&mut self, device: &dyn RootDevice) -> Result<(), ()> {
@@ -48,23 +77,33 @@ impl EzkvmSchemaBuilder {
         if let Some(handler) = self.handlers.get(&device_type) {
             handler(self, device)
         } else {
-            println!("No ezkvm handler for device type: {:?}", device_type);
+            println!(
+                "No ezkvm handler for device '{}', type: {:?}",
+                device.get_name(),
+                device_type
+            );
             Err(())
         }
     }
+
+    pub fn with_memory(&mut self, memory: Memory) -> &mut Self {
+        self.memory = Some(memory);
+        self
+    }
+
+    pub fn with_chipset(&mut self, chipset: Chipset) -> &mut Self {
+        self.chipset = Some(chipset);
+        self
+    }
 }
 
-impl TryFrom<(Runtime, EzkvmHostSchema)> for EzkvmVmSchema {
+impl TryFrom<Runtime> for EzkvmConfigSchema {
     type Error = ();
 
-    fn try_from(value: (Runtime, EzkvmHostSchema)) -> Result<Self, Self::Error> {
-        let (device_tree, host_schema) = value;
-        let mut handlers = HashMap::new();
-        handlers.extend(EzkvmMemoryHandler::handlers());
-        handlers.extend(EzkvmChipsetHandler::handlers());
-        let mut builder = EzkvmSchemaBuilder::new(host_schema, handlers);
+    fn try_from(value: Runtime) -> Result<Self, Self::Error> {
+        let mut builder = EzkvmSchemaBuilder::new();
 
-        for device in device_tree.root_devices() {
+        for device in value.root_devices() {
             builder.with_device(device.as_ref())?;
         }
 
@@ -72,16 +111,22 @@ impl TryFrom<(Runtime, EzkvmHostSchema)> for EzkvmVmSchema {
     }
 }
 
-impl TryFrom<(EzkvmVmSchema, EzkvmHostSchema)> for Runtime {
+impl TryFrom<EzkvmConfigSchema> for Runtime {
     type Error = ();
 
-    fn try_from(value: (EzkvmVmSchema, EzkvmHostSchema)) -> Result<Self, Self::Error> {
-        let (vm_schema, _host_schema) = value;
+    fn try_from(value: EzkvmConfigSchema) -> Result<Self, Self::Error> {
         let builder = RuntimeBuilder::new();
+        let bus_devices = builder.bus_devices();
 
-        if let Some(memory) = vm_schema.memory {
-            builder.with_memory(memory.into());
-        }
+        builder.with_memory(value.virtual_machine.memory.into());
+        match value.virtual_machine.machine.chipset {
+            Chipset::Q35 { q35: _ } => builder.with_chipset(
+                crate::runtime::Chipset::Q35(crate::runtime::Q35Chipset::new(bus_devices.clone())),
+            ),
+            Chipset::I440FX { i440fx: _ } => builder.with_chipset(
+                crate::runtime::Chipset::I440FX,
+            ),
+        };
 
         builder.build()
     }

@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
-use crate::runtime::{PvScsi, Q35Chipset, Runtime, SataAddress, ScsiAddress, Ssd};
+use crate::{
+    config::EzkvmConfigSchema,
+    runtime::{PvScsi, Q35Chipset, Runtime, SataAddress, ScsiAddress, Ssd},
+};
 
 mod config;
 mod runtime;
+mod serde_yaml;
 
 fn main() {
-    println!("Hello, world!");
-
     let builder = runtime::RuntimeBuilder::new();
     let bus_devices = builder.bus_devices();
     let chipset = Q35Chipset::new(bus_devices.clone());
@@ -40,12 +42,9 @@ fn main() {
     let runtime = builder.build().unwrap();
     println!("runtime: {:?}", runtime);
 
-    let host_schema = config::EzkvmHostSchema {};
-    let vm_schema =
-        config::EzkvmVmSchema::try_from((runtime, host_schema)).expect("Failed to build VM schema");
-    println!("ezkvm schema: {:?}", vm_schema);
+    let schema = EzkvmConfigSchema::try_from(runtime).expect("Failed to build VM schema");
+    println!("ezkvm schema: {:?}", schema);
 
-    let runtime = Runtime::try_from((vm_schema, host_schema))
-        .expect("Failed to build runtime from VM schema");
+    let runtime = Runtime::try_from(schema).expect("Failed to build runtime from VM schema");
     println!("runtime: {:?}", runtime);
 }

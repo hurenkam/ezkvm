@@ -6,3 +6,7 @@ edition = "2024"
 [dependencies]
 derive-getters = "0.5.0"
 derive-new = "0.7.0"
+hashlink = "0.12.1"
+ordered-float = "5.3.0"
+saphyr = "0.0.11"
+serde = { version="1.0.228", features = ["derive"] }

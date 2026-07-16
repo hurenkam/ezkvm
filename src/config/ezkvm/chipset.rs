@@ -1,55 +1,69 @@
-use std::{
-    any::TypeId,
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{any::TypeId, collections::HashMap};
 
-use crate::config::{EzkvmDeviceHandler, EzkvmSchemaBuilder};
-use crate::runtime::{Chipset, Q35Chipset, RootDevice};
+use crate::{
+    config::{EzkvmDeviceHandler, EzkvmSchemaBuilder},
+    runtime::RootDevice,
+};
+use derive_getters::Getters;
+use derive_new::new;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
+pub struct Q35Chipset {
+    version: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Getters, new)]
+pub struct I440FXChipset {
+    version: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Chipset {
+    Q35 { q35: Q35Chipset },
+    I440FX { i440fx: I440FXChipset },
+}
 
 pub struct EzkvmChipsetHandler;
 impl EzkvmDeviceHandler for EzkvmChipsetHandler {
     fn handlers() -> HashMap<TypeId, fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>>
     {
         HashMap::from([(
-            TypeId::of::<Chipset>(),
+            TypeId::of::<crate::runtime::Chipset>(),
             chipset_handler as fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>,
         )])
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Copy, Default)]
-pub enum EzkvmChipset {
-    #[default]
-    Q35,
-    I440FX,
-}
-
-impl From<Chipset> for EzkvmChipset {
-    fn from(chipset: Chipset) -> Self {
-        match chipset {
-            Chipset::Q35(_) => EzkvmChipset::Q35,
-            Chipset::I440FX => EzkvmChipset::I440FX,
-        }
-    }
-}
-
-impl From<EzkvmChipset> for Chipset {
-    fn from(chipset: EzkvmChipset) -> Self {
-        match chipset {
-            EzkvmChipset::Q35 => Chipset::Q35(Q35Chipset::new(Arc::new(Mutex::new(
-                crate::runtime::BusDeviceRegistry(HashMap::new()),
-            )))),
-            EzkvmChipset::I440FX => Chipset::I440FX,
-        }
-    }
-}
-
 fn chipset_handler(builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()> {
-    if let Some(chipset) = device.as_any().downcast_ref::<Chipset>() {
-        builder.vm_schema.chipset = Some(chipset.clone().into());
+    if let Some(chipset) = device.as_any().downcast_ref::<crate::runtime::Chipset>() {
+        builder.with_chipset(chipset.clone().into());
         Ok(())
     } else {
         Err(())
     }
 }
+
+impl From<crate::runtime::Chipset> for Chipset {
+    fn from(chipset: crate::runtime::Chipset) -> Self {
+        match chipset {
+            crate::runtime::Chipset::Q35(q35) => Chipset::Q35 {
+                q35: Q35Chipset { version: None },
+            },
+            crate::runtime::Chipset::I440FX => Chipset::I440FX {
+                i440fx: I440FXChipset { version: None },
+            },
+        }
+    }
+}
+/*
+impl From<Chipset> for crate::runtime::Chipset {
+    fn from(chipset: Chipset) -> Self {
+        match chipset {
+            Chipset::Q35 { q35: _ } => crate::runtime::Chipset::Q35(crate::runtime::Q35Chipset::new(_)),
+            Chipset::I440FX { i440fx: _ } => crate::runtime::Chipset::I440FX,
+        }
+    }
+}
+*/

@@ -2,47 +2,53 @@ use std::{any::TypeId, collections::HashMap};
 
 use derive_getters::Getters;
 use derive_new::new;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{EzkvmDeviceHandler, EzkvmSchemaBuilder},
-    runtime::{Memory, RootDevice},
+    runtime::RootDevice,
 };
+
+#[allow(dead_code)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Getters, new)]
+pub struct Memory {
+    size: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hugepages_kb: Option<usize>,
+    #[serde(default)]
+    numa_enabled: bool,
+}
+impl From<crate::runtime::Memory> for Memory {
+    fn from(value: crate::runtime::Memory) -> Self {
+        Memory {
+            size: value.size().clone(),
+            hugepages_kb: None,
+            numa_enabled: false,
+        }
+    }
+}
+impl From<Memory> for crate::runtime::Memory {
+    fn from(value: Memory) -> Self {
+        crate::runtime::Memory::new(value.size)
+    }
+}
 
 pub struct EzkvmMemoryHandler;
 impl EzkvmDeviceHandler for EzkvmMemoryHandler {
     fn handlers() -> HashMap<TypeId, fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>>
     {
         HashMap::from([(
-            TypeId::of::<Memory>(),
+            TypeId::of::<crate::runtime::Memory>(),
             memory_handler as fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>,
         )])
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Copy, Default, Getters, new)]
-pub struct EzkvmMemory {
-    size: usize,
-}
-
-impl From<Memory> for EzkvmMemory {
-    fn from(memory: Memory) -> Self {
-        EzkvmMemory {
-            size: *memory.size(),
-        }
-    }
-}
-
-impl From<EzkvmMemory> for Memory {
-    fn from(memory: EzkvmMemory) -> Self {
-        Memory::new(memory.size)
-    }
-}
-
 fn memory_handler(builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()> {
-    if let Some(memory) = device.as_any().downcast_ref::<Memory>() {
-        builder.vm_schema.memory = Some((*memory).into());
-        Ok(())
-    } else {
-        Err(())
-    }
+    let memory = device
+        .as_any()
+        .downcast_ref::<crate::runtime::Memory>()
+        .ok_or(())?;
+    builder.with_memory(memory.clone().into());
+    Ok(())
 }
