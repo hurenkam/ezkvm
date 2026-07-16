@@ -1,11 +1,9 @@
-use std::{any::TypeId, collections::HashMap};
-
 use derive_getters::Getters;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{EzkvmDeviceHandler, EzkvmSchemaBuilder},
+    config::{RootDeviceHandler, EzkvmSchemaBuilder},
     runtime::RootDevice,
 };
 
@@ -33,22 +31,15 @@ impl From<Memory> for crate::runtime::Memory {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct EzkvmMemoryHandler;
-impl EzkvmDeviceHandler for EzkvmMemoryHandler {
-    fn handlers() -> HashMap<TypeId, fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>>
-    {
-        HashMap::from([(
-            TypeId::of::<crate::runtime::Memory>(),
-            memory_handler as fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>,
-        )])
+impl RootDeviceHandler for EzkvmMemoryHandler {
+    fn handle(&self, builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()> {
+        let memory = device
+            .as_any()
+            .downcast_ref::<crate::runtime::Memory>()
+            .ok_or(())?;
+        builder.with_memory(memory.clone().into());
+        Ok(())
     }
-}
-
-fn memory_handler(builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()> {
-    let memory = device
-        .as_any()
-        .downcast_ref::<crate::runtime::Memory>()
-        .ok_or(())?;
-    builder.with_memory(memory.clone().into());
-    Ok(())
 }

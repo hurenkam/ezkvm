@@ -1,7 +1,5 @@
-use std::{any::TypeId, collections::HashMap};
-
 use crate::{
-    config::{EzkvmDeviceHandler, EzkvmSchemaBuilder},
+    config::{RootDeviceHandler, EzkvmSchemaBuilder},
     runtime::RootDevice,
 };
 use derive_getters::Getters;
@@ -25,23 +23,16 @@ pub enum Chipset {
     I440FX { i440fx: I440FXChipset },
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct EzkvmChipsetHandler;
-impl EzkvmDeviceHandler for EzkvmChipsetHandler {
-    fn handlers() -> HashMap<TypeId, fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>>
-    {
-        HashMap::from([(
-            TypeId::of::<crate::runtime::Chipset>(),
-            chipset_handler as fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>,
-        )])
-    }
-}
-
-fn chipset_handler(builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()> {
-    if let Some(chipset) = device.as_any().downcast_ref::<crate::runtime::Chipset>() {
-        builder.with_chipset(chipset.clone().into());
-        Ok(())
-    } else {
-        Err(())
+impl RootDeviceHandler for EzkvmChipsetHandler {
+    fn handle(&self, builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()> {
+        if let Some(chipset) = device.as_any().downcast_ref::<crate::runtime::Chipset>() {
+            builder.with_chipset(chipset.clone().into());
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
 

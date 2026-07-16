@@ -11,31 +11,37 @@ pub use schema::EzkvmConfigSchema;
 
 use crate::{
     config::ezkvm::{
-        chipset::{Chipset, EzkvmChipsetHandler, I440FXChipset, Q35Chipset}, memory::{EzkvmMemoryHandler, Memory},
-    }, runtime::{BusDeviceRegistry, RootDevice, Runtime, RuntimeBuilder},
+        chipset::{Chipset, EzkvmChipsetHandler}, memory::{EzkvmMemoryHandler, Memory},
+    }, runtime::{BusDevice, BusDeviceRegistry, RootDevice, Runtime, RuntimeBuilder},
 };
-use std::{any::TypeId, collections::HashMap, sync::{Arc, Mutex}};
+use std::{any::TypeId, collections::HashMap, fmt::Debug, sync::{Arc, Mutex}};
 
-type EzkvmSchemaHandler = fn(&mut EzkvmSchemaBuilder, &dyn RootDevice) -> Result<(), ()>;
-pub trait EzkvmDeviceHandler {
-    fn handlers() -> HashMap<TypeId, EzkvmSchemaHandler>;
+pub trait RootDeviceHandler: Debug + Send + Sync + 'static {
+    fn handle(&self, builder: &mut EzkvmSchemaBuilder, device: &dyn RootDevice) -> Result<(), ()>;
+}
+
+pub trait BusDeviceHandler: Debug + Send + Sync + 'static {
+    fn handle(&self, builder: &mut EzkvmSchemaBuilder, device: &dyn BusDevice) -> Result<(), ()>;
 }
 
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct EzkvmSchemaBuilder {
-    handlers: HashMap<TypeId, EzkvmSchemaHandler>,
+    root_device_handlers: HashMap<TypeId, Arc<dyn RootDeviceHandler>>,
+    bus_device_handlers: HashMap<TypeId, Arc<dyn BusDeviceHandler>>,
     memory: Option<memory::Memory>,
     chipset: Option<chipset::Chipset>,
     bus_devices: Arc<Mutex<BusDeviceRegistry>>
 }
 impl EzkvmSchemaBuilder {
     pub fn new() -> Self {
-        let mut handlers = HashMap::new();
-        handlers.extend(EzkvmMemoryHandler::handlers());
-        handlers.extend(EzkvmChipsetHandler::handlers());
         EzkvmSchemaBuilder {
-            handlers,
+            root_device_handlers: HashMap::from([
+                (TypeId::of::<crate::runtime::Memory>(), Arc::new(EzkvmMemoryHandler) as Arc<dyn RootDeviceHandler>),
+                (TypeId::of::<crate::runtime::Chipset>(), Arc::new(EzkvmChipsetHandler) as Arc<dyn RootDeviceHandler>),
+            ]),
+            bus_device_handlers: HashMap::from([
+            ]),
             memory: None,
             chipset: None,
             bus_devices: Arc::new(Mutex::new(BusDeviceRegistry(HashMap::new()))),
@@ -74,8 +80,8 @@ impl EzkvmSchemaBuilder {
 
     pub fn with_device(&mut self, device: &dyn RootDevice) -> Result<(), ()> {
         let device_type = device.get_type();
-        if let Some(handler) = self.handlers.get(&device_type) {
-            handler(self, device)
+        if let Some(handler) = self.root_device_handlers.get(&device_type) {
+            handler.clone().handle(self, device)
         } else {
             println!(
                 "No ezkvm handler for device '{}', type: {:?}",
