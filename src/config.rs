@@ -1,5 +1,6 @@
 mod ezkvm;
 mod proxmox;
 mod qemu;
-pub use ezkvm::{EzkvmConfigSchema, RootDeviceHandler, EzkvmSchemaBuilder};
-//pub use ezkvm::{EzkvmDeviceHandler, EzkvmHostSchema, EzkvmSchemaBuilder, EzkvmVmSchema};
+
+#[allow(unused_imports)]
+pub use ezkvm::{ConfigFileStore as EzkvmConfigFileStore, ConfigSchema as EzkvmConfigSchema};

@@ -1,13 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EglHeadlessSchema {}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct GtkSchema {}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SdlSchema {}
+#[serde(untagged)]
+pub enum AudioSchema {
+    Alsa { alsa: AlsaSchema },
+    PulseAudio { pulse_audio: PulseAudioSchema },
+    PipeWire { pipe_wire: PipeWireSchema },
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AlsaSchema {}

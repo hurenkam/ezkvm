@@ -4,7 +4,6 @@ use std::{
 };
 
 use derive_getters::Getters;
-use derive_new::new;
 
 use crate::runtime::{BusDeviceRegistry, IdeDevice, PciDevice, PcieDevice, SataDevice};
 

@@ -5,14 +5,10 @@ The code uses trait-driven polymorphism and explicit module export boundaries.
 
 ## Goal
 
-The main goal of the runtime is to model the whole vm hardware as close as possible,
-including chipset, busses, address assignments and device characteristics.
-The idea is that all attributes are defined at this stage, leaving no defaults that
-need to be guessed when constructing the qemu commmmandline, or converting to other
-config file types.
+The main goal of the runtime is to model the whole vm hardware as close as possible as it actually is connected on real hardware, including chipset, busses, address assignments and device characteristics.
+The idea is that all attributes are defined at this stage, leaving no defaults that need to be guessed when constructing the qemu commmmandline, or converting to other config file types.
 
-Types in the runtime tree shall not depend on types defined in other config file
-types, dependencies shall go in the other direction.
+Types in the runtime tree shall not depend on types defined in other config file types, dependencies shall go in the other direction.
 
 So Runtime --> EzkvmSchema dependency is not ok.
 But ExkvmSchema --> Runtime dependency is ok.
