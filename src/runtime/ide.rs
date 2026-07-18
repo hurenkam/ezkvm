@@ -1,19 +1,15 @@
-use crate::runtime::{BusAddress, StorageDevice};
+use derive_getters::Getters;
+use derive_new::new;
+
+use crate::runtime::StorageDevice;
+use std::fmt::Debug;
 
 #[allow(dead_code)]
-pub trait IdeDevice: StorageDevice {
-    fn get_ide_address(&self) -> IdeAddress;
-    fn set_ide_address(&self, address: IdeAddress);
-}
+pub trait IdeDevice: StorageDevice + Debug + Sync + Send + 'static {}
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Getters, new)]
 pub struct IdeAddress {
-    pub channel: u8,
-    pub device: u8,
-}
-impl BusAddress for IdeAddress {
-    fn get_bus_id(&self) -> u8 {
-        0
-    }
+    channel: u8,
+    device: u8,
 }

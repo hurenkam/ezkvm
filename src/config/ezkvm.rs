@@ -11,32 +11,22 @@ use crate::{
         runtime::{EzkvmChipsetHandler, EzkvmMemoryHandler},
         schema::{ChipsetSchema, EZKVM_CONFIG_SCHEMA_VERSION, MemorySchema},
     },
-    runtime::{BusDevice, BusDeviceRegistry, RootDevice, Runtime, RuntimeBuilder},
+    runtime::{RootDevice, Runtime, RuntimeBuilder},
 };
-use std::{
-    any::TypeId,
-    collections::HashMap,
-    fmt::Debug,
-    sync::{Arc, Mutex},
-};
+use std::{any::TypeId, collections::HashMap, fmt::Debug, sync::Arc};
 
 pub trait RootDeviceHandler: Debug + Send + Sync + 'static {
     fn handle(&self, builder: &mut SchemaBuilder, device: &dyn RootDevice) -> Result<(), ()>;
 }
 
 #[allow(dead_code)]
-pub trait BusDeviceHandler: Debug + Send + Sync + 'static {
-    fn handle(&self, builder: &mut SchemaBuilder, device: &dyn BusDevice) -> Result<(), ()>;
-}
-
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct SchemaBuilder {
     root_device_handlers: HashMap<TypeId, Arc<dyn RootDeviceHandler>>,
-    bus_device_handlers: HashMap<TypeId, Arc<dyn BusDeviceHandler>>,
+    //bus_device_handlers: HashMap<TypeId, Arc<dyn BusDeviceHandler>>,
     memory: Option<MemorySchema>,
     chipset: Option<ChipsetSchema>,
-    bus_devices: Arc<Mutex<BusDeviceRegistry>>,
+    //bus_devices: Arc<Mutex<BusDeviceRegistry>>,
 }
 impl SchemaBuilder {
     pub fn new() -> Self {
@@ -51,10 +41,8 @@ impl SchemaBuilder {
                     Arc::new(EzkvmChipsetHandler) as Arc<dyn RootDeviceHandler>,
                 ),
             ]),
-            bus_device_handlers: HashMap::from([]),
             memory: None,
             chipset: None,
-            bus_devices: Arc::new(Mutex::new(BusDeviceRegistry(HashMap::new()))),
         }
     }
 
@@ -77,8 +65,6 @@ impl SchemaBuilder {
         let smbios_uuid = None;
         let vmgenid = None;
         let tpm = None;
-        //let display = None;
-        //let audio = None;
         let guest_agent = None;
         let devices = vec![];
         let virtual_machine = schema::VirtualMachineSchema::new(
@@ -89,8 +75,6 @@ impl SchemaBuilder {
             smbios_uuid,
             vmgenid,
             tpm,
-            //display,
-            //audio,
             guest_agent,
             devices,
         );
@@ -141,17 +125,17 @@ impl TryFrom<ConfigSchema> for Runtime {
 
     fn try_from(value: ConfigSchema) -> Result<Self, Self::Error> {
         let builder = RuntimeBuilder::new();
-        let bus_devices = builder.bus_devices();
+        //let bus_devices = builder.bus_devices();
 
-        builder.with_memory(value.virtual_machine().memory().into());
-        match &value.virtual_machine().machine().chipset() {
-            ChipsetSchema::Q35 { q35: _ } => builder.with_chipset(crate::runtime::Chipset::Q35(
-                crate::runtime::Q35Chipset::new(bus_devices.clone()),
-            )),
-            ChipsetSchema::I440FX { i440fx: _ } => {
-                builder.with_chipset(crate::runtime::Chipset::I440FX)
-            }
-        };
+        let builder = builder.with_memory(value.virtual_machine().memory().into());
+        //match &value.virtual_machine().machine().chipset() {
+        //    ChipsetSchema::Q35 { q35: _ } => builder.with_chipset(crate::runtime::Chipset::Q35(
+        //        crate::runtime::Q35Chipset::new(/*bus_devices.clone()*/),
+        //    )),
+        //    ChipsetSchema::I440FX { i440fx: _ } => {
+        //        builder.with_chipset(crate::runtime::Chipset::I440FX)
+        //    }
+        //};
 
         builder.build()
     }

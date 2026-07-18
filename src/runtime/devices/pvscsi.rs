@@ -1,7 +1,9 @@
-use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, sync::Arc};
+
+use derive_new::new;
 
 use crate::runtime::{
-    BusDevice, BusDeviceRegistry, PciDevice, PcieAddress, PcieDevice,
+    PciDevice, PcieAddress, PcieDevice, ScsiAddress,
     isa::{IsaAddress, IsaDevice},
     pci::PciAddress,
     scsi::ScsiDevice,
@@ -15,84 +17,38 @@ enum Address {
     Isa(IsaAddress),
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct PvScsi {
-    address: Mutex<Option<Address>>,
-    bus_id: u8,
+pub struct PvScsiBuilder {
+    scsi_bus: HashMap<ScsiAddress, Arc<dyn ScsiDevice>>,
 }
-
-impl PvScsi {
-    pub fn new(bus_devices: Arc<Mutex<BusDeviceRegistry>>) -> Self {
-        let bus_id = bus_devices
-            .lock()
-            .unwrap()
-            .add_bus(std::any::TypeId::of::<dyn ScsiDevice>());
-        println!(
-            "PvScsi::new(): scsi bus id: {}, type id: {:?}, type name: {}",
-            bus_id,
-            std::any::TypeId::of::<dyn ScsiDevice>(),
-            std::any::type_name::<dyn ScsiDevice>()
-        );
-        PvScsi {
-            address: Mutex::new(None),
-            bus_id,
+impl PvScsiBuilder {
+    pub fn new() -> Self {
+        Self {
+            scsi_bus: HashMap::new(),
         }
     }
-}
-
-impl PcieDevice for PvScsi {
-    fn get_pcie_address(&self) -> Option<PcieAddress> {
-        match *self.address.lock().unwrap() {
-            Some(Address::Pcie(addr)) => Some(addr),
-            _ => None,
-        }
+    pub fn build(self) -> PvScsi {
+        PvScsi::new(self.scsi_bus)
     }
-    fn set_pcie_address(&self, address: PcieAddress) {
-        println!("Setting PCIe address to {:?}", address);
-        let mut addr = self.address.lock().unwrap();
-        *addr = Some(Address::Pcie(address));
-    }
-}
-
-impl PciDevice for PvScsi {
-    fn get_pci_address(&self) -> Option<PciAddress> {
-        match *self.address.lock().unwrap() {
-            Some(Address::Pci(addr)) => Some(addr),
-            _ => None,
-        }
-    }
-    fn set_pci_address(&self, address: PciAddress) {
-        println!("Setting PCI address to {:?}", address);
-        let mut addr = self.address.lock().unwrap();
-        *addr = Some(Address::Pci(address));
-    }
-}
-
-impl IsaDevice for PvScsi {
-    fn get_isa_address(&self) -> Option<IsaAddress> {
-        match *self.address.lock().unwrap() {
-            Some(Address::Isa(addr)) => Some(addr),
-            _ => None,
-        }
-    }
-    fn set_isa_address(&self, address: IsaAddress) {
-        println!("Setting ISA address to {:?}", address);
-        let mut addr = self.address.lock().unwrap();
-        *addr = Some(Address::Isa(address));
-    }
-}
-
-impl BusDevice for PvScsi {
-    fn as_any(&self) -> &dyn std::any::Any {
+    pub fn with_scsi_device(
+        mut self,
+        address: Option<ScsiAddress>,
+        device: Arc<dyn ScsiDevice>,
+    ) -> Self {
+        let address = match address {
+            Some(address) => address,
+            None => ScsiAddress::new(0, 0),
+        };
+        self.scsi_bus.insert(address, device);
         self
     }
-
-    fn get_name(&self) -> &str {
-        "pvscsi"
-    }
-
-    fn get_type(&self) -> std::any::TypeId {
-        std::any::TypeId::of::<Self>()
-    }
 }
+
+#[allow(dead_code)]
+#[derive(Debug, new)]
+pub struct PvScsi {
+    scsi_bus: HashMap<ScsiAddress, Arc<dyn ScsiDevice>>,
+}
+
+impl PcieDevice for PvScsi {}
+impl PciDevice for PvScsi {}
+impl IsaDevice for PvScsi {}

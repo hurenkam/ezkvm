@@ -1,20 +1,15 @@
-use crate::runtime::{BusAddress, StorageDevice};
+use derive_getters::Getters;
+use derive_new::new;
+use std::fmt::Debug;
+
+use crate::runtime::StorageDevice;
 
 #[allow(dead_code)]
-pub trait ScsiDevice: StorageDevice {
-    fn get_scsi_address(&self) -> Option<ScsiAddress>;
-    fn set_scsi_address(&self, address: ScsiAddress);
-}
+pub trait ScsiDevice: StorageDevice + Debug + Send + Sync + 'static {}
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Getters, new)]
 pub struct ScsiAddress {
-    pub bus: u8,
-    pub target: u8,
-    pub lun: u8,
-}
-impl BusAddress for ScsiAddress {
-    fn get_bus_id(&self) -> u8 {
-        self.bus
-    }
+    target: u8,
+    lun: u8,
 }

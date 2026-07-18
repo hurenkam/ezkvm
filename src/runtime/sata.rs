@@ -1,20 +1,15 @@
-use crate::runtime::{BusAddress, StorageDevice};
+use derive_getters::Getters;
+use derive_new::new;
+use std::fmt::Debug;
+
+use crate::runtime::StorageDevice;
 
 #[allow(dead_code)]
-pub trait SataDevice: StorageDevice {
-    fn get_sata_address(&self) -> Option<SataAddress>;
-    fn set_sata_address(&self, address: SataAddress);
-}
+pub trait SataDevice: StorageDevice + Debug + Sync + Send + 'static {}
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Getters, new)]
 pub struct SataAddress {
-    pub bus: u8,
-    pub port: u8,
-    pub device: u8,
-}
-impl BusAddress for SataAddress {
-    fn get_bus_id(&self) -> u8 {
-        self.bus
-    }
+    port: u8,
+    device: u8,
 }

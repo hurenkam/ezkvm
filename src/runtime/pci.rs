@@ -1,20 +1,14 @@
-use crate::runtime::{BusAddress, BusDevice};
+use std::fmt::Debug;
+
+use derive_getters::Getters;
+use derive_new::new;
 
 #[allow(dead_code)]
-pub trait PciDevice: BusDevice {
-    fn get_pci_address(&self) -> Option<PciAddress>;
-    fn set_pci_address(&self, address: PciAddress);
-}
+pub trait PciDevice: Debug + Sync + Send + 'static {}
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Getters, new)]
 pub struct PciAddress {
-    pub bus: u8,
-    pub device: u8,
-    pub function: u8,
-}
-impl BusAddress for PciAddress {
-    fn get_bus_id(&self) -> u8 {
-        self.bus
-    }
+    device: u8,
+    function: u8,
 }
