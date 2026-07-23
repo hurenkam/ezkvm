@@ -4,13 +4,19 @@ use crate::{
     config::ezkvm::{
         ConfigSchema,
         schema::{
-            ChipsetSchema, DeviceSchema, IdeDeviceTypeSchema, PciDeviceTypeSchema, PcieDeviceTypeSchema,
-            SataDeviceTypeSchema, ScsiDeviceTypeSchema, UsbDeviceTypeSchema,
+            BiosSchema, ChipsetSchema, DeviceSchema, DisplaySchema, IdeDeviceTypeSchema,
+            MemoryResourceSchema, PciDeviceTypeSchema, PcieDeviceTypeSchema, PcieResourceSchema,
+            ResourceSchema, SataDeviceTypeSchema, ScsiDeviceTypeSchema, StorageResourceSchema,
+            TpmSchema, UsbDeviceTypeSchema,
         },
     }, runtime::{
-        Cdrom, Chipset, GenericPciDevice, GenericUsbDevice, Hdd, IdeAddress, Memory, PciAddress, PciDeviceKind, PcieAddress, PcieDevice, PvScsiBuilder, Q35ChipsetBuilder, Runtime, RuntimeBuilder, SataAddress, ScsiAddress, Ssd, UsbAddress, UsbDeviceKind, VirtioNetPcie,
+        AudioDevice, Cdrom, Chipset, EfiDisk, GenericPciDevice, GenericUsbDevice, Hdd, HostPci,
+        IdeAddress, Ivshmem, Memory, PciAddress, PciDeviceKind, PcieAddress, PcieDevice, PvScsiBuilder,
+        Q35ChipsetBuilder, RawArgs, Runtime, RuntimeBuilder, SataAddress, ScsiAddress, SpiceDisplay,
+        Ssd, TpmState, UsbAddress, UsbDeviceKind, VirtioNetPcie,
     },
 };
+use super::error::YamlRuntimeError;
 use derive_getters::Getters;
 use derive_new::new;
 
@@ -24,7 +30,7 @@ enum StorageKind {
 #[derive(Default)]
 struct PvScsiControllerSpec {
     pcie_address: Option<PcieAddress>,
-    scsi_disks: Vec<(ScsiAddress, StorageKind)>,
+    scsi_disks: Vec<(ScsiAddress, StorageKind, String)>,
 }
 
 #[derive(Debug, Getters, new)]
@@ -33,19 +39,68 @@ pub struct Builder {
     schema: ConfigSchema,
 }
 impl Builder {
-    pub fn build(&self) -> Result<Runtime, String> {
+    pub fn build(&self) -> Result<Runtime, YamlRuntimeError> {
         let vm = self.schema.virtual_machine();
         let memory = Memory::new(*vm.memory().size());
         let chipset = self.build_chipset()?;
 
-        RuntimeBuilder::new()
-            .with_memory(memory)
-            .with_chipset(chipset)
+        let mut builder = RuntimeBuilder::new().with_memory(memory).with_chipset(chipset);
+
+        if let BiosSchema::Uefi { uefi } = vm.boot().bios() {
+            builder = builder.with_efidisk(EfiDisk::new(
+                uefi.resource().clone(),
+                uefi.efitype().clone(),
+                *uefi.pre_enrolled_keys(),
+                uefi.ms_cert().clone(),
+                uefi.logical_size().clone().unwrap_or_default(),
+                None, // block_device_size_bytes: Phase 7/9 scope only
+            ));
+        }
+
+        if let Some(tpm) = vm.tpm() {
+            match tpm {
+                TpmSchema::Emulated { swtpm } => {
+                    builder = builder.with_tpmstate(TpmState::new(
+                        swtpm.resource().clone(),
+                        swtpm.version().clone(),
+                    ));
+                }
+                TpmSchema::Passthrough { .. } => {
+                    return Err(YamlRuntimeError::UnsupportedTpmType {
+                        tpm_type: "passthrough".to_string(),
+                    });
+                }
+            }
+        }
+
+        if let Some(audio) = vm.audio_device() {
+            builder = builder.with_audio_device(AudioDevice::new(
+                audio.device_type().clone(),
+                audio.driver().clone(),
+            ));
+        }
+
+        if let Some(raw_args) = vm.raw_args() {
+            builder = builder.with_raw_args(RawArgs(raw_args.value().to_string()));
+        }
+
+        if let Some(DisplaySchema::Spice { spice }) = self.schema.host().display() {
+            builder = builder.with_spice_display(SpiceDisplay::new(
+                Some(*spice.port()),
+                Some(spice.listen().clone()),
+                *spice.disable_ticketing(),
+                *spice.gl(),
+                spice.rendernode().clone(),
+                *spice.clipboard(),
+            ));
+        }
+
+        Ok(builder
             .build()
-            .map_err(|_| "failed to build runtime".to_string())
+            .unwrap_or_else(|_| unreachable!("RuntimeBuilder::build() never fails")))
     }
 
-    fn build_chipset(&self) -> Result<Chipset, String> {
+    fn build_chipset(&self) -> Result<Chipset, YamlRuntimeError> {
         let vm = self.schema.virtual_machine();
         match vm.machine().chipset() {
             ChipsetSchema::Q35 { .. } => self.build_q35_chipset(),
@@ -53,30 +108,31 @@ impl Builder {
                 if vm.devices().is_empty() {
                     Ok(Chipset::I440FX)
                 } else {
-                    Err("i440fx conversion currently supports no attached devices".to_string())
+                    Err(YamlRuntimeError::I440fxWithDevices)
                 }
             }
         }
     }
 
-    fn build_q35_chipset(&self) -> Result<Chipset, String> {
+    fn build_q35_chipset(&self) -> Result<Chipset, YamlRuntimeError> {
+        let resources = self.schema.host().resources();
         let mut pvsci_by_bus: BTreeMap<u8, PvScsiControllerSpec> = BTreeMap::new();
         let mut pcie_devices: Vec<(PcieAddress, Arc<dyn crate::runtime::PcieDevice>)> = Vec::new();
-        let mut sata_disks: Vec<(SataAddress, StorageKind)> = Vec::new();
+        let mut sata_disks: Vec<(SataAddress, StorageKind, String)> = Vec::new();
         let mut pci_devices: Vec<(PciAddress, PciDeviceKind)> = Vec::new();
-        let mut ide_devices: Vec<(IdeAddress, StorageKind)> = Vec::new();
+        let mut ide_devices: Vec<(IdeAddress, StorageKind, String)> = Vec::new();
         let mut usb_devices: Vec<(UsbAddress, UsbDeviceKind)> = Vec::new();
 
         for device in self.schema.virtual_machine().devices() {
             match device {
                 DeviceSchema::Pcie { pcie } => {
-                    match_pcie_device(&mut pvsci_by_bus, &mut pcie_devices, pcie)?;
+                    match_pcie_device(&mut pvsci_by_bus, &mut pcie_devices, pcie, resources)?;
                 }
                 DeviceSchema::Scsi { scsi } => {
-                    match_scsi_device(&mut pvsci_by_bus, scsi);
+                    match_scsi_device(&mut pvsci_by_bus, scsi, resources)?;
                 }
                 DeviceSchema::Sata { sata } => {
-                    match_sata_device(&mut sata_disks, sata)?;
+                    match_sata_device(&mut sata_disks, sata, resources)?;
                 }
                 DeviceSchema::Pci { pci } => {
                     match_pci_device(&mut pci_devices, pci)?;
@@ -85,15 +141,15 @@ impl Builder {
                     match_usb_device(&mut usb_devices, usb)?;
                 }
                 DeviceSchema::Ide { ide } => {
-                    match_ide_device(&mut ide_devices, ide);
+                    match_ide_device(&mut ide_devices, ide, resources)?;
                 }
             }
         }
 
-        sata_disks.sort_by_key(|(addr, _)| (*addr.port(), *addr.device()));
+        sata_disks.sort_by_key(|(addr, _, _)| (*addr.port(), *addr.device()));
         pcie_devices.sort_by_key(|(addr, _)| (*addr.device(), *addr.function()));
         pci_devices.sort_by_key(|(addr, _)| (*addr.device(), *addr.function()));
-        ide_devices.sort_by_key(|(addr, _)| (*addr.channel(), *addr.device()));
+        ide_devices.sort_by_key(|(addr, _, _)| (*addr.channel(), *addr.device()));
         usb_devices.sort_by_key(|(addr, _)| addr.port().clone());
 
         let mut q35_builder = Q35ChipsetBuilder::new();
@@ -115,17 +171,59 @@ impl Builder {
     }
 }
 
-fn insert_pvsci_controllers(pvsci_by_bus: BTreeMap<u8, PvScsiControllerSpec>, mut q35_builder: Q35ChipsetBuilder, used_pcie_addresses: &mut HashSet<PcieAddress>) -> Result<Q35ChipsetBuilder, String> {
+fn find_storage_resource(id: &str, resources: &[ResourceSchema]) -> Result<String, YamlRuntimeError> {
+    for resource in resources {
+        if let ResourceSchema::Storage { id: rid, storage } = resource {
+            if rid == id {
+                return Ok(match storage {
+                    StorageResourceSchema::File { file } => file.clone(),
+                    StorageResourceSchema::BlockDevice { block_device } => block_device.clone(),
+                });
+            }
+        }
+    }
+    Err(YamlRuntimeError::ResourceNotFound { id: id.to_string() })
+}
+
+fn find_pcie_resource<'a>(
+    id: &str,
+    resources: &'a [ResourceSchema],
+) -> Result<&'a PcieResourceSchema, YamlRuntimeError> {
+    for resource in resources {
+        if let ResourceSchema::PcieDevice { id: rid, pcie } = resource {
+            if rid == id {
+                return Ok(pcie);
+            }
+        }
+    }
+    Err(YamlRuntimeError::ResourceNotFound { id: id.to_string() })
+}
+
+fn find_memory_resource<'a>(
+    id: &str,
+    resources: &'a [ResourceSchema],
+) -> Result<&'a MemoryResourceSchema, YamlRuntimeError> {
+    for resource in resources {
+        if let ResourceSchema::Memory { id: rid, memory } = resource {
+            if rid == id {
+                return Ok(memory);
+            }
+        }
+    }
+    Err(YamlRuntimeError::ResourceNotFound { id: id.to_string() })
+}
+
+fn insert_pvsci_controllers(pvsci_by_bus: BTreeMap<u8, PvScsiControllerSpec>, mut q35_builder: Q35ChipsetBuilder, used_pcie_addresses: &mut HashSet<PcieAddress>) -> Result<Q35ChipsetBuilder, YamlRuntimeError> {
     for (bus, mut spec) in pvsci_by_bus {
         spec.scsi_disks
-            .sort_by_key(|(addr, _)| (*addr.target(), *addr.lun()));
+            .sort_by_key(|(addr, _, _)| (*addr.target(), *addr.lun()));
 
         let mut pvsci_builder = PvScsiBuilder::new();
-        for (scsi_address, storage_kind) in spec.scsi_disks {
+        for (scsi_address, storage_kind, path) in spec.scsi_disks {
             let storage: Arc<dyn crate::runtime::ScsiDevice> = match storage_kind {
-                StorageKind::Hdd => Arc::new(Hdd::new(String::new())),
-                StorageKind::Ssd => Arc::new(Ssd::new(String::new())),
-                StorageKind::Cdrom => Arc::new(Cdrom::new(String::new())),
+                StorageKind::Hdd => Arc::new(Hdd::new(path)),
+                StorageKind::Ssd => Arc::new(Ssd::new(path)),
+                StorageKind::Cdrom => Arc::new(Cdrom::new(path)),
             };
             pvsci_builder = pvsci_builder.with_scsi_device(Some(scsi_address), storage);
         }
@@ -133,11 +231,10 @@ fn insert_pvsci_controllers(pvsci_by_bus: BTreeMap<u8, PvScsiControllerSpec>, mu
             .pcie_address
             .unwrap_or_else(|| PcieAddress::new(bus, 0));
         if !used_pcie_addresses.insert(pcie_address) {
-            return Err(format!(
-                "duplicate pcie address during runtime conversion: {}:{}",
-                pcie_address.device(),
-                pcie_address.function()
-            ));
+            return Err(YamlRuntimeError::DuplicatePcieAddress {
+                device: *pcie_address.device(),
+                function: *pcie_address.function(),
+            });
         }
 
         q35_builder = q35_builder
@@ -146,71 +243,76 @@ fn insert_pvsci_controllers(pvsci_by_bus: BTreeMap<u8, PvScsiControllerSpec>, mu
     Ok(q35_builder)
 }
 
-fn insert_ide_devices(ide_devices: Vec<(IdeAddress, StorageKind)>, mut q35_builder: Q35ChipsetBuilder) -> Q35ChipsetBuilder {
-    for (ide_address, storage_kind) in ide_devices {
+fn insert_ide_devices(ide_devices: Vec<(IdeAddress, StorageKind, String)>, mut q35_builder: Q35ChipsetBuilder) -> Q35ChipsetBuilder {
+    for (ide_address, storage_kind, path) in ide_devices {
         match storage_kind {
             StorageKind::Hdd => {
-                q35_builder = q35_builder.with_ide_device(Some(ide_address), Arc::new(Hdd::new(String::new())));
+                q35_builder = q35_builder.with_ide_device(Some(ide_address), Arc::new(Hdd::new(path)));
             }
             StorageKind::Ssd => {
-                q35_builder = q35_builder.with_ide_device(Some(ide_address), Arc::new(Ssd::new(String::new())));
+                q35_builder = q35_builder.with_ide_device(Some(ide_address), Arc::new(Ssd::new(path)));
             }
             StorageKind::Cdrom => {
-                q35_builder = q35_builder.with_ide_device(Some(ide_address), Arc::new(Cdrom::new(String::new())));
+                q35_builder = q35_builder.with_ide_device(Some(ide_address), Arc::new(Cdrom::new(path)));
             }
         }
     }
     q35_builder
 }
 
-fn insert_sata_devices(sata_disks: Vec<(SataAddress, StorageKind)>, mut q35_builder: Q35ChipsetBuilder) -> Q35ChipsetBuilder {
-    for (sata_address, storage_kind) in sata_disks {
+fn insert_sata_devices(sata_disks: Vec<(SataAddress, StorageKind, String)>, mut q35_builder: Q35ChipsetBuilder) -> Q35ChipsetBuilder {
+    for (sata_address, storage_kind, path) in sata_disks {
         q35_builder = match storage_kind {
             StorageKind::Hdd => {
-                q35_builder.with_sata_device(Some(sata_address), Arc::new(Hdd::new(String::new())))
+                q35_builder.with_sata_device(Some(sata_address), Arc::new(Hdd::new(path)))
             }
             StorageKind::Ssd => {
-                q35_builder.with_sata_device(Some(sata_address), Arc::new(Ssd::new(String::new())))
+                q35_builder.with_sata_device(Some(sata_address), Arc::new(Ssd::new(path)))
             }
             StorageKind::Cdrom => {
-                q35_builder.with_sata_device(Some(sata_address), Arc::new(Cdrom::new(String::new())))
+                q35_builder.with_sata_device(Some(sata_address), Arc::new(Cdrom::new(path)))
             }
         };
     }
     q35_builder
 }
 
-fn insert_pcie_devices(pcie_devices: Vec<(PcieAddress, Arc<dyn PcieDevice + 'static>)>, mut q35_builder: Q35ChipsetBuilder, mut used_pcie_addresses: HashSet<PcieAddress>) -> Result<Q35ChipsetBuilder, String> {
+fn insert_pcie_devices(pcie_devices: Vec<(PcieAddress, Arc<dyn PcieDevice + 'static>)>, mut q35_builder: Q35ChipsetBuilder, mut used_pcie_addresses: HashSet<PcieAddress>) -> Result<Q35ChipsetBuilder, YamlRuntimeError> {
     for (pcie_address, pcie_device) in pcie_devices {
         if !used_pcie_addresses.insert(pcie_address) {
-            return Err(format!(
-                "duplicate pcie address during runtime conversion: {}:{}",
-                pcie_address.device(),
-                pcie_address.function()
-            ));
+            return Err(YamlRuntimeError::DuplicatePcieAddress {
+                device: *pcie_address.device(),
+                function: *pcie_address.function(),
+            });
         }
         q35_builder = q35_builder.with_pcie_device(Some(pcie_address), pcie_device);
     }
     Ok(q35_builder)
 }
 
-fn match_ide_device(ide_devices: &mut Vec<(IdeAddress, StorageKind)>, ide: &crate::config::ezkvm::schema::IdeDeviceSchema) {
+fn match_ide_device(
+    ide_devices: &mut Vec<(IdeAddress, StorageKind, String)>,
+    ide: &crate::config::ezkvm::schema::IdeDeviceSchema,
+    resources: &[ResourceSchema],
+) -> Result<(), YamlRuntimeError> {
     let channel = ide.bus().unwrap_or(0);
     let address = ide.address().as_ref().map(|a| a.address).unwrap_or(0);
 
-    let storage_kind = match ide.device() {
-        IdeDeviceTypeSchema::Hdd { .. } => StorageKind::Hdd,
-        IdeDeviceTypeSchema::Ssd { .. } => StorageKind::Ssd,
-        IdeDeviceTypeSchema::Cdrom { .. } => StorageKind::Cdrom,
+    let (storage_kind, resource_id) = match ide.device() {
+        IdeDeviceTypeSchema::Hdd { resource } => (StorageKind::Hdd, resource),
+        IdeDeviceTypeSchema::Ssd { resource } => (StorageKind::Ssd, resource),
+        IdeDeviceTypeSchema::Cdrom { resource } => (StorageKind::Cdrom, resource),
     };
+    let path = find_storage_resource(resource_id, resources)?;
 
-    ide_devices.push((IdeAddress::new(channel, address), storage_kind));
+    ide_devices.push((IdeAddress::new(channel, address), storage_kind, path));
+    Ok(())
 }
 
-fn match_usb_device(usb_devices: &mut Vec<(UsbAddress, UsbDeviceKind)>, usb: &crate::config::ezkvm::schema::UsbDeviceSchema) -> Result<(), String> {
+fn match_usb_device(usb_devices: &mut Vec<(UsbAddress, UsbDeviceKind)>, usb: &crate::config::ezkvm::schema::UsbDeviceSchema) -> Result<(), YamlRuntimeError> {
     let bus = usb.bus().unwrap_or(0);
     if bus != 0 {
-        return Err(format!("unsupported usb bus {} for runtime conversion", bus));
+        return Err(YamlRuntimeError::UnsupportedUsbBus { bus });
     }
     let address = usb
         .address()
@@ -231,10 +333,12 @@ fn match_usb_device(usb_devices: &mut Vec<(UsbAddress, UsbDeviceKind)>, usb: &cr
     Ok(())
 }
 
-fn match_pci_device(pci_devices: &mut Vec<(PciAddress, PciDeviceKind)>, pci: &crate::config::ezkvm::schema::PciDeviceSchema) -> Result<(), String> {
+fn match_pci_device(pci_devices: &mut Vec<(PciAddress, PciDeviceKind)>, pci: &crate::config::ezkvm::schema::PciDeviceSchema) -> Result<(), YamlRuntimeError> {
     let bus = pci.bus().unwrap_or(0);
     if bus != 0 {
-        return Err(format!("unsupported pci bus {} for runtime conversion", bus));
+        return Err(YamlRuntimeError::UnsupportedPcieDevice {
+            device_type: format!("legacy PCI bus {} (only bus 0 supported)", bus),
+        });
     }
     let address = pci
         .address()
@@ -246,7 +350,7 @@ fn match_pci_device(pci_devices: &mut Vec<(PciAddress, PciDeviceKind)>, pci: &cr
         PciDeviceTypeSchema::QxlGpu => PciDeviceKind::QxlGpu,
         PciDeviceTypeSchema::Ac97 => PciDeviceKind::Ac97,
         PciDeviceTypeSchema::HostPci { .. } => {
-            return Err("HostPci passthrough on PCI bus is not yet supported in runtime conversion".to_string());
+            return Err(YamlRuntimeError::UnsupportedPciPassthroughOnPciBus);
         }
     };
     pci_devices.push((address, kind));
@@ -255,35 +359,34 @@ fn match_pci_device(pci_devices: &mut Vec<(PciAddress, PciDeviceKind)>, pci: &cr
     Ok(())
 }
 
-fn match_sata_device(sata_disks: &mut Vec<(SataAddress, StorageKind)>, sata: &crate::config::ezkvm::schema::SataDeviceSchema) -> Result<(), String> {
-    let storage_kind = match sata.device() {
-        SataDeviceTypeSchema::Hdd { .. } => StorageKind::Hdd,
-        SataDeviceTypeSchema::Ssd { .. } => StorageKind::Ssd,
-        SataDeviceTypeSchema::Cdrom { .. } => StorageKind::Cdrom,
+fn match_sata_device(sata_disks: &mut Vec<(SataAddress, StorageKind, String)>, sata: &crate::config::ezkvm::schema::SataDeviceSchema, resources: &[ResourceSchema]) -> Result<(), YamlRuntimeError> {
+    let (storage_kind, resource_id) = match sata.device() {
+        SataDeviceTypeSchema::Hdd { resource } => (StorageKind::Hdd, resource),
+        SataDeviceTypeSchema::Ssd { resource } => (StorageKind::Ssd, resource),
+        SataDeviceTypeSchema::Cdrom { resource } => (StorageKind::Cdrom, resource),
     };
     let bus = sata.bus().unwrap_or(0);
     if bus != 0 {
-        return Err(format!(
-            "unsupported sata bus {} for runtime conversion",
-            bus
-        ));
+        return Err(YamlRuntimeError::UnsupportedSataBus { bus });
     }
+    let path = find_storage_resource(resource_id, resources)?;
     let address = sata
         .address()
         .as_ref()
         .map(|a| SataAddress::new(a.address, 0))
         .unwrap_or_else(|| SataAddress::new(0, 0));
-    sata_disks.push((address, storage_kind));
+    sata_disks.push((address, storage_kind, path));
 
     Ok(())
 }
 
-fn match_scsi_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, scsi: &crate::config::ezkvm::schema::ScsiDeviceSchema) {
-    let storage_kind = match scsi.device() {
-        ScsiDeviceTypeSchema::Hdd { .. } => StorageKind::Hdd,
-        ScsiDeviceTypeSchema::Ssd { .. } => StorageKind::Ssd,
-        ScsiDeviceTypeSchema::Cdrom { .. } => StorageKind::Cdrom,
+fn match_scsi_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, scsi: &crate::config::ezkvm::schema::ScsiDeviceSchema, resources: &[ResourceSchema]) -> Result<(), YamlRuntimeError> {
+    let (storage_kind, resource_id) = match scsi.device() {
+        ScsiDeviceTypeSchema::Hdd { resource } => (StorageKind::Hdd, resource),
+        ScsiDeviceTypeSchema::Ssd { resource } => (StorageKind::Ssd, resource),
+        ScsiDeviceTypeSchema::Cdrom { resource } => (StorageKind::Cdrom, resource),
     };
+    let path = find_storage_resource(resource_id, resources)?;
 
     let bus = scsi.bus().unwrap_or(0);
     let address = scsi
@@ -295,10 +398,12 @@ fn match_scsi_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, scsi
         .entry(bus)
         .or_default()
         .scsi_disks
-        .push((address, storage_kind));
+        .push((address, storage_kind, path));
+
+    Ok(())
 }
 
-fn match_pcie_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, pcie_devices: &mut Vec<(PcieAddress, Arc<dyn PcieDevice + 'static>)>, pcie: &crate::config::ezkvm::schema::PcieDeviceSchema) -> Result<(), String> {
+fn match_pcie_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, pcie_devices: &mut Vec<(PcieAddress, Arc<dyn PcieDevice + 'static>)>, pcie: &crate::config::ezkvm::schema::PcieDeviceSchema, resources: &[ResourceSchema]) -> Result<(), YamlRuntimeError> {
     let bus = pcie.bus().unwrap_or(0);
     let pcie_address = pcie
         .address()
@@ -320,10 +425,9 @@ fn match_pcie_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, pcie
             vhost,
         } => {
             if bus != 0 {
-                return Err(format!(
-                    "unsupported pcie bus {} for virtio_net runtime conversion",
-                    bus
-                ));
+                return Err(YamlRuntimeError::UnsupportedPcieDevice {
+                    device_type: format!("virtio_net on pcie bus {} (only bus 0 supported)", bus),
+                });
             }
 
             let address = pcie_address.unwrap_or_else(|| PcieAddress::new(0, 0));
@@ -336,18 +440,43 @@ fn match_pcie_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, pcie
             ));
             pcie_devices.push((address, nic));
         }
-        _ => {
-            return Err(format!(
-                "unsupported pcie device for runtime conversion: {:?}",
-                pcie.device()
-            ));
+        PcieDeviceTypeSchema::HostPci { resource, x_vga } => {
+            let pcie_resource = find_pcie_resource(resource, resources)?;
+            match pcie_resource {
+                PcieResourceSchema::HostAddress { address, functions, rombar, romfile } => {
+                    let addr = pcie_address.unwrap_or_else(|| PcieAddress::new(0, 0));
+                    let host_pci = Arc::new(HostPci::new(
+                        address.clone(),
+                        functions.clone(),
+                        true,
+                        *x_vga,
+                        *rombar,
+                        romfile.clone(),
+                    ));
+                    pcie_devices.push((addr, host_pci));
+                }
+                PcieResourceSchema::Address { .. } => {
+                    return Err(YamlRuntimeError::ResourceNotFound { id: resource.clone() });
+                }
+            }
+        }
+        PcieDeviceTypeSchema::IvshmemPlain { resource } => {
+            let memory = find_memory_resource(resource, resources)?;
+            let addr = pcie_address.unwrap_or_else(|| PcieAddress::new(0, 0));
+            let ivshmem = Arc::new(Ivshmem::new(resource.clone(), memory.path.clone(), memory.size.clone()));
+            pcie_devices.push((addr, ivshmem));
+        }
+        other => {
+            return Err(YamlRuntimeError::UnsupportedPcieDevice {
+                device_type: format!("{:?}", other),
+            });
         }
     }
     Ok(())
 }
 
 impl TryFrom<ConfigSchema> for Runtime {
-    type Error = String;
+    type Error = YamlRuntimeError;
 
     fn try_from(value: ConfigSchema) -> Result<Self, Self::Error> {
         let builder = Builder::new(value);
@@ -361,9 +490,9 @@ mod tests {
         BootSchema, ChipsetSchema, ConfigSchema, DeviceSchema, HostSchema, I440FXChipsetSchema,
         IdeAddressSchema, IdeDeviceSchema, IdeDeviceTypeSchema, MachineSchema, MemorySchema,
         MetadataSchema, PciAddressSchema, PciDeviceSchema, PciDeviceTypeSchema, PcieAddressSchema,
-        PcieDeviceSchema, PcieDeviceTypeSchema, Q35ChipsetSchema, SataAddressSchema,
-        SataDeviceSchema, SataDeviceTypeSchema, UsbAddressSchema, UsbDeviceSchema,
-        UsbDeviceTypeSchema, VirtualMachineSchema,
+        PcieDeviceSchema, PcieDeviceTypeSchema, Q35ChipsetSchema, ResourceSchema, SataAddressSchema,
+        SataDeviceSchema, SataDeviceTypeSchema, StorageResourceSchema, UsbAddressSchema,
+        UsbDeviceSchema, UsbDeviceTypeSchema, VirtualMachineSchema,
     };
 
     #[test]
@@ -401,7 +530,14 @@ mod tests {
     fn sata_hdd_is_supported() {
         let schema = ConfigSchema::new(
             MetadataSchema::new("1.0.0".to_string(), "vm".to_string()),
-            HostSchema::new(None, None, vec![]),
+            HostSchema::new(
+                None,
+                None,
+                vec![ResourceSchema::Storage {
+                    id: "storage0".to_string(),
+                    storage: StorageResourceSchema::File { file: "storage0".to_string() },
+                }],
+            ),
             VirtualMachineSchema::new(
                 MachineSchema::new(
                     ChipsetSchema::Q35 {
@@ -438,7 +574,20 @@ mod tests {
     fn q35_extended_device_types_are_supported() {
         let schema = ConfigSchema::new(
             MetadataSchema::new("1.0.0".to_string(), "vm".to_string()),
-            HostSchema::new(None, None, vec![]),
+            HostSchema::new(
+                None,
+                None,
+                vec![
+                    ResourceSchema::Storage {
+                        id: "iso0".to_string(),
+                        storage: StorageResourceSchema::File { file: "iso0".to_string() },
+                    },
+                    ResourceSchema::Storage {
+                        id: "storage0".to_string(),
+                        storage: StorageResourceSchema::File { file: "storage0".to_string() },
+                    },
+                ],
+            ),
             VirtualMachineSchema::new(
                 MachineSchema::new(
                     ChipsetSchema::Q35 {
@@ -507,5 +656,51 @@ mod tests {
 
         let result = crate::runtime::Runtime::try_from(schema);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn missing_resource_id_returns_typed_error() {
+        // Q35 chipset referencing a HostPci resource ("hostpci99") that does not exist in
+        // host.resources() — the conversion must fail with a typed ResourceNotFound error,
+        // not panic or silently substitute an empty path.
+        let schema = ConfigSchema::new(
+            MetadataSchema::new("1.0.0".to_string(), "vm".to_string()),
+            HostSchema::new(None, None, vec![]),
+            VirtualMachineSchema::new(
+                MachineSchema::new(
+                    ChipsetSchema::Q35 {
+                        q35: Q35ChipsetSchema::new(None),
+                    },
+                    None,
+                ),
+                None,
+                MemorySchema::new(1024, None, false),
+                BootSchema::default(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                vec![DeviceSchema::Pcie {
+                    pcie: PcieDeviceSchema::new(
+                        Some(0),
+                        None,
+                        PcieDeviceTypeSchema::HostPci {
+                            resource: "hostpci99".to_string(),
+                            x_vga: false,
+                        },
+                    ),
+                }],
+            ),
+        );
+
+        let result = crate::runtime::Runtime::try_from(schema);
+        match result {
+            Err(crate::config::ezkvm::runtime::YamlRuntimeError::ResourceNotFound { id }) => {
+                assert_eq!(id, "hostpci99");
+            }
+            other => panic!("expected ResourceNotFound {{ id: \"hostpci99\" }}, got {other:?}"),
+        }
     }
 }

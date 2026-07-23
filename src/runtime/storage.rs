@@ -44,7 +44,11 @@ impl Cdrom {
     }
 }
 
-impl IdeDevice for Ssd {}
+impl IdeDevice for Ssd {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 impl SataDevice for Ssd {
     fn as_any(&self) -> &dyn std::any::Any {
@@ -68,7 +72,11 @@ impl StorageDevice for Ssd {
     }
 }
 
-impl IdeDevice for Hdd {}
+impl IdeDevice for Hdd {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 impl SataDevice for Hdd {
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -90,7 +98,11 @@ impl StorageDevice for Hdd {
     }
 }
 
-impl IdeDevice for Cdrom {}
+impl IdeDevice for Cdrom {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 impl SataDevice for Cdrom {
     fn as_any(&self) -> &dyn std::any::Any {
         self
