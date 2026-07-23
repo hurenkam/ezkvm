@@ -1,0 +1,34 @@
+00:00.0 Host bridge: Intel Corporation 82G33/G31/P35/P31 Express DRAM Controller
+00:01.0 VGA compatible controller: Red Hat, Inc. Virtio GPU (rev 01)
+00:1a.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #4 (rev 03)
+00:1a.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #5 (rev 03)
+00:1a.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #6 (rev 03)
+00:1a.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #2 (rev 03)
+00:1b.0 Audio device: Intel Corporation 82801I (ICH9 Family) HD Audio Controller (rev 03)
+00:1c.0 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.1 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.2 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.3 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1d.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #1 (rev 03)
+00:1d.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #2 (rev 03)
+00:1d.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #3 (rev 03)
+00:1d.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #1 (rev 03)
+00:1e.0 PCI bridge: Intel Corporation 82801 PCI Bridge (rev 92)
+00:1f.0 ISA bridge: Intel Corporation 82801IB (ICH9) LPC Interface Controller (rev 02)
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+00:1f.3 SMBus: Intel Corporation 82801I (ICH9 Family) SMBus Controller (rev 02)
+01:00.0 Ethernet controller: Intel Corporation 82574L Gigabit Network Connection
+05:01.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:02.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:03.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:04.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+06:03.0 Unclassified device [00ff]: Red Hat, Inc. Virtio memory balloon
+06:08.0 Communication controller: Red Hat, Inc. Virtio console
+06:09.0 Communication controller: Red Hat, Inc. Virtio console
+06:12.0 Ethernet controller: Red Hat, Inc. Virtio network device
+07:1b.0 USB controller: Red Hat, Inc. QEMU XHCI Host Controller (rev 01)
+09:01.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+09:02.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+09:03.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+09:04.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+

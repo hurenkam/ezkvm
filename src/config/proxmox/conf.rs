@@ -51,38 +51,38 @@ pub struct ProxmoxSerialConf {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ProxmoxVmConf {
-    pub scsi:    BTreeMap<u8, ProxmoxDiskConf>,
-    pub sata:    BTreeMap<u8, ProxmoxDiskConf>,
-    pub ide:     BTreeMap<u8, ProxmoxDiskConf>,
-    pub virtio:  BTreeMap<u8, ProxmoxDiskConf>,
-    pub net:     BTreeMap<u8, ProxmoxNetConf>,
+    pub scsi: BTreeMap<u8, ProxmoxDiskConf>,
+    pub sata: BTreeMap<u8, ProxmoxDiskConf>,
+    pub ide: BTreeMap<u8, ProxmoxDiskConf>,
+    pub virtio: BTreeMap<u8, ProxmoxDiskConf>,
+    pub net: BTreeMap<u8, ProxmoxNetConf>,
     pub hostpci: BTreeMap<u8, ProxmoxHostPciConf>,
-    pub usb:     BTreeMap<u8, ProxmoxUsbConf>,
-    pub serial:  BTreeMap<u8, ProxmoxSerialConf>,
+    pub usb: BTreeMap<u8, ProxmoxUsbConf>,
+    pub serial: BTreeMap<u8, ProxmoxSerialConf>,
 
-    pub efidisk:  Option<ProxmoxEfiDiskConf>,
+    pub efidisk: Option<ProxmoxEfiDiskConf>,
     pub tpmstate: Option<ProxmoxTpmConf>,
-    pub audio:    Option<ProxmoxAudioConf>,
+    pub audio: Option<ProxmoxAudioConf>,
 
-    pub memory:  Option<u64>,
+    pub memory: Option<u64>,
     pub machine: Option<String>,
-    pub bios:    Option<String>,
-    pub cpu:     Option<String>,
-    pub args:    Option<String>,
-    pub vga:     Option<String>,
-    pub cores:   Option<u8>,
+    pub bios: Option<String>,
+    pub cpu: Option<String>,
+    pub args: Option<String>,
+    pub vga: Option<String>,
+    pub cores: Option<u8>,
     pub sockets: Option<u8>,
-    pub name:    Option<String>,
-    pub ostype:  Option<String>,
-    pub numa:    Option<bool>,
-    pub boot:    Option<String>,
-    pub scsihw:  Option<String>,
-    pub parent:  Option<String>,
-    pub meta:    Option<String>,
+    pub name: Option<String>,
+    pub ostype: Option<String>,
+    pub numa: Option<bool>,
+    pub boot: Option<String>,
+    pub scsihw: Option<String>,
+    pub parent: Option<String>,
+    pub meta: Option<String>,
     pub smbios1: Option<String>,
-    pub tablet:  Option<bool>,
+    pub tablet: Option<bool>,
     pub vmgenid: Option<String>,
-    pub agent:   Option<String>,
+    pub agent: Option<String>,
 }
 
 // FromStr implemented in Task 03-02-B after parse_sub_options() is available (Plan 03-03)
@@ -91,8 +91,8 @@ use std::str::FromStr;
 
 use crate::config::proxmox::error::ProxmoxParseError;
 use crate::config::proxmox::parser::{
-    parse_disk_raw, parse_efidisk_raw, parse_hostpci_raw, parse_net_raw, parse_serial_raw,
-    parse_tpmstate_raw, parse_usb_raw, parse_audio_raw, split_sections,
+    parse_audio_raw, parse_disk_raw, parse_efidisk_raw, parse_hostpci_raw, parse_net_raw,
+    parse_serial_raw, parse_tpmstate_raw, parse_usb_raw, split_sections,
 };
 
 impl FromStr for ProxmoxVmConf {
@@ -103,19 +103,50 @@ impl FromStr for ProxmoxVmConf {
         let mut conf = ProxmoxVmConf::default();
 
         for (key, value) in entries {
+            let parse_index = |prefix: &str| {
+                key.strip_prefix(prefix)
+                    .unwrap_or_default()
+                    .parse::<u8>()
+                    .map_err(|_| ProxmoxParseError::InvalidSubOption {
+                        field: key.clone(),
+                        raw: value.clone(),
+                    })
+            };
+
             // scsihw must be checked BEFORE any starts_with("scsi") prefix
             if key == "scsihw" {
                 conf.scsihw = Some(value);
             } else if key == "memory" {
-                conf.memory = value.parse::<u64>().ok();
+                conf.memory = Some(value.parse::<u64>().map_err(|_| {
+                    ProxmoxParseError::InvalidSubOption {
+                        field: "memory".into(),
+                        raw: value.clone(),
+                    }
+                })?);
             } else if key == "cores" {
-                conf.cores = value.parse::<u8>().ok();
+                conf.cores =
+                    Some(
+                        value
+                            .parse::<u8>()
+                            .map_err(|_| ProxmoxParseError::InvalidSubOption {
+                                field: "cores".into(),
+                                raw: value.clone(),
+                            })?,
+                    );
             } else if key == "sockets" {
-                conf.sockets = value.parse::<u8>().ok();
+                conf.sockets =
+                    Some(
+                        value
+                            .parse::<u8>()
+                            .map_err(|_| ProxmoxParseError::InvalidSubOption {
+                                field: "sockets".into(),
+                                raw: value.clone(),
+                            })?,
+                    );
             } else if key == "numa" {
-                conf.numa = Some(value == "1");
+                conf.numa = Some(value != "0");
             } else if key == "tablet" {
-                conf.tablet = Some(value == "1");
+                conf.tablet = Some(value != "0");
             } else if key == "cpu" {
                 conf.cpu = Some(value);
             } else if key == "machine" {
@@ -143,63 +174,43 @@ impl FromStr for ProxmoxVmConf {
             } else if key == "agent" {
                 conf.agent = Some(value);
             } else if key == "audio0" {
-                conf.audio = parse_audio_raw(&value).ok();
+                conf.audio = Some(parse_audio_raw(&value)?);
             } else if key == "efidisk0" {
-                conf.efidisk = parse_efidisk_raw(&value).ok();
+                conf.efidisk = Some(parse_efidisk_raw(&value)?);
             } else if let Some(rest) = key.strip_prefix("tpmstate") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if idx == 0 {
-                        conf.tpmstate = parse_tpmstate_raw(&value).ok();
-                    }
+                let idx = rest
+                    .parse::<u8>()
+                    .map_err(|_| ProxmoxParseError::InvalidSubOption {
+                        field: key.clone(),
+                        raw: value.clone(),
+                    })?;
+                if idx == 0 {
+                    conf.tpmstate = Some(parse_tpmstate_raw(&value)?);
                 }
-            } else if let Some(rest) = key.strip_prefix("scsi") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(disk) = parse_disk_raw(&value) {
-                        conf.scsi.insert(idx, disk);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("sata") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(disk) = parse_disk_raw(&value) {
-                        conf.sata.insert(idx, disk);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("ide") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(disk) = parse_disk_raw(&value) {
-                        conf.ide.insert(idx, disk);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("virtio") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(disk) = parse_disk_raw(&value) {
-                        conf.virtio.insert(idx, disk);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("net") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(net) = parse_net_raw(&value) {
-                        conf.net.insert(idx, net);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("hostpci") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(pci) = parse_hostpci_raw(&value) {
-                        conf.hostpci.insert(idx, pci);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("usb") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(usb) = parse_usb_raw(&value) {
-                        conf.usb.insert(idx, usb);
-                    }
-                }
-            } else if let Some(rest) = key.strip_prefix("serial") {
-                if let Ok(idx) = rest.parse::<u8>() {
-                    if let Ok(serial) = parse_serial_raw(&value) {
-                        conf.serial.insert(idx, serial);
-                    }
-                }
+            } else if key.strip_prefix("scsi").is_some() {
+                let idx = parse_index("scsi")?;
+                conf.scsi.insert(idx, parse_disk_raw(&value)?);
+            } else if key.strip_prefix("sata").is_some() {
+                let idx = parse_index("sata")?;
+                conf.sata.insert(idx, parse_disk_raw(&value)?);
+            } else if key.strip_prefix("ide").is_some() {
+                let idx = parse_index("ide")?;
+                conf.ide.insert(idx, parse_disk_raw(&value)?);
+            } else if key.strip_prefix("virtio").is_some() {
+                let idx = parse_index("virtio")?;
+                conf.virtio.insert(idx, parse_disk_raw(&value)?);
+            } else if key.strip_prefix("net").is_some() {
+                let idx = parse_index("net")?;
+                conf.net.insert(idx, parse_net_raw(&value)?);
+            } else if key.strip_prefix("hostpci").is_some() {
+                let idx = parse_index("hostpci")?;
+                conf.hostpci.insert(idx, parse_hostpci_raw(&value)?);
+            } else if key.strip_prefix("usb").is_some() {
+                let idx = parse_index("usb")?;
+                conf.usb.insert(idx, parse_usb_raw(&value)?);
+            } else if key.strip_prefix("serial").is_some() {
+                let idx = parse_index("serial")?;
+                conf.serial.insert(idx, parse_serial_raw(&value)?);
             }
             // unknown keys are silently ignored
         }
@@ -229,9 +240,19 @@ mod tests {
         assert_eq!(conf.net[&0].mac, "BC:24:11:3A:21:B7", "MAC preserved");
         assert!(conf.scsi.contains_key(&0), "scsi0 should be parsed");
         assert!(conf.scsi.contains_key(&1), "scsi1 should be parsed");
+        assert_eq!(conf.scsi[&0].volume, "vm1-pool:vm-108-boot");
+        assert_eq!(conf.memory, Some(16384));
+        assert!(conf
+            .scsi
+            .values()
+            .all(|disk| !disk.volume.contains("x86-64-v2-AES")));
         assert!(conf.audio.is_some(), "audio0 should be parsed");
         assert!(conf.usb.contains_key(&0), "usb0 should be parsed");
         assert!(conf.args.is_some(), "args should be preserved verbatim");
-        assert_eq!(conf.scsihw.as_deref(), Some("pvscsi"), "scsihw should be 'pvscsi'");
+        assert_eq!(
+            conf.scsihw.as_deref(),
+            Some("pvscsi"),
+            "scsihw should be 'pvscsi'"
+        );
     }
 }

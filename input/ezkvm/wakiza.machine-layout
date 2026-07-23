@@ -1,0 +1,51 @@
+Validating configuration: input/ezkvm/wakiza.yaml
+✓ Configuration is valid
+VM Name: wakiza
+Architecture: x86_64
+Memory: 16384 MiB
+vCPUs: 8
+[2m2026-05-08T08:11:35.825287Z[0m [33m WARN[0m [2mezkvm::qemu::network[0m[2m:[0m network resolution warning [3mwarning[0m[2m=[0mnetwork 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
+
+Machine layout:
+machine pc-q35-8.1
+|- bus ide.1
+|  \- ide2 (ide-cd)
+|- bus pcie.0
+|  |- ivshmem-plain#7 (ivshmem-plain @0x8)
+|  |- uhci-4 (ich9-usb-uhci4 @1a.0 readconfig)
+|  |- uhci-5 (ich9-usb-uhci5 @1a.1 readconfig)
+|  |- uhci-6 (ich9-usb-uhci6 @1a.2 readconfig)
+|  |- ehci-2 (ich9-usb-ehci2 @1a.7 readconfig)
+|  |- audio0 (ich9-intel-hda @1b.0 readconfig)
+|  |- ich9-pcie-port-1 (pcie-root-port @1c.0 readconfig)
+|  |  |- hostpci0 (vfio-pci @0x0.0)
+|  |  \- hostpci1 (vfio-pci @0x0.1)
+|  |- ich9-pcie-port-2 (pcie-root-port @1c.1 readconfig)
+|  |- ich9-pcie-port-3 (pcie-root-port @1c.2 readconfig)
+|  |- ich9-pcie-port-4 (pcie-root-port @1c.3 readconfig)
+|  |- uhci1 (ich9-usb-uhci1 @1d.0 readconfig)
+|  |- uhci2 (ich9-usb-uhci2 @1d.1 readconfig)
+|  |- uhci3 (ich9-usb-uhci3 @1d.2 readconfig)
+|  |- ehci (ich9-usb-ehci1 @1d.7 readconfig)
+|  \- pcidmi (i82801b11-bridge @1e.0 readconfig)
+|     |- pci.0 (pci-bridge @1.0 readconfig)
+|     |  |- virtio-keyboard#6 (virtio-keyboard)
+|     |  |- virtio-mouse#5 (virtio-mouse)
+|     |  |- virtio-net-pci#1 (virtio-net-pci @0x12)
+|     |  |- scsihw0 (pvscsi @0x5)
+|     |  |  |- scsi0 (scsi-hd)
+|     |  |  \- scsi1 (scsi-hd)
+|     |  |- qga0 (virtio-serial @0x8)
+|     |  |  \- virtserialport#3 (virtserialport)
+|     |  \- virtio-serial0 (virtio-serial-pci @0x9)
+|     |     \- virtserialport#4 (virtserialport)
+|     |- pci.1 (pci-bridge @2.0 readconfig)
+|     |- pci.2 (pci-bridge @3.0 readconfig)
+|     |  \- audiodev0 (ich9-intel-hda @0xc)
+|     |     |- audiodev0-codec0 (hda-micro)
+|     |     \- audiodev0-codec1 (hda-duplex)
+|     \- pci.3 (pci-bridge @4.0 readconfig)
+|- tpm-tis#2 (tpm-tis)
+|- xhci (qemu-xhci)
+|  \- usb0 (usb-host)
+\- vmgenid#8 (vmgenid)

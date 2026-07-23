@@ -1,0 +1,32 @@
+00:00.0 Host bridge: Intel Corporation 82G33/G31/P35/P31 Express DRAM Controller
+00:01.0 RAM memory: Red Hat, Inc. QEMU Inter-VM shared memory device (rev 01)
+00:02.0 RAM memory: Red Hat, Inc. QEMU Inter-VM shared memory device (rev 01)
+00:03.0 RAM memory: Red Hat, Inc. QEMU Inter-VM shared memory device (rev 01)
+00:1a.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #4 (rev 03)
+00:1a.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #5 (rev 03)
+00:1a.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #6 (rev 03)
+00:1a.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #2 (rev 03)
+00:1b.0 Audio device: Intel Corporation 82801I (ICH9 Family) HD Audio Controller (rev 03)
+00:1c.0 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.1 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.2 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.3 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1d.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #1 (rev 03)
+00:1d.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #2 (rev 03)
+00:1d.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #3 (rev 03)
+00:1d.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #1 (rev 03)
+00:1e.0 PCI bridge: Intel Corporation 82801 PCI Bridge (rev 92)
+00:1f.0 ISA bridge: Intel Corporation 82801IB (ICH9) LPC Interface Controller (rev 02)
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+00:1f.3 SMBus: Intel Corporation 82801I (ICH9 Family) SMBus Controller (rev 02)
+01:00.0 USB controller: Fresco Logic FL1100 USB 3.0 Host Controller (rev 10)
+02:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Ellesmere [Radeon RX 470/480/570/570X/580/580X/590] (rev ef)
+02:00.1 Audio device: Advanced Micro Devices, Inc. [AMD/ATI] Ellesmere HDMI Audio [Radeon RX 470/480 / 570/580/590]
+03:00.0 Ethernet controller: Intel Corporation X550 Virtual Function
+05:01.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:02.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:03.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:04.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+06:05.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+06:08.0 Communication controller: Red Hat, Inc. Virtio console
+

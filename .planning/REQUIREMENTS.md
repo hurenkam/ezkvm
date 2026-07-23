@@ -19,18 +19,18 @@
 
 ### Proxmox Import
 
-- [ ] **PROX-01**: Parser correctly splits active config from named snapshot sections before processing any fields
-- [ ] **PROX-02**: Parser handles URL-encoded comments (e.g., `##args%3A`) without treating them as live config entries
-- [ ] **PROX-03**: Parser tokenizes sub-option values correctly for fields containing colons (MAC addresses, PCI BDFs, storage volume names)
-- [ ] **PROX-04**: `storage.cfg` is parsed as a first-class input alongside `.conf` to resolve storage pool references
-- [ ] **PROX-05**: Proxmox importer populates all RUNT-01 through RUNT-07 Runtime fields from `.conf` input
-- [ ] **PROX-06**: Multi-function PCI devices (e.g., `0000:03:00.0` and `0000:03:00.1`) are represented distinctly in the Runtime
+- [x] **PROX-01**: Parser correctly splits active config from named snapshot sections before processing any fields
+- [x] **PROX-02**: Parser handles URL-encoded comments (e.g., `##args%3A`) without treating them as live config entries
+- [x] **PROX-03**: Parser tokenizes sub-option values correctly for fields containing colons (MAC addresses, PCI BDFs, storage volume names)
+- [x] **PROX-04**: `storage.cfg` is parsed as a first-class input alongside `.conf` to resolve storage pool references
+- [x] **PROX-05**: Proxmox importer populates all RUNT-01 through RUNT-07 Runtime fields from `.conf` input
+- [x] **PROX-06**: Multi-function PCI devices (e.g., `0000:03:00.0` and `0000:03:00.1`) are represented distinctly in the Runtime
 
 ### ezkvm YAML Round-Trip
 
 - [ ] **YAML-01**: Runtime serializes to ezkvm YAML format via saphyr
 - [ ] **YAML-02**: ezkvm YAML deserializes back to an identical Runtime (round-trip lossless for all RUNT-01–07 fields)
-- [ ] **YAML-03**: YAML schema covers all v1 Runtime device types
+- [x] **YAML-03**: YAML schema covers all v1 Runtime device types
 
 ### QEMU Commandline Generation
 
@@ -103,15 +103,15 @@
 | RUNT-07 | Phase 2 | Pending |
 | RUNT-08 | Phase 1 | Pending |
 | RUNT-09 | Phase 1 | Pending |
-| PROX-01 | Phase 3 | Pending |
-| PROX-02 | Phase 3 | Pending |
-| PROX-03 | Phase 3 | Pending |
-| PROX-04 | Phase 3 | Pending |
-| PROX-05 | Phase 4 | Pending |
-| PROX-06 | Phase 4 | Pending |
+| PROX-01 | Phase 3 | Complete |
+| PROX-02 | Phase 3 | Complete |
+| PROX-03 | Phase 3 | Complete |
+| PROX-04 | Phase 3 | Complete |
+| PROX-05 | Phase 4 | Complete |
+| PROX-06 | Phase 4 | Complete |
 | YAML-01 | Phase 6 | Pending |
 | YAML-02 | Phase 6 | Pending |
-| YAML-03 | Phase 5 | Pending |
+| YAML-03 | Phase 5 | Complete |
 | QEMU-01 | Phase 7 | Pending |
 | QEMU-02 | Phase 7 | Pending |
 | QEMU-03 | Phase 7 | Pending |
@@ -123,6 +123,7 @@
 | VMGR-05 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 27 total
 - Mapped to phases: 27 ✓
 - Unmapped: 0 ✓

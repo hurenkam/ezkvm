@@ -24,7 +24,10 @@ pub struct ProxmoxStorageConf {
 
 enum StorageParserState {
     Idle,
-    Building { name: String, entry: ProxmoxStorageEntry },
+    Building {
+        name: String,
+        entry: ProxmoxStorageEntry,
+    },
 }
 
 impl FromStr for ProxmoxStorageConf {
@@ -94,15 +97,23 @@ impl<'a> StorageResolver<'a> {
 
     /// Resolve a `pool:volume` reference to a host path.
     /// Returns `Err(InvalidVolumeRef)` if the string has no `:` separator.
-    pub fn resolve(&self, pool_volume: &str) -> Result<String, crate::config::proxmox::error::ProxmoxImportError> {
+    pub fn resolve(
+        &self,
+        pool_volume: &str,
+    ) -> Result<String, crate::config::proxmox::error::ProxmoxImportError> {
         use crate::config::proxmox::error::ProxmoxImportError;
 
-        let (pool, volume) = pool_volume.split_once(':').ok_or_else(|| {
-            ProxmoxImportError::InvalidVolumeRef { raw: pool_volume.to_string() }
-        })?;
+        let (pool, volume) =
+            pool_volume
+                .split_once(':')
+                .ok_or_else(|| ProxmoxImportError::InvalidVolumeRef {
+                    raw: pool_volume.to_string(),
+                })?;
 
         let entry = self.storage_conf.entries.get(pool).ok_or_else(|| {
-            ProxmoxImportError::UnknownStorage { pool: pool.to_string() }
+            ProxmoxImportError::UnknownStorage {
+                pool: pool.to_string(),
+            }
         })?;
 
         match &entry.storage_type {
@@ -122,7 +133,13 @@ impl<'a> StorageResolver<'a> {
                         property: "path".to_string(),
                     }
                 })?;
-                Ok(format!("{}/images/{}/{}", path, self.vmid, volume))
+                if let Some(iso) = volume.strip_prefix("iso/") {
+                    Ok(format!("{}/template/iso/{}", path, iso))
+                } else if let Some(template) = volume.strip_prefix("vztmpl/") {
+                    Ok(format!("{}/template/cache/{}", path, template))
+                } else {
+                    Ok(format!("{}/images/{}/{}", path, self.vmid, volume))
+                }
             }
             StorageType::Unknown(t) => Err(ProxmoxImportError::UnsupportedStorageType {
                 pool: pool.to_string(),
@@ -132,7 +149,7 @@ impl<'a> StorageResolver<'a> {
     }
 }
 
-
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -145,7 +162,10 @@ mod tests {
 
         let conf = ProxmoxStorageConf::from_str(&content).unwrap();
 
-        assert!(conf.entries.contains_key("vm1-pool"), "vm1-pool entry missing");
+        assert!(
+            conf.entries.contains_key("vm1-pool"),
+            "vm1-pool entry missing"
+        );
         assert_eq!(
             conf.entries["vm1-pool"].storage_type,
             StorageType::LvmThin,
@@ -170,14 +190,17 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_resolver_dir_includes_vmid() {
+    fn test_storage_resolver_dir_iso_uses_template_layout() {
         let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = std::path::Path::new(&manifest).join("input/felucia/storage.cfg");
         let content = std::fs::read_to_string(&path).unwrap();
         let conf = ProxmoxStorageConf::from_str(&content).unwrap();
         let resolver = StorageResolver::new(&conf, 108);
         let result = resolver.resolve("local:iso/virtio-win.iso").unwrap();
-        assert!(result.contains("/images/108/"), "path should include vmid");
+        assert_eq!(
+            result, "/var/lib/vz/template/iso/virtio-win.iso",
+            "ISO content must not use the VM image layout"
+        );
     }
 
     #[test]
@@ -185,7 +208,10 @@ mod tests {
         let conf = ProxmoxStorageConf::default();
         let resolver = StorageResolver::new(&conf, 108);
         let err = resolver.resolve("none").unwrap_err();
-        assert!(matches!(err, crate::config::proxmox::error::ProxmoxImportError::InvalidVolumeRef { .. }));
+        assert!(matches!(
+            err,
+            crate::config::proxmox::error::ProxmoxImportError::InvalidVolumeRef { .. }
+        ));
     }
 
     #[test]
@@ -193,6 +219,9 @@ mod tests {
         let conf = ProxmoxStorageConf::default();
         let resolver = StorageResolver::new(&conf, 108);
         let err = resolver.resolve("no-such-pool:vm-disk").unwrap_err();
-        assert!(matches!(err, crate::config::proxmox::error::ProxmoxImportError::UnknownStorage { .. }));
+        assert!(matches!(
+            err,
+            crate::config::proxmox::error::ProxmoxImportError::UnknownStorage { .. }
+        ));
     }
 }

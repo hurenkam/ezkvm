@@ -1,0 +1,76 @@
+Loading configuration from: input/ezkvm/wakiza.yaml
+✓ Configuration loaded and validated
+✓ Central configuration loaded
+✓ Runtime preflight checks passed
+[2m2026-05-08T08:10:07.008472Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0mnetwork 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
+Preflight warning: network 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
+[2m2026-05-08T08:10:07.008548Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0msystem.tpm.state_backend_uri resolves to local path '/dev/vm1/vm-108-tpmstate' but it does not exist on this host
+Preflight warning: system.tpm.state_backend_uri resolves to local path '/dev/vm1/vm-108-tpmstate' but it does not exist on this host
+[2m2026-05-08T08:10:07.008562Z[0m [33m WARN[0m [2mezkvm::preflight[0m[2m:[0m optional preflight warning [3mwarning[0m[2m=[0mLooking Glass shared memory path '/dev/kvmfr0' does not exist on this host
+Preflight warning: Looking Glass shared memory path '/dev/kvmfr0' does not exist on this host
+[2m2026-05-08T08:10:07.009635Z[0m [33m WARN[0m [2mezkvm::qemu::network[0m[2m:[0m network resolution warning [3mwarning[0m[2m=[0mnetwork 'net0' downgraded to user-mode because no bridge helper was found; install qemu-bridge-helper or set host_capabilities.network.bridge_helper
+Starting VM: wakiza
+QEMU binary: qemu-system-x86_64
+Dry run mode - would execute:
+qemu-system-x86_64 \
+  -name wakiza \
+  -machine type=pc-q35-8.1,hpet=off \
+  -cpu host,hv_ipi,hv_relaxed,hv_reset,hv_runtime,hv_spinlocks=0x1fff,hv_stimer,hv_synic,hv_time,hv_vapic,hv_vendor_id=proxmox,hv_vpindex,kvm=off,+kvm_pv_eoi,+kvm_pv_unhalt \
+  -m 16384M \
+  -smp 8,sockets=1,cores=8,maxcpus=8 \
+  -readconfig /usr/share/ezkvm/ezkvm-q35.cfg \
+  -device pvscsi,id=scsihw0,bus=pci.0,addr=0x5 \
+  -drive file=/dev/vm1/vm-108-boot,if=none,id=drive-scsi0,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap \
+  -device scsi-hd,drive=drive-scsi0,id=scsi0,bus=scsihw0.0,scsi-id=0,rotation_rate=1,bootindex=100 \
+  -drive file=/dev/vm1/vm-108-tmp,if=none,id=drive-scsi1,format=raw,discard=unmap,cache=none,aio=io_uring,detect-zeroes=unmap \
+  -device scsi-hd,drive=drive-scsi1,id=scsi1,bus=scsihw0.0,scsi-id=1,rotation_rate=1 \
+  -drive if=none,id=drive-ide2,media=cdrom \
+  -device ide-cd,drive=drive-ide2,id=ide2,bus=ide.1,bootindex=101 \
+  -netdev type=user,id=net0,hostname=wakiza \
+  -device virtio-net-pci,netdev=net0,mac=BC:24:11:3A:21:B7,bus=pci.0,addr=0x12,bootindex=102 \
+  -boot menu=on,strict=on,reboot-timeout=1000 \
+  -drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd \
+  -drive if=pflash,unit=1,id=drive-efidisk0,format=raw,file=/dev/vm1/vm-108-efidisk,size=540672 \
+  -chardev socket,id=tpmchar,path=/var/run/ezkvm/wakiza.swtpm \
+  -tpmdev emulator,id=tpmdev,chardev=tpmchar \
+  -device tpm-tis,tpmdev=tpmdev \
+  -device virtio-serial,id=qga0,bus=pci.0,addr=0x8 \
+  -chardev socket,path=/var/run/ezkvm/wakiza.qga,server=on,wait=off,id=qga0 \
+  -device virtserialport,chardev=qga0,name=org.qemu.guest_agent.0,bus=qga0.0 \
+  -device vfio-pci,host=0000:03:00.0,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0.0,multifunction=on \
+  -device vfio-pci,host=0000:03:00.1,id=hostpci1,bus=ich9-pcie-port-1,addr=0x0.1 \
+  -device qemu-xhci,id=xhci,p2=15,p3=15 \
+  -device usb-host,hostbus=1,hostport=2.2,id=usb0,bus=xhci.0,port=1 \
+  -spice port=5903,addr=127.0.0.1,disable-ticketing=on \
+  -device virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x9 \
+  -chardev spicevmc,id=vdagent,name=vdagent \
+  -device virtserialport,chardev=vdagent,name=com.redhat.spice.0,bus=virtio-serial0.0 \
+  -audiodev spice,id=spice-backend0 \
+  -device ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc \
+  -device hda-micro,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0 \
+  -device hda-duplex,id=audiodev0-codec1,bus=audiodev0.0,cad=1,audiodev=spice-backend0 \
+  -device virtio-mouse,bus=pci.0 \
+  -device virtio-keyboard,bus=pci.0 \
+  -device ivshmem-plain,memdev=ivshmem0,bus=pcie.0,addr=0x8 \
+  -object memory-backend-file,id=ivshmem0,share=on,mem-path=/dev/kvmfr0,size=128M \
+  -qmp unix:/var/run/ezkvm/wakiza.qmp,server=on,wait=off \
+  -smbios type=1,uuid=04d064c3-66a1-4aa7-9589-f8b3ecf91cd7 \
+  -device vmgenid,guid=c13b46f3-9743-49f0-92e8-297b9feac497 \
+  -pidfile /run/user/1000/ezkvm/wakiza.pid \
+  -nodefaults \
+  -vga none \
+  -nographic \
+  -global kvm-pit.lost_tick_policy=discard \
+  -global ICH9-LPC.disable_s3=1 \
+  -global ICH9-LPC.disable_s4=1 \
+  -rtc base=localtime,driftfix=slew \
+  -enable-kvm
+PID file: /run/user/1000/ezkvm/wakiza.pid
+Auxiliary launch (swtpm): /usr/bin/swtpm socket --tpm2 --tpmstate backend-uri=file:///dev/vm1/vm-108-tpmstate,mode=0600 --ctrl type=unixio,path=/var/run/ezkvm/wakiza.swtpm,mode=0600 --pid file=/var/run/ezkvm/wakiza.swtpm.pid --terminate --log file=/var/log/ezkvm/wakiza-swtpm.log,level=1 --daemon
+Capability resolution diagnostics:
+  mode: PortableLinux
+  runtime_root: source=central-config, value=/var/run/ezkvm
+  swtpm_binary: source=central-config, value=/usr/bin/swtpm
+  ovmf_code: source=central-config, value=/usr/share/pve-edk2-firmware/OVMF_CODE_4M.secboot.fd
+  looking_glass_program: mode=Auto, source=unresolved, value=<none>
+  network[net0]: mode=UserFallback, source=built-in-fallback, backend=user

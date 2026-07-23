@@ -1,0 +1,59 @@
+/usr/bin/kvm \
+  -id 502 \
+  -name 'malachor,debug-threads=on' \
+  -no-shutdown \
+  -chardev 'socket,id=qmp,path=/var/run/qemu-server/502.qmp,server=on,wait=off' \
+  -mon 'chardev=qmp,mode=control' \
+  -chardev 'socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect-ms=5000' \
+  -mon 'chardev=qmp-event,mode=control' \
+  -pidfile /var/run/qemu-server/502.pid \
+  -daemonize \
+  -smbios 'type=1,uuid=276b8aa5-2efd-4bb4-816a-81a2ac4a152e' \
+  -object '{"id":"throttle-drive-efidisk0","limits":{},"qom-type":"throttle-group"}' \
+  -blockdev '{"driver":"raw","file":{"driver":"file","filename":"/usr/share/pve-edk2-firmware//OVMF_CODE_4M.secboot.fd"},"node-name":"pflash0","read-only":true}' \
+  -blockdev '{"detect-zeroes":"on","discard":"ignore","driver":"throttle","file":{"cache":{"direct":false,"no-flush":false},"detect-zeroes":"on","discard":"ignore","driver":"raw","file":{"aio":"io_uring","cache":{"direct":false,"no-flush":false},"detect-zeroes":"on","discard":"ignore","driver":"host_device","filename":"/dev/vm1/vm-502-disk-0","node-name":"e784ca1307373ab6936d5220844082a","read-only":false},"node-name":"f784ca1307373ab6936d5220844082a","read-only":false,"size":540672},"node-name":"drive-efidisk0","read-only":false,"throttle-group":"throttle-drive-efidisk0"}' \
+  -smp '8,sockets=1,cores=8,maxcpus=8' \
+  -nodefaults \
+  -boot 'menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg' \
+  -vga none \
+  -nographic \
+  -cpu 'EPYC,enforce,+kvm_pv_eoi,+kvm_pv_unhalt,vendor=AuthenticAMD' \
+  -m 8192 \
+  -object 'memory-backend-file,id=ram-node0,size=8192M,mem-path=/run/hugepages/kvm/1048576kB,share=on,prealloc=yes' \
+  -numa 'node,nodeid=0,cpus=0-7,memdev=ram-node0' \
+  -object 'iothread,id=iothread-virtioscsi0' \
+  -object '{"id":"throttle-drive-scsi0","limits":{},"qom-type":"throttle-group"}' \
+  -global 'ICH9-LPC.disable_s3=1' \
+  -global 'ICH9-LPC.disable_s4=1' \
+  -readconfig /usr/share/qemu-server/pve-q35-4.0.cfg \
+  -device 'vmgenid,guid=a7eb2e77-2aa8-49f9-99f2-c92d2e606fd2' \
+  -device 'usb-tablet,id=tablet,bus=ehci.0,port=1' \
+  -device 'vfio-pci,host=0000:06:00.0,id=hostpci0,bus=ich9-pcie-port-1,addr=0x0' \
+  -device 'vfio-pci,host=0000:12:00.0,id=hostpci1.0,bus=ich9-pcie-port-2,addr=0x0.0,multifunction=on' \
+  -device 'vfio-pci,host=0000:12:00.1,id=hostpci1.1,bus=ich9-pcie-port-2,addr=0x0.1' \
+  -chardev 'socket,id=serial0,path=/var/run/qemu-server/502.serial0,server=on,wait=off' \
+  -device 'isa-serial,chardev=serial0' \
+  -device 'ich9-intel-hda,id=audiodev0,bus=pci.2,addr=0xc' \
+  -device 'hda-micro,id=audiodev0-codec0,bus=audiodev0.0,cad=0,audiodev=spice-backend0' \
+  -device 'hda-duplex,id=audiodev0-codec1,bus=audiodev0.0,cad=1,audiodev=spice-backend0' \
+  -audiodev 'spice,id=spice-backend0' \
+  -chardev 'socket,path=/var/run/qemu-server/502.qga,server=on,wait=off,id=qga0' \
+  -device 'virtio-serial,id=qga0,bus=pci.0,addr=0x8' \
+  -device 'virtserialport,chardev=qga0,name=org.qemu.guest_agent.0' \
+  -iscsi 'initiator-name=iqn.1993-08.org.debian:01:89402da79cc0' \
+  -device 'ide-cd,bus=ide.1,unit=0,id=ide2,bootindex=101' \
+  -device 'virtio-scsi-pci,id=virtioscsi0,bus=pci.3,addr=0x1,iothread=iothread-virtioscsi0' \
+  -blockdev '{"detect-zeroes":"unmap","discard":"unmap","driver":"throttle","file":{"cache":{"direct":false,"no-flush":false},"detect-zeroes":"unmap","discard":"unmap","driver":"raw","file":{"aio":"io_uring","cache":{"direct":false,"no-flush":false},"detect-zeroes":"unmap","discard":"unmap","driver":"host_device","filename":"/dev/vm1/vm-502-disk-1","node-name":"e10faf5d29183d53ead81f5ec8b69b5","read-only":false},"node-name":"f10faf5d29183d53ead81f5ec8b69b5","read-only":false},"node-name":"drive-scsi0","read-only":false,"throttle-group":"throttle-drive-scsi0"}' \
+  -device 'scsi-hd,bus=virtioscsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0,id=scsi0,device_id=drive-scsi0,rotation_rate=1,bootindex=100,write-cache=on' \
+  -netdev 'type=tap,id=net0,ifname=tap502i0,script=/usr/libexec/qemu-server/pve-bridge,downscript=/usr/libexec/qemu-server/pve-bridgedown,vhost=on' \
+  -device 'virtio-net-pci,mac=4A:0F:57:55:EC:55,netdev=net0,bus=pci.0,addr=0x12,id=net0,rx_queue_size=1024,tx_queue_size=256,bootindex=102,host_mtu=1500' \
+  -machine 'pflash0=pflash0,pflash1=drive-efidisk0,type=q35+pve1' \
+  -cpu EPYC,-hypervisor,+svm \
+  -spice 'port=5905,addr=0.0.0.0,disable-ticketing=on' \
+  -device virtio-serial-pci \
+  -chardev 'spicevmc,id=vdagent,name=vdagent' \
+  -device 'virtserialport,chardev=vdagent,name=com.redhat.spice.0' \
+  -device virtio-mouse \
+  -device virtio-keyboard \
+  -device 'ivshmem-plain,memdev=ivshmem12,bus=pcie.0' \
+  -object 'memory-backend-file,id=ivshmem12,share=on,mem-path=/dev/shm/lg12,size=32M'

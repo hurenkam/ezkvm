@@ -1,0 +1,343 @@
+hurenkam@pandora-markh-1:~/phoenix/hue-bridge-2/zigbee/libs$ lspci
+00:00.0 Host bridge: Intel Corporation 82G33/G31/P35/P31 Express DRAM Controller
+00:01.0 VGA compatible controller: Red Hat, Inc. Virtio GPU (rev 01)
+00:1a.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #4 (rev 03)
+00:1a.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #5 (rev 03)
+00:1a.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #6 (rev 03)
+00:1a.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #2 (rev 03)
+00:1b.0 Audio device: Intel Corporation 82801I (ICH9 Family) HD Audio Controller (rev 03)
+00:1c.0 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.1 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.2 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1c.3 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:1d.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #1 (rev 03)
+00:1d.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #2 (rev 03)
+00:1d.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #3 (rev 03)
+00:1d.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #1 (rev 03)
+00:1e.0 PCI bridge: Intel Corporation 82801 PCI Bridge (rev 92)
+00:1f.0 ISA bridge: Intel Corporation 82801IB (ICH9) LPC Interface Controller (rev 02)
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+00:1f.3 SMBus: Intel Corporation 82801I (ICH9 Family) SMBus Controller (rev 02)
+01:00.0 Ethernet controller: Intel Corporation 82574L Gigabit Network Connection
+05:01.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:02.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:03.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+05:04.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge
+06:03.0 Unclassified device [00ff]: Red Hat, Inc. Virtio memory balloon
+06:08.0 Communication controller: Red Hat, Inc. Virtio console
+06:09.0 Communication controller: Red Hat, Inc. Virtio console
+06:12.0 Ethernet controller: Red Hat, Inc. Virtio network device
+07:1b.0 USB controller: Red Hat, Inc. QEMU XHCI Host Controller (rev 01)
+09:01.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+09:02.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+09:03.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+09:04.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+hurenkam@pandora-markh-1:~/phoenix/hue-bridge-2/zigbee/libs$ lspci -t
+-[0000:00]-+-00.0
+           +-01.0
+           +-1a.0
+           +-1a.1
+           +-1a.2
+           +-1a.7
+           +-1b.0
+           +-1c.0-[01]----00.0
+           +-1c.1-[02]--
+           +-1c.2-[03]--
+           +-1c.3-[04]--
+           +-1d.0
+           +-1d.1
+           +-1d.2
+           +-1d.7
+           +-1e.0-[05-09]--+-01.0-[06]--+-03.0
+           |               |            +-08.0
+           |               |            +-09.0
+           |               |            \-12.0
+           |               +-02.0-[07]----1b.0
+           |               +-03.0-[08]--
+           |               \-04.0-[09]--+-01.0
+           |                            +-02.0
+           |                            +-03.0
+           |                            \-04.0
+           +-1f.0
+           +-1f.2
+           \-1f.3
+hurenkam@pandora-markh-1:~/phoenix/hue-bridge-2/zigbee/libs$ lspci -v
+00:00.0 Host bridge: Intel Corporation 82G33/G31/P35/P31 Express DRAM Controller
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0
+
+00:01.0 VGA compatible controller: Red Hat, Inc. Virtio GPU (rev 01) (prog-if 00 [VGA controller])
+	Subsystem: Red Hat, Inc. Virtio GPU
+	Flags: bus master, fast devsel, latency 0, IRQ 21
+	Memory at 80000000 (32-bit, prefetchable) [size=8M]
+	Memory at 7080000000 (64-bit, prefetchable) [size=16K]
+	Memory at 81a4b000 (32-bit, non-prefetchable) [size=4K]
+	Expansion ROM at 000c0000 [disabled] [size=128K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+00:1a.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #4 (rev 03) (prog-if 00 [UHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	I/O ports at 9100 [size=32]
+	Kernel driver in use: uhci_hcd
+
+00:1a.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #5 (rev 03) (prog-if 00 [UHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 17
+	I/O ports at 90e0 [size=32]
+	Kernel driver in use: uhci_hcd
+
+00:1a.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #6 (rev 03) (prog-if 00 [UHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 18
+	I/O ports at 90c0 [size=32]
+	Kernel driver in use: uhci_hcd
+
+00:1a.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #2 (rev 03) (prog-if 20 [EHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 19
+	Memory at 81a4a000 (32-bit, non-prefetchable) [size=4K]
+	Kernel driver in use: ehci-pci
+
+00:1b.0 Audio device: Intel Corporation 82801I (ICH9 Family) HD Audio Controller (rev 03)
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 117
+	Memory at 81a40000 (32-bit, non-prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: snd_hda_intel
+	Kernel modules: snd_hda_intel
+
+00:1c.0 PCI bridge: Red Hat, Inc. QEMU PCIe Root port (prog-if 00 [Normal decode])
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	Memory at 81a49000 (32-bit, non-prefetchable) [size=4K]
+	Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+	I/O behind bridge: 00008000-00008fff [size=4K]
+	Memory behind bridge: 81800000-819fffff [size=2M]
+	Prefetchable memory behind bridge: 0000007000000000-000000700fffffff [size=256M]
+	Capabilities: <access denied>
+	Kernel driver in use: pcieport
+
+00:1c.1 PCI bridge: Red Hat, Inc. QEMU PCIe Root port (prog-if 00 [Normal decode])
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	Memory at 81a48000 (32-bit, non-prefetchable) [size=4K]
+	Bus: primary=00, secondary=02, subordinate=02, sec-latency=0
+	I/O behind bridge: 00001000-00001fff [size=4K]
+	Memory behind bridge: 81600000-817fffff [size=2M]
+	Prefetchable memory behind bridge: 0000007010000000-000000701fffffff [size=256M]
+	Capabilities: <access denied>
+	Kernel driver in use: pcieport
+
+00:1c.2 PCI bridge: Red Hat, Inc. QEMU PCIe Root port (prog-if 00 [Normal decode])
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	Memory at 81a47000 (32-bit, non-prefetchable) [size=4K]
+	Bus: primary=00, secondary=03, subordinate=03, sec-latency=0
+	I/O behind bridge: 00002000-00002fff [size=4K]
+	Memory behind bridge: 81400000-815fffff [size=2M]
+	Prefetchable memory behind bridge: 0000007020000000-000000702fffffff [size=256M]
+	Capabilities: <access denied>
+	Kernel driver in use: pcieport
+
+00:1c.3 PCI bridge: Red Hat, Inc. QEMU PCIe Root port (prog-if 00 [Normal decode])
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	Memory at 81a46000 (32-bit, non-prefetchable) [size=4K]
+	Bus: primary=00, secondary=04, subordinate=04, sec-latency=0
+	I/O behind bridge: 00003000-00003fff [size=4K]
+	Memory behind bridge: 81200000-813fffff [size=2M]
+	Prefetchable memory behind bridge: 0000007030000000-000000703fffffff [size=256M]
+	Capabilities: <access denied>
+	Kernel driver in use: pcieport
+
+00:1d.0 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #1 (rev 03) (prog-if 00 [UHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	I/O ports at 90a0 [size=32]
+	Kernel driver in use: uhci_hcd
+
+00:1d.1 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #2 (rev 03) (prog-if 00 [UHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 17
+	I/O ports at 9080 [size=32]
+	Kernel driver in use: uhci_hcd
+
+00:1d.2 USB controller: Intel Corporation 82801I (ICH9 Family) USB UHCI Controller #3 (rev 03) (prog-if 00 [UHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 18
+	I/O ports at 9060 [size=32]
+	Kernel driver in use: uhci_hcd
+
+00:1d.7 USB controller: Intel Corporation 82801I (ICH9 Family) USB2 EHCI Controller #1 (rev 03) (prog-if 20 [EHCI])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 19
+	Memory at 81a45000 (32-bit, non-prefetchable) [size=4K]
+	Kernel driver in use: ehci-pci
+
+00:1e.0 PCI bridge: Intel Corporation 82801 PCI Bridge (rev 92) (prog-if 01 [Subtractive decode])
+	Flags: bus master, 66MHz, fast devsel, latency 0
+	Bus: primary=00, secondary=05, subordinate=09, sec-latency=0
+	I/O behind bridge: 00006000-00007fff [size=8K]
+	Memory behind bridge: 80800000-810fffff [size=9M]
+	Prefetchable memory behind bridge: 0000007040000000-000000707fffffff [size=1G]
+	Capabilities: <access denied>
+
+00:1f.0 ISA bridge: Intel Corporation 82801IB (ICH9) LPC Interface Controller (rev 02)
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0
+	Kernel driver in use: lpc_ich
+	Kernel modules: lpc_ich
+
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02) (prog-if 01 [AHCI 1.0])
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 36
+	I/O ports at 9040 [size=32]
+	Memory at 81a44000 (32-bit, non-prefetchable) [size=4K]
+	Capabilities: <access denied>
+	Kernel driver in use: ahci
+	Kernel modules: ahci
+
+00:1f.3 SMBus: Intel Corporation 82801I (ICH9 Family) SMBus Controller (rev 02)
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	I/O ports at 9000 [size=64]
+	Kernel driver in use: i801_smbus
+	Kernel modules: i2c_i801
+
+01:00.0 Ethernet controller: Intel Corporation 82574L Gigabit Network Connection
+	Subsystem: Intel Corporation Gigabit CT Desktop Adapter
+	Physical Slot: 0
+	Flags: bus master, fast devsel, latency 0, IRQ 16
+	Memory at 81880000 (32-bit, non-prefetchable) [size=128K]
+	Memory at 81800000 (32-bit, non-prefetchable) [size=512K]
+	I/O ports at 8000 [size=32]
+	Memory at 818a0000 (32-bit, non-prefetchable) [size=16K]
+	Expansion ROM at 818c0000 [disabled] [size=256K]
+	Capabilities: <access denied>
+	Kernel driver in use: e1000e
+	Kernel modules: e1000e
+
+05:01.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge (prog-if 00 [Normal decode])
+	Flags: bus master, 66MHz, fast devsel, latency 0, IRQ 21
+	Memory at 81000000 (64-bit, non-prefetchable) [size=256]
+	Bus: primary=05, secondary=06, subordinate=06, sec-latency=0
+	I/O behind bridge: 00007000-00007fff [size=4K]
+	Memory behind bridge: 80e00000-80ffffff [size=2M]
+	Prefetchable memory behind bridge: 0000007070000000-000000707fffffff [size=256M]
+	Capabilities: <access denied>
+
+05:02.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge (prog-if 00 [Normal decode])
+	Flags: bus master, 66MHz, fast devsel, latency 0, IRQ 22
+	Memory at 81001000 (64-bit, non-prefetchable) [size=256]
+	Bus: primary=05, secondary=07, subordinate=07, sec-latency=0
+	I/O behind bridge: [disabled]
+	Memory behind bridge: 80c00000-80dfffff [size=2M]
+	Prefetchable memory behind bridge: 0000007060000000-000000706fffffff [size=256M]
+	Capabilities: <access denied>
+
+05:03.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge (prog-if 00 [Normal decode])
+	Flags: bus master, 66MHz, fast devsel, latency 0, IRQ 23
+	Memory at 81002000 (64-bit, non-prefetchable) [size=256]
+	Bus: primary=05, secondary=08, subordinate=08, sec-latency=0
+	I/O behind bridge: [disabled]
+	Memory behind bridge: 80a00000-80bfffff [size=2M]
+	Prefetchable memory behind bridge: 0000007050000000-000000705fffffff [size=256M]
+	Capabilities: <access denied>
+
+05:04.0 PCI bridge: Red Hat, Inc. QEMU PCI-PCI bridge (prog-if 00 [Normal decode])
+	Flags: bus master, 66MHz, fast devsel, latency 0, IRQ 20
+	Memory at 81003000 (64-bit, non-prefetchable) [size=256]
+	Bus: primary=05, secondary=09, subordinate=09, sec-latency=0
+	I/O behind bridge: 00006000-00006fff [size=4K]
+	Memory behind bridge: 80800000-809fffff [size=2M]
+	Prefetchable memory behind bridge: 0000007040000000-000000704fffffff [size=256M]
+	Capabilities: <access denied>
+
+06:03.0 Unclassified device [00ff]: Red Hat, Inc. Virtio memory balloon
+	Subsystem: Red Hat, Inc. Virtio memory balloon
+	Physical Slot: 3
+	Flags: bus master, fast devsel, latency 0, IRQ 20
+	I/O ports at 7080 [size=64]
+	Memory at 80e03000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 707000c000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+06:08.0 Communication controller: Red Hat, Inc. Virtio console
+	Subsystem: Red Hat, Inc. Virtio console
+	Physical Slot: 8-2
+	Flags: bus master, fast devsel, latency 0, IRQ 21
+	I/O ports at 7040 [size=64]
+	Memory at 80e02000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 7070008000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+06:09.0 Communication controller: Red Hat, Inc. Virtio console
+	Subsystem: Red Hat, Inc. Virtio console
+	Physical Slot: 9-2
+	Flags: bus master, fast devsel, latency 0, IRQ 22
+	I/O ports at 7000 [size=64]
+	Memory at 80e01000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 7070004000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+06:12.0 Ethernet controller: Red Hat, Inc. Virtio network device
+	Subsystem: Red Hat, Inc. Virtio network device
+	Physical Slot: 18-2
+	Flags: bus master, fast devsel, latency 0, IRQ 23
+	I/O ports at 70c0 [size=32]
+	Memory at 80e00000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 7070000000 (64-bit, prefetchable) [size=16K]
+	Expansion ROM at 80e40000 [disabled] [size=256K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+07:1b.0 USB controller: Red Hat, Inc. QEMU XHCI Host Controller (rev 01) (prog-if 30 [XHCI])
+	Subsystem: Red Hat, Inc. QEMU XHCI Host Controller
+	Physical Slot: 27-3
+	Flags: bus master, fast devsel, latency 0, IRQ 21
+	Memory at 80c00000 (64-bit, non-prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: xhci_hcd
+	Kernel modules: xhci_pci
+
+09:01.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+	Subsystem: Red Hat, Inc. Virtio SCSI
+	Physical Slot: 1-4
+	Flags: bus master, fast devsel, latency 0, IRQ 21
+	I/O ports at 60c0 [size=64]
+	Memory at 80803000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 704000c000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+09:02.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+	Subsystem: Red Hat, Inc. Virtio SCSI
+	Physical Slot: 2-4
+	Flags: bus master, fast devsel, latency 0, IRQ 22
+	I/O ports at 6080 [size=64]
+	Memory at 80802000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 7040008000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+09:03.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+	Subsystem: Red Hat, Inc. Virtio SCSI
+	Physical Slot: 3-4
+	Flags: bus master, fast devsel, latency 0, IRQ 23
+	I/O ports at 6040 [size=64]
+	Memory at 80801000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 7040004000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+
+09:04.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
+	Subsystem: Red Hat, Inc. Virtio SCSI
+	Physical Slot: 4-4
+	Flags: bus master, fast devsel, latency 0, IRQ 20
+	I/O ports at 6000 [size=64]
+	Memory at 80800000 (32-bit, non-prefetchable) [size=4K]
+	Memory at 7040000000 (64-bit, prefetchable) [size=16K]
+	Capabilities: <access denied>
+	Kernel driver in use: virtio-pci
+

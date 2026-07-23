@@ -1,0 +1,40 @@
+/usr/bin/kvm \
+  -id 1011 \
+  -name 'zbp-base-win11,debug-threads=on' \
+  -no-shutdown \
+  -chardev 'socket,id=qmp,path=/var/run/qemu-server/1011.qmp,server=on,wait=off' \
+  -mon 'chardev=qmp,mode=control' \
+  -chardev 'socket,id=qmp-event,path=/var/run/qmeventd.sock,reconnect-ms=5000' \
+  -mon 'chardev=qmp-event,mode=control' \
+  -pidfile /var/run/qemu-server/1011.pid \
+  -daemonize \
+  -object '{"id":"throttle-drive-efidisk0","limits":{},"qom-type":"throttle-group"}' \
+  -blockdev '{"driver":"raw","file":{"driver":"file","filename":"/usr/share/pve-edk2-firmware//OVMF_CODE_4M.fd"},"node-name":"pflash0","read-only":true}' \
+  -blockdev '{"detect-zeroes":"on","discard":"ignore","driver":"throttle","file":{"cache":{"direct":false,"no-flush":false},"detect-zeroes":"on","discard":"ignore","driver":"raw","file":{"aio":"io_uring","cache":{"direct":false,"no-flush":false},"detect-zeroes":"on","discard":"ignore","driver":"host_device","filename":"/dev/vm1/base-1011-disk-0","node-name":"e63bd3e6691c220e11e08eb32b6fee9","read-only":true},"node-name":"f63bd3e6691c220e11e08eb32b6fee9","read-only":true,"size":540672},"node-name":"drive-efidisk0","read-only":true,"throttle-group":"throttle-drive-efidisk0"}' \
+  -smp '1,sockets=1,cores=1,maxcpus=1' \
+  -nodefaults \
+  -boot 'menu=on,strict=on,reboot-timeout=1000,splash=/usr/share/qemu-server/bootsplash.jpg' \
+  -vga none \
+  -nographic \
+  -cpu qemu64 \
+  -m 512 \
+  -object '{"id":"throttle-drive-scsi0","limits":{},"qom-type":"throttle-group"}' \
+  -object '{"id":"throttle-drive-scsi1","limits":{},"qom-type":"throttle-group"}' \
+  -global 'PIIX4_PM.disable_s3=1' \
+  -global 'PIIX4_PM.disable_s4=1' \
+  -device 'pci-bridge,id=pci.1,chassis_nr=1,bus=pci.0,addr=0x1e' \
+  -device 'pci-bridge,id=pci.2,chassis_nr=2,bus=pci.0,addr=0x1f' \
+  -device 'pci-bridge,id=pci.3,chassis_nr=3,bus=pci.0,addr=0x5' \
+  -device 'piix3-usb-uhci,id=uhci,bus=pci.0,addr=0x1.0x2' \
+  -device 'usb-tablet,id=tablet,bus=uhci.0,port=1' \
+  -device 'virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x3,free-page-reporting=on' \
+  -iscsi 'initiator-name=iqn.1993-08.org.debian:01:89402da79cc0' \
+  -device 'ide-cd,bus=ide.1,unit=0,id=ide2,bootindex=200' \
+  -device 'virtio-scsi-pci,id=virtioscsi0,bus=pci.3,addr=0x1' \
+  -blockdev '{"detect-zeroes":"unmap","discard":"unmap","driver":"throttle","file":{"cache":{"direct":false,"no-flush":false},"detect-zeroes":"unmap","discard":"unmap","driver":"raw","file":{"aio":"io_uring","cache":{"direct":false,"no-flush":false},"detect-zeroes":"unmap","discard":"unmap","driver":"host_device","filename":"/dev/vm1/base-1011-disk-1","node-name":"e518a07a97e065a77b33459695f500f","read-only":true},"node-name":"f518a07a97e065a77b33459695f500f","read-only":true},"node-name":"drive-scsi0","read-only":true,"throttle-group":"throttle-drive-scsi0"}' \
+  -device 'scsi-hd,bus=virtioscsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0,id=scsi0,device_id=drive-scsi0,rotation_rate=1,write-cache=on' \
+  -device 'virtio-scsi-pci,id=virtioscsi1,bus=pci.3,addr=0x2' \
+  -blockdev '{"detect-zeroes":"unmap","discard":"unmap","driver":"throttle","file":{"cache":{"direct":false,"no-flush":false},"detect-zeroes":"unmap","discard":"unmap","driver":"raw","file":{"aio":"io_uring","cache":{"direct":false,"no-flush":false},"detect-zeroes":"unmap","discard":"unmap","driver":"host_device","filename":"/dev/ws0/base-1011-disk-0","node-name":"ef111dc7bb4648d5e00df51a8f84d41","read-only":true},"node-name":"ff111dc7bb4648d5e00df51a8f84d41","read-only":true},"node-name":"drive-scsi1","read-only":true,"throttle-group":"throttle-drive-scsi1"}' \
+  -device 'scsi-hd,bus=virtioscsi1.0,channel=0,scsi-id=0,lun=1,drive=drive-scsi1,id=scsi1,device_id=drive-scsi1,rotation_rate=1,write-cache=on' \
+  -machine 'pflash0=pflash0,pflash1=drive-efidisk0,accel=tcg,type=pc+pve0' \
+  -snapshot
