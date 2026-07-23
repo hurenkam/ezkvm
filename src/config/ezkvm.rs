@@ -1,11 +1,11 @@
-mod compact_yaml;
 mod runtime;
 mod schema;
-mod store;
+mod file;
 
 #[allow(unused_imports)]
-pub use {schema::ConfigSchema, store::ConfigFileStore};
+pub use {schema::ConfigSchema, file::ConfigFileStore};
 
+/*
 use crate::{
     config::ezkvm::{
         runtime::{EzkvmChipsetHandler, EzkvmMemoryHandler},
@@ -13,6 +13,7 @@ use crate::{
     },
     runtime::{RootDevice, Runtime, RuntimeBuilder},
 };
+
 use std::{any::TypeId, collections::HashMap, fmt::Debug, sync::Arc};
 
 pub trait RootDeviceHandler: Debug + Send + Sync + 'static {
@@ -41,6 +42,7 @@ impl SchemaBuilder {
                     Arc::new(EzkvmChipsetHandler) as Arc<dyn RootDeviceHandler>,
                 ),
             ]),
+            //bus_device_handlers: HashMap::from([]),
             memory: None,
             chipset: None,
         }
@@ -48,7 +50,7 @@ impl SchemaBuilder {
 
     pub fn build(self) -> Result<ConfigSchema, ()> {
         let metadata =
-            schema::Metadata::new(EZKVM_CONFIG_SCHEMA_VERSION.to_string(), "vm".to_string());
+            schema::MetadataSchema::new(EZKVM_CONFIG_SCHEMA_VERSION.to_string(), "vm".to_string());
 
         let display = None;
         let audio = None;
@@ -65,6 +67,8 @@ impl SchemaBuilder {
         let smbios_uuid = None;
         let vmgenid = None;
         let tpm = None;
+        let audio_device = None;
+        let raw_args = None;
         let guest_agent = None;
         let devices = vec![];
         let virtual_machine = schema::VirtualMachineSchema::new(
@@ -75,6 +79,8 @@ impl SchemaBuilder {
             smbios_uuid,
             vmgenid,
             tpm,
+            audio_device,
+            raw_args,
             guest_agent,
             devices,
         );
@@ -105,38 +111,4 @@ impl SchemaBuilder {
         self
     }
 }
-
-impl TryFrom<Runtime> for ConfigSchema {
-    type Error = ();
-
-    fn try_from(value: Runtime) -> Result<Self, Self::Error> {
-        let mut builder = SchemaBuilder::new();
-
-        for device in value.root_devices() {
-            builder.with_device(device.as_ref())?;
-        }
-
-        builder.build()
-    }
-}
-
-impl TryFrom<ConfigSchema> for Runtime {
-    type Error = ();
-
-    fn try_from(value: ConfigSchema) -> Result<Self, Self::Error> {
-        let builder = RuntimeBuilder::new();
-        //let bus_devices = builder.bus_devices();
-
-        let builder = builder.with_memory(value.virtual_machine().memory().into());
-        //match &value.virtual_machine().machine().chipset() {
-        //    ChipsetSchema::Q35 { q35: _ } => builder.with_chipset(crate::runtime::Chipset::Q35(
-        //        crate::runtime::Q35Chipset::new(/*bus_devices.clone()*/),
-        //    )),
-        //    ChipsetSchema::I440FX { i440fx: _ } => {
-        //        builder.with_chipset(crate::runtime::Chipset::I440FX)
-        //    }
-        //};
-
-        builder.build()
-    }
-}
+ */

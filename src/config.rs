@@ -1,5 +1,5 @@
 mod ezkvm;
-mod proxmox;
+pub mod proxmox;
 mod qemu;
 
 #[allow(unused_imports)]

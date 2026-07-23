@@ -45,6 +45,12 @@ pub struct SpiceSchema {
     tls_ciphers: Option<String>,
     #[serde(default)]
     seamless_migration: bool,
+    #[serde(default)]
+    gl: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rendernode: Option<String>,
+    #[serde(default)]
+    clipboard: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -55,3 +61,22 @@ pub struct GtkSchema {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SdlSchema {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spice_schema_round_trips_yaml() {
+        let schema = SpiceSchema::new(
+            5900, "0.0.0.0".to_string(), false, false,
+            None, None, false,
+            true, Some("/dev/dri/renderD128".to_string()), false,
+        );
+        let yaml = crate::serde_yaml::to_string(&schema).unwrap();
+        let decoded: SpiceSchema = crate::serde_yaml::from_str(&yaml).unwrap();
+        assert!(*decoded.gl());
+        assert_eq!(decoded.rendernode().as_deref(), Some("/dev/dri/renderD128"));
+        assert!(!decoded.clipboard());
+    }
+}

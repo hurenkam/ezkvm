@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 
 /// Config-level guest agent configuration for the virtual machine.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct GuestAgent {
+pub struct GuestAgentSchema {
     #[serde(default = "default_true")]
     pub enabled: bool,
 }
 
-impl Default for GuestAgent {
+impl Default for GuestAgentSchema {
     fn default() -> Self {
         Self { enabled: true }
     }

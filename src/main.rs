@@ -16,12 +16,12 @@ fn main() {
         .with_memory(runtime::Memory::new(1024))
         .with_chipset(runtime::Chipset::Q35(
             Q35ChipsetBuilder::new()
-                .with_sata_device(Some(SataAddress::new(0, 0)), Arc::new(Ssd::new()))
+                .with_sata_device(Some(SataAddress::new(0, 0)), Arc::new(Ssd::new(String::new())))
                 .with_pcie_device(
                     Some(PcieAddress::new(0, 0)),
                     Arc::new(
                         PvScsiBuilder::new()
-                            .with_scsi_device(Some(ScsiAddress::new(0, 0)), Arc::new(Ssd::new()))
+                            .with_scsi_device(Some(ScsiAddress::new(0, 0)), Arc::new(Ssd::new(String::new())))
                             .build(),
                     ),
                 )
@@ -30,13 +30,13 @@ fn main() {
         .build()
         .expect("build runtime failed");
 
-    println!("runtime: {:?}\n\n\n", runtime);
+    println!("runtime: {}\n\n\n", runtime);
 
     let schema = EzkvmConfigSchema::try_from(runtime).expect("Failed to build VM schema");
     println!("ezkvm schema: {:?}\n\n\n", schema);
 
     let runtime = Runtime::try_from(schema).expect("Failed to build runtime from VM schema");
-    println!("runtime: {:?}\n\n\n", runtime);
+    println!("runtime: {}\n\n\n", runtime);
 
     let input = r#"
 metadata:
@@ -74,7 +74,7 @@ virtual_machine:
     uefi:
       resource: storage0
   swtpm:
-    version: 2.0
+    version: "v2.0"
     resource: storage1
   devices:
   - pcie:

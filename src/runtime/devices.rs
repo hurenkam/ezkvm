@@ -1,2 +1,12 @@
 mod pvscsi;
+mod pcie_net;
+mod pci_generic;
+mod usb_generic;
+mod hostpci;
+mod ivshmem;
 pub use pvscsi::*;
+pub use pcie_net::*;
+pub use pci_generic::*;
+pub use usb_generic::*;
+pub use hostpci::*;
+pub use ivshmem::*;

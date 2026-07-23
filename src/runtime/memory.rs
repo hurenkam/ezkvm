@@ -22,4 +22,13 @@ impl RootDevice for Memory {
     fn get_name(&self) -> &str {
         "memory"
     }
+    fn device_kind(&self) -> crate::runtime::RootDeviceKind {
+        crate::runtime::RootDeviceKind::Memory
+    }
+}
+
+impl std::fmt::Display for Memory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Memory: {}", self.size)
+    }
 }

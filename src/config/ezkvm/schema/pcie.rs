@@ -66,4 +66,32 @@ pub enum PcieDeviceTypeSchema {
     IvshmemPlain {
         resource: String,
     },
+    HostPci {
+        resource: String,
+        #[serde(default)]
+        x_vga: bool,
+    },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hostpci_round_trips_yaml() {
+        let device = PcieDeviceTypeSchema::HostPci {
+            resource: "hostpci0".to_string(),
+            x_vga: false,
+        };
+        let schema = PcieDeviceSchema::new(None, None, device);
+        let yaml = crate::serde_yaml::to_string(&schema).unwrap();
+        assert!(yaml.contains("host_pci"), "expected type: host_pci in yaml: {yaml}");
+        let decoded: PcieDeviceSchema = crate::serde_yaml::from_str(&yaml).unwrap();
+        if let PcieDeviceTypeSchema::HostPci { resource, x_vga } = decoded.device() {
+            assert_eq!(resource, "hostpci0");
+            assert!(!x_vga);
+        } else {
+            panic!("expected HostPci variant");
+        }
+    }
 }

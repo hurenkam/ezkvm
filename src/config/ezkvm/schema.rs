@@ -1,4 +1,5 @@
 mod audio;
+mod audio_device;
 mod boot;
 mod chipset;
 mod config;
@@ -14,6 +15,7 @@ mod meta;
 mod pci;
 mod pcie;
 mod resources;
+mod rawargs;
 mod sata;
 mod scsi;
 mod tpm;
@@ -22,10 +24,11 @@ mod virtual_machine;
 
 #[allow(unused_imports)]
 pub use {
-    audio::*, boot::*, chipset::*, config::*, cpu::*, device::*, display::*, guest_agent::*,
-    host::*, ide::*, machine::*, memory::*, meta::*, pci::*, pcie::*, resources::*, sata::*,
-    scsi::*, tpm::*, usb::*, virtual_machine::*,
+    audio::*, audio_device::*, boot::*, chipset::*, config::*, cpu::*, device::*, display::*,
+    guest_agent::*, host::*, ide::*, machine::*, memory::*, meta::*, pci::*, pcie::*,
+    rawargs::*, resources::*, sata::*, scsi::*, tpm::*, usb::*, virtual_machine::*,
 };
 
 /// Schema version for ezkvm runtime config specification.
+#[allow(dead_code)]
 pub const EZKVM_CONFIG_SCHEMA_VERSION: &str = "1.0.0";

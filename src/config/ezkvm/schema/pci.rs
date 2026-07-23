@@ -21,11 +21,16 @@ pub struct PciDeviceSchema {
     bus: Option<PciBusSchema>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     address: Option<PciAddressSchema>,
-    device: PciDeviceType,
+    device: PciDeviceTypeSchema,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum PciDeviceType {
+pub enum PciDeviceTypeSchema {
     NetworkController,
     QxlGpu,
     Ac97,
+    HostPci {
+        resource: String,
+        #[serde(default)]
+        x_vga: bool,
+    },
 }
