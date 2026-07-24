@@ -2,17 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 7
-current_phase_name: QEMU Cmdline
+current_phase: 8
+current_phase_name: VM Lifecycle
 status: planning
-last_updated: "2026-07-24T01:28:00+02:00"
+stopped_at: Phase 7 context gathered
+last_updated: "2026-07-24T15:58:25.825Z"
 last_activity: 2026-07-24
-last_activity_desc: Phase 06 YAML runtime round-trip verified complete
+last_activity_desc: Phase 7 complete, transitioned to Phase 8
 progress:
-  total_phases: 9
-  completed_phases: 6
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 7
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 8
 ---
 
 # Project State
@@ -26,10 +27,10 @@ See: .planning/PROJECT.md (updated 2025-07-15)
 
 ## Current Position
 
-Phase: 7 — QEMU Cmdline
+Phase: 8 — VM Lifecycle
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-24 — Phase 06 verified complete
+Last activity: 2026-07-24 — Phase 7 complete, transitioned to Phase 8
 
 Progress: [██████░░░░] 66%
 
@@ -37,7 +38,7 @@ Progress: [██████░░░░] 66%
 
 **Velocity:**
 
-- Total plans completed: 3
+- Total plans completed: 9
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -51,6 +52,7 @@ Progress: [██████░░░░] 66%
 | 04 | 1 | - | - |
 | 05 | 1 | - | - |
 | 06 | 1 | - | - |
+| 7 | 5 | - | - |
 
 **Recent Trend:**
 
@@ -64,6 +66,7 @@ Progress: [██████░░░░] 66%
 - **Phase 01 — Foundation:** Complete. Typed conversion errors, `device_kind()` dispatch across
   device traits, and a mutex-free `RuntimeBuilder` are present; no `type Error = ()` or
   `downcast_ref()` calls remain under `src/`.
+
 - **Phase 02 — Runtime Model:** Complete. `EfiDisk`, `TpmState`, `HostPci`, `Ivshmem`,
   `AudioDevice`, `SpiceDisplay`, and `RawArgs` are first-class Runtime types with builder and
   device-kind coverage in `tests/runtime_phase2.rs`.
@@ -106,3 +109,9 @@ Progress: [██████░░░░] 66%
 ---
 *State initialized: 2025-07-15*
 *Last updated: 2026-07-24 — Phases 01 and 02 verified as historically complete*
+
+## Session
+
+**Last session:** 2026-07-24T08:00:40.852Z
+**Stopped at:** Phase 7 context gathered
+**Resume file:** .planning/phases/07-qemu-cmdline/07-CONTEXT.md

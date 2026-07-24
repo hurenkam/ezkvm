@@ -84,6 +84,10 @@ impl Parser {
                         ),
                     });
                 }
+                // CpuTopology/VgaConfig (added Phase 7 for QEMU -smp/-cpu/-vga emission)
+                // have no corresponding YAML schema representation yet — deferred to a
+                // later phase that extends the ezkvm YAML schema. No-op here.
+                RootDeviceKind::CpuTopology | RootDeviceKind::VgaConfig => {}
             }
         }
 

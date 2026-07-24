@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Proxmox→Runtime** - TryFrom/ProxmoxImporter conversion: ProxmoxVmConf + ProxmoxStorageConf → fully populated Runtime (completed 2026-07-23)
 - [x] **Phase 5: YAML Schema** - Extend ezkvm YAML schema to cover all seven v1 Runtime device types via saphyr (completed 2026-07-23)
 - [x] **Phase 6: YAML↔Runtime** - TryFrom/Into impls for lossless Runtime ↔ ezkvm YAML round-trip (completed 2026-07-24)
-- [ ] **Phase 7: QEMU Cmdline** - Segment-based QEMU commandline emitter with drive-before-device ordering and verbatim raw args
+- [x] **Phase 7: QEMU Cmdline** - Segment-based QEMU commandline emitter with drive-before-device ordering and verbatim raw args (completed 2026-07-24)
 - [ ] **Phase 8: VM Lifecycle** - Start/stop/reset VM processes (qemu + swtpm), launch UI clients (Looking Glass / remote-viewer), QEMU monitor control
 - [ ] **Phase 9: Round-Trip Verification** - Integration tests: felucia/108.conf → Runtime → ezkvm YAML → Runtime → QEMU cmdline → bootable VM
 
@@ -221,14 +221,31 @@ Plans:
 - **Pitfall 6** (netdev ordering): Same constraint; netdev segment must precede devices segment in the fixed emission order
 - **Pitfall 11** (bootindex): Derive `bootindex` values from the Runtime boot order list starting at 100; devices absent from the boot order omit `bootindex` entirely
 
-**Plans**: TBD
+**Plans**: 5/5 plans executed
 
 Plans:
 
-- [ ] 07-01: Implement `QemuCommandLine` segmented struct (`machine`, `firmware`, `drives`, `netdevs`, `chardevs`, `tpm`, `objects`, `devices`, `misc` fields, each `Vec<String>`); implement `Display` emitting segments in that fixed order; define `QemuContext` (vm_name, socket_paths, storage_paths)
-- [ ] 07-02: Implement `TryFrom<(Runtime, QemuContext)> for QemuCommandLine`; emit EfiDisk (pflash drive pair), TpmState (chardev + tpmdev pair), HostPci (one vfio-pci device per function, multifunction=on for .0 when companion exists), AudioDevice, and network devices
-- [ ] 07-03: Emit Ivshmem object+device pair; append `RawArgs` blob verbatim to `misc` segment (or as a final append after all segments); derive `bootindex` from Runtime boot order; handle `vga: none` as active `-vga none -nographic` flags
-- [ ] 07-04: Write ordering validation test: tokenize emitted cmdline string; assert every `drive=<id>` reference position follows a `-drive ...,id=<id>,...` position; assert every `netdev=<id>` reference follows a `-netdev ...,id=<id>,...` position
+- [x] 07-01-PLAN.md
+- [x] 07-02-PLAN.md
+- [x] 07-03-PLAN.md
+- [x] 07-04-PLAN.md
+- [x] 07-05-PLAN.md
+
+**Wave 1**
+
+- [x] 07-01: Implement `QemuCommandLine` segmented struct (`machine`, `firmware`, `drives`, `netdevs`, `chardevs`, `tpm`, `objects`, `devices`, `misc` fields, each `Vec<String>`); implement `Display` emitting segments in that fixed order; define `QemuContext` (vm_name, socket_paths, storage_paths)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 07-02: Implement `TryFrom<(Runtime, QemuContext)> for QemuCommandLine`; emit EfiDisk (pflash drive pair), TpmState (chardev + tpmdev pair), HostPci (one vfio-pci device per function, multifunction=on for .0 when companion exists), AudioDevice, and network devices
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 07-03: Emit Ivshmem object+device pair; append `RawArgs` blob verbatim to `misc` segment (or as a final append after all segments); derive `bootindex` from Runtime boot order; handle `vga: none` as active `-vga none -nographic` flags
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 07-04: Write ordering validation test: tokenize emitted cmdline string; assert every `drive=<id>` reference position follows a `-drive ...,id=<id>,...` position; assert every `netdev=<id>` reference follows a `-netdev ...,id=<id>,...` position
 
 ---
 
@@ -304,6 +321,6 @@ Note: Phase 3 (Proxmox Parser) depends only on Phase 1 and may begin in parallel
 | 4. Proxmox→Runtime | 1/1 | Complete    | 2026-07-23 |
 | 5. YAML Schema | 1/1 | Complete    | 2026-07-23 |
 | 6. YAML↔Runtime | 0/3 | Not started | - |
-| 7. QEMU Cmdline | 0/4 | Not started | - |
+| 7. QEMU Cmdline | 5/5 | Complete    | 2026-07-24 |
 | 8. VM Lifecycle | 0/4 | Not started | - |
 | 9. Round-Trip Verification | 0/3 | Not started | - |

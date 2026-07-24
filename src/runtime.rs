@@ -15,6 +15,8 @@ mod sata;
 mod scsi;
 mod storage;
 mod usb;
+mod cpu;
+mod vga;
 
 pub use chipset::Chipset;
 pub use devices::{GenericPciDevice, GenericUsbDevice, HostPci, Ivshmem, PciDeviceKind, PvScsi, PvScsiBuilder, UsbDeviceKind, VirtioNetPcie};
@@ -33,6 +35,8 @@ pub use scsi::{ScsiAddress, ScsiDevice};
 pub use storage::{Cdrom, Hdd, Ssd, StorageDevice, StorageDeviceType};
 pub use usb::{UsbAddress, UsbDevice, UsbBusDeviceKind};
 pub use isa::IsaBusDeviceKind;
+pub use cpu::CpuTopology;
+pub use vga::VgaConfig;
 
 use derive_getters::Getters;
 use std::fmt::Debug;
@@ -42,6 +46,7 @@ use std::{any::TypeId, sync::Arc};
 #[derive(Debug, Default, Getters)]
 pub struct Runtime {
     root_devices: Vec<Arc<dyn RootDevice>>,
+    boot_order: Vec<String>,
 }
 
 impl std::fmt::Display for Runtime {
@@ -78,6 +83,7 @@ impl Runtime {
     pub fn new() -> Self {
         Runtime {
             root_devices: Vec::new(),
+            boot_order: Vec::new(),
         }
     }
 
@@ -95,6 +101,8 @@ pub enum RootDeviceKind {
     AudioDevice,
     SpiceDisplay,
     RawArgs,
+    CpuTopology,
+    VgaConfig,
 }
 
 #[allow(dead_code)]
@@ -110,17 +118,37 @@ pub trait RootDevice: Debug + Send + Sync + 'static {
 #[allow(dead_code)]
 pub struct RuntimeBuilder {
     root_devices: Vec<Arc<dyn RootDevice>>,
+    boot_order: Vec<String>,
 }
 #[allow(dead_code)]
 impl RuntimeBuilder {
     pub fn new() -> Self {
         RuntimeBuilder {
             root_devices: Vec::new(),
+            boot_order: Vec::new(),
         }
     }
 
     pub fn build(self) -> Result<Runtime, ()> {
-        Ok(Runtime { root_devices: self.root_devices })
+        Ok(Runtime {
+            root_devices: self.root_devices,
+            boot_order: self.boot_order,
+        })
+    }
+
+    pub fn with_boot_order(mut self, order: Vec<String>) -> Self {
+        self.boot_order = order;
+        self
+    }
+
+    pub fn with_cpu_topology(mut self, cpu: CpuTopology) -> Self {
+        self.root_devices.push(Arc::new(cpu));
+        self
+    }
+
+    pub fn with_vga_config(mut self, vga: VgaConfig) -> Self {
+        self.root_devices.push(Arc::new(vga));
+        self
     }
 
     pub fn with_memory(mut self, memory: Memory) -> Self {

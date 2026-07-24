@@ -22,8 +22,9 @@ fn test_proxmox_import_felucia_108_root_devices() {
     let runtime = ProxmoxImporter::new(vm_conf, storage_conf, 108)
         .into_runtime()
         .expect("into_runtime");
-    // Memory + Chipset + EfiDisk + TpmState + AudioDevice + RawArgs
-    assert_eq!(runtime.root_devices().len(), 6);
+    // Memory + Chipset + EfiDisk + TpmState + AudioDevice + RawArgs + CpuTopology + VgaConfig
+    // (CpuTopology/VgaConfig added Phase 7 Plan 07-01 for -smp/-cpu/-vga emission, D-02/D-07)
+    assert_eq!(runtime.root_devices().len(), 8);
 }
 
 #[test]

@@ -34,9 +34,9 @@
 
 ### QEMU Commandline Generation
 
-- [ ] **QEMU-01**: Runtime generates a valid QEMU commandline covering all RUNT-01–07 device types
-- [ ] **QEMU-02**: Emitter guarantees drive/netdev argument precedes its corresponding `-device` argument
-- [ ] **QEMU-03**: Raw `args` passthrough is appended verbatim at end of generated commandline
+- [x] **QEMU-01**: Runtime generates a valid QEMU commandline covering all RUNT-01–07 device types
+- [x] **QEMU-02**: Emitter guarantees drive/netdev argument precedes its corresponding `-device` argument
+- [x] **QEMU-03**: Raw `args` passthrough is appended verbatim at end of generated commandline
 - [ ] **QEMU-04**: Generated commandline for felucia/108.conf produces a VM that starts in QEMU
 
 ### VM Lifecycle Management
@@ -112,9 +112,9 @@
 | YAML-01 | Phase 6 | Complete |
 | YAML-02 | Phase 6 | Complete |
 | YAML-03 | Phase 5 | Complete |
-| QEMU-01 | Phase 7 | Pending |
-| QEMU-02 | Phase 7 | Pending |
-| QEMU-03 | Phase 7 | Pending |
+| QEMU-01 | Phase 7 | Complete |
+| QEMU-02 | Phase 7 | Complete |
+| QEMU-03 | Phase 7 | Complete |
 | QEMU-04 | Phase 9 | Pending |
 | VMGR-01 | Phase 8 | Pending |
 | VMGR-02 | Phase 8 | Pending |

@@ -1,6 +1,6 @@
 {
   "model_profile": "adaptive",
-  "commit_docs": true,
+  "commit_docs": false,
   "parallelization": true,
   "search_gitignored": false,
   "brave_search": false,
