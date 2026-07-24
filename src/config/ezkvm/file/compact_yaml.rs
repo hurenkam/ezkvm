@@ -178,9 +178,17 @@ fn render_block(
                     continue;
                 }
 
+                if matches!(&value.node, StyledNode::Sequence(items) if items.is_empty()) {
+                    out.push(format!("{}{}: []", " ".repeat(indent), key));
+                    continue;
+                }
+
                 let nested = render_with_style(value, indent)?;
-                let is_block_sequence = matches!(value.node, StyledNode::Sequence(_));
-                if nested.contains('\n') || is_block_sequence {
+                let is_block_child = matches!(
+                    value.node,
+                    StyledNode::Mapping(_) | StyledNode::Sequence(_)
+                );
+                if nested.contains('\n') || is_block_child {
                     out.push(format!("{}{}:", " ".repeat(indent), key));
                     out.push(indent_lines(&nested, indent + 2));
                 } else {

@@ -7,15 +7,15 @@
 
 ### Runtime Model
 
-- [ ] **RUNT-01**: Runtime model supports EFI disk (`efidisk0`) including pre-enrolled keys and size attributes
-- [ ] **RUNT-02**: Runtime model supports TPM state (`tpmstate0`) at version 2.0 with storage volume reference
-- [ ] **RUNT-03**: Runtime model supports PCI passthrough (`hostpci0`–`hostpciN`) including `pcie`, `x-vga`, `rombar`, `romfile` sub-options
-- [ ] **RUNT-04**: Runtime model supports ivshmem shared memory devices with size and name attributes
-- [ ] **RUNT-05**: Runtime model supports audio devices (`audio0`) with device type (ich9-intel-hda) and driver (spice/pa/none)
-- [ ] **RUNT-06**: Runtime model supports SPICE display including gl, rendernode, port, and clipboard attributes
-- [ ] **RUNT-07**: Runtime model supports raw/opaque argument passthrough (`args`) preserved verbatim through all conversions
-- [ ] **RUNT-08**: Device trait exposes `device_kind()` method to eliminate unsafe `downcast_ref()` usage across device types
-- [ ] **RUNT-09**: All conversion errors use typed `thiserror` error enums (no `type Error = ()`)
+- [x] **RUNT-01**: Runtime model supports EFI disk (`efidisk0`) including pre-enrolled keys and size attributes
+- [x] **RUNT-02**: Runtime model supports TPM state (`tpmstate0`) at version 2.0 with storage volume reference
+- [x] **RUNT-03**: Runtime model supports PCI passthrough (`hostpci0`–`hostpciN`) including `pcie`, `x-vga`, `rombar`, `romfile` sub-options
+- [x] **RUNT-04**: Runtime model supports ivshmem shared memory devices with size and name attributes
+- [x] **RUNT-05**: Runtime model supports audio devices (`audio0`) with device type (ich9-intel-hda) and driver (spice/pa/none)
+- [x] **RUNT-06**: Runtime model supports SPICE display including gl, rendernode, port, and clipboard attributes
+- [x] **RUNT-07**: Runtime model supports raw/opaque argument passthrough (`args`) preserved verbatim through all conversions
+- [x] **RUNT-08**: Device trait exposes `device_kind()` method to eliminate unsafe `downcast_ref()` usage across device types
+- [x] **RUNT-09**: All conversion errors use typed `thiserror` error enums (no `type Error = ()`)
 
 ### Proxmox Import
 
@@ -28,8 +28,8 @@
 
 ### ezkvm YAML Round-Trip
 
-- [ ] **YAML-01**: Runtime serializes to ezkvm YAML format via saphyr
-- [ ] **YAML-02**: ezkvm YAML deserializes back to an identical Runtime (round-trip lossless for all RUNT-01–07 fields)
+- [x] **YAML-01**: Runtime serializes to ezkvm YAML format via saphyr
+- [x] **YAML-02**: ezkvm YAML deserializes back to an identical Runtime (round-trip lossless for all RUNT-01–07 fields)
 - [x] **YAML-03**: YAML schema covers all v1 Runtime device types
 
 ### QEMU Commandline Generation
@@ -94,23 +94,23 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUNT-01 | Phase 2 | Pending |
-| RUNT-02 | Phase 2 | Pending |
-| RUNT-03 | Phase 2 | Pending |
-| RUNT-04 | Phase 2 | Pending |
-| RUNT-05 | Phase 2 | Pending |
-| RUNT-06 | Phase 2 | Pending |
-| RUNT-07 | Phase 2 | Pending |
-| RUNT-08 | Phase 1 | Pending |
-| RUNT-09 | Phase 1 | Pending |
+| RUNT-01 | Phase 2 | Complete |
+| RUNT-02 | Phase 2 | Complete |
+| RUNT-03 | Phase 2 | Complete |
+| RUNT-04 | Phase 2 | Complete |
+| RUNT-05 | Phase 2 | Complete |
+| RUNT-06 | Phase 2 | Complete |
+| RUNT-07 | Phase 2 | Complete |
+| RUNT-08 | Phase 1 | Complete |
+| RUNT-09 | Phase 1 | Complete |
 | PROX-01 | Phase 3 | Complete |
 | PROX-02 | Phase 3 | Complete |
 | PROX-03 | Phase 3 | Complete |
 | PROX-04 | Phase 3 | Complete |
 | PROX-05 | Phase 4 | Complete |
 | PROX-06 | Phase 4 | Complete |
-| YAML-01 | Phase 6 | Pending |
-| YAML-02 | Phase 6 | Pending |
+| YAML-01 | Phase 6 | Complete |
+| YAML-02 | Phase 6 | Complete |
 | YAML-03 | Phase 5 | Complete |
 | QEMU-01 | Phase 7 | Pending |
 | QEMU-02 | Phase 7 | Pending |

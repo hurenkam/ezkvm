@@ -22,12 +22,12 @@ delivers a coherent, testable capability whose output is the next phase's input.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Typed thiserror error enums, device_kind() dispatch, and RuntimeBuilder cleanup — unblocks all conversion phases
-- [ ] **Phase 2: Runtime Model** - Implement EfiDisk, TpmState, HostPci, Ivshmem, AudioDevice, SpiceDisplay, and RawArgs as first-class Runtime types
+- [x] **Phase 1: Foundation** - Typed thiserror error enums, device_kind() dispatch, and RuntimeBuilder cleanup — unblocks all conversion phases (historically verified 2026-07-24)
+- [x] **Phase 2: Runtime Model** - Implement EfiDisk, TpmState, HostPci, Ivshmem, AudioDevice, SpiceDisplay, and RawArgs as first-class Runtime types (historically verified 2026-07-24)
 - [x] **Phase 3: Proxmox Parser** - Snapshot-aware .conf parser + storage.cfg parser with correct sub-option tokenization for colons and URL-encoded comments (completed 2026-07-23)
 - [x] **Phase 4: Proxmox→Runtime** - TryFrom/ProxmoxImporter conversion: ProxmoxVmConf + ProxmoxStorageConf → fully populated Runtime (completed 2026-07-23)
 - [x] **Phase 5: YAML Schema** - Extend ezkvm YAML schema to cover all seven v1 Runtime device types via saphyr (completed 2026-07-23)
-- [ ] **Phase 6: YAML↔Runtime** - TryFrom/Into impls for lossless Runtime ↔ ezkvm YAML round-trip
+- [x] **Phase 6: YAML↔Runtime** - TryFrom/Into impls for lossless Runtime ↔ ezkvm YAML round-trip (completed 2026-07-24)
 - [ ] **Phase 7: QEMU Cmdline** - Segment-based QEMU commandline emitter with drive-before-device ordering and verbatim raw args
 - [ ] **Phase 8: VM Lifecycle** - Start/stop/reset VM processes (qemu + swtpm), launch UI clients (Looking Glass / remote-viewer), QEMU monitor control
 - [ ] **Phase 9: Round-Trip Verification** - Integration tests: felucia/108.conf → Runtime → ezkvm YAML → Runtime → QEMU cmdline → bootable VM

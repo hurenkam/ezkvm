@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 6
-current_phase_name: YAML↔Runtime
+current_phase: 7
+current_phase_name: QEMU Cmdline
 status: planning
-last_updated: "2026-07-23T21:10:23.640Z"
-last_activity: 2026-07-23
-last_activity_desc: Phase 05 complete, transitioned to Phase 6
+last_updated: "2026-07-24T01:28:00+02:00"
+last_activity: 2026-07-24
+last_activity_desc: Phase 06 YAML runtime round-trip verified complete
 progress:
-  total_phases: 5
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 2
+  total_phases: 9
+  completed_phases: 6
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
@@ -22,16 +22,16 @@ progress:
 See: .planning/PROJECT.md (updated 2025-07-15)
 
 **Core value:** Import Proxmox VM configurations into a typed Runtime model, save/load as ezkvm YAML, and generate valid QEMU commandlines — with full round-trip fidelity for real-world configs.
-**Current focus:** Phase 03 — proxmox-parser
+**Current focus:** Phase 07 — QEMU Cmdline
 
 ## Current Position
 
-Phase: 6 — YAML↔Runtime
+Phase: 7 — QEMU Cmdline
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-23 — Phase 05 complete, transitioned to Phase 6
+Last activity: 2026-07-24 — Phase 06 verified complete
 
-Progress: [██░░░░░░░░] 22%
+Progress: [██████░░░░] 66%
 
 ## Performance Metrics
 
@@ -45,9 +45,12 @@ Progress: [██░░░░░░░░] 22%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
+| 01 | historical | - | - |
+| 02 | historical | - | - |
 | 03 | 1 | - | - |
 | 04 | 1 | - | - |
 | 05 | 1 | - | - |
+| 06 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -55,6 +58,15 @@ Progress: [██░░░░░░░░] 22%
 - Trend: —
 
 *Updated after each plan completion*
+
+## Historical Phase Verification
+
+- **Phase 01 — Foundation:** Complete. Typed conversion errors, `device_kind()` dispatch across
+  device traits, and a mutex-free `RuntimeBuilder` are present; no `type Error = ()` or
+  `downcast_ref()` calls remain under `src/`.
+- **Phase 02 — Runtime Model:** Complete. `EfiDisk`, `TpmState`, `HostPci`, `Ivshmem`,
+  `AudioDevice`, `SpiceDisplay`, and `RawArgs` are first-class Runtime types with builder and
+  device-kind coverage in `tests/runtime_phase2.rs`.
 
 ## Accumulated Context
 
@@ -83,13 +95,14 @@ Progress: [██░░░░░░░░] 22%
 - **Multi-function GPU**: `hostpci0: 0000:03:00,pcie=1,x-vga=1` maps to two `vfio-pci` devices (`.0` audio + `.1` GPU). Model as `functions: Vec<u8>` in `HostPci`.
 - **EfiDisk dual sizes**: `efidisk0` has a logical size field AND a block device size in bytes — both must be preserved.
 - **RuntimeBuilder Mutex**: Current builder wraps device Vec in Mutex; remove it (builders are single-threaded, Mutex can poison on panic).
+- **Phase 6 YAML boundary**: The Felucia test now exercises `Runtime → ConfigSchema → YAML → ConfigSchema → Runtime`, while dedicated tests cover SPICE and empty collections.
 
 ## Next Steps
 
-1. Run `/gsd-plan-phase 3` to plan Phase 3 (Proxmox importer)
-2. Execute Phase 3 plan
-3. Continue phases 4–8 in order
+1. Plan Phase 7 QEMU commandline generation.
+2. Implement the segmented commandline emitter and ordering tests.
+3. Verify Phase 7 before transitioning to VM lifecycle management.
 
 ---
 *State initialized: 2025-07-15*
-*Last updated: 2025-07-15 — Project onboarding complete*
+*Last updated: 2026-07-24 — Phases 01 and 02 verified as historically complete*
