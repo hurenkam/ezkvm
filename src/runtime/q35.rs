@@ -5,8 +5,8 @@ use derive_new::new;
 
 use crate::runtime::{
     GenericPciDevice, GenericUsbDevice, HostPci, IdeAddress, IdeDevice, Ivshmem, PciBusDeviceKind, PciDevice,
-    PcieAddress, PcieBusDeviceKind, PcieDevice, PvScsi, SataAddress, SataDevice,
-    StorageDeviceType, UsbBusDeviceKind, VirtioNetPcie,
+    PcieAddress, PcieBusDeviceKind, PcieDevice, GenericScsiController, SataAddress, SataDevice,
+    StorageDeviceType, UsbBusDeviceKind, UsbHostIdentity, VirtioNetPcie, VirtioScsiSingleDisk,
     pci::PciAddress,
     usb::{UsbAddress, UsbDevice},
 };
@@ -165,9 +165,16 @@ impl std::fmt::Display for Q35Chipset {
 
 fn format_pcie_device(device: &dyn PcieDevice) -> String {
     match device.device_kind() {
-        PcieBusDeviceKind::PvScsi => {
-            let pvscsi = device.as_any().downcast_ref::<PvScsi>().unwrap();
-            format!("{}", pvscsi)
+        PcieBusDeviceKind::ScsiController => {
+            let scsi_controller = device
+                .as_any()
+                .downcast_ref::<GenericScsiController>()
+                .unwrap();
+            format!("{}", scsi_controller)
+        }
+        PcieBusDeviceKind::VirtioScsiSingleDisk => {
+            let disk = device.as_any().downcast_ref::<VirtioScsiSingleDisk>().unwrap();
+            format!("{}", disk)
         }
         PcieBusDeviceKind::VirtioNet => {
             let virtio_net = device.as_any().downcast_ref::<VirtioNetPcie>().unwrap();
@@ -211,8 +218,11 @@ fn format_pci_device(device: &dyn PciDevice) -> String {
             format!("GenericPciDevice({:?})", generic.kind())
         }
         PciBusDeviceKind::PvScsi => {
-            let pvscsi = device.as_any().downcast_ref::<PvScsi>().unwrap();
-            format!("{}", pvscsi)
+            let scsi_controller = device
+                .as_any()
+                .downcast_ref::<GenericScsiController>()
+                .unwrap();
+            format!("{}", scsi_controller)
         }
     }
 }
@@ -221,7 +231,17 @@ fn format_usb_device(device: &dyn UsbDevice) -> String {
     match device.device_kind() {
         UsbBusDeviceKind::Generic => {
             let generic = device.as_any().downcast_ref::<GenericUsbDevice>().unwrap();
-            format!("GenericUsbDevice({:?})", generic.kind())
+            match generic.kind() {
+                crate::runtime::UsbDeviceKind::HostPassthrough { identity } => match identity {
+                    UsbHostIdentity::BusPort { bus, port } => {
+                        format!("GenericUsbDevice(host {}-{})", bus, port)
+                    }
+                    UsbHostIdentity::VendorProduct { vendor_id, product_id } => {
+                        format!("GenericUsbDevice(host {}:{})", vendor_id, product_id)
+                    }
+                },
+                other => format!("GenericUsbDevice({other:?})"),
+            }
         }
     }
 }

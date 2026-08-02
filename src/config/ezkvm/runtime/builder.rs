@@ -6,14 +6,17 @@ use crate::{
         schema::{
             BiosSchema, ChipsetSchema, DeviceSchema, DisplaySchema, IdeDeviceTypeSchema,
             MemoryResourceSchema, PciDeviceTypeSchema, PcieDeviceTypeSchema, PcieResourceSchema,
-            ResourceSchema, SataDeviceTypeSchema, ScsiDeviceTypeSchema, StorageResourceSchema,
-            TpmSchema, UsbDeviceTypeSchema,
+            PcieStorageDeviceTypeSchema, ResourceSchema, SataDeviceTypeSchema,
+            ScsiControllerTypeSchema, ScsiDeviceTypeSchema, StorageResourceSchema, TpmSchema,
+            UsbDeviceTypeSchema, UsbHostIdentitySchema,
         },
     }, runtime::{
-        AudioDevice, Cdrom, Chipset, EfiDisk, GenericPciDevice, GenericUsbDevice, Hdd, HostPci,
-        IdeAddress, Ivshmem, Memory, PciAddress, PciDeviceKind, PcieAddress, PcieDevice, PvScsiBuilder,
-        Q35ChipsetBuilder, RawArgs, Runtime, RuntimeBuilder, SataAddress, ScsiAddress, SpiceDisplay,
-        Ssd, TpmState, UsbAddress, UsbDeviceKind, VirtioNetPcie,
+        AudioDevice, Cdrom, Chipset, EfiDisk, GenericPciDevice, GenericScsiControllerBuilder,
+        GenericUsbDevice, Hdd, HostPci, IdeAddress, Ivshmem, Memory, PciAddress, PciDeviceKind,
+        PcieAddress, PcieDevice, Q35ChipsetBuilder, RawArgs, Runtime, RuntimeBuilder,
+        SataAddress, ScsiAddress, ScsiControllerType, SpiceDisplay, Ssd, StorageDeviceType,
+        TpmState, UsbAddress, UsbDeviceKind, UsbHostIdentity, VirtioNetPcie,
+        VirtioScsiSingleDisk,
     },
 };
 use super::error::YamlRuntimeError;
@@ -30,6 +33,7 @@ enum StorageKind {
 #[derive(Default)]
 struct PvScsiControllerSpec {
     pcie_address: Option<PcieAddress>,
+    controller_type: Option<ScsiControllerType>,
     scsi_disks: Vec<(ScsiAddress, StorageKind, String)>,
 }
 
@@ -218,7 +222,8 @@ fn insert_pvsci_controllers(pvsci_by_bus: BTreeMap<u8, PvScsiControllerSpec>, mu
         spec.scsi_disks
             .sort_by_key(|(addr, _, _)| (*addr.target(), *addr.lun()));
 
-        let mut pvsci_builder = PvScsiBuilder::new();
+        let mut pvsci_builder = GenericScsiControllerBuilder::new()
+            .with_controller_type(spec.controller_type.unwrap_or(ScsiControllerType::PvScsi));
         for (scsi_address, storage_kind, path) in spec.scsi_disks {
             let storage: Arc<dyn crate::runtime::ScsiDevice> = match storage_kind {
                 StorageKind::Hdd => Arc::new(Hdd::new(path)),
@@ -322,9 +327,20 @@ fn match_usb_device(usb_devices: &mut Vec<(UsbAddress, UsbDeviceKind)>, usb: &cr
     let kind = match usb.device() {
         UsbDeviceTypeSchema::NetworkController => UsbDeviceKind::NetworkController,
         UsbDeviceTypeSchema::Tablet => UsbDeviceKind::Tablet,
-        UsbDeviceTypeSchema::HostPassthrough { resource } => {
+        UsbDeviceTypeSchema::HostPassthrough { identity } => {
             UsbDeviceKind::HostPassthrough {
-                resource: resource.clone(),
+                identity: match identity {
+                    UsbHostIdentitySchema::BusPort { bus, port } => UsbHostIdentity::BusPort {
+                        bus: bus.clone(),
+                        port: port.clone(),
+                    },
+                    UsbHostIdentitySchema::VendorProduct { vendor_id, product_id } => {
+                        UsbHostIdentity::VendorProduct {
+                            vendor_id: vendor_id.clone(),
+                            product_id: product_id.clone(),
+                        }
+                    }
+                },
             }
         }
     };
@@ -411,11 +427,15 @@ fn match_pcie_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, pcie
         .map(|a| PcieAddress::new(a.device, a.function));
 
     match pcie.device() {
-        PcieDeviceTypeSchema::PvScsi => {
+        PcieDeviceTypeSchema::ScsiController { controller_type } => {
             let slot = pvsci_by_bus.entry(bus).or_default();
             if pcie_address.is_some() {
                 slot.pcie_address = pcie_address;
             }
+            slot.controller_type = Some(match controller_type {
+                ScsiControllerTypeSchema::PvScsi => ScsiControllerType::PvScsi,
+                ScsiControllerTypeSchema::VirtioScsiPci => ScsiControllerType::VirtioScsiPci,
+            });
         }
         PcieDeviceTypeSchema::VirtioNet {
             resource,
@@ -439,6 +459,28 @@ fn match_pcie_device(pvsci_by_bus: &mut BTreeMap<u8, PvScsiControllerSpec>, pcie
                 *vhost,
             ));
             pcie_devices.push((address, nic));
+        }
+        PcieDeviceTypeSchema::VirtioScsiSingle { resource, index, storage_type } => {
+            if bus != 0 {
+                return Err(YamlRuntimeError::UnsupportedPcieDevice {
+                    device_type: format!(
+                        "virtio_scsi_single on pcie bus {} (only bus 0 supported)",
+                        bus
+                    ),
+                });
+            }
+
+            let path = find_storage_resource(resource, resources)?;
+            let address = pcie_address.unwrap_or_else(|| PcieAddress::new(0, 0));
+            let storage_type = match storage_type {
+                PcieStorageDeviceTypeSchema::Hdd => StorageDeviceType::Hdd,
+                PcieStorageDeviceTypeSchema::Ssd => StorageDeviceType::Ssd,
+                PcieStorageDeviceTypeSchema::Cdrom => StorageDeviceType::Odd,
+            };
+            pcie_devices.push((
+                address,
+                Arc::new(VirtioScsiSingleDisk::new(path, storage_type, *index)),
+            ));
         }
         PcieDeviceTypeSchema::HostPci { resource, x_vga } => {
             let pcie_resource = find_pcie_resource(resource, resources)?;
@@ -490,9 +532,10 @@ mod tests {
         BootSchema, ChipsetSchema, ConfigSchema, DeviceSchema, HostSchema, I440FXChipsetSchema,
         IdeAddressSchema, IdeDeviceSchema, IdeDeviceTypeSchema, MachineSchema, MemorySchema,
         MetadataSchema, PciAddressSchema, PciDeviceSchema, PciDeviceTypeSchema, PcieAddressSchema,
-        PcieDeviceSchema, PcieDeviceTypeSchema, Q35ChipsetSchema, ResourceSchema, SataAddressSchema,
-        SataDeviceSchema, SataDeviceTypeSchema, StorageResourceSchema, UsbAddressSchema,
-        UsbDeviceSchema, UsbDeviceTypeSchema, VirtualMachineSchema,
+        PcieDeviceSchema, PcieDeviceTypeSchema, Q35ChipsetSchema, ResourceSchema,
+        SataAddressSchema, SataDeviceSchema, SataDeviceTypeSchema, ScsiControllerTypeSchema,
+        StorageResourceSchema, UsbAddressSchema, UsbDeviceSchema, UsbDeviceTypeSchema,
+        VirtualMachineSchema,
     };
 
     #[test]
@@ -517,7 +560,13 @@ mod tests {
                 None,
                 None,
                 vec![crate::config::ezkvm::schema::DeviceSchema::Pcie {
-                    pcie: PcieDeviceSchema::new(Some(0), None, PcieDeviceTypeSchema::PvScsi),
+                    pcie: PcieDeviceSchema::new(
+                        Some(0),
+                        None,
+                        PcieDeviceTypeSchema::ScsiController {
+                            controller_type: ScsiControllerTypeSchema::PvScsi,
+                        },
+                    ),
                 }],
             ),
         );

@@ -1,0 +1,10 @@
+qemu_path: /usr/bin/qemu-system-x86_64
+qemu_default_args: []
+swtpm_path: /usr/bin/swtpm
+remote_viewer_path: /usr/bin/remote-viewer
+remote_viewer_default_args: []
+looking_glass_client_path: /usr/bin/looking-glass-client
+looking_glass_client_default_args: []
+host_resources: []
+vm_dir: /etc/ezkvm/vm.d
+state_dir: /run/ezkvm

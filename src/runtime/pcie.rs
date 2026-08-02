@@ -5,7 +5,8 @@ use std::fmt::Debug;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PcieBusDeviceKind {
     VirtioNet,
-    PvScsi,
+    ScsiController,
+    VirtioScsiSingleDisk,
     HostPci,
     Ivshmem,
 }

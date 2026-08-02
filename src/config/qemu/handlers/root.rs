@@ -205,7 +205,7 @@ mod tests {
     use crate::config::proxmox::{ProxmoxImporter, ProxmoxStorageConf, ProxmoxVmConf};
     use crate::config::qemu::QemuCommandLine;
     use crate::runtime::{
-        IdeAddress, PcieAddress, PvScsiBuilder, Q35ChipsetBuilder, RuntimeBuilder, SataAddress,
+        IdeAddress, PcieAddress, GenericScsiControllerBuilder, Q35ChipsetBuilder, RuntimeBuilder, SataAddress,
         ScsiAddress, Ssd, VirtioNetPcie,
     };
     use std::str::FromStr;
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_07_04_empty_boot_order_emits_zero_bootindex_tokens() {
-        let pvscsi = PvScsiBuilder::new()
+        let pvscsi = GenericScsiControllerBuilder::new()
             .with_scsi_device(
                 Some(ScsiAddress::new(0, 0)),
                 Arc::new(Ssd::new("/dev/vm1/boot".to_string())),

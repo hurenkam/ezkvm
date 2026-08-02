@@ -19,7 +19,11 @@ mod cpu;
 mod vga;
 
 pub use chipset::Chipset;
-pub use devices::{GenericPciDevice, GenericUsbDevice, HostPci, Ivshmem, PciDeviceKind, PvScsi, PvScsiBuilder, UsbDeviceKind, VirtioNetPcie};
+pub use devices::{
+    GenericPciDevice, GenericScsiController, GenericScsiControllerBuilder, GenericUsbDevice,
+    HostPci, Ivshmem, PciDeviceKind, ScsiControllerType, UsbDeviceKind, UsbHostIdentity,
+    VirtioNetPcie, VirtioScsiSingleDisk,
+};
 pub use efidisk::EfiDisk;
 pub use tpmstate::TpmState;
 pub use audio::AudioDevice;

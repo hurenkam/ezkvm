@@ -1,0 +1,45 @@
+# CI fixture intentionally hand-authored instead of imported from a literal Proxmox example:
+# it preserves the same deployment-packaging intent (real headless QEMU boot with no host-
+# specific passthrough) while avoiding unrelated EFI/TPM/import-path gaps and any PCI/USB
+# hardware dependency that cannot exist on a CI runner.
+metadata:
+  schema_version: 1.0.0
+  vm_name: ci-boot
+host:
+  resources:
+    - id: storage0
+      storage:
+        file: /tmp/ezkvm-ci/ci-boot.img
+    - id: net0
+      network:
+        bridge: vmbr-ci
+virtual_machine:
+  machine:
+    q35: {}
+  cpu:
+    model: Host
+    cores: 1
+    threads: 1
+    sockets: 1
+  memory:
+    size: 1073741824
+  devices:
+    - pcie:
+        bus: 0
+        device: 0
+        function: 0
+        type: scsi_controller
+        controller_type: virtio_scsi_pci
+    - pcie:
+        bus: 0
+        device: 16
+        function: 0
+        type: virtio_net
+        resource: net0
+    - scsi:
+        bus: 0
+        address:
+          target: 0
+          lun: 0
+        type: hdd
+        resource: storage0

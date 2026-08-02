@@ -10,4 +10,28 @@ derive-new = "0.7.0"
 hashlink = "0.12.1"
 ordered-float = "5.3.0"
 saphyr = "0.0.11"
-serde = { version="1.0.228", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"] }
+serde_json = "1.0.151"
+libc = "0.2.189"
+
+# Debian revision suffix follows cargo-deb's default -1 from Cargo.toml's version; see debian/host.yaml.example for packaging-only -2/-3 bumps.
+[package.metadata.deb]
+maintainer = "ezkvm maintainers"
+copyright = "2026, ezkvm contributors"
+license-file = ["LICENSE", "0"]
+depends = "qemu-system-x86, swtpm"
+recommends = "virt-viewer, looking-glass-client"
+section = "admin"
+priority = "optional"
+maintainer-scripts = "debian/"
+assets = [
+    ["target/release/ezkvm", "usr/bin/", "755"],
+    ["debian/host.yaml.example", "etc/ezkvm/host.yaml", "640"],
+    ["debian/ezkvm.conf", "usr/lib/tmpfiles.d/ezkvm.conf", "644"],
+]
+conf-files = ["/etc/ezkvm/host.yaml"]
+
+[profile.release]
+lto = true
+strip = true

@@ -32,4 +32,7 @@ pub enum ProxmoxImportError {
 
     #[error("storage pool '{pool}' is missing required property '{property}'")]
     MissingStorageProperty { pool: String, property: String },
+
+    #[error("malformed USB host identity '{raw}' (expected '<bus>-<port>' or '<vendor>:<product>')")]
+    MalformedUsbHostIdentity { raw: String },
 }

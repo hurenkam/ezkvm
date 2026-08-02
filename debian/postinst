@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    getent group ezkvm >/dev/null || addgroup --system ezkvm
+    install -d -o root -g ezkvm -m 0770 /var/lib/ezkvm
+    chgrp ezkvm /etc/ezkvm
+    chmod 0750 /etc/ezkvm
+    install -d -o root -g ezkvm -m 0750 /etc/ezkvm/vm.d
+fi
+#DEBHELPER#

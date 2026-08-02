@@ -1,6 +1,10 @@
-mod ezkvm;
+pub mod ezkvm;
 pub mod proxmox;
 pub mod qemu;
 
 #[allow(unused_imports)]
-pub use ezkvm::{ConfigFileStore as EzkvmConfigFileStore, ConfigSchema as EzkvmConfigSchema};
+pub use ezkvm::{
+    ConfigFileStore as EzkvmConfigFileStore, 
+    ConfigSchema as EzkvmConfigSchema,
+    Builder as EzkvmRuntimeBuilder
+};

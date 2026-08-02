@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "purge" ]; then
+    if getent group ezkvm >/dev/null; then
+        delgroup --system ezkvm || true
+    fi
+    rm -rf /var/lib/ezkvm
+fi
+#DEBHELPER#

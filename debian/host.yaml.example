@@ -1,0 +1,18 @@
+# ezkvm host configuration installed by the Debian package.
+# Add each login user who should manage VMs to the `ezkvm` group before use.
+# `looking-glass-client` is only a Recommends dependency and is absent from Debian 12/13
+# and Ubuntu 26.04 archives; install it from upstream https://looking-glass.io releases
+# yourself if you use Looking Glass on those targets.
+# Package versioning follows Cargo.toml plus cargo-deb's default Debian revision suffix:
+# package builds normally ship as -1, while packaging-only fixes without a Cargo.toml version
+# bump should increment to -2, -3, and so on.
+qemu_path: /usr/bin/qemu-system-x86_64
+qemu_default_args: []
+swtpm_path: /usr/bin/swtpm
+remote_viewer_path: /usr/bin/remote-viewer
+remote_viewer_default_args: []
+looking_glass_client_path: /usr/bin/looking-glass-client
+looking_glass_client_default_args: []
+host_resources: []
+vm_dir: /etc/ezkvm/vm.d
+state_dir: /run/ezkvm

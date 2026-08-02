@@ -26,8 +26,16 @@ pub struct UsbDeviceSchema {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum UsbDeviceTypeSchema {
     NetworkController,
     Tablet,
-    HostPassthrough { resource: String },
+    HostPassthrough { identity: UsbHostIdentitySchema },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum UsbHostIdentitySchema {
+    BusPort { bus: String, port: String },
+    VendorProduct { vendor_id: String, product_id: String },
 }

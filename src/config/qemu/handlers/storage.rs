@@ -23,13 +23,24 @@ pub(crate) fn emit_scsi_storage(
     builder: &mut QemuCommandLineBuilder,
     resource: &str,
     device_type: StorageDeviceType,
+    controller_id: u8,
     target: u8,
     bootindex: Option<u32>,
 ) {
+    let drive_id = if controller_id == 0 {
+        format!("drive-scsi{}", target)
+    } else {
+        format!("drive-scsi{}-{}", controller_id, target)
+    };
+    let device_id = if controller_id == 0 {
+        format!("scsi{}", target)
+    } else {
+        format!("scsi{}-{}", controller_id, target)
+    };
     builder.push_drive(format!(
-        "-drive file={},if=none,id=drive-scsi{},format=raw{}",
+        "-drive file={},if=none,id={},format=raw{}",
         resource,
-        target,
+        drive_id,
         if device_type == StorageDeviceType::Odd {
             ",media=cdrom"
         } else {
@@ -38,11 +49,12 @@ pub(crate) fn emit_scsi_storage(
     ));
 
     builder.push_device(format!(
-        "-device {},bus=scsihw0.0,scsi-id={},drive=drive-scsi{},id=scsi{}{}",
+        "-device {},bus=scsihw{}.0,scsi-id={},drive={},id={}{}",
         storage_device_model(device_type, "scsi"),
+        controller_id,
         target,
-        target,
-        target,
+        drive_id,
+        device_id,
         bootindex
             .map(|b| format!(",bootindex={}", b))
             .unwrap_or_default()
@@ -139,6 +151,7 @@ mod tests {
             "/dev/vm1/vm-108-boot",
             StorageDeviceType::Ssd,
             0,
+            0,
             None,
         );
         let output = builder.build().to_string();
@@ -156,6 +169,7 @@ mod tests {
             &mut builder,
             "/dev/vm1/vm-108-cd",
             StorageDeviceType::Odd,
+            0,
             1,
             None,
         );

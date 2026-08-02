@@ -16,6 +16,8 @@
 - [x] **RUNT-07**: Runtime model supports raw/opaque argument passthrough (`args`) preserved verbatim through all conversions
 - [x] **RUNT-08**: Device trait exposes `device_kind()` method to eliminate unsafe `downcast_ref()` usage across device types
 - [x] **RUNT-09**: All conversion errors use typed `thiserror` error enums (no `type Error = ()`)
+- [x] **RUNT-10**: Runtime model represents USB passthrough device identity as either bus-port (`bus`/`port`) or vendor:product-ID (`vendor_id`/`product_id`) form, round-tripping losslessly through Proxmox import, ezkvm YAML, and QEMU commandline emission
+- [x] **RUNT-11**: Runtime model represents SCSI controller type (`pvscsi`, `virtio-scsi-pci`, `virtio-scsi-single`) as a first-class field, round-tripping losslessly through Proxmox import, ezkvm YAML, and QEMU commandline emission (instead of collapsing all variants to `pvscsi`)
 
 ### Proxmox Import
 
@@ -37,15 +39,22 @@
 - [x] **QEMU-01**: Runtime generates a valid QEMU commandline covering all RUNT-01–07 device types
 - [x] **QEMU-02**: Emitter guarantees drive/netdev argument precedes its corresponding `-device` argument
 - [x] **QEMU-03**: Raw `args` passthrough is appended verbatim at end of generated commandline
-- [ ] **QEMU-04**: Generated commandline for felucia/108.conf produces a VM that starts in QEMU
+- [ ] **QEMU-04**: Generated commandline for felucia/108.conf produces a VM that starts in QEMU (Phase 10's CI workflow proves this pattern on a synthetic CI-safe fixture across 4 distro/version targets once GitHub Actions actually runs it — authored and locally metadata-validated in this sandbox, which has no Docker daemon; felucia/108's own real-hardware boot remains explicitly manual-only per `doc/dev/MANUAL-VERIFICATION.md`)
 
 ### VM Lifecycle Management
 
-- [ ] **VMGR-01**: ezkvm starts a VM by launching `qemu-system-x86_64` (and `swtpm` when TPM is configured) as child processes
-- [ ] **VMGR-02**: After VM start, ezkvm launches the configured UI client (Looking Glass client or `remote-viewer`) to connect to the running VM
-- [ ] **VMGR-03**: ezkvm gracefully shuts down a running VM via QEMU monitor `system_powerdown` command
-- [ ] **VMGR-04**: ezkvm force-stops a running VM via QEMU monitor `quit` (or SIGTERM fallback)
-- [ ] **VMGR-05**: ezkvm resets a running VM via QEMU monitor `system_reset` command
+- [x] **VMGR-01**: ezkvm starts a VM by launching `qemu-system-x86_64` (and `swtpm` when TPM is configured) as child processes
+- [x] **VMGR-02**: After VM start, ezkvm launches the configured UI client (Looking Glass client or `remote-viewer`) to connect to the running VM
+- [x] **VMGR-03**: ezkvm gracefully shuts down a running VM via QEMU monitor `system_powerdown` command
+- [x] **VMGR-04**: ezkvm force-stops a running VM via QEMU monitor `quit` (or SIGTERM fallback)
+- [x] **VMGR-05**: ezkvm resets a running VM via QEMU monitor `system_reset` command
+
+### Deployment Packaging
+
+- [x] **DEPLOY-01**: A single statically musl-linked `.deb` package builds via `cargo-deb` targeting `x86_64-unknown-linux-musl` (independently rebuilt and confirmed: static-pie musl binary, correct `Depends`/`Recommends` metadata via `dpkg -I`)
+- [ ] **DEPLOY-02**: The package installs cleanly on Debian 13 (trixie), Debian 12 (bookworm), Ubuntu 26.04, and Ubuntu 24.04, creating a dedicated `ezkvm` group and FHS directories (`/etc/ezkvm`, `/var/lib/ezkvm`, `/run/ezkvm`) via `postinst` (postinst/postrm scripts authored and inspected — real installs across all 4 targets require the GitHub Actions CI matrix in `.github/workflows/package-verify.yml` to actually run, which this sandbox's lack of a Docker daemon prevented)
+- [x] **DEPLOY-03**: The package declares `qemu-system-x86` and `swtpm` as hard `Depends`, and `virt-viewer`/`looking-glass-client` as `Recommends` only (never hard `Depends`, since `looking-glass-client` is absent from 3 of the 4 target distros) — confirmed via `dpkg -I` on the independently rebuilt `.deb`
+- [ ] **DEPLOY-04**: Real `ezkvm start`/`status`/`stop`/`kill`/`reset` is verified against a real `qemu-system-x86_64` process inside a container with `/dev/kvm` passthrough, on all 4 target distro/version combinations, using a CI-safe fixture with no PCI/USB hardware passthrough (workflow authored, YAML-validated, and the fixture confirmed to build a valid `Runtime` locally; the actual containerized boot has not yet executed — requires a real GitHub Actions run)
 
 ## v2 Requirements
 
@@ -103,6 +112,8 @@
 | RUNT-07 | Phase 2 | Complete |
 | RUNT-08 | Phase 1 | Complete |
 | RUNT-09 | Phase 1 | Complete |
+| RUNT-10 | Phase 8.1 | Complete |
+| RUNT-11 | Phase 8.1 | Complete |
 | PROX-01 | Phase 3 | Complete |
 | PROX-02 | Phase 3 | Complete |
 | PROX-03 | Phase 3 | Complete |
@@ -115,17 +126,21 @@
 | QEMU-01 | Phase 7 | Complete |
 | QEMU-02 | Phase 7 | Complete |
 | QEMU-03 | Phase 7 | Complete |
-| QEMU-04 | Phase 9 | Pending |
-| VMGR-01 | Phase 8 | Pending |
-| VMGR-02 | Phase 8 | Pending |
-| VMGR-03 | Phase 8 | Pending |
-| VMGR-04 | Phase 8 | Pending |
-| VMGR-05 | Phase 8 | Pending |
+| QEMU-04 | Phase 10 | Pending — CI workflow authored/YAML-validated in `.github/workflows/package-verify.yml`; actual containerized boot requires a real GitHub Actions run (no Docker daemon in this sandbox) |
+| VMGR-01 | Phase 8 | Complete |
+| VMGR-02 | Phase 8 | Complete |
+| VMGR-03 | Phase 8 | Complete |
+| VMGR-04 | Phase 8 | Complete |
+| VMGR-05 | Phase 8 | Complete |
+| DEPLOY-01 | Phase 10 | Complete |
+| DEPLOY-02 | Phase 10 | Pending — postinst/postrm authored and inspected; real cross-distro install requires a real GitHub Actions run |
+| DEPLOY-03 | Phase 10 | Complete |
+| DEPLOY-04 | Phase 10 | Pending — same CI-execution caveat as QEMU-04 |
 
 **Coverage:**
 
-- v1 requirements: 27 total
-- Mapped to phases: 27 ✓
+- v1 requirements: 33 total
+- Mapped to phases: 33 ✓
 - Unmapped: 0 ✓
 
 ---

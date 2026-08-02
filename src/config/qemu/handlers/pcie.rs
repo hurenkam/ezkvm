@@ -2,11 +2,11 @@ use crate::config::qemu::bootindex;
 use crate::config::qemu::handlers::storage;
 use crate::config::qemu::{QemuCommandLineBuilder, QemuContext};
 use crate::runtime::{
-    Cdrom, Hdd, PcieAddress, PcieBusDeviceKind, PcieDevice, PvScsi, Runtime, Ssd,
-    StorageDeviceType,
+    Cdrom, GenericScsiController, Hdd, PcieAddress, PcieBusDeviceKind, PcieDevice, Runtime,
+    ScsiControllerType, Ssd, StorageDeviceType, VirtioScsiSingleDisk,
 };
 
-/// Dispatch over all 4 `PcieBusDeviceKind` variants a `Q35Chipset.pcie_bus` entry can hold.
+/// Dispatch over all PCIe device variants a `Q35Chipset.pcie_bus` entry can hold.
 ///
 /// `net_ordinal` is the caller-computed position of this entry among *only* the
 /// `VirtioNet`-kind entries on `pcie_bus`, sorted by `PcieAddress` (RESEARCH.md's Critical
@@ -27,9 +27,19 @@ pub(crate) fn emit_pcie_device(
     net_ordinal: u8,
 ) {
     match device.device_kind() {
-        PcieBusDeviceKind::PvScsi => {
-            let pvscsi = device.as_any().downcast_ref::<PvScsi>().unwrap();
-            emit_pvscsi(builder, pvscsi, runtime.boot_order());
+        PcieBusDeviceKind::ScsiController => {
+            let scsi_controller = device
+                .as_any()
+                .downcast_ref::<GenericScsiController>()
+                .unwrap();
+            emit_scsi_controller(builder, scsi_controller, runtime.boot_order());
+        }
+        PcieBusDeviceKind::VirtioScsiSingleDisk => {
+            let disk = device
+                .as_any()
+                .downcast_ref::<VirtioScsiSingleDisk>()
+                .unwrap();
+            emit_virtio_scsi_single(builder, address, disk, runtime.boot_order());
         }
         PcieBusDeviceKind::HostPci => {
             let host_pci = device
@@ -55,19 +65,25 @@ pub(crate) fn emit_pcie_device(
     }
 }
 
-/// pvscsi controller line + sorted recursion into `scsi_bus`. `pub(crate)` so Plan 07-03's
+/// Shared SCSI controller line + sorted recursion into `scsi_bus`. `pub(crate)` so Plan 07-03's
 /// `pci_bus` `PvScsi` arm can call it without duplicating logic. `boot_order` is forwarded
 /// unmodified from the caller (root.rs's bus-walk loop, via `Runtime::boot_order()`) — this
 /// function reconstructs each scsi entry's label itself (`bootindex::scsi_label`) and looks
 /// up its bootindex (Plan 07-04, D-07).
-pub(crate) fn emit_pvscsi(
+pub(crate) fn emit_scsi_controller(
     builder: &mut QemuCommandLineBuilder,
-    pvscsi: &PvScsi,
+    scsi_controller: &GenericScsiController,
     boot_order: &[String],
 ) {
-    builder.push_device("-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5".to_string());
+    let device_model = match scsi_controller.controller_type() {
+        ScsiControllerType::PvScsi => "pvscsi",
+        ScsiControllerType::VirtioScsiPci => "virtio-scsi-pci",
+    };
+    builder.push_device(format!(
+        "-device {device_model},id=scsihw0,bus=pci.0,addr=0x5"
+    ));
 
-    let mut entries: Vec<_> = pvscsi.scsi_bus().iter().collect();
+    let mut entries: Vec<_> = scsi_controller.scsi_bus().iter().collect();
     entries.sort_by_key(|(a, _)| (*a.target(), *a.lun()));
 
     for (address, device) in entries {
@@ -87,8 +103,43 @@ pub(crate) fn emit_pvscsi(
             boot_order,
             &bootindex::scsi_label(*address.target()),
         );
-        storage::emit_scsi_storage(builder, resource, device_type, *address.target(), bootindex);
+        storage::emit_scsi_storage(
+            builder,
+            resource,
+            device_type,
+            0,
+            *address.target(),
+            bootindex,
+        );
     }
+}
+
+pub(crate) fn emit_virtio_scsi_single(
+    builder: &mut QemuCommandLineBuilder,
+    address: &PcieAddress,
+    disk: &VirtioScsiSingleDisk,
+    boot_order: &[String],
+) {
+    let controller_id = *disk.index();
+    builder.push_object(format!("-object iothread,id=iothread{}", controller_id));
+    builder.push_device(format!(
+        "-device virtio-scsi-pci,id=scsihw{},bus=pci.0,addr=0x{:x},iothread=iothread{}",
+        controller_id,
+        address.device(),
+        controller_id
+    ));
+    let bootindex = bootindex::lookup_bootindex(
+        boot_order,
+        &bootindex::scsi_label(*disk.index()),
+    );
+    storage::emit_scsi_storage(
+        builder,
+        disk.resource(),
+        *disk.storage_type(),
+        controller_id,
+        0,
+        bootindex,
+    );
 }
 
 pub(crate) fn emit_hostpci(
@@ -165,7 +216,10 @@ pub(crate) fn emit_virtio_net(
 mod tests {
     use super::*;
     use crate::config::qemu::QemuContext;
-    use crate::runtime::{HostPci, Ivshmem, PvScsiBuilder, ScsiAddress, VirtioNetPcie};
+    use crate::runtime::{
+        GenericScsiControllerBuilder, HostPci, Ivshmem, ScsiAddress, ScsiControllerType,
+        StorageDeviceType, VirtioNetPcie, VirtioScsiSingleDisk,
+    };
     use std::sync::Arc;
 
     fn make_ctx() -> QemuContext {
@@ -180,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_07_02_pvscsi_controller_and_single_ssd_end_to_end() {
-        let pvscsi = PvScsiBuilder::new()
+        let scsi_controller = GenericScsiControllerBuilder::new()
             .with_scsi_device(
                 Some(ScsiAddress::new(0, 0)),
                 Arc::new(Ssd::new("/dev/vm1/vm-108-boot".to_string())),
@@ -188,7 +242,7 @@ mod tests {
             .build();
 
         let mut builder = QemuCommandLineBuilder::new();
-        emit_pvscsi(&mut builder, &pvscsi, &[]);
+        emit_scsi_controller(&mut builder, &scsi_controller, &[]);
         let output = builder.build().to_string();
 
         assert!(output.contains("pvscsi,id=scsihw0"), "output was: {output}");
@@ -201,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_07_02_pvscsi_cdrom_and_hdd_device_models() {
-        let pvscsi = PvScsiBuilder::new()
+        let scsi_controller = GenericScsiControllerBuilder::new()
             .with_scsi_device(
                 Some(ScsiAddress::new(1, 0)),
                 Arc::new(Cdrom::new("/dev/vm1/vm-108-cd".to_string())),
@@ -213,7 +267,7 @@ mod tests {
             .build();
 
         let mut builder = QemuCommandLineBuilder::new();
-        emit_pvscsi(&mut builder, &pvscsi, &[]);
+        emit_scsi_controller(&mut builder, &scsi_controller, &[]);
         let output = builder.build().to_string();
 
         let cd_line = output
@@ -238,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_07_02_pvscsi_scsi_bus_sorted_by_target_not_insertion_order() {
-        let pvscsi = PvScsiBuilder::new()
+        let scsi_controller = GenericScsiControllerBuilder::new()
             .with_scsi_device(
                 Some(ScsiAddress::new(1, 0)),
                 Arc::new(Ssd::new("/dev/vm1/second".to_string())),
@@ -250,7 +304,7 @@ mod tests {
             .build();
 
         let mut builder = QemuCommandLineBuilder::new();
-        emit_pvscsi(&mut builder, &pvscsi, &[]);
+        emit_scsi_controller(&mut builder, &scsi_controller, &[]);
         let output = builder.build().to_string();
 
         let idx0 = output.find("drive-scsi0").expect("drive-scsi0 missing");
@@ -361,7 +415,7 @@ mod tests {
     fn test_07_02_root_chipset_walks_pcie_bus_for_pvscsi_and_hostpci() {
         use crate::runtime::{Chipset, Memory, Q35ChipsetBuilder, Runtime, RuntimeBuilder};
 
-        let pvscsi = PvScsiBuilder::new()
+        let scsi_controller = GenericScsiControllerBuilder::new()
             .with_scsi_device(
                 Some(ScsiAddress::new(0, 0)),
                 Arc::new(Ssd::new("/dev/vm1/vm-108-boot".to_string())),
@@ -373,7 +427,7 @@ mod tests {
             .with_memory(Memory::new(16384))
             .with_chipset(Chipset::Q35(
                 Q35ChipsetBuilder::new()
-                    .with_pcie_device(Some(PcieAddress::new(16, 0)), Arc::new(pvscsi))
+                    .with_pcie_device(Some(PcieAddress::new(16, 0)), Arc::new(scsi_controller))
                     .with_host_pci(0, Arc::new(host_pci))
                     .build(),
             ))
@@ -385,5 +439,69 @@ mod tests {
 
         assert!(output.contains("pvscsi,id=scsihw0"), "output was: {output}");
         assert!(output.contains("hostpci0.0"), "output was: {output}");
+    }
+
+    #[test]
+    fn test_08_01_pvscsi_controller_line_is_unchanged() {
+        let scsi_controller = GenericScsiControllerBuilder::new().build();
+        let mut builder = QemuCommandLineBuilder::new();
+        emit_scsi_controller(&mut builder, &scsi_controller, &[]);
+        let output = builder.build().to_string();
+
+        assert!(
+            output.contains("-device pvscsi,id=scsihw0,bus=pci.0,addr=0x5"),
+            "output was: {output}"
+        );
+    }
+
+    #[test]
+    fn test_08_01_virtio_scsi_pci_controller_emits_correct_device_model() {
+        let scsi_controller = GenericScsiControllerBuilder::new()
+            .with_controller_type(ScsiControllerType::VirtioScsiPci)
+            .build();
+        let mut builder = QemuCommandLineBuilder::new();
+        emit_scsi_controller(&mut builder, &scsi_controller, &[]);
+        let output = builder.build().to_string();
+
+        assert!(
+            output.contains("-device virtio-scsi-pci,id=scsihw0,bus=pci.0,addr=0x5"),
+            "output was: {output}"
+        );
+    }
+
+    #[test]
+    fn test_08_01_virtio_scsi_single_emits_distinct_ids_for_four_controllers() {
+        let mut builder = QemuCommandLineBuilder::new();
+        for idx in 0..4 {
+            emit_virtio_scsi_single(
+                &mut builder,
+                &PcieAddress::new(16 + idx, 0),
+                &VirtioScsiSingleDisk::new(
+                    format!("/dev/vm0/vm-301-disk-{idx}"),
+                    StorageDeviceType::Ssd,
+                    idx,
+                ),
+                &[],
+            );
+        }
+        let output = builder.build().to_string();
+
+        for idx in 0..4 {
+            assert_eq!(output.matches(&format!("id=iothread{idx}")).count(), 1, "output was: {output}");
+            assert_eq!(output.matches(&format!("id=scsihw{idx}")).count(), 1, "output was: {output}");
+            let drive_id = if idx == 0 {
+                "id=drive-scsi0".to_string()
+            } else {
+                format!("id=drive-scsi{idx}-0")
+            };
+            let device_id = if idx == 0 {
+                "id=scsi0".to_string()
+            } else {
+                format!("id=scsi{idx}-0")
+            };
+            assert_eq!(output.matches(&drive_id).count(), 1, "output was: {output}");
+            assert_eq!(output.matches(&device_id).count(), 1, "output was: {output}");
+            assert!(output.contains(&format!("bus=scsihw{idx}.0")), "output was: {output}");
+        }
     }
 }

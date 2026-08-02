@@ -128,7 +128,7 @@ fn test_proxmox_import_felucia_108_hostpci() {
 
 #[test]
 fn test_proxmox_import_felucia_108_scsi0_resource() {
-    use ezkvm::runtime::{PvScsi, ScsiAddress};
+    use ezkvm::runtime::{GenericScsiController, ScsiAddress};
     let (vm_conf, storage_conf) = load_felucia_108();
     let runtime = ProxmoxImporter::new(vm_conf, storage_conf, 108)
         .into_runtime()
@@ -150,7 +150,7 @@ fn test_proxmox_import_felucia_108_scsi0_resource() {
         .get(&PcieAddress::new(16, 0))
         .expect("PvScsi not at PcieAddress(16,0)")
         .as_any()
-        .downcast_ref::<PvScsi>()
+        .downcast_ref::<GenericScsiController>()
         .expect("downcast to PvScsi");
     let scsi0 = pvscsi
         .scsi_bus()

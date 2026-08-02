@@ -1,0 +1,85 @@
+name: package-verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl target
+        run: rustup target add x86_64-unknown-linux-musl
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+      - name: Build Debian package
+        run: cargo deb --target x86_64-unknown-linux-musl
+      - name: Sanity-check package size
+        run: |
+          # Pitfall 6: static musl packaging can silently balloon if strip/LTO regress; fail well before Installed-Size gets absurd.
+          max_bytes=$((200 * 1024 * 1024))
+          deb_path=$(ls target/x86_64-unknown-linux-musl/debian/*.deb)
+          deb_bytes=$(stat -c %s "$deb_path")
+          test "$deb_bytes" -le "$max_bytes"
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ezkvm-deb
+          path: target/x86_64-unknown-linux-musl/debian/*.deb
+
+  verify:
+    needs: build-deb
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - debian:bookworm
+          - debian:trixie
+          - ubuntu:24.04
+          - ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ezkvm-deb
+          path: dist
+      - name: Relax /dev/kvm permissions for throwaway CI runner
+        run: sudo chmod 666 /dev/kvm
+      - name: Create synthetic disk image
+        run: |
+          mkdir -p /tmp/ezkvm-ci
+          truncate -s 2G /tmp/ezkvm-ci/ci-boot.img
+      - name: Verify package inside container
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          docker run --rm --device /dev/kvm \
+            -e DEBIAN_FRONTEND="$DEBIAN_FRONTEND" \
+            -v "$PWD/dist:/dist" \
+            -v "$PWD/.github/ci-fixtures:/fixtures:ro" \
+            -v /tmp/ezkvm-ci:/tmp/ezkvm-ci \
+            "${{ matrix.image }}" \
+            bash -lc '
+              set -eux
+              apt-get update
+              apt-get install -y iproute2 /dist/*.deb
+              ip link add vmbr-ci type bridge
+              ip link set vmbr-ci up
+              mkdir -p /etc/ezkvm/vm.d
+              cp /fixtures/host.yaml /etc/ezkvm/host.yaml
+              cp /fixtures/ci-boot.yaml /etc/ezkvm/vm.d/ci-boot.yaml
+              useradd -m ci
+              usermod -aG ezkvm ci
+              su ci -c "ezkvm start ci-boot"
+              sleep 5
+              su ci -c "ezkvm status ci-boot | grep -i running"
+              su ci -c "ezkvm stop ci-boot"
+              su ci -c "ezkvm start ci-boot"
+              su ci -c "ezkvm reset ci-boot"
+              su ci -c "ezkvm kill ci-boot"
+            '

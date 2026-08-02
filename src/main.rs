@@ -1,112 +1,113 @@
-use std::{str::FromStr, sync::Arc};
+use std::{path::PathBuf, process::ExitCode};
 
-use crate::{
-    config::EzkvmConfigSchema,
-    runtime::{
-        PcieAddress, PvScsiBuilder, Q35ChipsetBuilder, Runtime, SataAddress, ScsiAddress, Ssd,
-    },
+use clap::{Parser, Subcommand};
+use ezkvm::lifecycle::{
+    host_config::HostConfig,
+    kill, reset,
+    start::start,
+    status::{StatusReport, status},
+    stop,
 };
 
-mod config;
-mod runtime;
-mod serde_yaml;
+#[derive(Debug, Parser)]
+#[command(name = "ezkvm")]
+#[command(about = "VM lifecycle management for ezkvm YAML configs")]
+struct Cli {
+    #[arg(long, default_value = "/etc/ezkvm", global = true)]
+    config_dir: PathBuf,
+    #[command(subcommand)]
+    verb: Verb,
+}
 
-fn main() {
-    let runtime = runtime::RuntimeBuilder::new()
-        .with_memory(runtime::Memory::new(1024))
-        .with_chipset(runtime::Chipset::Q35(
-            Q35ChipsetBuilder::new()
-                .with_sata_device(Some(SataAddress::new(0, 0)), Arc::new(Ssd::new(String::new())))
-                .with_pcie_device(
-                    Some(PcieAddress::new(0, 0)),
-                    Arc::new(
-                        PvScsiBuilder::new()
-                            .with_scsi_device(Some(ScsiAddress::new(0, 0)), Arc::new(Ssd::new(String::new())))
-                            .build(),
-                    ),
+#[derive(Debug, Subcommand)]
+enum Verb {
+    Start {
+        vm_name: String,
+    },
+    Stop {
+        #[arg(long = "escalate-after")]
+        escalate_after: Option<u64>,
+        vm_name: String,
+    },
+    Kill {
+        vm_name: String,
+    },
+    Reset {
+        vm_name: String,
+    },
+    Status {
+        vm_name: String,
+    },
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(Some(message)) => {
+            println!("{message}");
+            ExitCode::SUCCESS
+        }
+        Ok(None) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("error: {err}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> Result<Option<String>, String> {
+    let cli = Cli::parse();
+    let host_config = HostConfig::load(&cli.config_dir).map_err(|err| err.to_string())?;
+
+    match cli.verb {
+        Verb::Start { vm_name } => {
+            start(&host_config, &vm_name).map_err(|err| err.to_string())?;
+            Ok(None)
+        }
+        Verb::Status { vm_name } => {
+            let report =
+                status(host_config.state_dir(), &vm_name).map_err(|err| err.to_string())?;
+            Ok(Some(match report {
+                StatusReport::Running {
+                    qemu_pid,
+                    swtpm_pid,
+                    ui_client_pid,
+                } => format!(
+                    "running (qemu_pid={qemu_pid}, swtpm_pid={swtpm_pid:?}, ui_client_pid={ui_client_pid:?})"
+                ),
+                StatusReport::NotRunning => "not running".to_string(),
+            }))
+        }
+        Verb::Stop {
+            vm_name,
+            escalate_after,
+        } => {
+            let effective_host = if let Some(timeout) = escalate_after {
+                HostConfig::new(
+                    host_config.vm_dir().clone(),
+                    host_config.state_dir().clone(),
+                    host_config.qemu_path().clone(),
+                    host_config.qemu_default_args().clone(),
+                    host_config.swtpm_path().clone(),
+                    host_config.remote_viewer_path().clone(),
+                    host_config.remote_viewer_default_args().clone(),
+                    host_config.looking_glass_client_path().clone(),
+                    host_config.looking_glass_client_default_args().clone(),
+                    host_config.host_resources().clone(),
+                    Some(timeout),
                 )
-                .build(),
-        ))
-        .build()
-        .expect("build runtime failed");
-
-    println!("runtime: {}\n\n\n", runtime);
-
-    let schema = EzkvmConfigSchema::try_from(runtime).expect("Failed to build VM schema");
-    println!("ezkvm schema: {:?}\n\n\n", schema);
-
-    let runtime = Runtime::try_from(schema).expect("Failed to build runtime from VM schema");
-    println!("runtime: {}\n\n\n", runtime);
-
-    let input = r#"
-metadata:
-  schema_version: 1.0.0
-  vm_name: wakiza
-host:
-  resources:
-  - id: storage0
-    storage:
-      block_device: /dev/vm1/vm-108-efidisk
-  - id: storage1
-    storage:
-      block_device: /dev/vm1/vm-108-tpmstate
-  - id: net0
-    network:
-      bridge: vmbr0
-  - id: storage2
-    storage:
-      block_device: /dev/vm1/vm-108-boot
-  - id: storage3
-    storage:
-      block_device: /dev/vm1/vm-108-tmp
-virtual_machine:
-  machine:
-    family: pc
-    q35: { version: "6.2"}
-  cpu:
-    model: Host
-    cores: 8
-    threads: 1
-    sockets: 1
-  memory:
-    size: 17179869184
-  boot:
-    uefi:
-      resource: storage0
-  swtpm:
-    version: "v2.0"
-    resource: storage1
-  devices:
-  - pcie:
-      bus: 0
-      device: 0
-      function: 0
-      type: pv_scsi
-  - pcie:
-      bus: 0
-      device: 16
-      function: 0
-      type: virtio_net
-      resource: net0
-  - scsi:
-      bus: 0
-      address:
-        target: 0
-        lun: 0
-      type: hdd
-      resource: storage2
-  - scsi:
-      bus: 0
-      address:
-        target: 0
-        lun: 1
-      type: hdd
-      resource: storage3
-"#;
-
-    let schema = EzkvmConfigSchema::from_str(input).expect("Failed to parse VM schema from input");
-    println!("ezkvm schema: {:?}\n\n\n", schema);
-
-    let content = schema.to_styled_compact_yaml().unwrap();
-    println!("styled compact yaml:\n{:?}", content);
+            } else {
+                host_config.clone()
+            };
+            stop::stop(&effective_host, &vm_name).map_err(|err| err.to_string())?;
+            Ok(None)
+        }
+        Verb::Kill { vm_name } => {
+            kill::kill(&host_config, &vm_name).map_err(|err| err.to_string())?;
+            Ok(None)
+        }
+        Verb::Reset { vm_name } => {
+            reset::reset(&host_config, &vm_name).map_err(|err| err.to_string())?;
+            Ok(None)
+        }
+    }
 }

@@ -27,7 +27,14 @@ pub struct PcieDeviceSchema {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PcieDeviceTypeSchema {
-    PvScsi,
+    ScsiController {
+        controller_type: ScsiControllerTypeSchema,
+    },
+    VirtioScsiSingle {
+        resource: String,
+        index: u8,
+        storage_type: PcieStorageDeviceTypeSchema,
+    },
     VirtioNet {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         resource: Option<String>,
@@ -73,6 +80,21 @@ pub enum PcieDeviceTypeSchema {
     },
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScsiControllerTypeSchema {
+    PvScsi,
+    VirtioScsiPci,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PcieStorageDeviceTypeSchema {
+    Hdd,
+    Ssd,
+    Cdrom,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +114,28 @@ mod tests {
             assert!(!x_vga);
         } else {
             panic!("expected HostPci variant");
+        }
+    }
+
+    #[test]
+    fn virtio_scsi_single_round_trips_yaml() {
+        let device = PcieDeviceTypeSchema::VirtioScsiSingle {
+            resource: "disk0".to_string(),
+            index: 3,
+            storage_type: PcieStorageDeviceTypeSchema::Ssd,
+        };
+        let schema = PcieDeviceSchema::new(None, None, device);
+        let yaml = crate::serde_yaml::to_string(&schema).unwrap();
+        assert!(yaml.contains("virtio_scsi_single"), "yaml was: {yaml}");
+        let decoded: PcieDeviceSchema = crate::serde_yaml::from_str(&yaml).unwrap();
+        if let PcieDeviceTypeSchema::VirtioScsiSingle { resource, index, storage_type } =
+            decoded.device()
+        {
+            assert_eq!(resource, "disk0");
+            assert_eq!(index, &3);
+            assert_eq!(storage_type, &PcieStorageDeviceTypeSchema::Ssd);
+        } else {
+            panic!("expected VirtioScsiSingle variant");
         }
     }
 }

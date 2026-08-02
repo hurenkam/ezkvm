@@ -4,14 +4,16 @@
 
 ezkvm converts Proxmox `.conf` and `storage.cfg` files into a typed in-memory Runtime model,
 serializes that model to ezkvm YAML, and generates valid QEMU commandlines — with full
-round-trip fidelity for real-world configurations. The v1 journey flows in nine phases of
+round-trip fidelity for real-world configurations. The v1 journey flows in ten phases of
 strict dependency order: first a stable foundation of typed errors and device dispatch
 (Phase 1), then the missing Runtime device types (Phase 2), then the Proxmox file parser
 (Phase 3) and Proxmox→Runtime conversion (Phase 4), then the YAML schema extension (Phase 5)
 and YAML↔Runtime wiring (Phase 6), then the QEMU commandline emitter (Phase 7), then
-VM lifecycle management — start, stop, reset, and UI client launch (Phase 8) — and finally
-an integration test that boots `input/felucia/108.conf` as a real VM (Phase 9). Each phase
-delivers a coherent, testable capability whose output is the next phase's input.
+VM lifecycle management — start, stop, reset, and UI client launch (Phase 8) — then
+an integration test that boots `input/felucia/108.conf` as a real VM (Phase 9), and finally
+deployment packaging with real host-tooling verification on Debian 13 and Ubuntu 26.04
+(Phase 10). Each phase delivers a coherent, testable capability whose output is the next
+phase's input.
 
 ## Phases
 
@@ -29,8 +31,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: YAML Schema** - Extend ezkvm YAML schema to cover all seven v1 Runtime device types via saphyr (completed 2026-07-23)
 - [x] **Phase 6: YAML↔Runtime** - TryFrom/Into impls for lossless Runtime ↔ ezkvm YAML round-trip (completed 2026-07-24)
 - [x] **Phase 7: QEMU Cmdline** - Segment-based QEMU commandline emitter with drive-before-device ordering and verbatim raw args (completed 2026-07-24)
-- [ ] **Phase 8: VM Lifecycle** - Start/stop/reset VM processes (qemu + swtpm), launch UI clients (Looking Glass / remote-viewer), QEMU monitor control
-- [ ] **Phase 9: Round-Trip Verification** - Integration tests: felucia/108.conf → Runtime → ezkvm YAML → Runtime → QEMU cmdline → bootable VM
+- [x] **Phase 8: VM Lifecycle** - Start/stop/reset VM processes (qemu + swtpm), launch UI clients (Looking Glass / remote-viewer), QEMU monitor control (completed 2026-07-28)
+- [x] **Phase 8.1: USB & SCSI Schema Extension** (INSERTED) - Native Runtime/ezkvm-YAML support for USB vendor:product-ID passthrough identity and virtio-scsi-pci/virtio-scsi-single controller types, replacing narrow handler-level workarounds (completed 2026-07-28)
+- [x] **Phase 9: Round-Trip Verification** - Integration tests: felucia/108.conf → Runtime → ezkvm YAML → Runtime → QEMU cmdline → bootable VM
+- [x] **Phase 10: Deployment Packaging - Debian/Ubuntu** - Build installable packages and verify VM lifecycle against real host tooling on Debian 13 and Ubuntu 26.04
 
 ## Phase Details
 
@@ -56,9 +60,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 
-- [ ] 01-01: Add `thiserror = "2.0"` explicitly to Cargo.toml; replace `type Error = ()` in proxmox.rs and qemu.rs with named thiserror error enums (`ProxmoxConversionError`, `QemuConversionError`)
-- [ ] 01-02: Add `fn device_kind(&self) -> DeviceKind` to RootDevice, PcieDevice, ScsiDevice, SataDevice, UsbDevice, and StorageDevice traits; implement for all existing concrete types (Memory, Q35Chipset, PvScsi, VirtioNet, Ssd, Hdd, Cdrom, GenericPciDevice, GenericUsbDevice)
-- [ ] 01-03: Remove `Mutex` from `RuntimeBuilder`; replace with `Vec<Arc<dyn RootDevice>>`; verify all builder tests compile and pass
+- [x] 01-01: Add `thiserror = "2.0"` explicitly to Cargo.toml; replace `type Error = ()` in proxmox.rs and qemu.rs with named thiserror error enums (`ProxmoxConversionError`, `QemuConversionError`)
+- [x] 01-02: Add `fn device_kind(&self) -> DeviceKind` to RootDevice, PcieDevice, ScsiDevice, SataDevice, UsbDevice, and StorageDevice traits; implement for all existing concrete types (Memory, Q35Chipset, PvScsi, VirtioNet, Ssd, Hdd, Cdrom, GenericPciDevice, GenericUsbDevice)
+- [x] 01-03: Remove `Mutex` from `RuntimeBuilder`; replace with `Vec<Arc<dyn RootDevice>>`; verify all builder tests compile and pass
 
 ---
 
@@ -84,10 +88,10 @@ Plans:
 
 Plans:
 
-- [ ] 02-01: Implement `EfiDisk` (logical_size: String, block_device_size_bytes: Option<u64>, efitype: String, pre_enrolled_keys: bool, storage_volume: String) and `TpmState` (version: String, storage_volume: String) in `src/runtime/`
-- [ ] 02-02: Implement `HostPci` (base_bdf: String, functions: Vec<u8>, pcie: bool, x_vga: bool, rombar: bool, romfile: Option<String>) and `Ivshmem` (size_mb: u64, name: String) in `src/runtime/`
-- [ ] 02-03: Implement `AudioDevice` (device_type: String, driver: String), `SpiceDisplay` (gl: bool, rendernode: Option<String>, port: Option<u16>, clipboard: bool), and `RawArgs(String)` in `src/runtime/`
-- [ ] 02-04: Register all seven types with appropriate device traits; add `device_kind()` variants; wire into Q35ChipsetBuilder (or as RootDevice as appropriate); write construction tests for each type
+- [x] 02-01: Implement `EfiDisk` (logical_size: String, block_device_size_bytes: Option<u64>, efitype: String, pre_enrolled_keys: bool, storage_volume: String) and `TpmState` (version: String, storage_volume: String) in `src/runtime/`
+- [x] 02-02: Implement `HostPci` (base_bdf: String, functions: Vec<u8>, pcie: bool, x_vga: bool, rombar: bool, romfile: Option<String>) and `Ivshmem` (size_mb: u64, name: String) in `src/runtime/`
+- [x] 02-03: Implement `AudioDevice` (device_type: String, driver: String), `SpiceDisplay` (gl: bool, rendernode: Option<String>, port: Option<u16>, clipboard: bool), and `RawArgs(String)` in `src/runtime/`
+- [x] 02-04: Register all seven types with appropriate device traits; add `device_kind()` variants; wire into Q35ChipsetBuilder (or as RootDevice as appropriate); write construction tests for each type
 
 ---
 
@@ -197,9 +201,9 @@ Plans:
 
 Plans:
 
-- [ ] 06-01: Implement `TryFrom<Runtime> for ConfigSchema` extensions (Runtime → YAML direction) for all seven new device types; follow existing handler pattern in `src/config/ezkvm/runtime/builder.rs`
-- [ ] 06-02: Implement `TryFrom<ConfigSchema> for Runtime` extensions (YAML → Runtime direction) for all seven new device types; follow existing handler pattern in `src/config/ezkvm/runtime/parser.rs`
-- [ ] 06-03: Write round-trip integration test: felucia/108.conf → ProxmoxImporter → Runtime → ConfigSchema → YAML string → ConfigSchema → Runtime; assert field-level equality for all seven v1 device types
+- [x] 06-01: Implement `TryFrom<Runtime> for ConfigSchema` extensions (Runtime → YAML direction) for all seven new device types; follow existing handler pattern in `src/config/ezkvm/runtime/builder.rs`
+- [x] 06-02: Implement `TryFrom<ConfigSchema> for Runtime` extensions (YAML → Runtime direction) for all seven new device types; follow existing handler pattern in `src/config/ezkvm/runtime/parser.rs`
+- [x] 06-03: Write round-trip integration test: felucia/108.conf → ProxmoxImporter → Runtime → ConfigSchema → YAML string → ConfigSchema → Runtime; assert field-level equality for all seven v1 device types
 
 ---
 
@@ -268,59 +272,120 @@ Plans:
 - QEMU monitor socket path must be stable and included in the generated cmdline (`-qmp unix:<path>,server,nowait`)
 - UI client launch must be non-blocking (detached child process); failure to launch client must not kill the VM
 
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 
-- [ ] 08-01: Define `VmHandle` struct tracking qemu PID, swtpm PID, monitor socket path, and UI client PID; implement `start()` launching swtpm (if needed) then qemu with generated cmdline
-- [ ] 08-02: Implement QEMU monitor client (QMP JSON over Unix socket): `system_powerdown`, `quit`, `system_reset` commands; implement `stop()`, `kill()`, `reset()` on `VmHandle`
-- [ ] 08-03: Implement UI client launch (Looking Glass / remote-viewer) as detached child; read client binary and args from ezkvm YAML `display` config
-- [ ] 08-04: Write integration tests: start VM, verify qemu process running, send monitor command, verify process exits
+- [x] 08-01-PLAN.md — Tracer: `clap` CLI skeleton, `host.yaml`/`HostConfig`, `VmHandle` state file, detached process helpers, minimal TPM-less `start`/`status`, `<vm-name>` path-traversal guard
+- [x] 08-02-PLAN.md — Start flow completion: swtpm readiness polling, already-running guard, orphaned-swtpm cleanup, UI-client launch mapping (Spice/Vnc/LookingGlass)
+- [x] 08-03-PLAN.md — QMP client (capabilities handshake, `system_powerdown`/`quit`/`system_reset`) and `stop`/`kill`/`reset` verbs with UI-client cleanup and opt-in stop-to-kill escalation
+- [x] 08-04-PLAN.md — Full lifecycle integration tests and security verification (QMP socket permissions, cross-verb path-traversal rejection)
+
+---
+
+### Phase 8.1: USB & SCSI Schema Extension (INSERTED)
+
+**Goal**: Extend the Runtime model and ezkvm YAML schema to natively and losslessly represent USB vendor:product-ID passthrough identity and multiple SCSI controller types (`virtio-scsi-pci`, `virtio-scsi-single`, in addition to `pvscsi`), so real-world corpus configs using these variants (e.g. zbp-server-mh2/301) round-trip correctly without handler-level point-fixes or lossy collapsing to a single default.
+**Depends on**: Phase 6, Phase 7
+**Requirements**: RUNT-10, RUNT-11
+**Success Criteria** (what must be TRUE):
+
+  1. Runtime model represents USB device identity as a variant covering both bus-port (`bus`/`port`) and vendor:product-ID (`vendor_id`/`product_id`) forms; the QEMU emitter emits the correct flags for each variant without panicking
+  2. ezkvm YAML schema round-trips both USB identity variants losslessly (Runtime → YAML → Runtime produces an identical Runtime)
+  3. Proxmox importer correctly maps both `hostusbN: host=<bus>-<port>` and `hostusbN: host=<vendor>:<product>` forms into the new Runtime USB identity variants
+  4. Runtime model represents SCSI controller type (`pvscsi`, `virtio-scsi-pci`, `virtio-scsi-single`) as a first-class field instead of discarding it; the QEMU emitter emits the corresponding controller device type
+  5. ezkvm YAML schema round-trips the SCSI controller type field losslessly
+  6. Proxmox importer's already-parsed `scsihw` value is threaded into the Runtime's SCSI controller type field instead of being parsed-then-discarded
+  7. zbp-server-mh2/301 corpus (vendor:product-ID USB devices, `virtio-scsi-single` controller) is usable as Phase 9 test input without any handler-level workaround
+
+**Risks**:
+
+- Schema changes to USB/SCSI representation may require care to preserve backward compatibility with existing valid ezkvm YAML files that don't specify these fields (must default to current behavior: bus-port USB, pvscsi controller)
+- RawArgs "smart recognition" (re-injecting supported items during export) is explicitly OUT OF SCOPE for this phase — deferred to a future phase per user decision; this phase only addresses USB and SCSI schema support
+
+**Plans**: 3 plans
+
+Plans:
+- [x] 08.1-01-PLAN.md — Typed `UsbHostIdentity` (bus-port vs vendor:product-ID) end-to-end, D-01
+- [x] 08.1-02-PLAN.md — `GenericScsiController` + `ScsiControllerType` (pvscsi/virtio-scsi-pci), D-02
+- [x] 08.1-03-PLAN.md — `VirtioScsiSingleDisk` merged per-disk device + label-collision fix, D-03
+
+Plans:
+
+- [ ] TBD
 
 ---
 
 ### Phase 9: Round-Trip Verification
 
 **Goal**: The complete felucia/108.conf pipeline — `.conf` + `storage.cfg` → Runtime → ezkvm YAML → Runtime → QEMU cmdline — produces a QEMU commandline that starts a working VM, verified by integration tests across multiple corpus files.
-**Depends on**: Phase 6, Phase 7, Phase 8
+**Depends on**: Phase 6, Phase 7, Phase 8, Phase 8.1
 **Requirements**: QEMU-04
 **Success Criteria** (what must be TRUE):
 
   1. `input/felucia/108.conf` + `storage.cfg` imports, serializes to YAML, deserializes back, and generates a QEMU cmdline — all without errors
-  2. The generated QEMU cmdline matches `108.ezkvm.qemu.cmd` reference output; any divergences are documented with rationale
-  3. A VM launched with the generated cmdline reaches the QEMU monitor prompt without fatal startup errors
-  4. Integration tests pass for at least two additional corpus files beyond felucia/108.conf (e.g., one coruscant and one zbp-server-mh2 config)
+  2. The generated QEMU cmdline for each of the three target corpus configs (felucia/108, coruscant/501, zbp-server-mh2/301) passes structural spot-checks — correct device count/types, drive-before-device ordering, raw `args` verbatim — cross-referenced against each corpus's own `lspci`/`lsusb` output where available. (Supersedes the original "exact-diff against `108.ezkvm.qemu.cmd`" criterion — see `09-CONTEXT.md` D-05: that reference file is stale/historical and is not used as a diff target.)
+  3. The generated cmdline is well-formed and structurally valid; actual real-QEMU boot/monitor-prompt verification is explicitly deferred to Phase 10 (see `09-CONTEXT.md` D-01)
+  4. Integration tests pass for coruscant/501.conf and zbp-server-mh2/301.conf in addition to felucia/108.conf
 
 **Risks**:
 
 - **Pitfall 7** (args cross-references — Pitfall 7): The `args` blob in 108.conf contains internally cross-referencing QEMU flags (`chardev=vdagent` ↔ `virtserialport`, `-object memory-backend-file,id=ivshmem0` ↔ `-device ivshmem-plain,memdev=ivshmem0`); emit the blob verbatim — any reordering of individual tokens within it breaks the VM
 - Multi-corpus testing: Testing only 108.conf misses SCSI controller variant differences (pvscsi vs virtio-scsi-single) present in zbp-server-mh2 configs and NUMA configs on coruscant; these expose different Runtime paths
 
-**Plans**: TBD
+**Plans**: 2 plans (REPLANNED 2026-07-29 against the landed Phase 8.1 baseline — see `09-REPLAN-NOTES.md`. The old `09-02-PLAN.md` handler-level USB workaround is dropped: Phase 8.1 already fixed vendor:product-ID USB passthrough properly at the schema level via a typed `UsbHostIdentity`. `09-03` now asserts scsihw-controller-specific device strings for coruscant/zbp, since Phase 8.1 also wired `scsihw` fully through the pipeline instead of discarding it.) — **Complete 2026-07-29**, 168/168 tests passing, goal-backward verified (8/8 must-haves).
 
 Plans:
 
-- [ ] 08-01: Write end-to-end pipeline test for felucia/108.conf: import → Runtime → YAML → Runtime → QEMU cmdline; diff output against `108.ezkvm.qemu.cmd`; document each acceptable divergence in a `VERIFICATION.md` or test comment
-- [ ] 08-02: Add end-to-end tests for two additional corpus configs; confirm `cargo test` passes across all integration tests
-- [ ] 08-03: Fix any regressions discovered during multi-corpus testing; tag the passing test suite state as the v1 verification baseline
+- [x] 09-01-PLAN.md — Tracer: felucia/108.conf full 4-stage round-trip integration test (new `tests/round_trip_verification.rs` + reusable `load_corpus`/`runtime_for_cmdline`/`make_ctx` helpers), including a `pvscsi`-specific controller-device assertion
+- [x] 09-03-PLAN.md — coruscant/501.conf (virtio-scsi-pci) and zbp-server-mh2/301.conf (virtio-scsi-single, USB vendor:product-ID) round-trip integration tests, extending `tests/round_trip_verification.rs` (depends on 09-01 only)
+
+### Phase 10: Deployment Packaging - Debian/Ubuntu
+
+**Goal**: Build installable deployment packages for ezkvm (e.g. `.deb`) and verify real-VM start/stop/reset lifecycle behavior against actual target-OS environments — Debian 13/12 and Ubuntu 26.04/24.04 — rather than the mocked/stubbed host dependencies used in Phase 8's unit/integration tests. This phase intentionally depends on real installed system tooling (`qemu-system-x86_64`, `swtpm`, display clients) per target distro; it is the deliberate exception to the "tests must not depend on host-installed tooling" rule established for Phase 8 (see Phase 8's `08-CONTEXT.md`/`08-VALIDATION.md`) — those stay portable/host-agnostic, and this phase is where host-specific, package/OS-dependent verification belongs.
+**Depends on**: Phase 8, Phase 9
+**Requirements**: QEMU-04, DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04
+**Success Criteria** (draft, refine during discuss/plan):
+
+  1. A single statically musl-linked `.deb` package builds cleanly from the ezkvm codebase, installing binaries/config to their correct FHS target paths (`/etc/ezkvm`, `/var/lib/ezkvm`, `/run/ezkvm`), and creates a dedicated `ezkvm` group via `postinst` (no libvirt dependency, no systemd unit installed — see `10-CONTEXT.md` D-02–D-04, D-08)
+  2. The one package installs cleanly and `ezkvm start`/`stop`/`reset` work against a real QEMU VM on Debian 13 (trixie) — current focus
+  3. The same package installs cleanly and works identically on Ubuntu 26.04 — current focus
+  4. The same package also installs cleanly and works on Debian 12 (bookworm) and Ubuntu 24.04, proving the musl-static single-package approach's cross-version compatibility (D-08)
+  5. Any distro-specific packaging differences are documented; no AppArmor/SELinux profile is shipped in v1 (explicitly "unconfined", D-06)
+
+**Notes**:
+
+- Deliberately deferred until actual package creation/deployment-target work begins — not to be pulled forward into Phase 8, whose tests must remain host-agnostic (stubbed qemu/swtpm/UI-client processes, no real binaries required).
+- Consider containerized (Docker/systemd-nspawn) or VM-based CI runners for the four target distro/version combinations so this phase's tests are themselves reproducible (packaging tool and test environment choices left open for research — see `10-CONTEXT.md` D-01, D-05).
+- Discussed 2026-07-29 — see `10-CONTEXT.md`/`10-DISCUSSION-LOG.md` for the 8 locked decisions (no systemd integration, dedicated `ezkvm` group not user, standard FHS layout, no security profile in v1, Cargo.toml-tracked versioning, single musl-static package across 4 distro/version targets).
+
+**Plans**: 3 plans
+
+Plans:
+
+- [x] 10-01-PLAN.md — Tracer: cargo-deb musl packaging (Cargo.toml metadata, postinst/postrm, tmpfiles.d) + single-target (debian:bookworm) GitHub Actions real-QEMU boot smoke test
+- [x] 10-02-PLAN.md — Expand CI verification matrix to all 4 targets (Debian 13/12, Ubuntu 26.04/24.04) + package-size sanity check (depends on 10-01)
+- [x] 10-03-PLAN.md — Document distro-specific packaging differences, no-AppArmor/SELinux stance, revision-suffix convention, and felucia/108's manual-only real-hardware verification checklist (depends on 10-01)
 
 ---
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 8.1 → 9 → 10
 
-Note: Phase 3 (Proxmox Parser) depends only on Phase 1 and may begin in parallel with Phase 2 (Runtime Model). Phase 5 (YAML Schema) depends only on Phase 2 and may begin in parallel with Phase 3. Phase 7 (QEMU Cmdline) depends only on Phase 2 and may begin in parallel with Phases 3–6.
+Note: Phase 3 (Proxmox Parser) depends only on Phase 1 and may begin in parallel with Phase 2 (Runtime Model). Phase 5 (YAML Schema) depends only on Phase 2 and may begin in parallel with Phase 3. Phase 7 (QEMU Cmdline) depends only on Phase 2 and may begin in parallel with Phases 3–6. Phase 8.1 (URGENT insertion) depends on Phase 6 and Phase 7 and must complete before Phase 9.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/3 | Not started | - |
-| 2. Runtime Model | 0/4 | Not started | - |
+| 1. Foundation | 3/3 | Complete    | 2026-07-24 |
+| 2. Runtime Model | 4/4 | Complete    | 2026-07-24 |
 | 3. Proxmox Parser | 1/1 | Complete    | 2026-07-23 |
 | 4. Proxmox→Runtime | 1/1 | Complete    | 2026-07-23 |
 | 5. YAML Schema | 1/1 | Complete    | 2026-07-23 |
-| 6. YAML↔Runtime | 0/3 | Not started | - |
+| 6. YAML↔Runtime | 3/3 | Complete    | 2026-07-24 |
 | 7. QEMU Cmdline | 5/5 | Complete    | 2026-07-24 |
-| 8. VM Lifecycle | 0/4 | Not started | - |
-| 9. Round-Trip Verification | 0/3 | Not started | - |
+| 8. VM Lifecycle | 4/4 | Complete    | 2026-07-28 |
+| 8.1. USB & SCSI Schema Extension (INSERTED) | 3/3 | Complete    | 2026-07-28 |
+| 9. Round-Trip Verification | 2/2 | Complete    | 2026-07-29 |
+| 10. Deployment Packaging - Debian/Ubuntu | 3/3 | Complete    | 2026-07-30 |

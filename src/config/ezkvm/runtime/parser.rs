@@ -7,18 +7,20 @@ use crate::{
             IdeDeviceSchema, IdeDeviceTypeSchema, MachineSchema, MemoryResourceSchema,
             MemorySchema, MetadataSchema, PciAddressSchema, PciDeviceSchema, PciDeviceTypeSchema,
             PcieAddressSchema, PcieDeviceSchema, PcieDeviceTypeSchema, PcieResourceSchema,
-            Q35ChipsetSchema, RawArgsSchema, ResourceSchema, SataAddressSchema, SataDeviceSchema,
-            SataDeviceTypeSchema, ScsiAddressSchema, ScsiDeviceSchema, ScsiDeviceTypeSchema,
-            SpiceSchema, StorageResourceSchema, SwtpmSchema, TpmSchema, UefiSchema,
-            UsbAddressSchema, UsbDeviceSchema, UsbDeviceTypeSchema, VirtualMachineSchema,
+            PcieStorageDeviceTypeSchema, Q35ChipsetSchema, RawArgsSchema, ResourceSchema,
+            SataAddressSchema, SataDeviceSchema, SataDeviceTypeSchema, ScsiAddressSchema,
+            ScsiControllerTypeSchema, ScsiDeviceSchema, ScsiDeviceTypeSchema, SpiceSchema,
+            StorageResourceSchema, SwtpmSchema, TpmSchema, UefiSchema, UsbAddressSchema,
+            UsbDeviceSchema, UsbDeviceTypeSchema, UsbHostIdentitySchema, VirtualMachineSchema,
             EZKVM_CONFIG_SCHEMA_VERSION,
         },
     },
     runtime::{
-        AudioDevice, Cdrom, Chipset, EfiDisk, GenericPciDevice, GenericUsbDevice, Hdd, HostPci,
-        Ivshmem, Memory, PciBusDeviceKind, PciDeviceKind, PcieBusDeviceKind, PvScsi, Q35Chipset,
-        RawArgs, RootDeviceKind, Runtime, SpiceDisplay, Ssd, StorageDeviceType, TpmState,
-        UsbBusDeviceKind, UsbDeviceKind, VirtioNetPcie,
+        AudioDevice, Cdrom, Chipset, EfiDisk, GenericPciDevice, GenericScsiController,
+        GenericUsbDevice, Hdd, HostPci, Ivshmem, Memory, PciBusDeviceKind, PciDeviceKind,
+        PcieBusDeviceKind, Q35Chipset, RawArgs, RootDeviceKind, Runtime, ScsiControllerType,
+        SpiceDisplay, Ssd, StorageDeviceType, TpmState, UsbBusDeviceKind, UsbDeviceKind,
+        UsbHostIdentity, VirtioNetPcie, VirtioScsiSingleDisk,
     },
 };
 use super::error::YamlRuntimeError;
@@ -166,17 +168,27 @@ impl Parser {
         let mut pcie_entries = q35.pcie_bus().iter().collect::<Vec<_>>();
         pcie_entries.sort_by_key(|(addr, _)| (*addr.device(), *addr.function()));
         for (pcie_addr, pcie_device) in pcie_entries {
-            if pcie_device.device_kind() == PcieBusDeviceKind::PvScsi {
-                let pvscsi = pcie_device.as_any().downcast_ref::<PvScsi>().unwrap();
+            if pcie_device.device_kind() == PcieBusDeviceKind::ScsiController {
+                let scsi_controller = pcie_device
+                    .as_any()
+                    .downcast_ref::<GenericScsiController>()
+                    .unwrap();
                 devices.push(DeviceSchema::Pcie {
                     pcie: PcieDeviceSchema::new(
                         Some(0),
                         Some(PcieAddressSchema::new(*pcie_addr.device(), *pcie_addr.function())),
-                        PcieDeviceTypeSchema::PvScsi,
+                        PcieDeviceTypeSchema::ScsiController {
+                            controller_type: match scsi_controller.controller_type() {
+                                ScsiControllerType::PvScsi => ScsiControllerTypeSchema::PvScsi,
+                                ScsiControllerType::VirtioScsiPci => {
+                                    ScsiControllerTypeSchema::VirtioScsiPci
+                                }
+                            },
+                        },
                     ),
                 });
 
-                let mut scsi_entries = pvscsi.scsi_bus().iter().collect::<Vec<_>>();
+                let mut scsi_entries = scsi_controller.scsi_bus().iter().collect::<Vec<_>>();
                 scsi_entries.sort_by_key(|(addr, _)| (*addr.target(), *addr.lun()));
                 for (scsi_addr, scsi_device) in scsi_entries {
                     let resource_id = format!("scsi-{}-{}", scsi_addr.target(), scsi_addr.lun());
@@ -215,6 +227,34 @@ impl Parser {
                             rx_queue_size: *virtio_net.rx_queue_size(),
                             tx_queue_size: *virtio_net.tx_queue_size(),
                             vhost: *virtio_net.vhost(),
+                        },
+                    ),
+                });
+                continue;
+            }
+
+            if pcie_device.device_kind() == PcieBusDeviceKind::VirtioScsiSingleDisk {
+                let disk = pcie_device
+                    .as_any()
+                    .downcast_ref::<VirtioScsiSingleDisk>()
+                    .unwrap();
+                let resource_id = format!("virtio-scsi-single-{}", disk.index());
+                resources.push(ResourceSchema::Storage {
+                    id: resource_id.clone(),
+                    storage: storage_resource_schema(disk.resource()),
+                });
+                devices.push(DeviceSchema::Pcie {
+                    pcie: PcieDeviceSchema::new(
+                        Some(0),
+                        Some(PcieAddressSchema::new(*pcie_addr.device(), *pcie_addr.function())),
+                        PcieDeviceTypeSchema::VirtioScsiSingle {
+                            resource: resource_id,
+                            index: *disk.index(),
+                            storage_type: match disk.storage_type() {
+                                StorageDeviceType::Hdd => PcieStorageDeviceTypeSchema::Hdd,
+                                StorageDeviceType::Ssd => PcieStorageDeviceTypeSchema::Ssd,
+                                StorageDeviceType::Odd => PcieStorageDeviceTypeSchema::Cdrom,
+                            },
                         },
                     ),
                 });
@@ -364,8 +404,19 @@ impl Parser {
             let schema_device = match generic.kind() {
                 UsbDeviceKind::NetworkController => UsbDeviceTypeSchema::NetworkController,
                 UsbDeviceKind::Tablet => UsbDeviceTypeSchema::Tablet,
-                UsbDeviceKind::HostPassthrough { resource } => UsbDeviceTypeSchema::HostPassthrough {
-                    resource: resource.clone(),
+                UsbDeviceKind::HostPassthrough { identity } => UsbDeviceTypeSchema::HostPassthrough {
+                    identity: match identity {
+                        UsbHostIdentity::BusPort { bus, port } => UsbHostIdentitySchema::BusPort {
+                            bus: bus.clone(),
+                            port: port.clone(),
+                        },
+                        UsbHostIdentity::VendorProduct { vendor_id, product_id } => {
+                            UsbHostIdentitySchema::VendorProduct {
+                                vendor_id: vendor_id.clone(),
+                                product_id: product_id.clone(),
+                            }
+                        }
+                    },
                 },
             };
 
@@ -420,9 +471,9 @@ mod tests {
     use crate::runtime::{
         AudioDevice, Cdrom, Chipset, EfiDisk, GenericPciDevice, GenericUsbDevice, Hdd, HostPci,
         IdeAddress, Ivshmem, Memory, PciAddress, PciDeviceKind, PcieAddress, PcieBusDeviceKind,
-        PvScsiBuilder, Q35ChipsetBuilder, RawArgs, RootDeviceKind, Runtime, RuntimeBuilder,
-        SataAddress, ScsiAddress, SpiceDisplay, Ssd, TpmState, UsbAddress, UsbDeviceKind,
-        VirtioNetPcie,
+        GenericScsiControllerBuilder, Q35ChipsetBuilder, RawArgs, RootDeviceKind, Runtime, RuntimeBuilder,
+        SataAddress, ScsiAddress, SpiceDisplay, Ssd, StorageDeviceType, TpmState, UsbAddress,
+        UsbDeviceKind, VirtioNetPcie, VirtioScsiSingleDisk,
     };
 
     #[test]
@@ -434,7 +485,7 @@ mod tests {
                     .with_pcie_device(
                         Some(PcieAddress::new(0, 0)),
                         Arc::new(
-                            PvScsiBuilder::new()
+                            GenericScsiControllerBuilder::new()
                                 .with_scsi_device(Some(ScsiAddress::new(0, 0)), Arc::new(Ssd::new(String::new())))
                                 .build(),
                         ),
@@ -510,7 +561,7 @@ mod tests {
                     .with_pcie_device(
                         Some(PcieAddress::new(1, 0)),
                         Arc::new(
-                            PvScsiBuilder::new()
+                            GenericScsiControllerBuilder::new()
                                 .with_scsi_device(Some(ScsiAddress::new(2, 0)), Arc::new(Hdd::new(String::new())))
                                 .build(),
                         ),
@@ -560,6 +611,54 @@ mod tests {
         assert!(found_q35);
     }
 
+    #[test]
+    fn round_trip_q35_virtio_scsi_single_device() {
+        let runtime = RuntimeBuilder::new()
+            .with_memory(Memory::new(4096))
+            .with_chipset(Chipset::Q35(
+                Q35ChipsetBuilder::new()
+                    .with_pcie_device(
+                        Some(PcieAddress::new(16, 0)),
+                        Arc::new(VirtioScsiSingleDisk::new(
+                            "/dev/vm0/vm-301-boot".to_string(),
+                            StorageDeviceType::Ssd,
+                            0,
+                        )),
+                    )
+                    .build(),
+            ))
+            .build()
+            .expect("runtime build failed");
+
+        let schema = crate::config::ezkvm::ConfigSchema::try_from(runtime)
+            .expect("runtime -> schema conversion failed");
+        let round_tripped = Runtime::try_from(schema).expect("schema -> runtime conversion failed");
+
+        let chipset = round_tripped
+            .root_devices()
+            .iter()
+            .find(|d| d.device_kind() == RootDeviceKind::Chipset)
+            .expect("Chipset not found")
+            .as_any()
+            .downcast_ref::<Chipset>()
+            .expect("downcast to Chipset");
+        let q35 = match chipset {
+            Chipset::Q35(q) => q,
+            _ => panic!("expected Q35 chipset"),
+        };
+        let disk = q35
+            .pcie_bus()
+            .get(&PcieAddress::new(16, 0))
+            .expect("virtio-scsi-single device missing")
+            .as_any()
+            .downcast_ref::<VirtioScsiSingleDisk>()
+            .expect("downcast to VirtioScsiSingleDisk");
+
+        assert_eq!(disk.resource(), "/dev/vm0/vm-301-boot");
+        assert_eq!(disk.storage_type(), &StorageDeviceType::Ssd);
+        assert_eq!(disk.index(), &0);
+    }
+
     fn assert_runtime_has_memory_and_q35_counts(
         runtime: &Runtime,
         expected_memory: usize,
@@ -580,8 +679,8 @@ mod tests {
                     let pcie_count = q35.pcie_bus().len();
                     let mut scsi_count = 0usize;
                     for pcie_dev in q35.pcie_bus().values() {
-                        if pcie_dev.device_kind() == PcieBusDeviceKind::PvScsi {
-                            let pvscsi = pcie_dev.as_any().downcast_ref::<crate::runtime::PvScsi>().unwrap();
+                        if pcie_dev.device_kind() == PcieBusDeviceKind::ScsiController {
+                            let pvscsi = pcie_dev.as_any().downcast_ref::<crate::runtime::GenericScsiController>().unwrap();
                             scsi_count += pvscsi.scsi_bus().len();
                         }
                     }
@@ -866,7 +965,7 @@ mod tests {
                     .with_pcie_device(
                         Some(PcieAddress::new(16, 0)),
                         Arc::new(
-                            PvScsiBuilder::new()
+                            GenericScsiControllerBuilder::new()
                                 .with_scsi_device(
                                     Some(ScsiAddress::new(0, 0)),
                                     Arc::new(Ssd::new("/dev/vm1/vm-108-boot".to_string())),
@@ -898,7 +997,7 @@ mod tests {
         let pvscsi = q35
             .pcie_bus()
             .values()
-            .find_map(|d| d.as_any().downcast_ref::<crate::runtime::PvScsi>())
+            .find_map(|d| d.as_any().downcast_ref::<crate::runtime::GenericScsiController>())
             .expect("PvScsi not found");
         let ssd = pvscsi
             .scsi_bus()

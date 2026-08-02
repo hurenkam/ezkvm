@@ -6,10 +6,11 @@ use crate::config::proxmox::error::ProxmoxImportError;
 use crate::config::proxmox::storage::StorageResolver;
 use crate::config::proxmox::{ProxmoxDiskConf, ProxmoxStorageConf, ProxmoxVmConf};
 use crate::runtime::{
-    AudioDevice, Cdrom, Chipset, CpuTopology, EfiDisk, GenericUsbDevice, Hdd, HostPci, IdeAddress,
-    IdeDevice, Memory, PcieAddress, PvScsiBuilder, Q35ChipsetBuilder, RawArgs, RuntimeBuilder,
-    SataAddress, SataDevice, ScsiAddress, ScsiDevice, Ssd, TpmState, UsbAddress, UsbDeviceKind,
-    VgaConfig, VirtioNetPcie,
+    AudioDevice, Cdrom, Chipset, CpuTopology, EfiDisk, GenericScsiControllerBuilder,
+    GenericUsbDevice, Hdd, HostPci, IdeAddress, IdeDevice, Memory, PcieAddress,
+    Q35ChipsetBuilder, RawArgs, RuntimeBuilder, SataAddress, SataDevice, ScsiAddress,
+    ScsiControllerType, ScsiDevice, Ssd, StorageDeviceType, TpmState, UsbAddress, UsbDeviceKind,
+    UsbHostIdentity, VgaConfig, VirtioNetPcie, VirtioScsiSingleDisk,
 };
 
 pub struct ProxmoxImporter {
@@ -36,17 +37,36 @@ impl ProxmoxImporter {
 
         let resolver = StorageResolver::new(&self.storage_conf, self.vmid);
 
-        // Scsi disks → PvScsi on PCIe slot 16
-        let mut pvscsi_builder = PvScsiBuilder::new();
-        for (idx, disk_conf) in &self.vm_conf.scsi {
-            if !disk_conf.volume.contains(':') { continue; }
-            let resolved = resolver.resolve(&disk_conf.volume)?;
-            let device: Arc<dyn ScsiDevice> = classify_disk_scsi_resolved(disk_conf, resolved);
-            pvscsi_builder = pvscsi_builder
-                .with_scsi_device(Some(ScsiAddress::new(*idx, 0)), device);
+        // Scsi disks → either one shared controller or N merged virtio-scsi-single devices.
+        if self.vm_conf.scsihw.as_deref() == Some("virtio-scsi-single") {
+            for (idx, disk_conf) in &self.vm_conf.scsi {
+                if !disk_conf.volume.contains(':') { continue; }
+                let resolved = resolver.resolve(&disk_conf.volume)?;
+                let storage_type = classify_disk_storage_type(disk_conf);
+                chipset_builder = chipset_builder.with_pcie_device(
+                    Some(PcieAddress::new(16 + idx, 0)),
+                    Arc::new(VirtioScsiSingleDisk::new(resolved, storage_type, *idx)),
+                );
+            }
+        } else {
+            let controller_type = match self.vm_conf.scsihw.as_deref() {
+                Some("virtio-scsi-pci") => ScsiControllerType::VirtioScsiPci,
+                Some("pvscsi") | None | Some(_) => ScsiControllerType::PvScsi,
+            };
+            let mut scsi_controller_builder = GenericScsiControllerBuilder::new()
+                .with_controller_type(controller_type);
+            for (idx, disk_conf) in &self.vm_conf.scsi {
+                if !disk_conf.volume.contains(':') { continue; }
+                let resolved = resolver.resolve(&disk_conf.volume)?;
+                let device: Arc<dyn ScsiDevice> = classify_disk_scsi_resolved(disk_conf, resolved);
+                scsi_controller_builder = scsi_controller_builder
+                    .with_scsi_device(Some(ScsiAddress::new(*idx, 0)), device);
+            }
+            chipset_builder = chipset_builder.with_pcie_device(
+                Some(PcieAddress::new(16, 0)),
+                Arc::new(scsi_controller_builder.build()),
+            );
         }
-        chipset_builder = chipset_builder
-            .with_pcie_device(Some(PcieAddress::new(16, 0)), Arc::new(pvscsi_builder.build()));
 
         // Sata disks
         for (idx, disk_conf) in &self.vm_conf.sata {
@@ -117,8 +137,9 @@ impl ProxmoxImporter {
 
         // USB devices (D-01 import-side completion)
         for (idx, usb_conf) in &self.vm_conf.usb {
+            let identity = UsbHostIdentity::parse(&usb_conf.host)?;
             let generic = GenericUsbDevice::new(UsbDeviceKind::HostPassthrough {
-                resource: usb_conf.host.clone(),
+                identity,
             });
             chipset_builder = chipset_builder
                 .with_usb_device(Some(UsbAddress::new(idx.to_string())), Arc::new(generic));
@@ -203,13 +224,21 @@ fn is_ssd(disk_conf: &ProxmoxDiskConf) -> bool {
     disk_conf.options.get("ssd").map(|v| v == "1").unwrap_or(false)
 }
 
-fn classify_disk_scsi_resolved(disk_conf: &ProxmoxDiskConf, resource: String) -> Arc<dyn ScsiDevice> {
+fn classify_disk_storage_type(disk_conf: &ProxmoxDiskConf) -> StorageDeviceType {
     if is_cdrom(disk_conf) {
-        Arc::new(Cdrom::new(resource))
+        StorageDeviceType::Odd
     } else if is_ssd(disk_conf) {
-        Arc::new(Ssd::new(resource))
+        StorageDeviceType::Ssd
     } else {
-        Arc::new(Hdd::new(resource))
+        StorageDeviceType::Hdd
+    }
+}
+
+fn classify_disk_scsi_resolved(disk_conf: &ProxmoxDiskConf, resource: String) -> Arc<dyn ScsiDevice> {
+    match classify_disk_storage_type(disk_conf) {
+        StorageDeviceType::Odd => Arc::new(Cdrom::new(resource)),
+        StorageDeviceType::Ssd => Arc::new(Ssd::new(resource)),
+        StorageDeviceType::Hdd => Arc::new(Hdd::new(resource)),
     }
 }
 
@@ -238,7 +267,10 @@ mod tests {
     use super::*;
     use std::str::FromStr;
     use crate::config::proxmox::{ProxmoxVmConf, ProxmoxStorageConf};
-    use crate::runtime::RootDeviceKind;
+    use crate::runtime::{
+        Chipset, GenericScsiController, PcieAddress, PcieBusDeviceKind, RootDeviceKind,
+        ScsiControllerType, StorageDeviceType, VirtioScsiSingleDisk,
+    };
 
     fn make_importer(conf_str: &str) -> ProxmoxImporter {
         let vm_conf = ProxmoxVmConf::from_str(conf_str).unwrap();
@@ -284,7 +316,7 @@ mod tests {
         let chipset = runtime.root_devices().iter()
             .find(|d| d.device_kind() == crate::runtime::RootDeviceKind::Chipset)
             .expect("Chipset not found");
-        use crate::runtime::{Chipset, Q35Chipset};
+        use crate::runtime::Chipset;
         let chipset = chipset.as_any().downcast_ref::<Chipset>().unwrap();
         let q35 = match chipset {
             Chipset::Q35(q) => q,
@@ -295,6 +327,90 @@ mod tests {
             .expect("HostPci not found in pcie_bus");
         assert_eq!(host_pci.base_bdf(), "0000:03:00");
         assert_eq!(*host_pci.functions(), vec![0u8, 1u8]);
+    }
+
+    #[test]
+    fn test_08_01_importer_maps_virtio_scsi_pci_to_controller_type() {
+        let conf = "machine: pc-q35-8.1\nmemory: 4096\nscsihw: virtio-scsi-pci\nscsi0: vm1-pool:vm-108-disk-0,ssd=1\n";
+        let importer = make_importer(conf);
+        let runtime = importer.into_runtime().unwrap();
+        let chipset = runtime.root_devices().iter()
+            .find(|d| d.device_kind() == RootDeviceKind::Chipset)
+            .expect("Chipset not found")
+            .as_any()
+            .downcast_ref::<Chipset>()
+            .expect("downcast to Chipset");
+        let q35 = match chipset {
+            Chipset::Q35(q) => q,
+            _ => panic!("expected Q35"),
+        };
+        let scsi_controller = q35.pcie_bus()
+            .get(&PcieAddress::new(16, 0))
+            .expect("scsi controller not at PcieAddress(16,0)")
+            .as_any()
+            .downcast_ref::<GenericScsiController>()
+            .expect("downcast to GenericScsiController");
+
+        assert_eq!(
+            scsi_controller.controller_type(),
+            &ScsiControllerType::VirtioScsiPci
+        );
+    }
+
+    #[test]
+    fn test_08_01_importer_defaults_missing_scsihw_to_pvscsi() {
+        let conf = "machine: pc-q35-8.1\nmemory: 4096\nscsi0: vm1-pool:vm-108-disk-0,ssd=1\n";
+        let importer = make_importer(conf);
+        let runtime = importer.into_runtime().unwrap();
+        let chipset = runtime.root_devices().iter()
+            .find(|d| d.device_kind() == RootDeviceKind::Chipset)
+            .expect("Chipset not found")
+            .as_any()
+            .downcast_ref::<Chipset>()
+            .expect("downcast to Chipset");
+        let q35 = match chipset {
+            Chipset::Q35(q) => q,
+            _ => panic!("expected Q35"),
+        };
+        let scsi_controller = q35.pcie_bus()
+            .get(&PcieAddress::new(16, 0))
+            .expect("scsi controller not at PcieAddress(16,0)")
+            .as_any()
+            .downcast_ref::<GenericScsiController>()
+            .expect("downcast to GenericScsiController");
+
+        assert_eq!(scsi_controller.controller_type(), &ScsiControllerType::PvScsi);
+    }
+
+    #[test]
+    fn test_08_01_importer_virtio_scsi_single_creates_per_disk_devices() {
+        let conf = "machine: pc-q35-8.1\nmemory: 4096\nscsihw: virtio-scsi-single\nscsi0: vm1-pool:vm-108-disk-0,ssd=1\nscsi1: vm1-pool:vm-108-disk-1\n";
+        let importer = make_importer(conf);
+        let runtime = importer.into_runtime().unwrap();
+        let chipset = runtime.root_devices().iter()
+            .find(|d| d.device_kind() == RootDeviceKind::Chipset)
+            .expect("Chipset not found")
+            .as_any()
+            .downcast_ref::<Chipset>()
+            .expect("downcast to Chipset");
+        let q35 = match chipset {
+            Chipset::Q35(q) => q,
+            _ => panic!("expected Q35"),
+        };
+
+        assert_eq!(q35.pcie_bus().len(), 2);
+        for (slot, expected_type) in [(16, StorageDeviceType::Ssd), (17, StorageDeviceType::Hdd)] {
+            let disk = q35.pcie_bus()
+                .get(&PcieAddress::new(slot, 0))
+                .expect("virtio-scsi-single device missing");
+            assert_eq!(disk.device_kind(), PcieBusDeviceKind::VirtioScsiSingleDisk);
+            let disk = disk
+                .as_any()
+                .downcast_ref::<VirtioScsiSingleDisk>()
+                .expect("downcast to VirtioScsiSingleDisk");
+            assert_eq!(disk.index(), &(slot - 16));
+            assert_eq!(disk.storage_type(), &expected_type);
+        }
     }
 
     #[test]
@@ -392,8 +508,45 @@ mod tests {
             .expect("GenericUsbDevice not found in usb_bus");
         assert_eq!(
             generic.kind(),
-            &UsbDeviceKind::HostPassthrough { resource: "1-2.2".to_string() }
+            &UsbDeviceKind::HostPassthrough {
+                identity: UsbHostIdentity::BusPort {
+                    bus: "1".to_string(),
+                    port: "2.2".to_string(),
+                },
+            }
         );
+    }
+
+    #[test]
+    fn test_07_03_usb_vendor_product_parsed_into_usb_bus_host_passthrough() {
+        let conf = "machine: pc-q35-8.1\nmemory: 4096\nusb4: host=0451:16a0\n";
+        let importer = make_importer(conf);
+        let runtime = importer.into_runtime().unwrap();
+        let q35 = q35_chipset(&runtime);
+
+        let generic = q35.usb_bus().values()
+            .find_map(|d| d.as_any().downcast_ref::<GenericUsbDevice>())
+            .expect("GenericUsbDevice not found in usb_bus");
+        assert_eq!(
+            generic.kind(),
+            &UsbDeviceKind::HostPassthrough {
+                identity: UsbHostIdentity::VendorProduct {
+                    vendor_id: "0451".to_string(),
+                    product_id: "16a0".to_string(),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn test_07_03_usb_malformed_host_identity_returns_typed_error() {
+        let conf = "machine: pc-q35-8.1\nmemory: 4096\nusb0: host=garbage\n";
+        let importer = make_importer(conf);
+
+        assert!(matches!(
+            importer.into_runtime(),
+            Err(ProxmoxImportError::MalformedUsbHostIdentity { raw }) if raw == "garbage"
+        ));
     }
 
     #[test]

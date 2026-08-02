@@ -1,12 +1,14 @@
 use crate::config::qemu::QemuCommandLineBuilder;
-use crate::runtime::{GenericPciDevice, PciBusDeviceKind, PciDevice, PciDeviceKind, PvScsi};
+use crate::runtime::{
+    GenericPciDevice, GenericScsiController, PciBusDeviceKind, PciDevice, PciDeviceKind,
+};
 
 /// Dispatch over both `PciBusDeviceKind` variants a `Q35Chipset.pci_bus` entry can hold.
 ///
-/// The `PvScsi` arm calls `handlers::pcie::emit_pvscsi` directly rather than reimplementing
-/// the controller+scsi_bus-recursion logic (D-01 "shared, not rebuilt" pattern) — a `PvScsi`
-/// found on `pci_bus` emits identically to one found on `pcie_bus`. `boot_order` is forwarded
-/// unmodified to `emit_pvscsi` (Plan 07-04, D-07).
+/// The `PvScsi` arm calls `handlers::pcie::emit_scsi_controller` directly rather than
+/// reimplementing the controller+scsi_bus-recursion logic (D-01 "shared, not rebuilt"
+/// pattern) — a `PvScsi` found on `pci_bus` emits identically to one found on `pcie_bus`.
+/// `boot_order` is forwarded unmodified to `emit_scsi_controller` (Plan 07-04, D-07).
 pub(crate) fn emit_pci_device(
     builder: &mut QemuCommandLineBuilder,
     device: &dyn PciDevice,
@@ -25,8 +27,15 @@ pub(crate) fn emit_pci_device(
             ));
         }
         PciBusDeviceKind::PvScsi => {
-            let pvscsi = device.as_any().downcast_ref::<PvScsi>().unwrap();
-            crate::config::qemu::handlers::pcie::emit_pvscsi(builder, pvscsi, boot_order);
+            let scsi_controller = device
+                .as_any()
+                .downcast_ref::<GenericScsiController>()
+                .unwrap();
+            crate::config::qemu::handlers::pcie::emit_scsi_controller(
+                builder,
+                scsi_controller,
+                boot_order,
+            );
         }
     }
 }
@@ -34,7 +43,7 @@ pub(crate) fn emit_pci_device(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::{Ssd, PvScsiBuilder, ScsiAddress};
+    use crate::runtime::{GenericScsiControllerBuilder, ScsiAddress, Ssd};
     use std::sync::Arc;
 
     #[test]
@@ -49,7 +58,7 @@ mod tests {
 
     #[test]
     fn test_07_03_pvscsi_on_pci_bus_reuses_emit_pvscsi() {
-        let pvscsi = PvScsiBuilder::new()
+        let scsi_controller = GenericScsiControllerBuilder::new()
             .with_scsi_device(
                 Some(ScsiAddress::new(0, 0)),
                 Arc::new(Ssd::new("/dev/vm1/vm-108-boot".to_string())),
@@ -57,7 +66,7 @@ mod tests {
             .build();
 
         let mut builder = QemuCommandLineBuilder::new();
-        emit_pci_device(&mut builder, &pvscsi, &[]);
+        emit_pci_device(&mut builder, &scsi_controller, &[]);
         let output = builder.build().to_string();
 
         assert!(output.contains("pvscsi,id=scsihw0"), "output was: {output}");

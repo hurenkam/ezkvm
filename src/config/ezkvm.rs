@@ -1,9 +1,10 @@
-mod runtime;
-mod schema;
+pub mod runtime;
+pub mod schema;
 mod file;
 
 #[allow(unused_imports)]
 pub use {schema::ConfigSchema, file::ConfigFileStore};
+pub use {runtime::Builder};
 
 /*
 use crate::{
